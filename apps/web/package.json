@@ -12,7 +12,10 @@
     "test": "node --import tsx --test src/**/*.test.ts"
   },
   "dependencies": {
+    "@coppergate/config": "workspace:*",
     "@coppergate/db": "workspace:*",
+    "@coppergate/errors": "workspace:*",
+    "@coppergate/telemetry": "workspace:*",
     "next": "^15.3.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["DATABASE_URL", "REDIS_URL", "LOG_LEVEL", "OTEL_ENABLED", "NODE_ENV"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

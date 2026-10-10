@@ -13,6 +13,9 @@ apps/
   web/                 # Next.js UI + BFF (/health, /ready)
   worker/              # Job poller stub
 packages/
+  config/              # Zod env schema (fail-fast)
+  telemetry/           # Structured logs + OTel stubs
+  errors/              # API error envelope
   db/                  # Drizzle schema + migrations
   eslint-config/
   typescript-config/
@@ -59,7 +62,7 @@ pnpm --filter @coppergate/worker dev
 
 ## Status
 
-**TASK001** scaffold complete (monorepo, CI, migrations, health/ready). Next: TASK002 (config / telemetry / error shape).
+**TASK001** scaffold + **TASK002** config/telemetry/errors complete. Next: TASK003 (GitHub OAuth session).
 
 ## Related repos
 

@@ -12,7 +12,9 @@
     "test": "node --import tsx --test src/**/*.test.ts"
   },
   "dependencies": {
-    "@coppergate/db": "workspace:*"
+    "@coppergate/config": "workspace:*",
+    "@coppergate/db": "workspace:*",
+    "@coppergate/telemetry": "workspace:*"
   },
   "devDependencies": {
     "@coppergate/eslint-config": "workspace:*",

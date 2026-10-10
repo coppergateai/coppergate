@@ -1,0 +1,27 @@
+{
+  "name": "@coppergate/errors",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "prepare": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@coppergate/eslint-config": "workspace:*",
+    "@coppergate/typescript-config": "workspace:*",
+    "@types/node": "^22.15.21",
+    "eslint": "^9.27.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
