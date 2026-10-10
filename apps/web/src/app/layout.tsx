@@ -15,9 +15,9 @@ export const viewport: Viewport = {
 const siteUrl =
   process.env.APP_URL?.replace(/\/$/, "") || "https://www.coppergate.ai";
 
-const title = "Coppergate — From idea to reviewed PR";
+const title = "Coppergate — Agents compete. Survivors ship.";
 const description =
-  "An AI product studio that plans, codes, and opens pull requests with evidence — you open the gate for what ships.";
+  "An autonomous multi-agent arena. Contenders race, critics score, fitness decides — you set the budget and hold the kill-switch.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -28,12 +28,13 @@ export const metadata: Metadata = {
   description,
   applicationName: "Coppergate",
   keywords: [
-    "AI product studio",
-    "pull requests",
+    "autonomous agents",
+    "multi-agent arena",
+    "AI agents",
+    "Survivor agents",
     "GitHub",
     "AI coding",
-    "software delivery",
-    "code review",
+    "agent orchestration",
   ],
   authors: [{ name: "Coppergate", url: siteUrl }],
   creator: "Coppergate",

@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./landing.module.css";
 
 const events = [
-  { t: "14:02", label: "brief.approved" },
-  { t: "14:11", label: "checks.passed" },
-  { t: "14:12", label: "pr.opened" },
-  { t: "14:13", label: "review.required" },
+  { t: "14:02", label: "arena.armed" },
+  { t: "14:11", label: "tournament.scored" },
+  { t: "14:12", label: "fitness.passed" },
+  { t: "14:13", label: "contender.eliminated" },
 ] as const;
 
 export function ProductBoard() {
@@ -49,29 +49,29 @@ export function ProductBoard() {
       <div className={styles.productInner}>
         <div className={styles.productIntro}>
           <h2 id="product-title" className={styles.productTitle}>
-            Delivery you can verify.
+            Fitness you can verify.
           </h2>
           <p className={styles.productLede}>
-            Not another chat thread — a PR with checks, cost, and a merge gate
-            under your hand.
+            Not another chat thread — contenders, critic scores, CI, and cost.
+            Survivors promote with evidence.
           </p>
         </div>
 
         <div className={styles.board} aria-hidden="true">
           <div className={styles.boardRail}>
             <span className={`${styles.boardStep} ${styles.boardStep1}`}>
-              <em>01</em> Idea
+              <em>01</em> Arena
             </span>
             <span className={`${styles.boardStep} ${styles.boardStep2}`}>
-              <em>02</em> Brief
+              <em>02</em> Tournament
             </span>
             <span className={`${styles.boardStep} ${styles.boardStep3}`}>
-              <em>03</em> PR + CI
+              <em>03</em> Fitness
             </span>
             <span
               className={`${styles.boardStep} ${styles.boardStepActive} ${styles.boardStep4}`}
             >
-              <em>04</em> You open the gate
+              <em>04</em> Survive to ship
             </span>
           </div>
 
@@ -100,8 +100,8 @@ export function ProductBoard() {
               <span className={styles.diffFiles}>12 files</span>
             </div>
             <div className={styles.prGate}>
-              <span>Merge locked</span>
-              <span className={styles.prGateAction}>Awaiting your approval</span>
+              <span>Fitness passed</span>
+              <span className={styles.prGateAction}>Survivor promoted</span>
             </div>
           </div>
 

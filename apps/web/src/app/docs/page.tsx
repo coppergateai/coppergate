@@ -3,7 +3,8 @@ import { SiteChrome } from "../site-chrome";
 
 export const metadata = {
   title: "Docs · Coppergate",
-  description: "Public beta docs — supported stack, limitations, pricing intent.",
+  description:
+    "Private beta docs for the Coppergate Survivor arena — stack, limitations, pricing intent.",
 };
 
 export default function DocsIndexPage() {
@@ -11,14 +12,15 @@ export default function DocsIndexPage() {
     <SiteChrome>
       <main style={{ maxWidth: 640, margin: "0 auto", padding: "3rem 1.5rem 4rem" }}>
         <p style={{ margin: 0, color: "#A3A3A3", fontSize: "0.875rem" }}>
-          Public beta
+          Private beta
         </p>
         <h1 style={{ margin: "0.5rem 0 0.75rem", fontSize: "2rem", fontWeight: 600 }}>
           Documentation
         </h1>
         <p style={{ margin: 0, color: "#A3A3A3", lineHeight: 1.5 }}>
-          Self-serve guides for pilot users. No Discord required for the supported
-          happy path.
+          Guides for design partners. North star is the Survivor arena; today&apos;s
+          wedge is GitHub-native fitness (branch/PR + CI) with spend caps and a
+          kill-switch.
         </p>
 
         <ul style={{ listStyle: "none", padding: 0, margin: "2rem 0 0" }}>
@@ -26,22 +28,22 @@ export default function DocsIndexPage() {
             {
               href: "/docs/supported-stack",
               title: "Supported stack",
-              detail: "nextjs_ts template, auth, agent, and delivery modes",
+              detail: "Arena surface: nextjs_ts, GitHub auth, fitness delivery",
             },
             {
               href: "/docs/limitations",
               title: "Limitations & non-goals",
-              detail: "What Coppergate will not do in this pilot",
+              detail: "Wedge limits vs Survivor north star — what we will not do",
             },
             {
               href: "/docs/pricing",
               title: "Pricing intent",
-              detail: "How we think about pilots and paid conversion",
+              detail: "Arena budgets, cost per survivor PR, paid pilots",
             },
             {
               href: "/security",
               title: "Security",
-              detail: "Approvals, sandbox posture, credential handling",
+              detail: "Fitness gates, spend caps, kill-switch, credentials",
             },
           ].map((item) => (
             <li

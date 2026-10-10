@@ -6,7 +6,7 @@ import styles from "../landing.module.css";
 export const metadata: Metadata = {
   title: "Security",
   description:
-    "How Coppergate keeps merge under your control — GitHub identity, human approval, and evidence before ship.",
+    "How Coppergate keeps autonomy accountable — GitHub identity, fitness gates, spend caps, and a kill-switch.",
   alternates: { canonical: "/security" },
 };
 
@@ -16,16 +16,20 @@ export default function SecurityPage() {
       <article className={styles.legal}>
         <h1 className={styles.legalTitle}>Security</h1>
         <p className={styles.legalUpdated}>
-          How approvals and access work in private beta
+          How autonomy, access, and kill-switches work in private beta
         </p>
 
         <div className={styles.legalBody}>
           <section>
-            <h2>Human approval is the gate</h2>
+            <h2>Fitness is the gate</h2>
             <p>
-              Coppergate can plan work and open pull requests, but merge stays
-              locked until you approve. Shipping is always a human decision —
-              not an autonomous side effect of a chat thread.
+              Coppergate&apos;s north star is an autonomous Survivor arena:
+              contenders compete and promote through critic scores, tests, and
+              CI. You are not meant to approve every micro-step. You set policy
+              and spend caps, and you hold a kill-switch. Private beta ships a
+              GitHub fitness wedge first (PR + checks + budgets); production and
+              default-branch writes stay policy-gated (off until you enable
+              them).
             </p>
           </section>
 

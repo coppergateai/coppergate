@@ -1,10 +1,10 @@
 import styles from "./landing.module.css";
 
 const chips = [
-  "GitHub-native",
-  "Human approval",
-  "Cost visible",
-  "CI evidence",
+  "Autonomous arena",
+  "Tournament + elimination",
+  "Fitness gate",
+  "Kill-switch",
 ] as const;
 
 export function TrustStrip() {

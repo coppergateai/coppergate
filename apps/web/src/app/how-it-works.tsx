@@ -3,30 +3,30 @@ import styles from "./landing.module.css";
 const steps = [
   {
     n: "01",
-    title: "Idea",
-    body: "Drop a brief outcome. Coppergate turns it into a structured product brief you can approve.",
-    cue: "Raw idea → scoped brief",
+    title: "Set the arena",
+    body: "Drop a goal, policy, and spend cap. Coppergate spins up contenders — you are not the referee.",
+    cue: "Goal · policy · budget",
     visual: "idea" as const,
   },
   {
     n: "02",
-    title: "Plan",
-    body: "A task graph with clear acceptance criteria — not an unbounded chat thread.",
-    cue: "Tasks · criteria · budget",
+    title: "Contenders race",
+    body: "Multiple agents attack the same work in parallel. Weak paths burn budget; strong paths keep going.",
+    cue: "N agents · shared task",
     visual: "plan" as const,
   },
   {
     n: "03",
-    title: "PR + CI",
-    body: "Agents open a pull request with diffs, tests, and cost attached as evidence.",
-    cue: "Diff · checks · $ spend",
+    title: "Fitness gate",
+    body: "Critics score. CI and tests decide. The winner promotes with evidence — losers starve.",
+    cue: "Critic · CI · elimination",
     visual: "pr" as const,
   },
   {
     n: "04",
-    title: "You open the gate",
-    body: "Merge stays locked until you approve. Shipping remains a human decision.",
-    cue: "Approval required",
+    title: "Survive to ship",
+    body: "Survivors ship through the fitness gate. You hold the kill-switch and production policy — not every merge click.",
+    cue: "Kill-switch · policy",
     visual: "gate" as const,
   },
 ] as const;
@@ -35,20 +35,20 @@ function StepVisual({ kind }: { kind: (typeof steps)[number]["visual"] }) {
   if (kind === "idea") {
     return (
       <div className={styles.howVisual}>
-        <span className={styles.howVisualLabel}>Brief</span>
+        <span className={styles.howVisualLabel}>Arena</span>
         <p className={styles.howVisualLine}>“Ship a subscription tracker MVP”</p>
-        <span className={styles.howVisualMeta}>Awaiting structure…</span>
+        <span className={styles.howVisualMeta}>Budget $50 · kill-switch armed</span>
       </div>
     );
   }
   if (kind === "plan") {
     return (
       <div className={styles.howVisual}>
-        <span className={styles.howVisualLabel}>Plan</span>
+        <span className={styles.howVisualLabel}>Tournament</span>
         <ul className={styles.howVisualList}>
-          <li>Auth + billing hooks</li>
-          <li>Tracker list UI</li>
-          <li>Acceptance tests</li>
+          <li>Contender A · running</li>
+          <li>Contender B · running</li>
+          <li>Contender C · budget low</li>
         </ul>
       </div>
     );
@@ -56,20 +56,20 @@ function StepVisual({ kind }: { kind: (typeof steps)[number]["visual"] }) {
   if (kind === "pr") {
     return (
       <div className={styles.howVisual}>
-        <span className={styles.howVisualLabel}>Pull request</span>
+        <span className={styles.howVisualLabel}>Fitness</span>
         <p className={styles.howVisualLine}>
           <span className={styles.howVisualPass}>CI</span>
-          <span className={styles.howVisualCost}>$1.84</span>
+          <span className={styles.howVisualCost}>critic 0.91</span>
         </p>
-        <span className={styles.howVisualMeta}>+182 −14 · 12 files</span>
+        <span className={styles.howVisualMeta}>Winner → promote · 2 eliminated</span>
       </div>
     );
   }
   return (
     <div className={`${styles.howVisual} ${styles.howVisualGate}`}>
       <span className={styles.howVisualLabel}>Gate</span>
-      <p className={styles.howVisualLine}>Merge locked</p>
-      <span className={styles.howVisualMeta}>Your approval required</span>
+      <p className={styles.howVisualLine}>Fitness passed</p>
+      <span className={styles.howVisualMeta}>Kill-switch ready</span>
     </div>
   );
 }
@@ -85,11 +85,11 @@ export function HowItWorks() {
         <header className={styles.howIntro}>
           <p className={styles.howEyebrow}>How it works</p>
           <h2 id="how-title" className={styles.howTitle}>
-            A controlled path from brief to PR.
+            A Survivor loop, not an approval inbox.
           </h2>
           <p className={styles.howLede}>
-            Four gates. Each one leaves evidence you can inspect before anything
-            ships.
+            Contenders compete. Critics score. Fitness decides who ships — and
+            who gets eliminated.
           </p>
         </header>
 

@@ -20,9 +20,9 @@ export default function PrivacyPage() {
           <section>
             <h2>Who we are</h2>
             <p>
-              Coppergate (“we”, “us”) is a private-beta AI product studio that
-              plans work, opens pull requests on GitHub, and keeps merge under
-              your control. Contact:{" "}
+              Coppergate (“we”, “us”) is a private-beta autonomous multi-agent
+              arena that runs competitive agent work against GitHub fitness
+              signals, with spend caps and a kill-switch. Contact:{" "}
               <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
             </p>
           </section>
@@ -60,9 +60,9 @@ export default function PrivacyPage() {
               <li>Improve reliability, prevent abuse, and meet legal obligations</li>
             </ul>
             <p>
-              We do not sell your personal information. Human approval remains
-              required before merge; we process repository access only as needed
-              to deliver the product features you enable.
+              We do not sell your personal information. Production writes stay
+              policy-gated; we process repository access only as needed to
+              deliver the arena features you enable.
             </p>
           </section>
 

@@ -1,5 +1,7 @@
 import {
   bigint,
+  boolean,
+  doublePrecision,
   index,
   integer,
   pgTable,
@@ -306,7 +308,103 @@ export const tasks = pgTable(
   ],
 );
 
-/** Agent execution jobs — TASK013 queue + lease. */
+/** Survivor arena per project — TASK048 / ARENA.md. */
+export const arenas = pgTable(
+  "arenas",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    minHuman: boolean("min_human").notNull().default(false),
+    prodWritesEnabled: boolean("prod_writes_enabled").notNull().default(false),
+    defaultContenderN: integer("default_contender_n").notNull().default(2),
+    /** ARMED | RUNNING | KILLED | PAUSED */
+    status: text("status").notNull().default("ARMED"),
+    killedAt: timestamp("killed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("arenas_project_id_uidx").on(t.projectId),
+    index("arenas_workspace_id_idx").on(t.workspaceId),
+  ],
+);
+
+/** Contender in an arena pool — TASK048. */
+export const contenders = pgTable(
+  "contenders",
+  {
+    id: uuid("id").primaryKey(),
+    arenaId: uuid("arena_id")
+      .notNull()
+      .references(() => arenas.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    profileKey: text("profile_key").notNull().default("engineer"),
+    budgetMicrosRemaining: bigint("budget_micros_remaining", { mode: "number" })
+      .notNull()
+      .default(0),
+    /** ACTIVE | ELIMINATED */
+    status: text("status").notNull().default("ACTIVE"),
+    eliminatedAt: timestamp("eliminated_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("contenders_arena_id_idx").on(t.arenaId),
+    index("contenders_workspace_id_idx").on(t.workspaceId),
+  ],
+);
+
+/** Tournament round for a task — TASK048. */
+export const tournaments = pgTable(
+  "tournaments",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    arenaId: uuid("arena_id")
+      .notNull()
+      .references(() => arenas.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    n: integer("n").notNull().default(2),
+    winnerRunId: uuid("winner_run_id"),
+    /** OPEN | SCORING | RESOLVED | CANCELLED */
+    status: text("status").notNull().default("OPEN"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("tournaments_task_id_idx").on(t.taskId),
+    index("tournaments_arena_id_idx").on(t.arenaId),
+    index("tournaments_workspace_id_idx").on(t.workspaceId),
+  ],
+);
+
+/** Agent execution jobs — TASK013 queue + lease · TASK048 tournament fields. */
 export const agentRuns = pgTable(
   "agent_runs",
   {
@@ -348,6 +446,16 @@ export const agentRuns = pgTable(
     cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
+    tournamentId: uuid("tournament_id").references(() => tournaments.id, {
+      onDelete: "set null",
+    }),
+    contenderId: uuid("contender_id").references(() => contenders.id, {
+      onDelete: "set null",
+    }),
+    fitnessScore: doublePrecision("fitness_score"),
+    fitnessEvidenceRef: text("fitness_evidence_ref"),
+    /** WINNER | LOSER | CANCELLED */
+    tournamentResult: text("tournament_result"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -362,6 +470,8 @@ export const agentRuns = pgTable(
     ),
     index("agent_runs_claimable_idx").on(t.status, t.leaseUntil, t.createdAt),
     index("agent_runs_task_id_idx").on(t.taskId),
+    index("agent_runs_tournament_id_idx").on(t.tournamentId),
+    index("agent_runs_contender_id_idx").on(t.contenderId),
   ],
 );
 
@@ -679,12 +789,20 @@ export type TaskStatusTransition = typeof taskStatusTransitions.$inferSelect;
 export type Approval = typeof approvals.$inferSelect;
 export type Budget = typeof budgets.$inferSelect;
 export type UsageEvent = typeof usageEvents.$inferSelect;
+export type Arena = typeof arenas.$inferSelect;
+export type Contender = typeof contenders.$inferSelect;
+export type Tournament = typeof tournaments.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type AgentRunEvent = typeof agentRunEvents.$inferSelect;
 export type Artifact = typeof artifacts.$inferSelect;
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
 export type PilotInvite = typeof pilotInvites.$inferSelect;
 export type GithubWebhookDelivery = typeof githubWebhookDeliveries.$inferSelect;
+
+export type ArenaStatus = "ARMED" | "RUNNING" | "KILLED" | "PAUSED";
+export type ContenderStatus = "ACTIVE" | "ELIMINATED";
+export type TournamentStatus = "OPEN" | "SCORING" | "RESOLVED" | "CANCELLED";
+export type TournamentResult = "WINNER" | "LOSER" | "CANCELLED";
 
 export type AutonomyLevel = "L0" | "L1" | "L2";
 export type WorkspaceStatus = "active" | "suspended" | "deleted";
