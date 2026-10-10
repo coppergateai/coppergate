@@ -4,6 +4,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import styles from "./landing.module.css";
 
+const events = [
+  { t: "14:02", label: "brief.approved" },
+  { t: "14:11", label: "checks.passed" },
+  { t: "14:12", label: "pr.opened" },
+  { t: "14:13", label: "review.required" },
+] as const;
+
 export function ProductBoard() {
   const ref = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
@@ -35,18 +42,18 @@ export function ProductBoard() {
   return (
     <section
       ref={ref}
+      id="evidence"
       className={`${styles.product} ${visible ? styles.productVisible : ""}`}
       aria-labelledby="product-title"
     >
       <div className={styles.productInner}>
         <div className={styles.productIntro}>
-          <p className={styles.productEyebrow}>Verified delivery</p>
           <h2 id="product-title" className={styles.productTitle}>
             Delivery you can verify.
           </h2>
           <p className={styles.productLede}>
-            Not another chat thread. A controlled path from brief to a passing
-            pull request — with cost, checks, and merge under your hand.
+            Not another chat thread — a PR with checks, cost, and a merge gate
+            under your hand.
           </p>
         </div>
 
@@ -97,16 +104,22 @@ export function ProductBoard() {
               <span className={styles.prGateAction}>Awaiting your approval</span>
             </div>
           </div>
+
+          <ol className={styles.boardTrace}>
+            {events.map((event) => (
+              <li key={event.label}>
+                <time>{event.t}</time>
+                <code>{event.label}</code>
+              </li>
+            ))}
+          </ol>
         </div>
 
-        <div className={styles.productCta}>
-          <p className={styles.productCtaLede}>
-            Ready to put delivery behind a gate?
-          </p>
-          <Link className={styles.productCtaBtn} href="/#early-access">
-            Request access
+        <p className={styles.productCta}>
+          <Link className={styles.productCtaLink} href="/#early-access">
+            Request access →
           </Link>
-        </div>
+        </p>
       </div>
     </section>
   );

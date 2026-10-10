@@ -34,8 +34,7 @@ export function SiteFooter() {
               <Link href="/#how-it-works">How it works</Link>
               <Link href="/#features">Features</Link>
               <Link href="/#product-title">Delivery</Link>
-              <Link href="/#cost">Cost control</Link>
-              <Link href="/#governance">Governance</Link>
+              <Link href="/#control">Cost &amp; control</Link>
               <Link href="/#evidence">Evidence</Link>
               <Link href="/#faq">FAQ</Link>
             </nav>
