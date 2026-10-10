@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: coppergate
+          POSTGRES_PASSWORD: coppergate
+          POSTGRES_DB: coppergate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U coppergate -d coppergate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://coppergate:coppergate@localhost:5432/coppergate
+      # CI service maps container 5432 → host 5432 (no local Postgres conflict)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Migrate
+        run: pnpm db:migrate
+
+      - name: Migrate down then up
+        run: |
+          pnpm db:migrate:down
+          pnpm db:migrate

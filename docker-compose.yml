@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      # Host 5433 avoids clashing with a local Postgres on 5432
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: coppergate
+      POSTGRES_PASSWORD: coppergate
+      POSTGRES_DB: coppergate
+    volumes:
+      - coppergate_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coppergate -d coppergate"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - coppergate_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  coppergate_pg:
+  coppergate_redis:

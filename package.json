@@ -1,0 +1,22 @@
+{
+  "name": "coppergate",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:generate": "pnpm --filter @coppergate/db generate",
+    "db:migrate": "pnpm --filter @coppergate/db migrate",
+    "db:migrate:down": "pnpm --filter @coppergate/db migrate:down"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  }
+}

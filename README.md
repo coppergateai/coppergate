@@ -4,26 +4,67 @@ AI-native product execution platform — idea → brief → plan → isolated co
 
 **Slogan:** Build inside the gate. Ship when you open it.
 
-This is the product monorepo. Planning and ADRs live in [`coppergate-architecture`](https://github.com/coppergateai/coppergate-architecture) (private).
+Product monorepo. Planning / ADRs: [`coppergate-architecture`](https://github.com/coppergateai/coppergate-architecture) (private).
 
 ## Layout
 
 ```text
 apps/
-  web/                 # Next.js UI + BFF
-  worker/              # Job poller / run executor
-packages/              # domain, db, policy, github, agents, sandbox, llm, …
+  web/                 # Next.js UI + BFF (/health, /ready)
+  worker/              # Job poller stub
+packages/
+  db/                  # Drizzle schema + migrations
+  eslint-config/
+  typescript-config/
+  coppergate/          # npm name reserve (placeholder)
 ```
 
-Scaffold lands in **TASK001** (see architecture backlog). Do not invent APIs that conflict with `coppergate-architecture` docs.
+## Prerequisites
+
+- Node.js **22+**
+- [pnpm](https://pnpm.io) 9 (`corepack enable && corepack prepare pnpm@9.15.9 --activate`)
+- Docker (Postgres + Redis)
+
+## Local setup
+
+```bash
+cp .env.example .env
+docker compose up -d
+pnpm install
+pnpm db:migrate
+pnpm --filter @coppergate/web dev
+```
+
+- App: http://localhost:3000  
+- Liveness: http://localhost:3000/health  
+- Readiness: http://localhost:3000/ready  
+
+Postgres is published on host port **5433** (avoids clashing with a local Postgres on 5432).
+
+```bash
+pnpm db:migrate:down   # rollback baseline
+pnpm --filter @coppergate/worker dev
+```
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm lint` | ESLint across packages |
+| `pnpm typecheck` | TypeScript across packages |
+| `pnpm test` | Node test runner |
+| `pnpm build` | Build all packages/apps |
+| `pnpm db:migrate` | Apply Drizzle migrations |
+| `pnpm db:migrate:down` | Roll back baseline migration |
+
+## Status
+
+**TASK001** scaffold complete (monorepo, CI, migrations, health/ready). Next: TASK002 (config / telemetry / error shape).
 
 ## Related repos
 
 | Repo | Role |
 |------|------|
-| [`coppergate-architecture`](https://github.com/coppergateai/coppergate-architecture) | Private planning / ADRs / backlog |
+| [`coppergate-architecture`](https://github.com/coppergateai/coppergate-architecture) | Spec / ADRs / backlog / brand |
 | [`coppergate-examples`](https://github.com/coppergateai/coppergate-examples) | Next.js fixture for e2e / agent PRs |
-
-## Status
-
-Private. Implementation not started — waiting on Slice A / TASK001.
+| [`.github`](https://github.com/coppergateai/.github) | Org profile |

@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+.pnpm-debug.log*
 
 # Build
 dist/
@@ -9,6 +10,7 @@ build/
 out/
 coverage/
 *.tsbuildinfo
+apps/web/next-env.d.ts.bak
 
 # Env / secrets
 .env
