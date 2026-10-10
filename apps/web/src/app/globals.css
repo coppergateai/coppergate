@@ -61,19 +61,27 @@ a {
   }
 }
 
-@keyframes cg-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
 @keyframes cg-glow {
   0%,
   100% {
-    opacity: 0.35;
+    opacity: 0.45;
   }
   50% {
-    opacity: 0.7;
+    opacity: 0.9;
+  }
+}
+
+@keyframes cg-gate-in {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cg-gate-in-mobile {
+  to {
+    opacity: 1;
+    transform: translate(50%, 0) scale(1);
   }
 }
 
@@ -113,12 +121,9 @@ a {
   }
 
   .cg-rise,
-  .cg-gate-path,
-  .cg-gate-glow,
   .cg-path-rail {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
-    stroke-dashoffset: 0 !important;
   }
 }
