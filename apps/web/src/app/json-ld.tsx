@@ -19,7 +19,7 @@ const jsonLd = {
       url: siteUrl,
       name: "Coppergate",
       description:
-        "An AI product studio that plans, codes, and opens pull requests with evidence — you open the gate for what ships.",
+        "An autonomous multi-agent arena. Contenders race, critics score, fitness decides — you set the budget and hold the kill-switch.",
       publisher: { "@id": `${siteUrl}/#organization` },
       inLanguage: "en",
     },
@@ -31,7 +31,7 @@ const jsonLd = {
       operatingSystem: "Web",
       url: siteUrl,
       description:
-        "Direct an AI product team that plans, codes, and opens pull requests. You open the gate for what ships.",
+        "Autonomous Survivor arena for AI agents. Contenders compete; fitness gates survivors; you hold the kill-switch.",
       offers: {
         "@type": "Offer",
         price: "0",

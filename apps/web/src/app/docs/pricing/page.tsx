@@ -3,6 +3,8 @@ import { SiteChrome } from "../../site-chrome";
 
 export const metadata = {
   title: "Pricing · Coppergate Docs",
+  description:
+    "How Coppergate thinks about arena budgets, cost per survivor PR, and paid pilots.",
 };
 
 export default function PricingPage() {
@@ -18,13 +20,14 @@ export default function PricingPage() {
           Pricing intent
         </h1>
         <p style={{ color: "#E5E5E5", lineHeight: 1.55 }}>
-          Private / public beta is invite-gated. We charge for platform capability plus
-          transparent model/compute usage — not unlimited agent loops.
+          Private beta is invite-gated. We charge for arena capability plus
+          transparent model/compute usage — not unlimited agent loops. Budget is
+          selection pressure: weak paths starve; survivors ship with a cost ledger.
         </p>
         <ul style={{ color: "#E5E5E5", lineHeight: 1.6, paddingLeft: "1.2rem" }}>
-          <li>Pilot: invite code + hard project budgets</li>
-          <li>Usage: cost per accepted PR is a first-class metric</li>
-          <li>BYOK (Phase 2): bring your own provider key when ready</li>
+          <li>Pilot: invite + hard project / arena spend caps</li>
+          <li>Usage: cost per accepted (survivor) PR is a first-class metric</li>
+          <li>BYOK (later): bring your own provider key when ready</li>
         </ul>
         <p style={{ marginTop: "1.5rem", color: "#A3A3A3" }}>
           Interested in a paid pilot?{" "}

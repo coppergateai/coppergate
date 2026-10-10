@@ -1,0 +1,715 @@
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  assertSufficientBudget,
+  BudgetError,
+  reserveEstimateForTask,
+} from "./budgets.js";
+import type { Database } from "./client.js";
+import { enqueueAgentRun } from "./runs.js";
+import {
+  agentRuns,
+  arenas,
+  auditEvents,
+  contenders,
+  projects,
+  tasks,
+  tournaments,
+  type AgentRun,
+  type Arena,
+  type Contender,
+  type Tournament,
+} from "./schema.js";
+
+/**
+ * Hard-cap until TASK039 relaxes parallel-repo policy.
+ * ContenderRuns still isolate via distinct run rows + branch names.
+ */
+export const MAX_TOURNAMENT_FANOUT = 2;
+
+export class ArenaError extends Error {
+  readonly code:
+    | "not_found"
+    | "invalid"
+    | "killed"
+    | "eliminated"
+    | "insufficient"
+    | "conflict";
+
+  constructor(code: ArenaError["code"], message: string) {
+    super(message);
+    this.name = "ArenaError";
+    this.code = code;
+  }
+}
+
+/** Pure: budgets never go negative. */
+export function assertNonNegativeBudget(micros: number): void {
+  if (!Number.isFinite(micros) || micros < 0) {
+    throw new ArenaError("invalid", "budget must be a non-negative finite number");
+  }
+}
+
+/** Pure: debit; returns remaining (floored at 0) and whether eliminated. */
+export function debitContenderBudget(
+  remainingMicros: number,
+  debitMicros: number,
+): { remainingMicros: number; eliminated: boolean } {
+  assertNonNegativeBudget(remainingMicros);
+  if (!Number.isFinite(debitMicros) || debitMicros < 0) {
+    throw new ArenaError("invalid", "debit must be a non-negative finite number");
+  }
+  const next = Math.max(0, remainingMicros - debitMicros);
+  return { remainingMicros: next, eliminated: next <= 0 };
+}
+
+export type FitnessCandidate = {
+  runId: string;
+  fitnessScore: number | null;
+};
+
+/** Pure: highest finite score wins; ties break by runId lexicographic for determinism. */
+export function selectWinnerByFitness(
+  candidates: FitnessCandidate[],
+): FitnessCandidate {
+  if (candidates.length === 0) {
+    throw new ArenaError("invalid", "tournament has no candidates");
+  }
+  const scored = candidates.filter(
+    (c) => c.fitnessScore != null && Number.isFinite(c.fitnessScore),
+  );
+  if (scored.length === 0) {
+    throw new ArenaError("invalid", "no scored candidates");
+  }
+  return [...scored].sort((a, b) => {
+    const diff = (b.fitnessScore as number) - (a.fitnessScore as number);
+    if (diff !== 0) return diff;
+    return a.runId.localeCompare(b.runId);
+  })[0]!;
+}
+
+/** Pure: at most one WINNER label in a result list. */
+export function assertAtMostOneWinner(
+  results: Array<"WINNER" | "LOSER" | "CANCELLED" | null | undefined>,
+): void {
+  const winners = results.filter((r) => r === "WINNER");
+  if (winners.length > 1) {
+    throw new ArenaError("conflict", "tournament cannot have multiple winners");
+  }
+}
+
+export function canContenderEnqueue(input: {
+  arenaStatus: string;
+  contenderStatus: string;
+  budgetMicrosRemaining: number;
+}): boolean {
+  if (input.arenaStatus === "KILLED" || input.arenaStatus === "PAUSED") {
+    return false;
+  }
+  if (input.contenderStatus !== "ACTIVE") return false;
+  return input.budgetMicrosRemaining > 0;
+}
+
+export async function getArenaForProject(
+  db: Database,
+  input: { workspaceId: string; projectId: string },
+): Promise<Arena | null> {
+  const [row] = await db
+    .select()
+    .from(arenas)
+    .where(
+      and(
+        eq(arenas.workspaceId, input.workspaceId),
+        eq(arenas.projectId, input.projectId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+export async function ensureArenaForProject(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+    minHuman?: boolean;
+    defaultContenderN?: number;
+    contenderBudgetMicros?: number;
+    contenderCount?: number;
+  },
+): Promise<{ arena: Arena; contenders: Contender[]; created: boolean }> {
+  const existing = await getArenaForProject(db, input);
+  if (existing) {
+    const pool = await listContendersForArena(db, {
+      workspaceId: input.workspaceId,
+      arenaId: existing.id,
+    });
+    return { arena: existing, contenders: pool, created: false };
+  }
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(
+      and(
+        eq(projects.id, input.projectId),
+        eq(projects.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!project) {
+    throw new ArenaError("not_found", "project not found");
+  }
+
+  const n = input.defaultContenderN ?? 2;
+  if (!Number.isInteger(n) || n < 1 || n > 16) {
+    throw new ArenaError("invalid", "defaultContenderN must be 1..16");
+  }
+  const contenderCount = input.contenderCount ?? n;
+  const budgetEach = input.contenderBudgetMicros ?? 0;
+  assertNonNegativeBudget(budgetEach);
+
+  const arenaId = crypto.randomUUID();
+  const now = new Date();
+  const [arena] = await db
+    .insert(arenas)
+    .values({
+      id: arenaId,
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      minHuman: input.minHuman ?? false,
+      prodWritesEnabled: false,
+      defaultContenderN: n,
+      status: "ARMED",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+
+  const pool: Contender[] = [];
+  for (let i = 0; i < contenderCount; i++) {
+    const [c] = await db
+      .insert(contenders)
+      .values({
+        id: crypto.randomUUID(),
+        arenaId,
+        workspaceId: input.workspaceId,
+        profileKey: i === 0 ? "engineer" : `engineer_${i + 1}`,
+        budgetMicrosRemaining: budgetEach,
+        status: "ACTIVE",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    pool.push(c!);
+  }
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.ensure",
+    targetType: "arena",
+    targetId: arenaId,
+    meta: JSON.stringify({ projectId: input.projectId, n, contenderCount }),
+  });
+
+  return { arena: arena!, contenders: pool, created: true };
+}
+
+export async function listContendersForArena(
+  db: Database,
+  input: { workspaceId: string; arenaId: string },
+): Promise<Contender[]> {
+  return db
+    .select()
+    .from(contenders)
+    .where(
+      and(
+        eq(contenders.workspaceId, input.workspaceId),
+        eq(contenders.arenaId, input.arenaId),
+      ),
+    );
+}
+
+export async function applyContenderDebit(
+  db: Database,
+  input: {
+    workspaceId: string;
+    contenderId: string;
+    debitMicros: number;
+    actor: string;
+  },
+): Promise<Contender> {
+  const [c] = await db
+    .select()
+    .from(contenders)
+    .where(
+      and(
+        eq(contenders.id, input.contenderId),
+        eq(contenders.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!c) throw new ArenaError("not_found", "contender not found");
+  if (c.status === "ELIMINATED") {
+    throw new ArenaError("eliminated", "contender already eliminated");
+  }
+
+  const { remainingMicros, eliminated } = debitContenderBudget(
+    c.budgetMicrosRemaining,
+    input.debitMicros,
+  );
+  const now = new Date();
+  const [updated] = await db
+    .update(contenders)
+    .set({
+      budgetMicrosRemaining: remainingMicros,
+      status: eliminated ? "ELIMINATED" : c.status,
+      eliminatedAt: eliminated ? now : c.eliminatedAt,
+      updatedAt: now,
+    })
+    .where(eq(contenders.id, c.id))
+    .returning();
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: eliminated ? "contender.eliminated" : "contender.debit",
+    targetType: "contender",
+    targetId: c.id,
+    meta: JSON.stringify({
+      debitMicros: input.debitMicros,
+      remainingMicros,
+    }),
+  });
+
+  return updated!;
+}
+
+export async function createTournament(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    arenaId: string;
+    taskId: string;
+    n: number;
+    actor: string;
+  },
+): Promise<Tournament> {
+  const [arena] = await db
+    .select()
+    .from(arenas)
+    .where(
+      and(
+        eq(arenas.id, input.arenaId),
+        eq(arenas.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!arena) throw new ArenaError("not_found", "arena not found");
+  if (arena.status === "KILLED") {
+    throw new ArenaError("killed", "arena is killed");
+  }
+  if (!Number.isInteger(input.n) || input.n < 1 || input.n > 16) {
+    throw new ArenaError("invalid", "n must be 1..16");
+  }
+
+  const now = new Date();
+  const [row] = await db
+    .insert(tournaments)
+    .values({
+      id: crypto.randomUUID(),
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      arenaId: input.arenaId,
+      taskId: input.taskId,
+      n: input.n,
+      status: "OPEN",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+
+  await db
+    .update(arenas)
+    .set({ status: "RUNNING", updatedAt: now })
+    .where(eq(arenas.id, arena.id));
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "tournament.create",
+    targetType: "tournament",
+    targetId: row!.id,
+    meta: JSON.stringify({ taskId: input.taskId, n: input.n }),
+  });
+
+  return row!;
+}
+
+export async function listRunsForTournament(
+  db: Database,
+  input: { workspaceId: string; tournamentId: string },
+): Promise<AgentRun[]> {
+  return db
+    .select()
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.workspaceId, input.workspaceId),
+        eq(agentRuns.tournamentId, input.tournamentId),
+      ),
+    );
+}
+
+export async function getOpenTournamentForTask(
+  db: Database,
+  input: { workspaceId: string; taskId: string },
+): Promise<Tournament | null> {
+  const [row] = await db
+    .select()
+    .from(tournaments)
+    .where(
+      and(
+        eq(tournaments.workspaceId, input.workspaceId),
+        eq(tournaments.taskId, input.taskId),
+        inArray(tournaments.status, ["OPEN", "SCORING"]),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * TASK049 — spawn N ContenderRuns for a QUEUED task under an armed arena.
+ * Idempotent: reuses an open tournament for the task when present.
+ */
+export async function startTournamentFanout(
+  db: Database,
+  input: {
+    workspaceId: string;
+    taskId: string;
+    actor: string;
+    /** Override width; clamped to MAX_TOURNAMENT_FANOUT and active pool. */
+    n?: number;
+    attempt?: number;
+  },
+): Promise<{
+  arena: Arena;
+  tournament: Tournament;
+  runs: AgentRun[];
+  created: boolean;
+}> {
+  const [task] = await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.id, input.taskId),
+        eq(tasks.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!task) throw new ArenaError("not_found", "task not found");
+  if (task.status !== "QUEUED" && task.status !== "RUNNING") {
+    throw new ArenaError(
+      "invalid",
+      "Task must be QUEUED before tournament fan-out",
+    );
+  }
+
+  const existingTournament = await getOpenTournamentForTask(db, {
+    workspaceId: input.workspaceId,
+    taskId: task.id,
+  });
+  if (existingTournament) {
+    const arena = await getArenaForProject(db, {
+      workspaceId: input.workspaceId,
+      projectId: task.projectId,
+    });
+    if (!arena) throw new ArenaError("not_found", "arena not found");
+    const runs = await listRunsForTournament(db, {
+      workspaceId: input.workspaceId,
+      tournamentId: existingTournament.id,
+    });
+    return {
+      arena,
+      tournament: existingTournament,
+      runs,
+      created: false,
+    };
+  }
+
+  const { arena, contenders: pool } = await ensureArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: task.projectId,
+    actor: input.actor,
+    defaultContenderN: MAX_TOURNAMENT_FANOUT,
+    contenderCount: MAX_TOURNAMENT_FANOUT,
+    contenderBudgetMicros: Math.max(task.estimateMicros ?? 0, 1),
+  });
+  if (arena.status === "KILLED" || arena.status === "PAUSED") {
+    throw new ArenaError("killed", `arena is ${arena.status}`);
+  }
+
+  const eligible = pool.filter((c) =>
+    canContenderEnqueue({
+      arenaStatus: arena.status === "ARMED" ? "ARMED" : arena.status,
+      contenderStatus: c.status,
+      budgetMicrosRemaining: c.budgetMicrosRemaining,
+    }),
+  );
+  const requested = input.n ?? arena.defaultContenderN;
+  const n = Math.min(
+    MAX_TOURNAMENT_FANOUT,
+    Math.max(1, requested),
+    eligible.length,
+  );
+  if (n < 1) {
+    throw new ArenaError("eliminated", "no active contenders with budget");
+  }
+
+  const perRun = task.estimateMicros ?? 0;
+  const totalReserve = perRun * n;
+  try {
+    await assertSufficientBudget(
+      db,
+      input.workspaceId,
+      task.projectId,
+      totalReserve,
+    );
+  } catch (err) {
+    if (err instanceof BudgetError) {
+      throw new ArenaError("insufficient", err.message);
+    }
+    throw err;
+  }
+
+  const selected = eligible.slice(0, n);
+  const tournament = await createTournament(db, {
+    workspaceId: input.workspaceId,
+    projectId: task.projectId,
+    arenaId: arena.id,
+    taskId: task.id,
+    n,
+    actor: input.actor,
+  });
+
+  const attempt = input.attempt ?? task.attemptCount + 1;
+  const runs: AgentRun[] = [];
+  for (const contender of selected) {
+    const shortT = tournament.id.slice(0, 8);
+    const shortC = contender.id.slice(0, 8);
+    const { run, created } = await enqueueAgentRun(db, {
+      workspaceId: input.workspaceId,
+      projectId: task.projectId,
+      taskId: task.id,
+      idempotencyKey: `tournament:${tournament.id}:contender:${contender.id}`,
+      estimatedCostMicros: perRun,
+      spendCapMicros: perRun,
+      agentProfileKey: contender.profileKey,
+      attempt,
+      tournamentId: tournament.id,
+      contenderId: contender.id,
+      branchName: `cg/t/${shortT}/c/${shortC}`,
+      baseSha: task.baseSha ?? undefined,
+    });
+    if (!created) {
+      // Should not happen for a new tournament id; surface as conflict.
+      throw new ArenaError("conflict", "contender run already exists");
+    }
+    // Isolation invariant: each ContenderRun owns a distinct branch namespace.
+    if (
+      runs.some(
+        (r) => r.branchName != null && r.branchName === run.branchName,
+      )
+    ) {
+      throw new ArenaError("conflict", "contender branch collision");
+    }
+    if (runs.some((r) => r.contenderId === run.contenderId)) {
+      throw new ArenaError("conflict", "duplicate contender in fan-out");
+    }
+    runs.push(run);
+  }
+
+  await reserveEstimateForTask(db, {
+    workspaceId: input.workspaceId,
+    projectId: task.projectId,
+    taskId: task.id,
+    estimateMicros: totalReserve,
+  });
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "tournament.fanout",
+    targetType: "tournament",
+    targetId: tournament.id,
+    meta: JSON.stringify({
+      taskId: task.id,
+      n,
+      runIds: runs.map((r) => r.id),
+      maxFanout: MAX_TOURNAMENT_FANOUT,
+    }),
+  });
+
+  return { arena, tournament, runs, created: true };
+}
+
+export async function resolveTournamentByFitness(
+  db: Database,
+  input: {
+    workspaceId: string;
+    tournamentId: string;
+    actor: string;
+  },
+): Promise<{ tournament: Tournament; winnerRunId: string }> {
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(
+      and(
+        eq(tournaments.id, input.tournamentId),
+        eq(tournaments.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!tournament) throw new ArenaError("not_found", "tournament not found");
+  if (tournament.status === "RESOLVED") {
+    if (!tournament.winnerRunId) {
+      throw new ArenaError("conflict", "resolved tournament missing winner");
+    }
+    return { tournament, winnerRunId: tournament.winnerRunId };
+  }
+  if (tournament.status === "CANCELLED") {
+    throw new ArenaError("killed", "tournament cancelled");
+  }
+
+  const runs = await db
+    .select()
+    .from(agentRuns)
+    .where(eq(agentRuns.tournamentId, tournament.id));
+
+  const winner = selectWinnerByFitness(
+    runs.map((r) => ({ runId: r.id, fitnessScore: r.fitnessScore })),
+  );
+
+  const now = new Date();
+  for (const run of runs) {
+    const result = run.id === winner.runId ? "WINNER" : "LOSER";
+    await db
+      .update(agentRuns)
+      .set({ tournamentResult: result, updatedAt: now })
+      .where(eq(agentRuns.id, run.id));
+  }
+
+  assertAtMostOneWinner(
+    runs.map((r) => (r.id === winner.runId ? "WINNER" : "LOSER")),
+  );
+
+  const [updated] = await db
+    .update(tournaments)
+    .set({
+      status: "RESOLVED",
+      winnerRunId: winner.runId,
+      updatedAt: now,
+    })
+    .where(eq(tournaments.id, tournament.id))
+    .returning();
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "tournament.resolve",
+    targetType: "tournament",
+    targetId: tournament.id,
+    meta: JSON.stringify({ winnerRunId: winner.runId }),
+  });
+
+  return { tournament: updated!, winnerRunId: winner.runId };
+}
+
+export async function killArena(
+  db: Database,
+  input: { workspaceId: string; arenaId: string; actor: string },
+): Promise<Arena> {
+  const [arena] = await db
+    .select()
+    .from(arenas)
+    .where(
+      and(
+        eq(arenas.id, input.arenaId),
+        eq(arenas.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!arena) throw new ArenaError("not_found", "arena not found");
+
+  const now = new Date();
+  const [updated] = await db
+    .update(arenas)
+    .set({ status: "KILLED", killedAt: now, updatedAt: now })
+    .where(eq(arenas.id, arena.id))
+    .returning();
+
+  const openTournaments = await db
+    .select({ id: tournaments.id })
+    .from(tournaments)
+    .where(eq(tournaments.arenaId, arena.id));
+  const tournamentIds = openTournaments.map((t) => t.id);
+
+  if (tournamentIds.length > 0) {
+    await db
+      .update(tournaments)
+      .set({ status: "CANCELLED", updatedAt: now })
+      .where(
+        and(
+          eq(tournaments.arenaId, arena.id),
+          inArray(tournaments.status, ["OPEN", "SCORING"]),
+        ),
+      );
+
+    const activeRuns = await db
+      .select({ id: agentRuns.id, status: agentRuns.status })
+      .from(agentRuns)
+      .where(
+        and(
+          eq(agentRuns.workspaceId, input.workspaceId),
+          inArray(agentRuns.tournamentId, tournamentIds),
+        ),
+      );
+    const cancelIds = activeRuns
+      .filter((r) =>
+        ["QUEUED", "RUNNING", "VALIDATING"].includes(r.status),
+      )
+      .map((r) => r.id);
+    if (cancelIds.length > 0) {
+      await db
+        .update(agentRuns)
+        .set({
+          cancelRequestedAt: now,
+          tournamentResult: "CANCELLED",
+          updatedAt: now,
+        })
+        .where(inArray(agentRuns.id, cancelIds));
+    }
+  }
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.kill",
+    targetType: "arena",
+    targetId: arena.id,
+    meta: JSON.stringify({}),
+  });
+
+  return updated!;
+}

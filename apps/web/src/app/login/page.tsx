@@ -41,7 +41,7 @@ export default async function LoginPage() {
             Continue with GitHub
           </a>
           <p className={styles.authNote}>
-            Private beta · Human approval required before merge
+            Private beta · Kill-switch + spend caps · Policy-gated prod
           </p>
           <Link className={styles.authBack} href="/">
             ← Back home

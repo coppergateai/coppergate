@@ -6,8 +6,8 @@ export function StatusBand() {
       <div className={styles.statusInner}>
         <span className={styles.statusDot} aria-hidden="true" />
         <p className={styles.statusText}>
-          <strong>Private beta</strong> — currently onboarding design partners.
-          Seats open by invitation.
+          <strong>Private beta</strong> — GitHub fitness wedge live; Survivor
+          tournament next. Design-partner seats by invitation.
         </p>
         <a
           className={styles.statusLink}

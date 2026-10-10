@@ -20,8 +20,8 @@ export function SiteFooter() {
               />
             </Link>
             <p className={styles.footerLede}>
-              An AI product studio that plans, codes, and opens pull requests —
-              you open the gate for what ships.
+              An autonomous multi-agent arena. Contenders compete, fitness
+              decides — survivors ship.
             </p>
             <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
               hello@coppergate.ai

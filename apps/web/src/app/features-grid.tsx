@@ -2,20 +2,20 @@ import styles from "./landing.module.css";
 
 const features = [
   {
-    title: "Brief → plan",
-    body: "Outcomes become structured briefs and task plans you approve before agents run.",
+    title: "Tournament runs",
+    body: "N contenders on the same goal. The arena keeps the fittest path — not the loudest chat.",
   },
   {
-    title: "Budgeted runs",
-    body: "Reserve spend before queue. When the budget is gone, enqueue stops.",
+    title: "Budget as selection",
+    body: "Spend caps starve weak agents. When the budget is gone, they are out of the pool.",
   },
   {
-    title: "PR with evidence",
-    body: "Diffs, CI, and cost ride with the pull request — review starts from signal.",
+    title: "Fitness evidence",
+    body: "Critic scores, diffs, and CI ride with the winner — promotion starts from signal.",
   },
   {
-    title: "Inbox approvals",
-    body: "Brief, task, and merge decisions stay in one place you control.",
+    title: "Kill-switch, not inbox",
+    body: "You configure policy and can halt the arena. You are not approving every micro-step.",
   },
 ] as const;
 
@@ -29,10 +29,10 @@ export function FeaturesGrid() {
       <div className={styles.featuresInner}>
         <header className={styles.featuresIntro}>
           <h2 id="features-title" className={styles.featuresTitle}>
-            Everything you need to ship behind a gate.
+            Built for autonomy with teeth.
           </h2>
           <p className={styles.featuresLede}>
-            Built for teams that will not merge unreviewed AI code.
+            For operators who want agents to fight — and only survivors to ship.
           </p>
         </header>
 

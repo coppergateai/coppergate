@@ -3,6 +3,8 @@ import { SiteChrome } from "../../site-chrome";
 
 export const metadata = {
   title: "Supported stack · Coppergate Docs",
+  description:
+    "Current GitHub fitness wedge for the Coppergate Survivor arena — template, auth, delivery.",
 };
 
 export default function SupportedStackPage() {
@@ -17,6 +19,10 @@ export default function SupportedStackPage() {
         <h1 style={{ margin: "1rem 0 0.75rem", fontSize: "1.75rem", fontWeight: 600 }}>
           Supported stack
         </h1>
+        <p style={{ color: "#A3A3A3", lineHeight: 1.55, marginBottom: "1.25rem" }}>
+          First arena surface: GitHub-native fitness (branch/PR + checks). Tournament
+          concurrency lands later; the wedge proves evidence, spend, and kill-switch.
+        </p>
         <ul style={{ color: "#E5E5E5", lineHeight: 1.6, paddingLeft: "1.2rem" }}>
           <li>
             <strong>Template / fixture:</strong>{" "}
@@ -41,7 +47,8 @@ export default function SupportedStackPage() {
             uses <code>GITHUB_DELIVERY_MODE=http</code>
           </li>
           <li>
-            <strong>Verification:</strong> validation artifacts + GitHub check evidence
+            <strong>Fitness:</strong> validation artifacts + GitHub check evidence;
+            critic / elimination scoring is the arena roadmap
           </li>
         </ul>
         <p style={{ marginTop: "1.5rem", color: "#737373", fontSize: "0.875rem" }}>

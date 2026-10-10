@@ -5,6 +5,10 @@ import {
   resolvePendingApproval,
 } from "./approvals.js";
 import {
+  getArenaForProject,
+  startTournamentFanout,
+} from "./arena.js";
+import {
   assertSufficientBudget,
   BudgetError,
   reserveEstimateForTask,
@@ -296,23 +300,38 @@ export async function approveTask(
     reason: "approved",
   });
 
-  await reserveEstimateForTask(db, {
+  const nextAttempt = result.task.attemptCount + 1;
+  const arena = await getArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: result.task.projectId,
-    taskId: result.task.id,
-    estimateMicros: result.task.estimateMicros ?? 0,
   });
 
-  const nextAttempt = result.task.attemptCount + 1;
-  await enqueueAgentRun(db, {
-    workspaceId: input.workspaceId,
-    projectId: result.task.projectId,
-    taskId: result.task.id,
-    idempotencyKey: `task:${result.task.id}:attempt:${nextAttempt}`,
-    estimatedCostMicros: result.task.estimateMicros ?? 0,
-    spendCapMicros: result.task.estimateMicros ?? 0,
-    attempt: nextAttempt,
-  });
+  if (arena && arena.status !== "KILLED" && arena.status !== "PAUSED") {
+    // TASK049 — N ContenderRuns under Survivor arena (fan-out reserves budget).
+    await startTournamentFanout(db, {
+      workspaceId: input.workspaceId,
+      taskId: result.task.id,
+      actor: input.actor,
+      attempt: nextAttempt,
+    });
+  } else {
+    await reserveEstimateForTask(db, {
+      workspaceId: input.workspaceId,
+      projectId: result.task.projectId,
+      taskId: result.task.id,
+      estimateMicros: result.task.estimateMicros ?? 0,
+    });
+
+    await enqueueAgentRun(db, {
+      workspaceId: input.workspaceId,
+      projectId: result.task.projectId,
+      taskId: result.task.id,
+      idempotencyKey: `task:${result.task.id}:attempt:${nextAttempt}`,
+      estimatedCostMicros: result.task.estimateMicros ?? 0,
+      spendCapMicros: result.task.estimateMicros ?? 0,
+      attempt: nextAttempt,
+    });
+  }
 
   const [bumped] = await db
     .update(tasks)

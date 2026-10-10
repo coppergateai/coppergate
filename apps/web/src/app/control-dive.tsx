@@ -16,11 +16,11 @@ export function ControlDive() {
       <div className={styles.controlInner}>
         <header className={styles.controlIntro}>
           <h2 id="control-title" className={styles.controlTitle}>
-            Cost and merge stay under your hand.
+            Budget selects. You hold the kill-switch.
           </h2>
           <p className={styles.controlLede}>
-            Budgets hard-stop runaway spend. Approvals keep shipping a human
-            decision — pause or cancel anytime.
+            Spend caps starve weak contenders. Policy and kill-switch stop the
+            arena — you are not approving every micro-step.
           </p>
         </header>
 
@@ -51,30 +51,30 @@ export function ControlDive() {
 
           <div className={styles.divePanel} aria-hidden="true">
             <div className={styles.govHead}>
-              <span className={styles.govBadge}>Inbox</span>
-              <span>3 awaiting you</span>
+              <span className={styles.govBadge}>Arena</span>
+              <span>2 eliminated</span>
             </div>
             <ul className={styles.govList}>
               <li>
-                <strong>Brief</strong>
-                <span>Subscription tracker MVP</span>
-                <em>Approve</em>
+                <strong>Contender A</strong>
+                <span>fitness 0.91 · CI pass</span>
+                <em>Winner</em>
               </li>
               <li>
-                <strong>Task</strong>
-                <span>feat: billing hooks</span>
-                <em>Approve</em>
+                <strong>Contender B</strong>
+                <span>budget exhausted</span>
+                <em>Out</em>
               </li>
               <li className={styles.govActive}>
-                <strong>Merge</strong>
-                <span>PR #128 · CI passing</span>
-                <em>Open gate</em>
+                <strong>Kill-switch</strong>
+                <span>Armed · policy OK</span>
+                <em>Ready</em>
               </li>
             </ul>
             <div className={styles.govActions}>
-              <span className={styles.govMuted}>Cancel run</span>
-              <span className={styles.govMuted}>Pause</span>
-              <span className={styles.govPrimary}>Approve</span>
+              <span className={styles.govMuted}>Pause arena</span>
+              <span className={styles.govMuted}>Raise budget</span>
+              <span className={styles.govPrimary}>Kill all</span>
             </div>
           </div>
         </div>

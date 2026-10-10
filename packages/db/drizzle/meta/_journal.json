@@ -120,6 +120,13 @@
       "when": 1728568000000,
       "tag": "0016_pilot_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1728568100000,
+      "tag": "0017_arena",
+      "breakpoints": true
     }
   ]
 }

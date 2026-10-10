@@ -52,16 +52,19 @@ export default async function HomePage() {
           </div>
 
           <p className={styles.eyebrow}>Build inside the gate</p>
-          <h1 className={styles.headline}>From idea to reviewed&nbsp;PR.</h1>
+          <h1 className={styles.headline}>
+            Agents compete.&nbsp;Survivors&nbsp;ship.
+          </h1>
           <p className={styles.lede}>
-            An AI product studio that plans, codes, and opens pull requests with
-            evidence — you open the gate for what ships.
+            An autonomous multi-agent arena. Contenders race, critics attack,
+            fitness decides — you set the goal and budget, then hold the
+            kill-switch.
           </p>
 
           <div id="early-access" className={styles.ctaBlock}>
             <EarlyAccessForm signedInLogin={user?.login ?? null} />
             <p className={styles.ctaNote}>
-              Private beta · GitHub-native · Human approval required
+              Private beta · GitHub fitness wedge now · Survivor arena north star
             </p>
           </div>
         </div>

@@ -1,8 +1,8 @@
 # Coppergate
 
-AI-native product execution platform — idea → brief → plan → isolated coding run → PR + evidence → human review.
+Autonomous multi-agent Survivor arena — agents compete, fitness gates winners, losers lose budget. GitHub PR + CI is the first fitness wedge.
 
-**Slogan:** Build inside the gate. Ship when you open it.
+**Slogan:** Build inside the gate. Survive to ship.
 
 Product monorepo. Planning / ADRs: [`coppergate-architecture`](https://github.com/coppergateai/coppergate-architecture) (private).
 

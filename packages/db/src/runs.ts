@@ -47,6 +47,17 @@ function mapRow(row: Record<string, unknown>): AgentRun {
     startedAt: row.started_at == null ? null : new Date(String(row.started_at)),
     finishedAt:
       row.finished_at == null ? null : new Date(String(row.finished_at)),
+    tournamentId:
+      row.tournament_id == null ? null : String(row.tournament_id),
+    contenderId: row.contender_id == null ? null : String(row.contender_id),
+    fitnessScore:
+      row.fitness_score == null ? null : Number(row.fitness_score),
+    fitnessEvidenceRef:
+      row.fitness_evidence_ref == null
+        ? null
+        : String(row.fitness_evidence_ref),
+    tournamentResult:
+      row.tournament_result == null ? null : String(row.tournament_result),
     createdAt: new Date(String(row.created_at)),
     updatedAt: new Date(String(row.updated_at)),
   };
@@ -67,6 +78,9 @@ export async function enqueueAgentRun(
     estimatedCostMicros?: number;
     agentProfileKey?: string;
     attempt?: number;
+    tournamentId?: string | null;
+    contenderId?: string | null;
+    branchName?: string | null;
   },
 ): Promise<{ run: AgentRun; created: boolean }> {
   const [task] = await db
@@ -112,12 +126,15 @@ export async function enqueueAgentRun(
       attempt: input.attempt ?? task.attemptCount + 1,
       agentProfileKey: input.agentProfileKey ?? "engineer",
       baseSha: input.baseSha ?? task.baseSha ?? "unknown",
+      branchName: input.branchName ?? null,
       toolAllowlist: task.allowedPaths,
       spendCapMicros: input.spendCapMicros ?? task.estimateMicros ?? 0,
       estimatedCostMicros:
         input.estimatedCostMicros ?? task.estimateMicros ?? 0,
       actualCostMicros: 0,
       idempotencyKey: input.idempotencyKey,
+      tournamentId: input.tournamentId ?? null,
+      contenderId: input.contenderId ?? null,
       createdAt: now,
       updatedAt: now,
     })

@@ -6,7 +6,7 @@ import styles from "../landing.module.css";
 export const metadata: Metadata = {
   title: "Terms",
   description:
-    "Terms of use for the Coppergate private beta — early access, acceptable use, and human approval.",
+    "Terms of use for the Coppergate private beta — early access, arena policy, and acceptable use.",
   alternates: { canonical: "/terms" },
 };
 
@@ -54,9 +54,10 @@ export default function TermsPage() {
             <h2>AI-generated output</h2>
             <p>
               Plans, code, and pull requests produced through Coppergate are
-              suggestions. You are responsible for reviewing output before
-              merge. Human approval is required; Coppergate does not ship changes
-              without your gate.
+              autonomous arena outputs. You are responsible for arena policy,
+              spend caps, and reviewing what you accept into production.
+              Production and default-branch writes remain policy-gated; you
+              retain a kill-switch over the arena.
             </p>
           </section>
 

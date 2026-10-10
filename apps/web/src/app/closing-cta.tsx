@@ -16,11 +16,12 @@ export function ClosingCta({ signedInLogin = null }: Props) {
       <div className={styles.closingInner}>
         <p className={styles.closingEyebrow}>Get started</p>
         <h2 id="closing-title" className={styles.closingTitle}>
-          Put delivery behind a gate.
+          Arm the arena. Survive to ship.
         </h2>
         <p className={styles.closingLede}>
-          Private beta for teams that want AI-written PRs with evidence — and a
-          human hand on merge.
+          Private beta for builders who want autonomous agents that compete.
+          Today: GitHub fitness + spend caps + kill-switch. Next: full Survivor
+          tournament.
         </p>
         <div className={styles.closingForm}>
           <EarlyAccessForm signedInLogin={signedInLogin} />
