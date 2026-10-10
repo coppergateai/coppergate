@@ -7,7 +7,7 @@
   --copper: #b87333;
   --copper-dim: rgba(184, 115, 51, 0.35);
   --line: rgba(255, 255, 255, 0.08);
-  --font: var(--font-space-grotesk), system-ui, -apple-system, sans-serif;
+  --font: "Space Grotesk", system-ui, -apple-system, sans-serif;
 }
 
 *,
