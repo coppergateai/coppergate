@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import styles from "./onboarding-guide.module.css";
 
 export type OnboardingStep = {
   id: string;
@@ -12,62 +12,69 @@ export type OnboardingStep = {
 type Props = {
   title?: string;
   steps: OnboardingStep[];
+  /** Tighter spacing for app shells that already have a section label. */
+  compact?: boolean;
 };
 
 /** First-run guided path (TASK034). */
 export function OnboardingGuide({
   title = "Getting started",
   steps,
+  compact = false,
 }: Props) {
   const next = steps.find((s) => !s.done) ?? null;
 
   return (
-    <section style={{ marginTop: "1.75rem", marginBottom: "0.5rem" }}>
-      <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: "0 0 0.35rem" }}>
-        {title}
-      </h2>
-      <p style={{ margin: "0 0 0.85rem", color: "#737373", fontSize: "0.85rem" }}>
-        {next
-          ? `Next: ${next.title}`
-          : "You’re set — approve a task when ready."}
+    <section className={`${styles.guide} ${compact ? styles.compact : ""}`}>
+      <h2 className={styles.title}>{title}</h2>
+      <p className={styles.next}>
+        {next ? (
+          <>
+            Next: <span className={styles.nextStrong}>{next.title}</span>
+          </>
+        ) : (
+          "You’re set — approve a task when ready."
+        )}
       </p>
-      <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
-        {steps.map((step, i) => (
-          <li
-            key={step.id}
-            style={{
-              display: "flex",
-              gap: "0.75rem",
-              padding: "0.55rem 0",
-              borderBottom: "1px solid #262626",
-              fontSize: "0.85rem",
-            }}
-          >
-            <span style={{ color: step.done ? "#86EFAC" : "#737373", width: 18 }}>
-              {step.done ? "✓" : i + 1}
-            </span>
-            <div style={{ flex: 1 }}>
-              {step.href && !step.done ? (
-                <Link href={step.href} style={link}>
-                  {step.title}
-                </Link>
-              ) : (
-                <span style={{ color: step.done ? "#A3A3A3" : "#E5E5E5" }}>
-                  {step.title}
-                </span>
-              )}
-              <div style={{ color: "#737373", marginTop: 2 }}>{step.detail}</div>
-            </div>
-          </li>
-        ))}
+      <ol className={styles.list}>
+        {steps.map((step, i) => {
+          const isNext = next?.id === step.id;
+          return (
+            <li
+              key={step.id}
+              className={`${styles.step} ${isNext ? styles.stepNext : ""}`}
+            >
+              <span
+                className={`${styles.index} ${
+                  step.done ? styles.indexDone : isNext ? styles.indexNext : ""
+                }`}
+              >
+                {step.done ? "✓" : i + 1}
+              </span>
+              <div className={styles.body}>
+                {step.href && !step.done ? (
+                  <Link href={step.href} className={styles.link}>
+                    {step.title}
+                  </Link>
+                ) : (
+                  <span
+                    className={`${styles.stepTitle} ${
+                      step.done
+                        ? styles.stepTitleDone
+                        : isNext
+                          ? styles.stepTitleNext
+                          : ""
+                    }`}
+                  >
+                    {step.title}
+                  </span>
+                )}
+                <div className={styles.detail}>{step.detail}</div>
+              </div>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );
 }
-
-const link: CSSProperties = {
-  color: "#FFFFFF",
-  fontWeight: 600,
-  textDecoration: "underline",
-  textUnderlineOffset: 3,
-};

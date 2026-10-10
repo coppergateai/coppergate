@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styles from "./settings.module.css";
 
 type Props = {
   workspaceId: string;
@@ -23,6 +24,7 @@ export function WorkspaceSettingsForm({
 
   return (
     <form
+      className={styles.panel}
       onSubmit={(e) => {
         e.preventDefault();
         setPending(true);
@@ -49,61 +51,31 @@ export function WorkspaceSettingsForm({
           })
           .finally(() => setPending(false));
       }}
-      style={{ display: "grid", gap: "1rem", maxWidth: 360 }}
     >
-      <label style={{ display: "grid", gap: 6, fontSize: "0.875rem", color: "#A3A3A3" }}>
+      <label className={styles.field}>
         Name
         <input
           required
+          className={styles.input}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={{
-            padding: "0.65rem 0.75rem",
-            borderRadius: 4,
-            border: "1px solid #404040",
-            background: "#141414",
-            color: "#FFFFFF",
-          }}
         />
       </label>
-      <label style={{ display: "grid", gap: 6, fontSize: "0.875rem", color: "#A3A3A3" }}>
+      <label className={styles.field}>
         Autonomy default
         <select
+          className={styles.select}
           value={autonomyDefault}
           onChange={(e) => setAutonomyDefault(e.target.value)}
-          style={{
-            padding: "0.65rem 0.75rem",
-            borderRadius: 4,
-            border: "1px solid #404040",
-            background: "#141414",
-            color: "#FFFFFF",
-          }}
         >
           <option value="L0">L0 — approve everything</option>
           <option value="L1">L1 — approve high-risk</option>
           <option value="L2">L2 — autonomous within budget</option>
         </select>
       </label>
-      {error ? (
-        <p style={{ margin: 0, color: "#F87171", fontSize: "0.875rem" }}>{error}</p>
-      ) : null}
-      {saved ? (
-        <p style={{ margin: 0, color: "#86EFAC", fontSize: "0.875rem" }}>Saved.</p>
-      ) : null}
-      <button
-        type="submit"
-        disabled={pending}
-        style={{
-          padding: "0.7rem 1rem",
-          background: "#FFFFFF",
-          color: "#0A0A0A",
-          border: "none",
-          borderRadius: 4,
-          fontWeight: 600,
-          cursor: pending ? "wait" : "pointer",
-          opacity: pending ? 0.6 : 1,
-        }}
-      >
+      {error ? <p className={styles.error}>{error}</p> : null}
+      {saved ? <p className={styles.ok}>Saved.</p> : null}
+      <button type="submit" className={styles.submit} disabled={pending}>
         {pending ? "Saving…" : "Save settings"}
       </button>
     </form>

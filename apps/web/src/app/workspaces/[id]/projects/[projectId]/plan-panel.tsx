@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styles from "./project-detail.module.css";
 
 type PlanTask = {
   id: string;
@@ -114,11 +115,11 @@ export function PlanPanel({
   }
 
   return (
-    <section style={{ marginTop: "2.5rem" }}>
-      <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>
+    <section className={styles.section} aria-labelledby="plan-heading">
+      <h2 id="plan-heading" className={styles.sectionLabel}>
         Delivery plan
       </h2>
-      <p style={{ margin: "0 0 1rem", color: "#737373", fontSize: "0.875rem" }}>
+      <p className={styles.sectionLede}>
         Milestones and tasks from the approved brief (FR-03). Each task includes
         scope, dependencies, estimate, and acceptance criteria.
       </p>
@@ -126,9 +127,9 @@ export function PlanPanel({
       {isOwner ? (
         <button
           type="button"
+          className={styles.primaryBtn}
           disabled={pending || !hasApprovedBrief}
           onClick={() => void generate()}
-          style={btnStyle}
         >
           {pending
             ? "Generating…"
@@ -139,65 +140,41 @@ export function PlanPanel({
       ) : null}
 
       {!hasApprovedBrief ? (
-        <p style={{ marginTop: "0.75rem", color: "#737373", fontSize: "0.875rem" }}>
-          Approve a product brief first.
-        </p>
+        <p className={styles.muted}>Approve a product brief first.</p>
       ) : null}
 
-      {error ? (
-        <p style={{ marginTop: "0.75rem", color: "#F87171", fontSize: "0.875rem" }}>
-          {error}
-        </p>
-      ) : null}
+      {error ? <p className={styles.error}>{error}</p> : null}
 
       {plan ? (
-        <div style={{ marginTop: "1.5rem", display: "grid", gap: "1.5rem" }}>
-          <p style={{ margin: 0, color: "#A3A3A3", fontSize: "0.8rem" }}>
+        <div className={styles.milestones}>
+          <p className={styles.hint}>
             {plan.milestones.length} milestones ·{" "}
             {plan.milestones.reduce((n, m) => n + m.tasks.length, 0)} tasks ·{" "}
             {plan.dependencyCount} dependencies
           </p>
           {plan.milestones.map((m) => (
             <div key={m.id}>
-              <h3
-                style={{
-                  margin: "0 0 0.35rem",
-                  fontSize: "0.95rem",
-                  fontWeight: 600,
-                }}
-              >
+              <h3 className={styles.subTitle}>
                 {m.sequence}. {m.title}
               </h3>
-              <p style={{ margin: "0 0 0.75rem", color: "#737373", fontSize: "0.8rem" }}>
+              <p className={styles.muted}>
                 {m.description}
                 {m.estimatedCostMicros != null
                   ? ` · ~${(m.estimatedCostMicros / 100).toFixed(0)}¢ est.`
                   : ""}
               </p>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              <ul className={styles.taskList}>
                 {m.tasks.map((t) => (
-                  <li
-                    key={t.id}
-                    style={{
-                      padding: "0.75rem 0",
-                      borderTop: "1px solid #262626",
-                    }}
-                  >
-                    <div style={{ fontWeight: 500 }}>
+                  <li key={t.id} className={styles.taskItem}>
+                    <div>
                       <Link
                         href={`/workspaces/${workspaceId}/projects/${projectId}/tasks/${t.id}`}
-                        style={{ color: "inherit", textDecoration: "none" }}
+                        className={styles.taskTitle}
                       >
                         {t.title}
                       </Link>
                     </div>
-                    <div
-                      style={{
-                        color: "#737373",
-                        fontSize: "0.8rem",
-                        marginTop: 4,
-                      }}
-                    >
+                    <div className={styles.taskMeta}>
                       {t.estimateComplexity ?? "?"} ·{" "}
                       {t.estimateMicros != null
                         ? `${(t.estimateMicros / 100).toFixed(0)}¢`
@@ -207,23 +184,8 @@ export function PlanPanel({
                         ? ` · depends on ${t.dependsOnTaskIds.length}`
                         : ""}
                     </div>
-                    <div
-                      style={{
-                        color: "#A3A3A3",
-                        fontSize: "0.8rem",
-                        marginTop: 6,
-                      }}
-                    >
-                      Scope: {t.scope}
-                    </div>
-                    <ul
-                      style={{
-                        margin: "0.4rem 0 0",
-                        paddingLeft: "1.1rem",
-                        color: "#E5E5E5",
-                        fontSize: "0.8rem",
-                      }}
-                    >
+                    <div className={styles.taskScope}>Scope: {t.scope}</div>
+                    <ul className={styles.criteria}>
                       {t.acceptanceCriteria.map((c) => (
                         <li key={c}>{c}</li>
                       ))}
@@ -231,19 +193,13 @@ export function PlanPanel({
                     {isOwner &&
                     (t.status === "DRAFT" ||
                       t.status === "READY_FOR_APPROVAL") ? (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.4rem",
-                          marginTop: "0.55rem",
-                        }}
-                      >
+                      <div className={styles.btnRow}>
                         {t.status === "DRAFT" ? (
                           <button
                             type="button"
+                            className={styles.smallBtn}
                             disabled={pending}
                             onClick={() => void transitionTask(t.id, "submit")}
-                            style={btnSmall}
                           >
                             Submit
                           </button>
@@ -251,9 +207,9 @@ export function PlanPanel({
                         {t.status === "READY_FOR_APPROVAL" ? (
                           <button
                             type="button"
+                            className={styles.smallBtn}
                             disabled={pending}
                             onClick={() => void transitionTask(t.id, "approve")}
-                            style={btnSmall}
                           >
                             Approve → queue
                           </button>
@@ -267,29 +223,10 @@ export function PlanPanel({
           ))}
         </div>
       ) : hasApprovedBrief ? (
-        <p style={{ marginTop: "1rem", color: "#737373" }}>
+        <p className={styles.muted}>
           No plan yet. Generate one from the approved brief.
         </p>
       ) : null}
     </section>
   );
 }
-
-const btnStyle: CSSProperties = {
-  padding: "0.7rem 1rem",
-  background: "#FFFFFF",
-  color: "#0A0A0A",
-  border: "none",
-  borderRadius: 4,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const btnSmall: CSSProperties = {
-  ...btnStyle,
-  padding: "0.4rem 0.7rem",
-  fontSize: "0.8rem",
-  background: "transparent",
-  color: "#FFFFFF",
-  border: "1px solid #404040",
-};

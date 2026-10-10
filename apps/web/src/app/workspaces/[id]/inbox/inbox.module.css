@@ -1,0 +1,138 @@
+.main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  width: min(100%, 40rem);
+  margin: 0 auto;
+  padding: 2.75rem clamp(1.25rem, 4vw, 2rem) 4rem;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  margin: 0;
+  color: var(--mute-soft);
+  font-size: 0.9rem;
+}
+
+.navLink {
+  color: var(--mute);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.navLink:hover {
+  color: var(--paper);
+}
+
+.eyebrow {
+  margin: 1.1rem 0 0;
+  color: var(--copper);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0.55rem 0 0;
+  font-size: clamp(1.85rem, 4.5vw, 2.25rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+
+.lede {
+  margin: 0.65rem 0 0;
+  color: var(--mute);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.section {
+  margin-top: 2.1rem;
+  animation: cg-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.empty {
+  padding: 1.35rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 48%),
+    rgba(255, 255, 255, 0.015);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.emptyBody {
+  margin: 0.4rem 0 0;
+  color: var(--mute-soft);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.emptyLink {
+  color: var(--mute-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.emptyLink:hover {
+  color: var(--copper);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  border-bottom: 1px solid var(--line);
+}
+
+.rowLink {
+  display: block;
+  padding: 1rem 0.1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.rowLink:hover .rowTitle {
+  color: var(--copper);
+}
+
+.rowTitle {
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  transition: color 0.15s ease;
+}
+
+.rowMeta {
+  margin-top: 0.25rem;
+  color: var(--mute-soft);
+  font-size: 0.85rem;
+}
+
+.badge {
+  display: inline-block;
+  margin-right: 0.4rem;
+  color: var(--copper);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section {
+    animation: none;
+  }
+}

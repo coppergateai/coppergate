@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
+import styles from "./settings.module.css";
 
 export type ProjectBudgetRow = {
   projectId: string;
@@ -88,147 +89,111 @@ export function ProjectsBudgetPanel({
   }
 
   return (
-    <section style={{ marginTop: "2.5rem" }}>
-      <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+    <section className={styles.section} aria-labelledby="budgets-heading">
+      <h2 id="budgets-heading" className={styles.sectionLabel}>
         Project budgets
       </h2>
-      <p style={{ margin: "0 0 1rem", color: "#A3A3A3", fontSize: "0.875rem" }}>
+      <p className={styles.sectionLede}>
         Lower caps or pause spend. Workers refuse new agent work while paused.
       </p>
 
       {rows.length === 0 ? (
-        <p style={{ color: "#737373", fontSize: "0.875rem" }}>
+        <p className={styles.muted}>
           No projects yet.{" "}
           <Link
             href={`/workspaces/${workspaceId}/projects`}
-            style={{ color: "#A3A3A3" }}
+            className={styles.inlineLink}
           >
             Create a project
           </Link>
         </p>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        <ul className={styles.list}>
           {rows.map((row) => (
-            <li
-              key={row.projectId}
-              style={{
-                padding: "0.85rem 0",
-                borderBottom: "1px solid #262626",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                  flexWrap: "wrap",
-                  alignItems: "baseline",
-                }}
-              >
-                <div>
-                  <Link
-                    href={`/workspaces/${workspaceId}/projects/${row.projectId}`}
-                    style={{ color: "#FFFFFF", fontWeight: 600 }}
+            <li key={row.projectId} className={styles.row}>
+              <div>
+                <Link
+                  href={`/workspaces/${workspaceId}/projects/${row.projectId}`}
+                  className={styles.rowTitle}
+                >
+                  {row.name}
+                </Link>
+                <p className={styles.rowMeta}>
+                  {row.repoFullName} · cap {row.capMicros / 1_000_000}{" "}
+                  {row.currency} · available {row.availableMicros / 1_000_000} ·{" "}
+                  {row.budgetStatus}
+                </p>
+              </div>
+              {isOwner ? (
+                <div className={styles.rowActions}>
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    disabled={pendingId === row.projectId}
+                    onClick={() =>
+                      void setStatus(
+                        row.projectId,
+                        row.budgetStatus === "paused" ? "active" : "paused",
+                        row.capMicros,
+                      )
+                    }
                   >
-                    {row.name}
-                  </Link>
-                  <p
-                    style={{
-                      margin: "0.25rem 0 0",
-                      color: "#737373",
-                      fontSize: "0.8rem",
+                    {row.budgetStatus === "paused"
+                      ? "Resume spend"
+                      : "Pause spend"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    disabled={pendingId === row.projectId}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          `Archive project “${row.name}”? It will leave the active list.`,
+                        )
+                      ) {
+                        return;
+                      }
+                      setPendingId(row.projectId);
+                      setError(null);
+                      void fetch(
+                        `/api/projects/${row.projectId}?workspaceId=${workspaceId}`,
+                        { method: "DELETE", credentials: "same-origin" },
+                      )
+                        .then(async (res) => {
+                          if (!res.ok) {
+                            const body = (await res.json()) as {
+                              error?: { message: string };
+                            };
+                            throw new Error(
+                              body.error?.message ?? "Archive failed",
+                            );
+                          }
+                          setRows((prev) =>
+                            prev.filter((r) => r.projectId !== row.projectId),
+                          );
+                          router.refresh();
+                        })
+                        .catch((err: unknown) => {
+                          setError(
+                            err instanceof Error
+                              ? err.message
+                              : "Archive failed",
+                          );
+                        })
+                        .finally(() => setPendingId(null));
                     }}
                   >
-                    {row.repoFullName} · cap {row.capMicros / 1_000_000}{" "}
-                    {row.currency} · available {row.availableMicros / 1_000_000}{" "}
-                    · {row.budgetStatus}
-                  </p>
+                    Archive
+                  </button>
                 </div>
-                {isOwner ? (
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      disabled={pendingId === row.projectId}
-                      onClick={() =>
-                        void setStatus(
-                          row.projectId,
-                          row.budgetStatus === "paused" ? "active" : "paused",
-                          row.capMicros,
-                        )
-                      }
-                      style={ghostBtn}
-                    >
-                      {row.budgetStatus === "paused"
-                        ? "Resume spend"
-                        : "Pause spend"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pendingId === row.projectId}
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            `Archive project “${row.name}”? It will leave the active list.`,
-                          )
-                        ) {
-                          return;
-                        }
-                        setPendingId(row.projectId);
-                        setError(null);
-                        void fetch(
-                          `/api/projects/${row.projectId}?workspaceId=${workspaceId}`,
-                          { method: "DELETE", credentials: "same-origin" },
-                        )
-                          .then(async (res) => {
-                            if (!res.ok) {
-                              const body = (await res.json()) as {
-                                error?: { message: string };
-                              };
-                              throw new Error(
-                                body.error?.message ?? "Archive failed",
-                              );
-                            }
-                            setRows((prev) =>
-                              prev.filter((r) => r.projectId !== row.projectId),
-                            );
-                            router.refresh();
-                          })
-                          .catch((err: unknown) => {
-                            setError(
-                              err instanceof Error
-                                ? err.message
-                                : "Archive failed",
-                            );
-                          })
-                          .finally(() => setPendingId(null));
-                      }}
-                      style={ghostBtn}
-                    >
-                      Archive
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
 
-      {error ? (
-        <p style={{ marginTop: "0.75rem", color: "#F87171", fontSize: "0.875rem" }}>
-          {error}
-        </p>
-      ) : null}
+      {error ? <p className={styles.error}>{error}</p> : null}
     </section>
   );
 }
-
-const ghostBtn: CSSProperties = {
-  padding: "0.45rem 0.75rem",
-  background: "transparent",
-  color: "#FFFFFF",
-  border: "1px solid #404040",
-  borderRadius: 4,
-  cursor: "pointer",
-  fontSize: "0.8rem",
-};

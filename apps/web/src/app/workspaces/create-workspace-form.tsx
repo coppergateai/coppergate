@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styles from "./workspaces.module.css";
 
 type Props = {
   /** When true, invite code field is required (TASK035). */
@@ -17,6 +18,7 @@ export function CreateWorkspaceForm({ inviteRequired = false }: Props) {
 
   return (
     <form
+      className={`${styles.panel} ${styles.panelWide}`}
       onSubmit={(e) => {
         e.preventDefault();
         setPending(true);
@@ -48,67 +50,42 @@ export function CreateWorkspaceForm({ inviteRequired = false }: Props) {
             setPending(false);
           });
       }}
-      style={{ display: "grid", gap: "0.75rem", maxWidth: 360 }}
     >
-      <label style={{ display: "grid", gap: 6, fontSize: "0.875rem", color: "#A3A3A3" }}>
+      <label className={styles.field}>
         Name
         <input
           required
+          className={styles.input}
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Acme"
-          style={inputStyle}
         />
       </label>
       {inviteRequired ? (
-        <label style={{ display: "grid", gap: 6, fontSize: "0.875rem", color: "#A3A3A3" }}>
+        <label className={styles.field}>
           Pilot invite code
           <input
             required
+            className={styles.input}
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value)}
             placeholder="CG-…"
             autoComplete="off"
-            style={inputStyle}
           />
         </label>
       ) : null}
-      {error ? (
-        <p style={{ margin: 0, color: "#F87171", fontSize: "0.875rem" }}>{error}</p>
-      ) : null}
+      {error ? <p className={styles.error}>{error}</p> : null}
       <button
         type="submit"
+        className={styles.submit}
         disabled={
           pending ||
           !name.trim() ||
           (inviteRequired && !inviteCode.trim())
         }
-        style={{
-          padding: "0.7rem 1rem",
-          background: "#FFFFFF",
-          color: "#0A0A0A",
-          border: "none",
-          borderRadius: 4,
-          fontWeight: 600,
-          cursor: pending ? "wait" : "pointer",
-          opacity:
-            pending ||
-            !name.trim() ||
-            (inviteRequired && !inviteCode.trim())
-              ? 0.6
-              : 1,
-        }}
       >
         {pending ? "Creating…" : "Create workspace"}
       </button>
     </form>
   );
 }
-
-const inputStyle = {
-  padding: "0.65rem 0.75rem",
-  borderRadius: 4,
-  border: "1px solid #404040",
-  background: "#141414",
-  color: "#FFFFFF",
-} as const;

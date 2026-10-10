@@ -146,11 +146,73 @@ export async function applyTaskTransition(
   });
 }
 
-/** DRAFT → READY_FOR_APPROVAL */
+/**
+ * Enqueue execution after task is QUEUED — arena fan-out or single run.
+ */
+async function enqueueQueuedTask(
+  db: Database,
+  input: {
+    workspaceId: string;
+    task: Task;
+    actor: string;
+    reason: string;
+  },
+): Promise<Task> {
+  const nextAttempt = input.task.attemptCount + 1;
+  const arena = await getArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.task.projectId,
+  });
+
+  if (arena && arena.status !== "KILLED" && arena.status !== "PAUSED") {
+    await startTournamentFanout(db, {
+      workspaceId: input.workspaceId,
+      taskId: input.task.id,
+      actor: input.actor,
+      attempt: nextAttempt,
+    });
+  } else {
+    await reserveEstimateForTask(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.task.projectId,
+      taskId: input.task.id,
+      estimateMicros: input.task.estimateMicros ?? 0,
+    });
+
+    await enqueueAgentRun(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.task.projectId,
+      taskId: input.task.id,
+      idempotencyKey: `task:${input.task.id}:attempt:${nextAttempt}`,
+      estimatedCostMicros: input.task.estimateMicros ?? 0,
+      spendCapMicros: input.task.estimateMicros ?? 0,
+      attempt: nextAttempt,
+    });
+  }
+
+  const [bumped] = await db
+    .update(tasks)
+    .set({ attemptCount: nextAttempt, updatedAt: new Date() })
+    .where(eq(tasks.id, input.task.id))
+    .returning();
+
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "task.enqueue",
+    targetType: "task",
+    targetId: input.task.id,
+    meta: { reason: input.reason, attempt: nextAttempt },
+  });
+
+  return bumped ?? input.task;
+}
+
+/** DRAFT → READY_FOR_APPROVAL (or auto-queue when arena.min_human). */
 export async function submitTaskForApproval(
   db: Database,
   input: { workspaceId: string; taskId: string; actor: string },
-): Promise<TransitionResult> {
+): Promise<TransitionResult & { autoQueued?: boolean }> {
   const task = await loadTask(db, input.workspaceId, input.taskId);
   if (task.status !== "DRAFT" && task.status !== "NEEDS_REPLAN") {
     throw new TaskTransitionError(
@@ -165,22 +227,60 @@ export async function submitTaskForApproval(
       reason: "replan reset before submit",
     });
   }
-  const result = await applyTaskTransition(db, {
+  const ready = await applyTaskTransition(db, {
     ...input,
     toStatus: "READY_FOR_APPROVAL",
     reason: "submitted for approval",
   });
 
-  await requestApproval(db, {
+  const arena = await getArenaForProject(db, {
     workspaceId: input.workspaceId,
-    projectId: result.task.projectId,
-    targetType: "task",
-    targetId: result.task.id,
-    requestedBy: input.actor,
-    riskSummary: result.task.title,
+    projectId: ready.task.projectId,
   });
 
-  return result;
+  // TASK053 — min_human: skip inbox approve; queue immediately (default off).
+  if (
+    arena?.minHuman &&
+    arena.status !== "KILLED" &&
+    arena.status !== "PAUSED"
+  ) {
+    await assertQueuePolicies(db, input.workspaceId, ready.task);
+    const queued = await applyTaskTransition(db, {
+      ...input,
+      toStatus: "QUEUED",
+      reason: "min_human auto-queue",
+    });
+    const bumped = await enqueueQueuedTask(db, {
+      workspaceId: input.workspaceId,
+      task: queued.task,
+      actor: input.actor,
+      reason: "min_human",
+    });
+    await recordAuditEvent(db, {
+      workspaceId: input.workspaceId,
+      actor: input.actor,
+      action: "task.min_human_queue",
+      targetType: "task",
+      targetId: bumped.id,
+      meta: { arenaId: arena.id },
+    });
+    return {
+      task: bumped,
+      transition: queued.transition,
+      autoQueued: true,
+    };
+  }
+
+  await requestApproval(db, {
+    workspaceId: input.workspaceId,
+    projectId: ready.task.projectId,
+    targetType: "task",
+    targetId: ready.task.id,
+    requestedBy: input.actor,
+    riskSummary: ready.task.title,
+  });
+
+  return ready;
 }
 
 async function assertQueuePolicies(
@@ -300,44 +400,12 @@ export async function approveTask(
     reason: "approved",
   });
 
-  const nextAttempt = result.task.attemptCount + 1;
-  const arena = await getArenaForProject(db, {
+  const bumped = await enqueueQueuedTask(db, {
     workspaceId: input.workspaceId,
-    projectId: result.task.projectId,
+    task: result.task,
+    actor: input.actor,
+    reason: "approved",
   });
-
-  if (arena && arena.status !== "KILLED" && arena.status !== "PAUSED") {
-    // TASK049 — N ContenderRuns under Survivor arena (fan-out reserves budget).
-    await startTournamentFanout(db, {
-      workspaceId: input.workspaceId,
-      taskId: result.task.id,
-      actor: input.actor,
-      attempt: nextAttempt,
-    });
-  } else {
-    await reserveEstimateForTask(db, {
-      workspaceId: input.workspaceId,
-      projectId: result.task.projectId,
-      taskId: result.task.id,
-      estimateMicros: result.task.estimateMicros ?? 0,
-    });
-
-    await enqueueAgentRun(db, {
-      workspaceId: input.workspaceId,
-      projectId: result.task.projectId,
-      taskId: result.task.id,
-      idempotencyKey: `task:${result.task.id}:attempt:${nextAttempt}`,
-      estimatedCostMicros: result.task.estimateMicros ?? 0,
-      spendCapMicros: result.task.estimateMicros ?? 0,
-      attempt: nextAttempt,
-    });
-  }
-
-  const [bumped] = await db
-    .update(tasks)
-    .set({ attemptCount: nextAttempt, updatedAt: new Date() })
-    .where(eq(tasks.id, result.task.id))
-    .returning();
 
   try {
     await resolvePendingApproval(db, {
@@ -355,7 +423,7 @@ export async function approveTask(
   }
 
   return {
-    task: bumped ?? result.task,
+    task: bumped,
     transition: result.transition,
   };
 }

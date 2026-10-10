@@ -14,10 +14,13 @@ import {
 import { currentUser } from "@/lib/auth";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
+import { SiteChrome } from "../../../../site-chrome";
+import { ArenaPanel } from "./arena-panel";
 import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
 import { DeliveryBoard } from "./delivery-board";
 import { PlanPanel } from "./plan-panel";
+import styles from "./project-detail.module.css";
 
 type PageProps = { params: Promise<{ id: string; projectId: string }> };
 
@@ -111,102 +114,106 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     !hasApprovedBrief || !hasPlan || !hasBudget || !hasQueuedOrBeyond;
 
   return (
-    <main style={{ maxWidth: 720, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
-      <p style={{ margin: 0 }}>
-        <Link
-          href={`/workspaces/${workspaceId}/projects`}
-          style={{ color: "#A3A3A3" }}
-        >
-          ← Projects
-        </Link>
-        {" · "}
-        <Link
-          href={`/workspaces/${workspaceId}/inbox`}
-          style={{ color: "#A3A3A3" }}
-        >
-          Inbox
-        </Link>
-      </p>
-      <h1
-        style={{
-          margin: "1.25rem 0 0.35rem",
-          fontSize: "1.75rem",
-          fontWeight: 600,
-        }}
-      >
-        {row.project.name}
-      </h1>
-      <p style={{ margin: 0, color: "#A3A3A3" }}>
-        {row.repository.baseRepoFullName} · {row.project.mode} ·{" "}
-        {row.project.stack}
-      </p>
+    <SiteChrome>
+      <main className={styles.main}>
+        <p className={styles.nav}>
+          <Link
+            href={`/workspaces/${workspaceId}/projects`}
+            className={styles.navLink}
+          >
+            ← Projects
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link
+            href={`/workspaces/${workspaceId}/inbox`}
+            className={styles.navLink}
+          >
+            Inbox
+          </Link>
+        </p>
+        <p className={styles.eyebrow}>Project</p>
+        <h1 className={styles.title}>{row.project.name}</h1>
+        <p className={styles.lede}>
+          {row.repository.baseRepoFullName} · {row.project.mode} ·{" "}
+          {row.project.stack}
+        </p>
 
-      {showGuide ? (
-        <OnboardingGuide
-          title="Path to first PR"
-          steps={[
-            {
-              id: "budget",
-              title: "Set an active spend cap",
-              detail: "Budget panel below — pause blocks the worker.",
-              done: hasBudget,
-            },
-            {
-              id: "brief",
-              title: "Generate and approve a brief",
-              detail: "Keep scope tiny for the first delivery.",
-              done: hasApprovedBrief,
-            },
-            {
-              id: "plan",
-              title: "Generate a plan",
-              detail: "One small task is enough for the smoke path.",
-              done: hasPlan,
-            },
-            {
-              id: "task",
-              title: "Submit + approve a task",
-              detail: "Requires autonomy ≥ L1 and a running worker.",
-              done: hasQueuedOrBeyond,
-            },
-          ]}
+        {showGuide ? (
+          <div className={styles.path}>
+            <OnboardingGuide
+              compact
+              title="Path to first PR"
+              steps={[
+                {
+                  id: "budget",
+                  title: "Set an active spend cap",
+                  detail: "Budget panel below — pause blocks the worker.",
+                  done: hasBudget,
+                },
+                {
+                  id: "brief",
+                  title: "Generate and approve a brief",
+                  detail: "Keep scope tiny for the first delivery.",
+                  done: hasApprovedBrief,
+                },
+                {
+                  id: "plan",
+                  title: "Generate a plan",
+                  detail: "One small task is enough for the smoke path.",
+                  done: hasPlan,
+                },
+                {
+                  id: "task",
+                  title: "Submit + approve a task",
+                  detail: "Requires autonomy ≥ L1 and a running worker.",
+                  done: hasQueuedOrBeyond,
+                },
+              ]}
+            />
+          </div>
+        ) : null}
+
+        <BudgetPanel
+          workspaceId={workspaceId}
+          projectId={projectId}
+          initialUsage={{
+            capMicros: usage.capMicros,
+            spentMicros: usage.spentMicros,
+            reservedMicros: usage.reservedMicros,
+            availableMicros: usage.availableMicros,
+            currency: usage.currency,
+            budgetStatus: usage.budgetStatus,
+          }}
+          isOwner={access.role === "owner"}
         />
-      ) : null}
 
-      <BriefPanel
-        workspaceId={workspaceId}
-        projectId={projectId}
-        initialBrief={initialBrief}
-        isOwner={access.role === "owner"}
-      />
+        <BriefPanel
+          workspaceId={workspaceId}
+          projectId={projectId}
+          initialBrief={initialBrief}
+          isOwner={access.role === "owner"}
+        />
 
-      <PlanPanel
-        workspaceId={workspaceId}
-        projectId={projectId}
-        initialPlan={initialPlan}
-        hasApprovedBrief={hasApprovedBrief}
-        isOwner={access.role === "owner"}
-      />
+        <PlanPanel
+          workspaceId={workspaceId}
+          projectId={projectId}
+          initialPlan={initialPlan}
+          hasApprovedBrief={hasApprovedBrief}
+          isOwner={access.role === "owner"}
+        />
 
-      <DeliveryBoard
-        workspaceId={workspaceId}
-        projectId={projectId}
-        tasks={boardTasks}
-      />
+        <DeliveryBoard
+          workspaceId={workspaceId}
+          projectId={projectId}
+          tasks={boardTasks}
+        />
 
-      <BudgetPanel
-        workspaceId={workspaceId}
-        projectId={projectId}
-        initialUsage={{
-          capMicros: usage.capMicros,
-          spentMicros: usage.spentMicros,
-          reservedMicros: usage.reservedMicros,
-          availableMicros: usage.availableMicros,
-          currency: usage.currency,
-          budgetStatus: usage.budgetStatus,
-        }}
-        isOwner={access.role === "owner"}
-      />
-    </main>
+        <ArenaPanel
+          workspaceId={workspaceId}
+          projectId={projectId}
+          isOwner={access.role === "owner"}
+        />
+      </main>
+    </SiteChrome>
   );
 }

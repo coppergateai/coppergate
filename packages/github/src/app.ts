@@ -1,3 +1,4 @@
+import { createPrivateKey } from "node:crypto";
 import { SignJWT, importPKCS8 } from "jose";
 
 export type GithubAppConfig = {
@@ -18,7 +19,7 @@ export function githubAppInstallUrl(
 
 /** RS256 JWT for GitHub App authentication (≤10 minutes). */
 export async function createAppJwt(config: GithubAppConfig): Promise<string> {
-  const key = await importPKCS8(normalizePem(config.privateKeyPem), "RS256");
+  const key = await importPKCS8(toPkcs8Pem(config.privateKeyPem), "RS256");
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({})
     .setProtectedHeader({ alg: "RS256" })
@@ -28,9 +29,23 @@ export async function createAppJwt(config: GithubAppConfig): Promise<string> {
     .sign(key);
 }
 
-function normalizePem(pem: string): string {
-  // Allow env-stored keys with literal \n
-  return pem.includes("\\n") ? pem.replace(/\\n/g, "\n") : pem;
+/**
+ * Normalize env-stored PEM and convert PKCS#1 (`BEGIN RSA PRIVATE KEY`)
+ * to PKCS#8 (`BEGIN PRIVATE KEY`) for jose.importPKCS8.
+ */
+export function toPkcs8Pem(pem: string): string {
+  let normalized = pem.trim();
+  if (
+    (normalized.startsWith('"') && normalized.endsWith('"')) ||
+    (normalized.startsWith("'") && normalized.endsWith("'"))
+  ) {
+    normalized = normalized.slice(1, -1);
+  }
+  if (normalized.includes("\\n")) {
+    normalized = normalized.replace(/\\n/g, "\n");
+  }
+  const key = createPrivateKey(normalized);
+  return key.export({ type: "pkcs8", format: "pem" }).toString();
 }
 
 export type InstallationTokenResult = {

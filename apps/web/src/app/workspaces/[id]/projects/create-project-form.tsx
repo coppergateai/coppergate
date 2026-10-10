@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styles from "./projects.module.css";
 
 type Props = {
   workspaceId: string;
@@ -22,6 +23,7 @@ export function CreateProjectForm({ workspaceId, repositories }: Props) {
 
   return (
     <form
+      className={styles.panel}
       onSubmit={(e) => {
         e.preventDefault();
         setPending(true);
@@ -47,37 +49,37 @@ export function CreateProjectForm({ workspaceId, repositories }: Props) {
           })
           .finally(() => setPending(false));
       }}
-      style={{ display: "grid", gap: "0.85rem", maxWidth: 400 }}
     >
-      <label style={labelStyle}>
+      <label className={styles.field}>
         Name
         <input
           required
+          className={styles.input}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={inputStyle}
+          placeholder="my-project"
         />
       </label>
-      <label style={labelStyle}>
+      <label className={styles.field}>
         Mode
         <select
+          className={styles.select}
           value={mode}
           onChange={(e) =>
             setMode(e.target.value as "new_product" | "existing_repo")
           }
-          style={inputStyle}
         >
           <option value="existing_repo">Existing repo</option>
           <option value="new_product">New product (template)</option>
         </select>
       </label>
-      <label style={labelStyle}>
+      <label className={styles.field}>
         Repository
         <select
           required
+          className={styles.select}
           value={repositoryConnectionId}
           onChange={(e) => setRepositoryConnectionId(e.target.value)}
-          style={inputStyle}
         >
           {repositories.map((r) => (
             <option key={r.id} value={r.id}>
@@ -86,41 +88,18 @@ export function CreateProjectForm({ workspaceId, repositories }: Props) {
           ))}
         </select>
       </label>
-      <p style={{ margin: 0, color: "#737373", fontSize: "0.8rem" }}>
+      <p className={styles.hint}>
         Stack is fixed to <code>nextjs_ts</code> for MVP. Each repo can bind to
         only one project.
       </p>
-      {error ? (
-        <p style={{ margin: 0, color: "#F87171", fontSize: "0.875rem" }}>{error}</p>
-      ) : null}
-      <button type="submit" disabled={pending || !name.trim()} style={btnStyle}>
+      {error ? <p className={styles.error}>{error}</p> : null}
+      <button
+        type="submit"
+        className={styles.submit}
+        disabled={pending || !name.trim()}
+      >
         {pending ? "Creating…" : "Create project"}
       </button>
     </form>
   );
 }
-
-const labelStyle: CSSProperties = {
-  display: "grid",
-  gap: 6,
-  fontSize: "0.875rem",
-  color: "#A3A3A3",
-};
-
-const inputStyle: CSSProperties = {
-  padding: "0.65rem 0.75rem",
-  borderRadius: 4,
-  border: "1px solid #404040",
-  background: "#141414",
-  color: "#FFFFFF",
-};
-
-const btnStyle: CSSProperties = {
-  padding: "0.7rem 1rem",
-  background: "#FFFFFF",
-  color: "#0A0A0A",
-  border: "none",
-  borderRadius: 4,
-  fontWeight: 600,
-  cursor: "pointer",
-};
