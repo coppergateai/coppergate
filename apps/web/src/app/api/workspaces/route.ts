@@ -1,13 +1,16 @@
 import {
+  InviteError,
   createWorkspaceWithOwner,
   isAutonomyLevel,
   listWorkspacesForUser,
+  redeemPilotInvite,
   type AutonomyLevel,
 } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 import { requireUser } from "@/lib/auth";
 import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { serializeWorkspace } from "@/lib/workspace";
@@ -38,6 +41,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => null)) as {
       name?: unknown;
       autonomyDefault?: unknown;
+      inviteCode?: unknown;
     } | null;
 
     if (!body || typeof body.name !== "string") {
@@ -55,6 +59,41 @@ export async function POST(request: Request) {
       autonomyDefault = body.autonomyDefault;
     }
 
+    if (env.PILOT_INVITE_REQUIRED) {
+      if (typeof body.inviteCode !== "string" || !body.inviteCode.trim()) {
+        throw new ApiError(
+          "forbidden",
+          "A pilot invite code is required to create a workspace",
+        );
+      }
+      try {
+        await redeemPilotInvite(db, {
+          code: body.inviteCode,
+          userId: user.id,
+        });
+      } catch (err) {
+        if (err instanceof InviteError) {
+          throw new ApiError(
+            err.code === "required" || err.code === "invalid"
+              ? "forbidden"
+              : "conflict",
+            err.message,
+          );
+        }
+        throw err;
+      }
+    } else if (typeof body.inviteCode === "string" && body.inviteCode.trim()) {
+      // Optional redeem when gating is off (dev convenience).
+      try {
+        await redeemPilotInvite(db, {
+          code: body.inviteCode,
+          userId: user.id,
+        });
+      } catch {
+        /* ignore optional invite failures in open mode */
+      }
+    }
+
     const created = await createWorkspaceWithOwner(db, {
       name: body.name,
       ownerUserId: user.id,
@@ -65,6 +104,7 @@ export async function POST(request: Request) {
       correlationId,
       workspaceId: created.workspace.id,
       userId: user.id,
+      inviteRequired: env.PILOT_INVITE_REQUIRED,
     });
 
     return jsonOk(

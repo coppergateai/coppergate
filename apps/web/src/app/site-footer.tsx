@@ -41,6 +41,7 @@ export function SiteFooter() {
             </nav>
             <nav className={styles.footerCol} aria-label="Company">
               <h2 className={styles.footerHeading}>Company</h2>
+              <Link href="/docs">Docs</Link>
               <Link href="/security">Security</Link>
               <Link href="/changelog">Changelog</Link>
               <a href="mailto:hello@coppergate.ai">Contact</a>

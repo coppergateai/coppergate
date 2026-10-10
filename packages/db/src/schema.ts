@@ -619,6 +619,27 @@ export const waitlistSignups = pgTable("waitlist_signups", {
     .defaultNow(),
 });
 
+/** Pilot invite codes — TASK035 public beta gating. */
+export const pilotInvites = pgTable(
+  "pilot_invites",
+  {
+    id: uuid("id").primaryKey(),
+    code: text("code").notNull().unique(),
+    note: text("note"),
+    maxUses: integer("max_uses").notNull().default(1),
+    useCount: integer("use_count").notNull().default(0),
+    redeemedByUserId: uuid("redeemed_by_user_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("pilot_invites_code_idx").on(t.code)],
+);
+
 /** Idempotent GitHub webhook delivery log — TASK006. */
 export const githubWebhookDeliveries = pgTable(
   "github_webhook_deliveries",
@@ -662,6 +683,7 @@ export type AgentRun = typeof agentRuns.$inferSelect;
 export type AgentRunEvent = typeof agentRunEvents.$inferSelect;
 export type Artifact = typeof artifacts.$inferSelect;
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
+export type PilotInvite = typeof pilotInvites.$inferSelect;
 export type GithubWebhookDelivery = typeof githubWebhookDeliveries.$inferSelect;
 
 export type AutonomyLevel = "L0" | "L1" | "L2";
