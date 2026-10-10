@@ -6,6 +6,8 @@ import {
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { SiteChrome } from "../../../site-chrome";
+import styles from "./inbox.module.css";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -24,70 +26,60 @@ export default async function WorkspaceInboxPage({ params }: PageProps) {
   const pending = await listPendingApprovalsForWorkspace(db, id);
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
-      <p style={{ margin: 0 }}>
-        <Link href={`/workspaces/${id}/projects`} style={{ color: "#A3A3A3" }}>
-          ← Projects
-        </Link>
-        {" · "}
-        <Link href={`/workspaces/${id}/settings`} style={{ color: "#A3A3A3" }}>
-          Settings
-        </Link>
-      </p>
-      <h1
-        style={{
-          margin: "1.25rem 0 0.35rem",
-          fontSize: "1.75rem",
-          fontWeight: 600,
-        }}
-      >
-        Review inbox
-      </h1>
-      <p style={{ margin: 0, color: "#A3A3A3" }}>
-        Pending approvals for {access.workspace.name}
-      </p>
+    <SiteChrome>
+      <main className={styles.main}>
+        <p className={styles.nav}>
+          <Link href={`/workspaces/${id}/projects`} className={styles.navLink}>
+            ← Projects
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href={`/workspaces/${id}/settings`} className={styles.navLink}>
+            Settings
+          </Link>
+        </p>
+        <p className={styles.eyebrow}>Inbox</p>
+        <h1 className={styles.title}>Review inbox</h1>
+        <p className={styles.lede}>
+          Pending approvals for {access.workspace.name}
+        </p>
 
-      <section style={{ marginTop: "2rem" }}>
-        {pending.length === 0 ? (
-          <p style={{ color: "#737373" }}>No pending approvals.</p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {pending.map((a) => {
-              const href =
-                a.targetType === "brief" || a.targetType === "task"
-                  ? `/workspaces/${id}/projects/${a.projectId}`
-                  : `/workspaces/${id}/projects/${a.projectId}`;
-              return (
-                <li
-                  key={a.id}
-                  style={{
-                    padding: "0.85rem 0",
-                    borderBottom: "1px solid #262626",
-                  }}
+        <section className={styles.section} aria-label="Pending approvals">
+          {pending.length === 0 ? (
+            <div className={styles.empty}>
+              <p className={styles.emptyTitle}>No pending approvals</p>
+              <p className={styles.emptyBody}>
+                When a brief or task needs a human gate, it shows up here.{" "}
+                <Link
+                  href={`/workspaces/${id}/projects`}
+                  className={styles.emptyLink}
                 >
-                  <Link
-                    href={href}
-                    style={{ color: "inherit", textDecoration: "none" }}
-                  >
-                    <div style={{ fontWeight: 500 }}>
-                      {a.targetType} · {a.riskSummary || a.targetId.slice(0, 8)}
-                    </div>
-                    <div
-                      style={{
-                        color: "#737373",
-                        fontSize: "0.875rem",
-                        marginTop: 4,
-                      }}
-                    >
-                      pending · requested {a.createdAt.toISOString()}
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-    </main>
+                  Open projects
+                </Link>{" "}
+                to keep the path moving.
+              </p>
+            </div>
+          ) : (
+            <ul className={styles.list}>
+              {pending.map((a) => {
+                const href = `/workspaces/${id}/projects/${a.projectId}`;
+                return (
+                  <li key={a.id} className={styles.row}>
+                    <Link href={href} className={styles.rowLink}>
+                      <div className={styles.rowTitle}>
+                        <span className={styles.badge}>{a.targetType}</span>
+                        {a.riskSummary || a.targetId.slice(0, 8)}
+                      </div>
+                      <div className={styles.rowMeta}>
+                        pending · requested {a.createdAt.toISOString()}
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      </main>
+    </SiteChrome>
   );
 }

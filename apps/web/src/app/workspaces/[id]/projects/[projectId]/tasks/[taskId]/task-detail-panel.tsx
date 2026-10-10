@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
+import { TournamentPanel } from "./tournament-panel";
 
 type Run = {
   id: string;
@@ -448,6 +449,8 @@ export function TaskDetailPanel({
           ) : null}
         </section>
       ) : null}
+
+      <TournamentPanel workspaceId={workspaceId} taskId={taskId} />
 
       <section style={{ marginTop: "2rem" }}>
         <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>Runs & cost</h2>

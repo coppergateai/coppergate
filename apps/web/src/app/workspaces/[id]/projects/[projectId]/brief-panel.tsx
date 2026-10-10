@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styles from "./project-detail.module.css";
 
 type ClarifyingAnswer = {
   id: string;
@@ -98,27 +99,24 @@ export function BriefPanel({
     setPending(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/projects/${projectId}/brief/${brief.id}`,
-        {
-          method: "PATCH",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            workspaceId,
-            title: brief.title,
-            targetUser: brief.targetUser,
-            problem: brief.problem,
-            scope: brief.scope,
-            nonGoals: brief.nonGoals,
-            acceptanceCriteria: brief.acceptanceCriteria,
-            clarifyingAnswers: brief.clarifyingAnswers.map((q) => ({
-              ...q,
-              answer: answers[q.id] ?? q.answer,
-            })),
-          }),
-        },
-      );
+      const res = await fetch(`/api/projects/${projectId}/brief/${brief.id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId,
+          title: brief.title,
+          targetUser: brief.targetUser,
+          problem: brief.problem,
+          scope: brief.scope,
+          nonGoals: brief.nonGoals,
+          acceptanceCriteria: brief.acceptanceCriteria,
+          clarifyingAnswers: brief.clarifyingAnswers.map((q) => ({
+            ...q,
+            answer: answers[q.id] ?? q.answer,
+          })),
+        }),
+      });
       const body = (await res.json()) as {
         brief?: Brief;
         error?: { message: string };
@@ -187,11 +185,11 @@ export function BriefPanel({
   }
 
   return (
-    <section style={{ marginTop: "2rem" }}>
-      <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>
+    <section className={styles.section} aria-labelledby="brief-heading">
+      <h2 id="brief-heading" className={styles.sectionLabel}>
         Product brief
       </h2>
-      <p style={{ margin: "0 0 1rem", color: "#737373", fontSize: "0.875rem" }}>
+      <p className={styles.sectionLede}>
         Approve a brief before tasks can start (FR-02).
         {brief ? (
           <>
@@ -202,86 +200,89 @@ export function BriefPanel({
       </p>
 
       {isOwner ? (
-        <div style={{ display: "grid", gap: "0.85rem", marginBottom: "1.5rem" }}>
-          <label style={labelStyle}>
-            Idea
-            <textarea
-              value={idea}
-              onChange={(e) => setIdea(e.target.value)}
-              rows={3}
-              style={{ ...inputStyle, resize: "vertical" }}
-              placeholder="Describe what you want to build…"
-            />
-          </label>
+        <div className={styles.panel}>
+          <div className={styles.stack}>
+            <label className={styles.field}>
+              Idea
+              <textarea
+                className={styles.textarea}
+                value={idea}
+                onChange={(e) => setIdea(e.target.value)}
+                rows={3}
+                placeholder="Describe what you want to build…"
+              />
+            </label>
 
-          {(needsAnswers || (brief?.clarifyingAnswers.length ?? 0) > 0) &&
-          brief?.status === "draft" ? (
-            <div style={{ display: "grid", gap: "0.75rem" }}>
-              <p style={{ margin: 0, color: "#A3A3A3", fontSize: "0.8rem" }}>
-                Clarifying questions (≤3)
-              </p>
-              {(brief?.clarifyingAnswers ?? []).map((q) => (
-                <label key={q.id} style={labelStyle}>
-                  {q.question}
-                  <input
-                    value={answers[q.id] ?? ""}
-                    onChange={(e) =>
-                      setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                    }
-                    style={inputStyle}
-                  />
-                </label>
-              ))}
-            </div>
-          ) : null}
-
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              disabled={pending || !idea.trim()}
-              onClick={() => void generate()}
-              style={btnStyle}
-            >
-              {pending ? "Working…" : "Generate draft"}
-            </button>
-            {editable ? (
-              <>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => void save()}
-                  style={btnSecondary}
-                >
-                  Save edits
-                </button>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => void approve()}
-                  style={btnSecondary}
-                >
-                  Approve brief
-                </button>
-              </>
+            {(needsAnswers || (brief?.clarifyingAnswers.length ?? 0) > 0) &&
+            brief?.status === "draft" ? (
+              <div className={styles.stack}>
+                <p className={styles.hint}>Clarifying questions (≤3)</p>
+                {(brief?.clarifyingAnswers ?? []).map((q) => (
+                  <label key={q.id} className={styles.field}>
+                    {q.question}
+                    <input
+                      className={styles.input}
+                      value={answers[q.id] ?? ""}
+                      onChange={(e) =>
+                        setAnswers((prev) => ({
+                          ...prev,
+                          [q.id]: e.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
             ) : null}
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => void tryStartTasks()}
-              style={btnSecondary}
-            >
-              Start tasks
-            </button>
+
+            <div className={styles.btnRow}>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={pending || !idea.trim()}
+                onClick={() => void generate()}
+              >
+                {pending ? "Working…" : "Generate draft"}
+              </button>
+              {editable ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    disabled={pending}
+                    onClick={() => void save()}
+                  >
+                    Save edits
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    disabled={pending}
+                    onClick={() => void approve()}
+                  >
+                    Approve brief
+                  </button>
+                </>
+              ) : null}
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                disabled={pending}
+                onClick={() => void tryStartTasks()}
+              >
+                Start tasks
+              </button>
+            </div>
           </div>
         </div>
       ) : (
-        <p style={{ color: "#737373", fontSize: "0.875rem" }}>
+        <p className={styles.muted}>
           Only workspace owners can generate or approve briefs.
         </p>
       )}
 
       {brief ? (
-        <div style={{ display: "grid", gap: "0.75rem" }}>
+        <div className={`${styles.stack} ${styles.milestones}`}>
           {(
             [
               ["title", "Title"],
@@ -291,36 +292,37 @@ export function BriefPanel({
               ["nonGoals", "Non-goals"],
             ] as const
           ).map(([key, label]) => (
-            <label key={key} style={labelStyle}>
+            <label key={key} className={styles.field}>
               {label}
               {editable ? (
                 key === "problem" || key === "scope" || key === "nonGoals" ? (
                   <textarea
+                    className={styles.textarea}
                     value={brief[key]}
                     rows={2}
                     onChange={(e) =>
                       setBrief({ ...brief, [key]: e.target.value })
                     }
-                    style={{ ...inputStyle, resize: "vertical" }}
                   />
                 ) : (
                   <input
+                    className={styles.input}
                     value={brief[key]}
                     onChange={(e) =>
                       setBrief({ ...brief, [key]: e.target.value })
                     }
-                    style={inputStyle}
                   />
                 )
               ) : (
-                <div style={readonlyStyle}>{brief[key] || "—"}</div>
+                <div className={styles.readonly}>{brief[key] || "—"}</div>
               )}
             </label>
           ))}
-          <label style={labelStyle}>
+          <label className={styles.field}>
             Acceptance criteria
             {editable ? (
               <textarea
+                className={styles.textarea}
                 value={brief.acceptanceCriteria.join("\n")}
                 rows={3}
                 onChange={(e) =>
@@ -332,10 +334,9 @@ export function BriefPanel({
                       .filter(Boolean),
                   })
                 }
-                style={{ ...inputStyle, resize: "vertical" }}
               />
             ) : (
-              <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#E5E5E5" }}>
+              <ul className={styles.criteria}>
                 {brief.acceptanceCriteria.map((c) => (
                   <li key={c}>{c}</li>
                 ))}
@@ -344,59 +345,13 @@ export function BriefPanel({
           </label>
         </div>
       ) : (
-        <p style={{ color: "#737373" }}>No brief yet. Generate a draft from an idea.</p>
+        <p className={styles.muted}>
+          No brief yet. Generate a draft from an idea.
+        </p>
       )}
 
-      {error ? (
-        <p style={{ marginTop: "1rem", color: "#F87171", fontSize: "0.875rem" }}>
-          {error}
-        </p>
-      ) : null}
-      {gateMsg ? (
-        <p style={{ marginTop: "1rem", color: "#A3A3A3", fontSize: "0.875rem" }}>
-          {gateMsg}
-        </p>
-      ) : null}
+      {error ? <p className={styles.error}>{error}</p> : null}
+      {gateMsg ? <p className={styles.note}>{gateMsg}</p> : null}
     </section>
   );
 }
-
-const labelStyle: CSSProperties = {
-  display: "grid",
-  gap: 6,
-  fontSize: "0.875rem",
-  color: "#A3A3A3",
-};
-
-const inputStyle: CSSProperties = {
-  padding: "0.65rem 0.75rem",
-  borderRadius: 4,
-  border: "1px solid #404040",
-  background: "#141414",
-  color: "#FFFFFF",
-  font: "inherit",
-};
-
-const readonlyStyle: CSSProperties = {
-  ...inputStyle,
-  background: "#0A0A0A",
-  color: "#E5E5E5",
-  whiteSpace: "pre-wrap",
-};
-
-const btnStyle: CSSProperties = {
-  padding: "0.7rem 1rem",
-  background: "#FFFFFF",
-  color: "#0A0A0A",
-  border: "none",
-  borderRadius: 4,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const btnSecondary: CSSProperties = {
-  ...btnStyle,
-  background: "transparent",
-  color: "#FFFFFF",
-  border: "1px solid #404040",
-};

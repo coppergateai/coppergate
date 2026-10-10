@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   assertSufficientBudget,
   BudgetError,
@@ -232,6 +232,48 @@ export async function listContendersForArena(
     );
 }
 
+/** TASK053 — toggle min_human (default remains false until G1b). */
+export async function setArenaMinHuman(
+  db: Database,
+  input: {
+    workspaceId: string;
+    arenaId: string;
+    minHuman: boolean;
+    actor: string;
+  },
+): Promise<Arena> {
+  const [arena] = await db
+    .select()
+    .from(arenas)
+    .where(
+      and(
+        eq(arenas.id, input.arenaId),
+        eq(arenas.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!arena) throw new ArenaError("not_found", "arena not found");
+
+  const now = new Date();
+  const [updated] = await db
+    .update(arenas)
+    .set({ minHuman: input.minHuman, updatedAt: now })
+    .where(eq(arenas.id, arena.id))
+    .returning();
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.min_human",
+    targetType: "arena",
+    targetId: arena.id,
+    meta: JSON.stringify({ minHuman: input.minHuman }),
+  });
+
+  return updated!;
+}
+
 export async function applyContenderDebit(
   db: Database,
   input: {
@@ -382,6 +424,28 @@ export async function getOpenTournamentForTask(
     )
     .limit(1);
   return row ?? null;
+}
+
+/** TASK054 — open tournament, else most recent for the task. */
+export async function getLatestTournamentForTask(
+  db: Database,
+  input: { workspaceId: string; taskId: string },
+): Promise<Tournament | null> {
+  const open = await getOpenTournamentForTask(db, input);
+  if (open) return open;
+
+  const [latest] = await db
+    .select()
+    .from(tournaments)
+    .where(
+      and(
+        eq(tournaments.workspaceId, input.workspaceId),
+        eq(tournaments.taskId, input.taskId),
+      ),
+    )
+    .orderBy(desc(tournaments.createdAt))
+    .limit(1);
+  return latest ?? null;
 }
 
 /**
@@ -676,7 +740,7 @@ export async function killArena(
       );
 
     const activeRuns = await db
-      .select({ id: agentRuns.id, status: agentRuns.status })
+      .select()
       .from(agentRuns)
       .where(
         and(
@@ -684,12 +748,26 @@ export async function killArena(
           inArray(agentRuns.tournamentId, tournamentIds),
         ),
       );
-    const cancelIds = activeRuns
-      .filter((r) =>
-        ["QUEUED", "RUNNING", "VALIDATING"].includes(r.status),
-      )
+    const queuedIds = activeRuns
+      .filter((r) => r.status === "QUEUED")
       .map((r) => r.id);
-    if (cancelIds.length > 0) {
+    const inflightIds = activeRuns
+      .filter((r) => ["RUNNING", "VALIDATING"].includes(r.status))
+      .map((r) => r.id);
+
+    if (queuedIds.length > 0) {
+      await db
+        .update(agentRuns)
+        .set({
+          status: "CANCELLED",
+          cancelRequestedAt: now,
+          tournamentResult: "CANCELLED",
+          finishedAt: now,
+          updatedAt: now,
+        })
+        .where(inArray(agentRuns.id, queuedIds));
+    }
+    if (inflightIds.length > 0) {
       await db
         .update(agentRuns)
         .set({
@@ -697,7 +775,7 @@ export async function killArena(
           tournamentResult: "CANCELLED",
           updatedAt: now,
         })
-        .where(inArray(agentRuns.id, cancelIds));
+        .where(inArray(agentRuns.id, inflightIds));
     }
   }
 
@@ -712,4 +790,96 @@ export async function killArena(
   });
 
   return updated!;
+}
+
+/** Re-arm a killed/paused arena so fan-out can run again (TASK052). */
+export async function resumeArena(
+  db: Database,
+  input: { workspaceId: string; arenaId: string; actor: string },
+): Promise<Arena> {
+  const [arena] = await db
+    .select()
+    .from(arenas)
+    .where(
+      and(
+        eq(arenas.id, input.arenaId),
+        eq(arenas.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!arena) throw new ArenaError("not_found", "arena not found");
+  if (arena.status !== "KILLED" && arena.status !== "PAUSED") {
+    throw new ArenaError(
+      "invalid",
+      `arena status ${arena.status} cannot resume`,
+    );
+  }
+
+  const now = new Date();
+  const [updated] = await db
+    .update(arenas)
+    .set({
+      status: "ARMED",
+      killedAt: null,
+      updatedAt: now,
+    })
+    .where(eq(arenas.id, arena.id))
+    .returning();
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.resume",
+    targetType: "arena",
+    targetId: arena.id,
+    meta: JSON.stringify({ from: arena.status }),
+  });
+
+  return updated!;
+}
+
+/**
+ * TASK051 — debit loser contenders after resolve (actual or estimated spend).
+ * Winner is not debited here (project ledger already reserved fan-out total).
+ */
+export async function debitTournamentLosers(
+  db: Database,
+  input: {
+    workspaceId: string;
+    tournamentId: string;
+    actor: string;
+  },
+): Promise<Contender[]> {
+  const runs = await listRunsForTournament(db, {
+    workspaceId: input.workspaceId,
+    tournamentId: input.tournamentId,
+  });
+  const losers = runs.filter((r) => r.tournamentResult === "LOSER");
+  const updated: Contender[] = [];
+  for (const run of losers) {
+    if (!run.contenderId) continue;
+    const debit =
+      run.actualCostMicros > 0
+        ? run.actualCostMicros
+        : run.estimatedCostMicros > 0
+          ? run.estimatedCostMicros
+          : run.spendCapMicros;
+    if (debit <= 0) continue;
+    try {
+      const c = await applyContenderDebit(db, {
+        workspaceId: input.workspaceId,
+        contenderId: run.contenderId,
+        debitMicros: debit,
+        actor: input.actor,
+      });
+      updated.push(c);
+    } catch (err) {
+      if (err instanceof ArenaError && err.code === "eliminated") {
+        continue;
+      }
+      throw err;
+    }
+  }
+  return updated;
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styles from "./project-detail.module.css";
 
 type Usage = {
   capMicros: number;
@@ -78,84 +79,50 @@ export function BudgetPanel({
   }
 
   return (
-    <section style={{ marginTop: "2.5rem" }}>
-      <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>
+    <section className={styles.section} aria-labelledby="budget-heading">
+      <h2 id="budget-heading" className={styles.sectionLabel}>
         Budget
       </h2>
-      <p style={{ margin: "0 0 1rem", color: "#737373", fontSize: "0.875rem" }}>
+      <p className={styles.sectionLede}>
         Cap {usage.capMicros / 1_000_000} {usage.currency} · spent{" "}
-        {usage.spentMicros / 1_000_000} · reserved {usage.reservedMicros / 1_000_000}{" "}
-        · available {usage.availableMicros / 1_000_000} · {usage.budgetStatus}
+        {usage.spentMicros / 1_000_000} · reserved{" "}
+        {usage.reservedMicros / 1_000_000} · available{" "}
+        {usage.availableMicros / 1_000_000} · {usage.budgetStatus}
       </p>
       {isOwner ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "end" }}>
-          <label style={labelStyle}>
-            Cap (USD)
-            <input
-              value={capDollars}
-              onChange={(e) => setCapDollars(e.target.value)}
-              style={inputStyle}
-              inputMode="decimal"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => void save()}
-            style={btnStyle}
-          >
-            {pending ? "Saving…" : "Save cap"}
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              void save(usage.budgetStatus === "paused" ? "active" : "paused")
-            }
-            style={btnGhost}
-          >
-            {usage.budgetStatus === "paused" ? "Resume spend" : "Pause spend"}
-          </button>
+        <div className={styles.panel}>
+          <div className={styles.btnRow}>
+            <label className={styles.field}>
+              Cap (USD)
+              <input
+                className={styles.inputNarrow}
+                value={capDollars}
+                onChange={(e) => setCapDollars(e.target.value)}
+                inputMode="decimal"
+              />
+            </label>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              disabled={pending}
+              onClick={() => void save()}
+            >
+              {pending ? "Saving…" : "Save cap"}
+            </button>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              disabled={pending}
+              onClick={() =>
+                void save(usage.budgetStatus === "paused" ? "active" : "paused")
+              }
+            >
+              {usage.budgetStatus === "paused" ? "Resume spend" : "Pause spend"}
+            </button>
+          </div>
         </div>
       ) : null}
-      {error ? (
-        <p style={{ marginTop: "0.75rem", color: "#F87171", fontSize: "0.875rem" }}>
-          {error}
-        </p>
-      ) : null}
+      {error ? <p className={styles.error}>{error}</p> : null}
     </section>
   );
 }
-
-const labelStyle: CSSProperties = {
-  display: "grid",
-  gap: 6,
-  fontSize: "0.875rem",
-  color: "#A3A3A3",
-};
-
-const inputStyle: CSSProperties = {
-  padding: "0.65rem 0.75rem",
-  borderRadius: 4,
-  border: "1px solid #404040",
-  background: "#141414",
-  color: "#FFFFFF",
-  width: 140,
-};
-
-const btnStyle: CSSProperties = {
-  padding: "0.7rem 1rem",
-  background: "#FFFFFF",
-  color: "#0A0A0A",
-  border: "none",
-  borderRadius: 4,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const btnGhost: CSSProperties = {
-  ...btnStyle,
-  background: "transparent",
-  color: "#FFFFFF",
-  border: "1px solid #404040",
-};

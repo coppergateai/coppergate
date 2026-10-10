@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState } from "react";
+import styles from "./settings.module.css";
 
 type Installation = {
   id: string;
@@ -92,254 +93,212 @@ export function GithubPanel({ workspaceId, canManage, initialQuery }: Props) {
   );
 
   return (
-    <section style={{ marginTop: "2.5rem" }}>
-      <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+    <section className={styles.section} aria-labelledby="github-heading">
+      <h2 id="github-heading" className={styles.sectionLabel}>
         GitHub credentials
       </h2>
-      <p style={{ margin: "0 0 1rem", color: "#A3A3A3", fontSize: "0.875rem" }}>
+      <p className={styles.sectionLede}>
         Connect the Coppergate GitHub App, select repositories, and revoke
         access anytime. Disconnect purges sealed installation credentials for
         this workspace.
       </p>
 
-      {message ? (
-        <p style={{ color: "#86EFAC", fontSize: "0.875rem" }}>{message}</p>
-      ) : null}
-      {error ? (
-        <p style={{ color: "#F87171", fontSize: "0.875rem" }}>{error}</p>
-      ) : null}
+      <div className={styles.panel}>
+        {message ? <p className={styles.ok}>{message}</p> : null}
+        {error ? <p className={styles.error}>{error}</p> : null}
 
-      {installation ? (
-        <p style={{ color: "#E5E5E5", marginBottom: "1rem" }}>
-          Installed on <strong>@{installation.accountLogin}</strong> ({installation.status})
-        </p>
-      ) : (
-        <p style={{ color: "#737373", marginBottom: "1rem" }}>
-          No GitHub App installation yet.
-        </p>
-      )}
+        {installation ? (
+          <p className={styles.status}>
+            Installed on <strong>@{installation.accountLogin}</strong> (
+            {installation.status})
+          </p>
+        ) : (
+          <p className={styles.statusMuted}>No GitHub App installation yet.</p>
+        )}
 
-      {canManage ? (
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              setError(null);
-              void fetch("/api/integrations/github/install", {
-                method: "POST",
-                credentials: "same-origin",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ workspaceId }),
-              })
-                .then(async (res) => {
-                  const body = (await res.json()) as {
-                    url?: string;
-                    error?: { message: string };
-                  };
-                  if (!res.ok || !body.url) {
-                    throw new Error(body.error?.message ?? "Install failed");
-                  }
-                  window.location.href = body.url;
-                })
-                .catch((err: unknown) => {
-                  setError(err instanceof Error ? err.message : "Install failed");
-                  setBusy(false);
-                });
-            }}
-            style={primaryBtn}
-          >
-            {installation ? "Reconfigure on GitHub" : "Install GitHub App"}
-          </button>
-          {installation ? (
+        {canManage ? (
+          <div className={styles.btnRow}>
             <button
               type="button"
+              className={styles.primaryBtn}
               disabled={busy}
               onClick={() => {
                 setBusy(true);
                 setError(null);
-                void fetch(`/api/workspaces/${workspaceId}/github`, {
-                  method: "DELETE",
+                void fetch("/api/integrations/github/install", {
+                  method: "POST",
                   credentials: "same-origin",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ workspaceId }),
                 })
                   .then(async (res) => {
-                    if (!res.ok) {
-                      const body = (await res.json()) as {
-                        error?: { message: string };
-                      };
-                      throw new Error(body.error?.message ?? "Disconnect failed");
+                    const body = (await res.json()) as {
+                      url?: string;
+                      error?: { message: string };
+                    };
+                    if (!res.ok || !body.url) {
+                      throw new Error(body.error?.message ?? "Install failed");
                     }
-                    setSelectable([]);
-                    await refresh();
-                    setMessage(
-                      "GitHub credentials revoked for this workspace.",
-                    );
+                    window.location.href = body.url;
                   })
                   .catch((err: unknown) => {
                     setError(
-                      err instanceof Error ? err.message : "Revoke failed",
+                      err instanceof Error ? err.message : "Install failed",
                     );
-                  })
-                  .finally(() => setBusy(false));
+                    setBusy(false);
+                  });
               }}
-              style={ghostBtn}
             >
-              Revoke installation
+              {installation ? "Reconfigure on GitHub" : "Install GitHub App"}
             </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {connected.length > 0 ? (
-        <div style={{ marginTop: "1.5rem" }}>
-          <h3 style={{ fontSize: "0.9rem", fontWeight: 600 }}>Connected repos</h3>
-          <ul style={{ listStyle: "none", padding: 0, margin: "0.5rem 0 0" }}>
-            {connected.map((repo) => (
-              <li
-                key={repo.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                  padding: "0.65rem 0",
-                  borderBottom: "1px solid #262626",
+            {installation ? (
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  setError(null);
+                  void fetch(`/api/workspaces/${workspaceId}/github`, {
+                    method: "DELETE",
+                    credentials: "same-origin",
+                  })
+                    .then(async (res) => {
+                      if (!res.ok) {
+                        const body = (await res.json()) as {
+                          error?: { message: string };
+                        };
+                        throw new Error(
+                          body.error?.message ?? "Disconnect failed",
+                        );
+                      }
+                      setSelectable([]);
+                      await refresh();
+                      setMessage(
+                        "GitHub credentials revoked for this workspace.",
+                      );
+                    })
+                    .catch((err: unknown) => {
+                      setError(
+                        err instanceof Error ? err.message : "Revoke failed",
+                      );
+                    })
+                    .finally(() => setBusy(false));
                 }}
               >
-                <span>
-                  {repo.fullName}
-                  <span style={{ color: "#737373", marginLeft: 8 }}>
-                    {repo.defaultBranch}
-                  </span>
-                </span>
-                {canManage ? (
-                  <button
-                    type="button"
-                    style={linkBtn}
-                    onClick={() => {
-                      void fetch(
-                        `/api/workspaces/${workspaceId}/github/repos/${repo.id}`,
-                        { method: "DELETE", credentials: "same-origin" },
-                      )
-                        .then(async (res) => {
-                          if (!res.ok) {
-                            const body = (await res.json()) as {
-                              error?: { message: string };
-                            };
-                            throw new Error(
-                              body.error?.message ?? "Revoke failed",
-                            );
-                          }
-                          await refresh();
-                        })
-                        .catch((err: unknown) => {
-                          setError(
-                            err instanceof Error ? err.message : "Revoke failed",
-                          );
-                        });
-                    }}
-                  >
-                    Revoke
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+                Revoke installation
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
-      {canManage && selectable.length > 0 ? (
-        <div style={{ marginTop: "1.5rem" }}>
-          <h3 style={{ fontSize: "0.9rem", fontWeight: 600 }}>
-            Available on installation
-          </h3>
-          <ul style={{ listStyle: "none", padding: 0, margin: "0.5rem 0 0" }}>
-            {selectable.map((repo) => {
-              const already = connectedIds.has(repo.fullName.toLowerCase());
-              return (
-                <li
-                  key={repo.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: "1rem",
-                    padding: "0.65rem 0",
-                    borderBottom: "1px solid #262626",
-                  }}
-                >
+        {connected.length > 0 ? (
+          <div className={styles.subBlock}>
+            <h3 className={styles.subTitle}>Connected repos</h3>
+            <ul className={styles.list}>
+              {connected.map((repo) => (
+                <li key={repo.id} className={styles.row}>
                   <span>
                     {repo.fullName}
-                    {repo.private ? (
-                      <span style={{ color: "#737373", marginLeft: 8 }}>private</span>
-                    ) : null}
+                    <span className={styles.repoMeta}>{repo.defaultBranch}</span>
                   </span>
-                  <button
-                    type="button"
-                    disabled={already || busy}
-                    style={linkBtn}
-                    onClick={() => {
-                      setBusy(true);
-                      void fetch(`/api/workspaces/${workspaceId}/github/repos`, {
-                        method: "POST",
-                        credentials: "same-origin",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ githubRepoId: repo.id }),
-                      })
-                        .then(async (res) => {
-                          if (!res.ok) {
-                            const body = (await res.json()) as {
-                              error?: { message: string };
-                            };
-                            throw new Error(
-                              body.error?.message ?? "Connect failed",
+                  {canManage ? (
+                    <button
+                      type="button"
+                      className={styles.linkBtn}
+                      onClick={() => {
+                        void fetch(
+                          `/api/workspaces/${workspaceId}/github/repos/${repo.id}`,
+                          { method: "DELETE", credentials: "same-origin" },
+                        )
+                          .then(async (res) => {
+                            if (!res.ok) {
+                              const body = (await res.json()) as {
+                                error?: { message: string };
+                              };
+                              throw new Error(
+                                body.error?.message ?? "Revoke failed",
+                              );
+                            }
+                            await refresh();
+                          })
+                          .catch((err: unknown) => {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "Revoke failed",
                             );
-                          }
-                          await refresh();
-                        })
-                        .catch((err: unknown) => {
-                          setError(
-                            err instanceof Error ? err.message : "Connect failed",
-                          );
-                        })
-                        .finally(() => setBusy(false));
-                    }}
-                  >
-                    {already ? "Connected" : "Connect"}
-                  </button>
+                          });
+                      }}
+                    >
+                      Revoke
+                    </button>
+                  ) : null}
                 </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {canManage && selectable.length > 0 ? (
+          <div className={styles.subBlock}>
+            <h3 className={styles.subTitle}>Available on installation</h3>
+            <ul className={styles.list}>
+              {selectable.map((repo) => {
+                const already = connectedIds.has(repo.fullName.toLowerCase());
+                return (
+                  <li key={repo.id} className={styles.row}>
+                    <span>
+                      {repo.fullName}
+                      {repo.private ? (
+                        <span className={styles.repoMeta}>private</span>
+                      ) : null}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.linkBtn}
+                      disabled={already || busy}
+                      onClick={() => {
+                        setBusy(true);
+                        void fetch(
+                          `/api/workspaces/${workspaceId}/github/repos`,
+                          {
+                            method: "POST",
+                            credentials: "same-origin",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ githubRepoId: repo.id }),
+                          },
+                        )
+                          .then(async (res) => {
+                            if (!res.ok) {
+                              const body = (await res.json()) as {
+                                error?: { message: string };
+                              };
+                              throw new Error(
+                                body.error?.message ?? "Connect failed",
+                              );
+                            }
+                            await refresh();
+                          })
+                          .catch((err: unknown) => {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "Connect failed",
+                            );
+                          })
+                          .finally(() => setBusy(false));
+                      }}
+                    >
+                      {already ? "Connected" : "Connect"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
-
-const primaryBtn: CSSProperties = {
-  padding: "0.65rem 1rem",
-  background: "#FFFFFF",
-  color: "#0A0A0A",
-  border: "none",
-  borderRadius: 4,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const ghostBtn: CSSProperties = {
-  padding: "0.65rem 1rem",
-  background: "transparent",
-  color: "#FFFFFF",
-  border: "1px solid #404040",
-  borderRadius: 4,
-  cursor: "pointer",
-};
-
-const linkBtn: CSSProperties = {
-  background: "none",
-  border: "none",
-  color: "#A3A3A3",
-  cursor: "pointer",
-  fontSize: "0.875rem",
-  padding: 0,
-};

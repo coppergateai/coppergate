@@ -25,6 +25,11 @@ export function serializeRun(run: AgentRun) {
     leaseUntil: run.leaseUntil?.toISOString() ?? null,
     startedAt: run.startedAt?.toISOString() ?? null,
     finishedAt: run.finishedAt?.toISOString() ?? null,
+    tournamentId: run.tournamentId,
+    contenderId: run.contenderId,
+    fitnessScore: run.fitnessScore,
+    fitnessEvidenceRef: run.fitnessEvidenceRef,
+    tournamentResult: run.tournamentResult,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
   };
