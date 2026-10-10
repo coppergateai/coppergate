@@ -15,6 +15,7 @@ if (!url) {
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "drizzle");
 const downs = [
+  "0016_pilot_invites.down.sql",
   "0015_deletion.down.sql",
   "0014_artifacts.down.sql",
   "0013_run_events.down.sql",

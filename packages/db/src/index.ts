@@ -21,6 +21,7 @@ export {
   usageEvents,
   users,
   waitlistSignups,
+  pilotInvites,
   workspaces,
   type AgentRun,
   type AgentRunEvent,
@@ -55,6 +56,7 @@ export {
   type UsageKind,
   type User,
   type WaitlistSignup,
+  type PilotInvite,
   type Workspace,
   type WorkspaceStatus,
 } from "./schema.js";
@@ -63,6 +65,12 @@ export {
   normalizeWaitlistEmail,
   type JoinWaitlistResult,
 } from "./waitlist.js";
+export {
+  InviteError,
+  createPilotInvite,
+  normalizeInviteCode,
+  redeemPilotInvite,
+} from "./invites.js";
 export {
   createSession,
   deleteSessionByToken,

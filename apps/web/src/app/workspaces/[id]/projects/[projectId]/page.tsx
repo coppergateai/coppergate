@@ -12,6 +12,7 @@ import {
   serializeTaskCriteria,
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
+import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
 import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
@@ -84,6 +85,15 @@ export default async function ProjectDetailPage({ params }: PageProps) {
 
   const hasApprovedBrief = !!row.project.currentBriefId;
   const usage = await getProjectSpendSummary(db, workspaceId, projectId);
+  const hasBudget = usage.capMicros > 0 && usage.budgetStatus === "active";
+  const hasPlan = !!plan && plan.milestones.some((m) => m.tasks.length > 0);
+  const hasQueuedOrBeyond =
+    plan?.milestones.some(({ tasks }) =>
+      tasks.some(
+        ({ task }) =>
+          task.status !== "DRAFT" && task.status !== "READY_FOR_APPROVAL",
+      ),
+    ) ?? false;
 
   const boardTasks =
     plan?.milestones.flatMap(({ milestone, tasks }) =>
@@ -96,6 +106,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         milestoneTitle: milestone.title,
       })),
     ) ?? [];
+
+  const showGuide =
+    !hasApprovedBrief || !hasPlan || !hasBudget || !hasQueuedOrBeyond;
 
   return (
     <main style={{ maxWidth: 720, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
@@ -127,6 +140,38 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         {row.repository.baseRepoFullName} · {row.project.mode} ·{" "}
         {row.project.stack}
       </p>
+
+      {showGuide ? (
+        <OnboardingGuide
+          title="Path to first PR"
+          steps={[
+            {
+              id: "budget",
+              title: "Set an active spend cap",
+              detail: "Budget panel below — pause blocks the worker.",
+              done: hasBudget,
+            },
+            {
+              id: "brief",
+              title: "Generate and approve a brief",
+              detail: "Keep scope tiny for the first delivery.",
+              done: hasApprovedBrief,
+            },
+            {
+              id: "plan",
+              title: "Generate a plan",
+              detail: "One small task is enough for the smoke path.",
+              done: hasPlan,
+            },
+            {
+              id: "task",
+              title: "Submit + approve a task",
+              detail: "Requires autonomy ≥ L1 and a running worker.",
+              done: hasQueuedOrBeyond,
+            },
+          ]}
+        />
+      ) : null}
 
       <BriefPanel
         workspaceId={workspaceId}

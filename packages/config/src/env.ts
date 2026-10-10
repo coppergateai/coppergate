@@ -64,6 +64,14 @@ const envSchema = z.object({
    * Staging / TASK033 sets `http` with App credentials.
    */
   GITHUB_DELIVERY_MODE: z.enum(["fake", "http"]).default("fake"),
+  /**
+   * When true, POST /api/workspaces requires a valid pilot invite code (TASK035).
+   * Local/dev default false; staging/public beta should set true.
+   */
+  PILOT_INVITE_REQUIRED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
+  getInstallationForWorkspace,
   getWorkspaceForMember,
   listProjectsForWorkspace,
   listRepositoryConnections,
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
+import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
 import { CreateProjectForm } from "./create-project-form";
 
@@ -26,6 +28,11 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
   const projects = await listProjectsForWorkspace(db, id);
   const connections = await listRepositoryConnections(db, id);
   const unbound = connections.filter((c) => !c.projectId);
+  const installation = await getInstallationForWorkspace(db, id);
+  const githubReady =
+    !!installation &&
+    installation.status === "active" &&
+    connections.length > 0;
 
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
@@ -45,12 +52,50 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
         {access.workspace.name} · one GitHub repo per project · stack nextjs_ts
       </p>
 
+      {projects.length === 0 ? (
+        <OnboardingGuide
+          title="Project setup"
+          steps={[
+            {
+              id: "github",
+              title: "Connect GitHub App + select a repo",
+              detail: "Settings → Install → Connect an unbound repository.",
+              href: `/workspaces/${id}/settings`,
+              done: githubReady,
+            },
+            {
+              id: "project",
+              title: "Create your first project",
+              detail: "Bind the repo below. Supported stack: nextjs_ts.",
+              done: false,
+            },
+            {
+              id: "budget",
+              title: "Set a spend cap",
+              detail: "Open the project and raise the budget before queueing work.",
+              done: false,
+            },
+            {
+              id: "brief",
+              title: "Approve brief → plan → task",
+              detail: "Keep the first task tiny so the first PR lands in one session.",
+              done: false,
+            },
+          ]}
+        />
+      ) : null}
+
       <section style={{ marginTop: "2rem" }}>
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>
           Your projects
         </h2>
         {projects.length === 0 ? (
-          <p style={{ color: "#737373" }}>No projects yet.</p>
+          <p style={{ color: "#737373" }}>
+            No projects yet
+            {!githubReady
+              ? " — connect GitHub in settings first."
+              : " — create one below."}
+          </p>
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {projects.map(({ project, repository }) => (
