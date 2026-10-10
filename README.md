@@ -77,7 +77,7 @@ Public `/` is the early-access landing (Phase 0). Signups go to `waitlist_signup
 
 ## Status
 
-**TASK001–032** complete (MVP + private beta readiness). See `docs/PRIVATE_BETA.md` and `docs/OPS_RUNBOOK.md`.
+**TASK001–032** complete (MVP). Phase 2 planned as **TASK033–047** in architecture `MVP_BACKLOG.md` (Slices I–K). See `docs/PRIVATE_BETA.md` and `docs/OPS_RUNBOOK.md`.
 
 
 ## Related repos
