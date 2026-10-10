@@ -94,11 +94,12 @@ export function GithubPanel({ workspaceId, canManage, initialQuery }: Props) {
   return (
     <section style={{ marginTop: "2.5rem" }}>
       <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-        GitHub
+        GitHub credentials
       </h2>
       <p style={{ margin: "0 0 1rem", color: "#A3A3A3", fontSize: "0.875rem" }}>
-        Connect the Coppergate GitHub App and select repositories. Writes
-        (commits/PRs) stay disabled until a later phase.
+        Connect the Coppergate GitHub App, select repositories, and revoke
+        access anytime. Disconnect purges sealed installation credentials for
+        this workspace.
       </p>
 
       {message ? (
@@ -171,18 +172,20 @@ export function GithubPanel({ workspaceId, canManage, initialQuery }: Props) {
                     }
                     setSelectable([]);
                     await refresh();
-                    setMessage("GitHub disconnected for this workspace.");
+                    setMessage(
+                      "GitHub credentials revoked for this workspace.",
+                    );
                   })
                   .catch((err: unknown) => {
                     setError(
-                      err instanceof Error ? err.message : "Disconnect failed",
+                      err instanceof Error ? err.message : "Revoke failed",
                     );
                   })
                   .finally(() => setBusy(false));
               }}
               style={ghostBtn}
             >
-              Disconnect
+              Revoke installation
             </button>
           ) : null}
         </div>

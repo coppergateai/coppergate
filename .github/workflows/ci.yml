@@ -36,6 +36,7 @@ jobs:
       APP_URL: http://localhost:3000
       SESSION_SECRET: ci-only-coppergate-session-secret!!
       CREDENTIALS_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      GITHUB_WEBHOOK_SECRET: ci-webhook-secret-for-tests!!
 
 
     steps:
@@ -59,11 +60,17 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Migrate
+        run: pnpm db:migrate
+
       - name: Test
         run: pnpm test
 
-      - name: Migrate
-        run: pnpm db:migrate
+      - name: Delivery report contract
+        run: node scripts/assert-delivery-report-contract.mjs
+
+      - name: E2E happy path (FakeAgent)
+        run: pnpm --filter @coppergate/worker exec node --import tsx --test --test-force-exit src/e2e-happy-path.test.ts
 
       - name: Migrate down then up
         run: |

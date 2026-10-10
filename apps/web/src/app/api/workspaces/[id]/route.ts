@@ -1,5 +1,7 @@
 import {
+  DeletionError,
   isAutonomyLevel,
+  softDeleteWorkspace,
   updateWorkspaceForOwner,
   type AutonomyLevel,
 } from "@coppergate/db";
@@ -73,6 +75,44 @@ export async function PATCH(request: Request, context: RouteContext) {
       throw new ApiError("not_found", "Workspace not found");
     }
     return jsonOk({ workspace: serializeWorkspace(updated) }, { correlationId });
+  } catch (err) {
+    return jsonError(err, correlationId);
+  }
+}
+
+/** Soft-delete workspace — owner only. Purges GitHub credentials immediately. */
+export async function DELETE(request: Request, context: RouteContext) {
+  const correlationId = correlationIdFrom(request);
+  try {
+    requireCsrf(request);
+    const user = await requireUser(request);
+    const { id } = await context.params;
+    await requireWorkspaceOwner(db, id, user.id);
+
+    try {
+      const workspace = await softDeleteWorkspace(db, {
+        workspaceId: id,
+        actor: user.id,
+      });
+      return jsonOk(
+        {
+          workspace: {
+            id: workspace.id,
+            status: workspace.status,
+            deletedAt: workspace.deletedAt?.toISOString() ?? null,
+          },
+        },
+        { correlationId },
+      );
+    } catch (err) {
+      if (err instanceof DeletionError) {
+        throw new ApiError(
+          err.code === "not_found" ? "not_found" : "conflict",
+          err.message,
+        );
+      }
+      throw err;
+    }
   } catch (err) {
     return jsonError(err, correlationId);
   }

@@ -17,6 +17,7 @@ import {
   githubAppConfig,
   isSecureCookie,
 } from "@/lib/github-install";
+import { trackFunnel } from "@/lib/funnel";
 import { correlationIdFrom, jsonError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { requireWorkspaceOwner } from "@/lib/workspace";
@@ -83,6 +84,12 @@ export async function GET(request: Request) {
       workspaceId,
       installationId,
       userId: user.id,
+    });
+    trackFunnel({
+      stage: "github_connected",
+      workspaceId,
+      userId: user.id,
+      meta: { installationId },
     });
 
     const redirect = NextResponse.redirect(

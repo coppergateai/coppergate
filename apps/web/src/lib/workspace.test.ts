@@ -13,6 +13,7 @@ describe("serializeWorkspace", () => {
         slug: "acme",
         autonomyDefault: "L0",
         status: "active",
+        deletedAt: null,
         createdAt: now,
         updatedAt: now,
       },

@@ -30,3 +30,5 @@ apps/web/next-env.d.ts.bak
 .cache/
 tmp/
 temp/
+.vercel
+.env*
