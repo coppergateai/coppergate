@@ -54,15 +54,10 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  border-bottom: 1px solid transparent;
-  background: linear-gradient(
-    180deg,
-    rgba(7, 7, 7, 0.55) 0%,
-    rgba(7, 7, 7, 0.18) 85%,
-    transparent 100%
-  );
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(8, 8, 8, 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   transition:
     background 0.28s ease,
     border-color 0.28s ease,
@@ -70,9 +65,9 @@
 }
 
 .navScrolled {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
-  background: rgba(8, 8, 8, 0.88);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: rgba(8, 8, 8, 0.94);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
 
 .navInner {
@@ -468,9 +463,9 @@
 
 .ctaNote {
   margin: 0.9rem 0 0;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  color: rgba(163, 163, 163, 0.9);
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  color: var(--mute);
 }
 
 /* —— Trust strip —— */
@@ -479,55 +474,36 @@
   z-index: 1;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(0, 0, 0, 0.22);
+  background: rgba(0, 0, 0, 0.28);
 }
 
-.trustList {
+.trustChips {
   list-style: none;
   margin: 0 auto;
-  padding: 1.15rem clamp(1rem, 4vw, 2.75rem);
+  padding: 0.85rem clamp(1rem, 4vw, 2.75rem);
   width: min(1120px, 100%);
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 0.65rem;
 }
 
-.trustItem {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 0.65rem;
-  row-gap: 0.15rem;
-  align-items: center;
-}
-
-.trustMark {
-  grid-row: 1 / span 2;
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  background: var(--copper);
-  box-shadow: 0 0 0 3px rgba(184, 115, 51, 0.18);
-}
-
-.trustLabel {
-  font-size: 0.88rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  color: var(--paper);
-}
-
-.trustDetail {
+.trustChip {
   font-size: 0.78rem;
-  color: var(--mute);
+  font-weight: 500;
   letter-spacing: -0.01em;
+  color: var(--mute-strong);
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 /* —— How it works —— */
 .how {
   position: relative;
   z-index: 1;
-  padding: clamp(4rem, 9vh, 6rem) clamp(1rem, 4vw, 2.75rem);
+  padding: clamp(2.75rem, 7vh, 4.5rem) clamp(1rem, 4vw, 2.75rem);
   scroll-margin-top: 5rem;
 }
 
@@ -600,21 +576,18 @@
 .howVisual {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
-  min-height: 6.5rem;
-  padding: 0.75rem 0.8rem;
+  gap: 0.4rem;
+  height: 5.75rem;
+  padding: 0.7rem 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 2px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
-    rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
 }
 
 .howVisualGate {
-  box-shadow: inset 0 -1px 0 var(--copper);
-  background:
-    linear-gradient(180deg, rgba(184, 115, 51, 0.14), transparent 70%),
-    rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 -1px 0 rgba(184, 115, 51, 0.65);
+  background: rgba(184, 115, 51, 0.06);
 }
 
 .howVisualLabel {
@@ -694,10 +667,10 @@
 
 .howCue {
   margin: 0;
-  padding-top: 0.85rem;
+  padding-top: 0.7rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 0.8rem;
-  color: var(--mute-strong);
+  font-size: 0.74rem;
+  color: var(--mute);
   letter-spacing: -0.01em;
 }
 
@@ -705,7 +678,7 @@
 .features {
   position: relative;
   z-index: 1;
-  padding: clamp(4rem, 9vh, 6rem) clamp(1rem, 4vw, 2.75rem);
+  padding: clamp(2.75rem, 7vh, 4.5rem) clamp(1rem, 4vw, 2.75rem);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   scroll-margin-top: 5rem;
 }
@@ -758,31 +731,23 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.06);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
 }
 
 .featureCard {
-  padding: 1.4rem 1.25rem 1.5rem;
-  background: rgba(8, 8, 8, 0.92);
+  padding: 1.25rem 1.2rem 1.35rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-}
-
-.featureMark {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  background: var(--copper);
-  box-shadow: 0 0 0 3px rgba(184, 115, 51, 0.16);
+  gap: 0.45rem;
 }
 
 .featureTitle {
-  margin: 0.2rem 0 0;
-  font-size: 1.05rem;
+  margin: 0;
+  font-size: 1.02rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -798,7 +763,7 @@
 .dive {
   position: relative;
   z-index: 1;
-  padding: clamp(4rem, 9vh, 6rem) clamp(1rem, 4vw, 2.75rem);
+  padding: clamp(2.75rem, 7vh, 4.5rem) clamp(1rem, 4vw, 2.75rem);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   scroll-margin-top: 5rem;
 }
@@ -937,8 +902,49 @@
   margin: 1.1rem 0 0;
   padding-top: 0.85rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  color: var(--mute-strong);
+}
+
+/* —— Combined cost + governance —— */
+.control {
+  position: relative;
+  z-index: 1;
+  padding: clamp(2.75rem, 7vh, 4.5rem) clamp(1rem, 4vw, 2.75rem);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.22);
+  scroll-margin-top: 5rem;
+}
+
+.controlInner {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+
+.controlIntro {
+  max-width: 34rem;
+  margin: 0 0 1.75rem;
+}
+
+.controlTitle {
+  margin: 0;
+  font-size: clamp(1.55rem, 3.4vw, 2.05rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+}
+
+.controlLede {
+  margin: 0.75rem 0 0;
   color: var(--mute);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.controlPanels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
 }
 
 .govBadge {
@@ -1006,16 +1012,24 @@
 .govActions span {
   font-size: 0.78rem;
   padding: 0.4rem 0.7rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 2px;
-  color: var(--mute-strong);
+  color: var(--mute);
+  opacity: 0.85;
+  pointer-events: none;
+  user-select: none;
+}
+
+.govMuted {
+  opacity: 0.55 !important;
 }
 
 .govPrimary {
-  border-color: rgba(184, 115, 51, 0.55) !important;
-  background: rgba(184, 115, 51, 0.16);
+  border-color: rgba(184, 115, 51, 0.45) !important;
+  background: rgba(184, 115, 51, 0.1);
   color: #d4a574 !important;
   font-weight: 600;
+  opacity: 0.9 !important;
 }
 
 .traceHead {
@@ -1155,7 +1169,7 @@
 .faq {
   position: relative;
   z-index: 1;
-  padding: clamp(4rem, 9vh, 6rem) clamp(1rem, 4vw, 2.75rem);
+  padding: clamp(2.75rem, 7vh, 4.5rem) clamp(1rem, 4vw, 2.75rem);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   scroll-margin-top: 5rem;
 }
@@ -1230,7 +1244,7 @@
 .closing {
   position: relative;
   z-index: 1;
-  padding: clamp(4rem, 10vh, 6.5rem) clamp(1rem, 4vw, 2.75rem);
+  padding: clamp(3rem, 8vh, 5rem) clamp(1rem, 4vw, 2.75rem);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background:
     radial-gradient(
@@ -1451,8 +1465,7 @@
 .product {
   position: relative;
   z-index: 1;
-  padding: clamp(4rem, 10vh, 6.5rem) clamp(1.25rem, 4vw, 3rem)
-    clamp(3rem, 8vh, 5rem);
+  padding: clamp(2.75rem, 7vh, 4.5rem) clamp(1.25rem, 4vw, 3rem);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   scroll-margin-top: 5rem;
 }
@@ -1463,39 +1476,49 @@
 }
 
 .productCta {
-  margin-top: 2rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.85rem 1.25rem;
+  margin: 1.35rem 0 0;
   text-align: center;
 }
 
-.productCtaLede {
-  margin: 0;
-  color: var(--mute);
-  font-size: 0.95rem;
-  letter-spacing: -0.01em;
-}
-
-.productCtaBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.6rem;
-  padding: 0 1.15rem;
-  background: var(--paper);
-  color: var(--ink);
+.productCtaLink {
+  color: var(--mute-strong);
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
   text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  border-radius: 2px;
 }
 
-.productCtaBtn:hover {
-  background: #f2f2f2;
+.productCtaLink:hover {
+  color: var(--paper);
+}
+
+.boardTrace {
+  list-style: none;
+  margin: 0;
+  padding: 0.85rem 1.1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.boardTrace li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 0.74rem;
+}
+
+.boardTrace time {
+  font-variant-numeric: tabular-nums;
+  color: var(--mute);
+}
+
+.boardTrace code {
+  font-family: inherit;
+  color: var(--mute-strong);
+  letter-spacing: -0.01em;
 }
 
 .productIntro {
@@ -2039,10 +2062,6 @@
     display: none;
   }
 
-  .trustList {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .howSteps {
     grid-template-columns: 1fr 1fr;
   }
@@ -2056,18 +2075,8 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 
-  .featuresGrid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .diveInner,
-  .diveInnerReverse {
+  .controlPanels {
     grid-template-columns: 1fr;
-  }
-
-  .diveInnerReverse .diveCopy,
-  .diveInnerReverse .divePanel {
-    order: initial;
   }
 
   .footerTop {
@@ -2150,11 +2159,6 @@
 }
 
 @media (max-width: 520px) {
-  .trustList {
-    grid-template-columns: 1fr;
-    gap: 1.1rem;
-  }
-
   .featuresGrid {
     grid-template-columns: 1fr;
   }
