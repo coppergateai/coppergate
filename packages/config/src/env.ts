@@ -18,35 +18,52 @@ function hydrateDotenv(): void {
   }
 }
 
+/**
+ * Non-production / build fallback. Override in real deployments.
+ * (Next `next build` sets NODE_ENV=production, so we cannot hard-fail here.)
+ */
+export const DEV_SESSION_SECRET =
+  "dev-only-coppergate-session-secret!!";
+
+/** Dev-only 32-byte AES key (64 hex). Override in real deployments. */
+export const DEV_CREDENTIALS_ENCRYPTION_KEY =
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   REDIS_URL: z.string().min(1).optional(),
-  LOG_LEVEL: z
-    .enum(["debug", "info", "warn", "error"])
-    .default("info"),
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   OTEL_ENABLED: z
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  APP_URL: z.string().url().default("http://localhost:3000"),
+  SESSION_SECRET: z.string().min(32).default(DEV_SESSION_SECRET),
+  CREDENTIALS_ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, "must be 64 hex characters")
+    .default(DEV_CREDENTIALS_ENCRYPTION_KEY),
+  /** Optional until OAuth login is used — enforced at `/api/auth/github`. */
+  GITHUB_CLIENT_ID: z.string().min(1).optional(),
+  GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+  /** GitHub App — optional until install flow is used. */
+  GITHUB_APP_ID: z.string().min(1).optional(),
+  GITHUB_APP_SLUG: z.string().min(1).optional(),
+  GITHUB_APP_PRIVATE_KEY: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
 
 export type LoadEnvOptions = {
-  /** Override process.env (tests). */
   env?: NodeJS.ProcessEnv;
-  /** When true, throw instead of process.exit (tests). Default false. */
   throwOnError?: boolean;
 };
 
 let cached: Env | undefined;
 
-/**
- * Parse and cache environment. Fails fast on invalid/missing required vars.
- */
 export function loadEnv(options: LoadEnvOptions = {}): Env {
   if (cached && !options.env) {
     return cached;
@@ -72,7 +89,6 @@ export function loadEnv(options: LoadEnvOptions = {}): Env {
   return result.data;
 }
 
-/** Reset cache (tests only). */
 export function resetEnvCache(): void {
   cached = undefined;
 }

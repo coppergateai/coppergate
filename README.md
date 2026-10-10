@@ -10,13 +10,15 @@ Product monorepo. Planning / ADRs: [`coppergate-architecture`](https://github.co
 
 ```text
 apps/
-  web/                 # Next.js UI + BFF (/health, /ready)
+  web/                 # Next.js UI + BFF (auth, workspaces, /health)
   worker/              # Job poller stub
 packages/
   config/              # Zod env schema (fail-fast)
   telemetry/           # Structured logs + OTel stubs
   errors/              # API error envelope
   db/                  # Drizzle schema + migrations
+  auth/                # GitHub OAuth + session helpers
+  github/              # GitHub App JWT, install tokens, AES-GCM seal
   eslint-config/
   typescript-config/
   coppergate/          # npm name reserve (placeholder)
@@ -39,6 +41,7 @@ pnpm --filter @coppergate/web dev
 ```
 
 - App: http://localhost:3000  
+- Login: http://localhost:3000/login (needs `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`)  
 - Liveness: http://localhost:3000/health  
 - Readiness: http://localhost:3000/ready  
 
@@ -60,9 +63,22 @@ pnpm --filter @coppergate/worker dev
 | `pnpm db:migrate` | Apply Drizzle migrations |
 | `pnpm db:migrate:down` | Roll back baseline migration |
 
+## Discovery landing
+
+Public `/` is the early-access landing (Phase 0). Signups go to `waitlist_signups` via `POST /api/waitlist`.
+
+## Deploy (Vercel)
+
+1. Import [`coppergateai/coppergate`](https://github.com/coppergateai/coppergate).
+2. Set **Root Directory** to `apps/web` (uses `apps/web/vercel.json`).
+3. Env: `DATABASE_URL`, `APP_URL` (e.g. `https://coppergate.ai`), `SESSION_SECRET` (≥32 chars). OAuth optional until login is used.
+4. Migrate prod DB: `DATABASE_URL=… pnpm db:migrate`.
+5. Attach `coppergate.ai` (Cloudflare DNS — see architecture `EMAIL.md`).
+
 ## Status
 
-**TASK001** scaffold + **TASK002** config/telemetry/errors complete. Next: TASK003 (GitHub OAuth session).
+**TASK001–005** complete (scaffold → auth → workspaces → GitHub App connect). Discovery landing + waitlist added. Next: TASK006 (webhook receiver).
+
 
 ## Related repos
 

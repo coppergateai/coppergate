@@ -9,14 +9,18 @@
     "start": "next start --port 3000",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
   },
+
   "dependencies": {
+    "@coppergate/auth": "workspace:*",
     "@coppergate/config": "workspace:*",
     "@coppergate/db": "workspace:*",
     "@coppergate/errors": "workspace:*",
+    "@coppergate/github": "workspace:*",
     "@coppergate/telemetry": "workspace:*",
     "next": "^15.3.2",
+
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

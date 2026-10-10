@@ -17,6 +17,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@coppergate/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@coppergate/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -26,6 +29,9 @@ importers:
       '@coppergate/errors':
         specifier: workspace:*
         version: link:../../packages/errors
+      '@coppergate/github':
+        specifier: workspace:*
+        version: link:../../packages/github
       '@coppergate/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -82,6 +88,34 @@ importers:
       '@coppergate/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^22.15.21
+        version: 22.20.5
+      eslint:
+        specifier: ^9.27.0
+        version: 9.39.5
+      tsx:
+        specifier: ^4.19.4
+        version: 4.23.15
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  packages/auth:
+    dependencies:
+      '@coppergate/db':
+        specifier: workspace:*
+        version: link:../db
+      '@coppergate/errors':
+        specifier: workspace:*
+        version: link:../errors
+    devDependencies:
+      '@coppergate/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@coppergate/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
       '@types/node':
         specifier: ^22.15.21
         version: 22.20.5
@@ -194,6 +228,31 @@ importers:
       typescript-eslint:
         specifier: ^8.32.1
         version: 8.71.1(eslint@9.39.5)(typescript@5.9.3)
+
+  packages/github:
+    dependencies:
+      jose:
+        specifier: ^6.0.11
+        version: 6.2.12
+    devDependencies:
+      '@coppergate/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@coppergate/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.21
+        version: 22.20.5
+      eslint:
+        specifier: ^9.27.0
+        version: 9.39.5
+      tsx:
+        specifier: ^4.19.4
+        version: 4.23.15
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
   packages/telemetry:
     devDependencies:
@@ -1934,6 +1993,9 @@ packages:
   iterator.prototype@1.1.5:
     resolution: {integrity: sha512-H0dkQoCa3b2VEeKQBOxFph+JAbcrQdE7KC0UkqwpLmv2EC4P41QXP+rqo9wYodACiG5/WM5s9oDApTU8utwj9g==}
     engines: {node: '>= 0.4'}
+
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -4022,6 +4084,8 @@ snapshots:
       get-proto: 1.0.1
       has-symbols: 1.1.0
       set-function-name: 2.0.2
+
+  jose@6.2.12: {}
 
   js-tokens@4.0.0: {}
 

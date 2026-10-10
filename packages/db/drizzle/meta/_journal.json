@@ -8,6 +8,34 @@
       "when": 1728566400000,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1728566500000,
+      "tag": "0001_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1728566600000,
+      "tag": "0002_workspaces",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1728566700000,
+      "tag": "0003_github",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1728566800000,
+      "tag": "0004_waitlist",
+      "breakpoints": true
     }
   ]
 }

@@ -33,6 +33,10 @@ jobs:
     env:
       DATABASE_URL: postgresql://coppergate:coppergate@localhost:5432/coppergate
       # CI service maps container 5432 → host 5432 (no local Postgres conflict)
+      APP_URL: http://localhost:3000
+      SESSION_SECRET: ci-only-coppergate-session-secret!!
+      CREDENTIALS_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
 
     steps:
       - uses: actions/checkout@v4

@@ -1,4 +1,6 @@
 export {
+  DEV_CREDENTIALS_ENCRYPTION_KEY,
+  DEV_SESSION_SECRET,
   envSchema,
   formatZodError,
   loadEnv,

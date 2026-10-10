@@ -1,0 +1,240 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topBar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.topLink {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--mute-strong);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.topLink:hover {
+  color: var(--paper);
+}
+
+.hero {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: clamp(5.5rem, 12vh, 8rem) clamp(1.25rem, 4vw, 4rem)
+    clamp(2.5rem, 6vh, 4rem);
+  overflow: hidden;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.backdropSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.gateGlow {
+  position: absolute;
+  inset: 18% 28% 22%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(184, 115, 51, 0.14) 0%,
+    transparent 68%
+  );
+  filter: blur(8px);
+  animation: cg-glow 7s ease-in-out infinite;
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 10, 10, 0.35) 0%,
+    rgba(10, 10, 10, 0.55) 42%,
+    rgba(10, 10, 10, 0.92) 78%,
+    var(--ink) 100%
+  );
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
+}
+
+.brand {
+  display: block;
+  width: min(220px, 58vw);
+  height: auto;
+  margin-bottom: 1.75rem;
+}
+
+.headline {
+  margin: 0;
+  font-size: clamp(2.35rem, 6.2vw, 3.75rem);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.lede {
+  margin: 1.15rem 0 0;
+  max-width: 28rem;
+  font-size: clamp(1rem, 2.2vw, 1.125rem);
+  line-height: 1.5;
+  color: var(--mute);
+  letter-spacing: -0.01em;
+}
+
+.ctaBlock {
+  margin-top: 2rem;
+  max-width: 28rem;
+}
+
+.path {
+  border-top: 1px solid var(--line);
+  padding: clamp(3.5rem, 8vh, 5.5rem) clamp(1.25rem, 4vw, 4rem);
+}
+
+.pathInner {
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.pathTitle {
+  margin: 0;
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+.pathLede {
+  margin: 0.75rem 0 0;
+  max-width: 28rem;
+  color: var(--mute);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.steps {
+  list-style: none;
+  margin: 2.75rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
+  position: relative;
+}
+
+.steps::before {
+  content: "";
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  right: 0.55rem;
+  height: 1px;
+  background: var(--line);
+  transform-origin: left center;
+  animation: cg-rail 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+
+.step {
+  position: relative;
+  padding-top: 1.75rem;
+}
+
+.dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 1px;
+  background: var(--paper);
+  box-shadow: 0 0 0 4px var(--ink);
+}
+
+.step:last-child .dot {
+  background: var(--copper);
+}
+
+.stepLabel {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin-bottom: 0.4rem;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.footer {
+  margin-top: auto;
+  border-top: 1px solid var(--line);
+  padding: 1.5rem clamp(1.25rem, 4vw, 4rem) 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  justify-content: space-between;
+  align-items: baseline;
+  color: var(--mute);
+  font-size: 0.875rem;
+}
+
+.footer a {
+  color: var(--mute-strong);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--paper);
+}
+
+@media (max-width: 720px) {
+  .steps {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.75rem 1.25rem;
+  }
+
+  .steps::before {
+    display: none;
+  }
+
+  .hero {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .steps {
+    grid-template-columns: 1fr;
+  }
+}
