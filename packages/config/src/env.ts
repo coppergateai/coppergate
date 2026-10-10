@@ -59,6 +59,11 @@ const envSchema = z.object({
   LLM_API_KEY: z.string().min(1).optional(),
   LLM_BASE_URL: z.string().url().optional(),
   LLM_MODEL: z.string().min(1).optional(),
+  /**
+   * Worker PR delivery: `fake` (default) or `http` (real GitHub App installation).
+   * Staging / TASK033 sets `http` with App credentials.
+   */
+  GITHUB_DELIVERY_MODE: z.enum(["fake", "http"]).default("fake"),
 });
 
 export type Env = z.infer<typeof envSchema>;
