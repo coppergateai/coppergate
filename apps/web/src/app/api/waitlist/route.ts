@@ -15,10 +15,15 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => null)) as {
       email?: unknown;
       company?: unknown;
+      website?: unknown;
+      organization?: unknown;
     } | null;
 
     // Honeypot — bots fill hidden fields.
-    if (body && typeof body.company === "string" && body.company.trim()) {
+    const honeypotFilled =
+      (body && typeof body.website === "string" && body.website.trim()) ||
+      (body && typeof body.company === "string" && body.company.trim());
+    if (honeypotFilled) {
       return jsonOk({ ok: true }, { correlationId });
     }
 
@@ -26,11 +31,15 @@ export async function POST(request: Request) {
       throw new ApiError("bad_request", "email is required");
     }
 
+    const organization =
+      typeof body.organization === "string" ? body.organization.trim() : "";
+
     const result = await joinWaitlist(db, body.email);
     logger.info("waitlist signup", {
       correlationId,
       status: result.status,
       emailDomain: result.row.email.split("@")[1] ?? "unknown",
+      hasOrganization: Boolean(organization),
     });
 
     return jsonOk(

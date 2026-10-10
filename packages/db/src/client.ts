@@ -5,7 +5,12 @@ import * as schema from "./schema.js";
 export type Database = ReturnType<typeof createDb>;
 
 export function createDb(url: string, options?: { max?: number }) {
-  const client = postgres(url, { max: options?.max ?? 10 });
+  const client = postgres(url, {
+    max: options?.max ?? 10,
+    // Allow Node test processes to exit when idle (web singleton pool).
+    idle_timeout: 5,
+    max_lifetime: 60 * 30,
+  });
   const db = drizzle(client, { schema });
   return Object.assign(db, { $client: client as Sql });
 }

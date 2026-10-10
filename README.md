@@ -77,7 +77,7 @@ Public `/` is the early-access landing (Phase 0). Signups go to `waitlist_signup
 
 ## Status
 
-**TASK001–005** complete (scaffold → auth → workspaces → GitHub App connect). Discovery landing + waitlist added. Next: TASK006 (webhook receiver).
+**TASK001–032** complete (MVP + private beta readiness). See `docs/PRIVATE_BETA.md` and `docs/OPS_RUNBOOK.md`.
 
 
 ## Related repos

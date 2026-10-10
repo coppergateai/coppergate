@@ -1,6 +1,7 @@
 import { loadEnv } from "@coppergate/config";
 import { checkDb } from "@coppergate/db";
 import { createLogger, initTelemetry } from "@coppergate/telemetry";
+import { runWorkerLoop } from "./loop.js";
 
 const env = loadEnv();
 
@@ -20,16 +21,27 @@ if (!ok) {
   process.exit(1);
 }
 
-log.info("worker idle — waiting for jobs");
+const workerId =
+  process.env.WORKER_ID?.trim() ||
+  `worker-${process.pid}-${crypto.randomUUID().slice(0, 8)}`;
 
+let stopping = false;
 const shutdown = (signal: string) => {
-  log.info("worker shutting down", { signal });
-  process.exit(0);
+  if (stopping) return;
+  stopping = true;
+  log.info("worker shutting down", { signal, workerId });
 };
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
-await new Promise(() => {
-  /* intentionally never resolves */
+await runWorkerLoop({
+  databaseUrl: env.DATABASE_URL,
+  workerId,
+  log,
+  pollMs: Number(process.env.WORKER_POLL_MS ?? 1000),
+  leaseMs: Number(process.env.WORKER_LEASE_MS ?? 30_000),
+  shouldStop: () => stopping,
 });
+
+process.exit(0);

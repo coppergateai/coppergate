@@ -1,9 +1,10 @@
 "use client";
 
-export function LogoutButton() {
+export function LogoutButton({ className }: { className?: string }) {
   return (
     <button
       type="button"
+      className={className}
       onClick={() => {
         void fetch("/api/auth/logout", {
           method: "POST",
@@ -11,15 +12,6 @@ export function LogoutButton() {
         }).then(() => {
           window.location.href = "/";
         });
-      }}
-      style={{
-        padding: "0.65rem 1.1rem",
-        background: "transparent",
-        color: "#FFFFFF",
-        border: "1px solid #404040",
-        borderRadius: 4,
-        cursor: "pointer",
-        fontWeight: 500,
       }}
     >
       Sign out

@@ -1,7 +1,12 @@
-import Link from "next/link";
-import { currentUser } from "@/lib/auth";
 import { EarlyAccessForm } from "./early-access-form";
-import { LogoutButton } from "./logout-button";
+import { HowItWorks } from "./how-it-works";
+import { JsonLd } from "./json-ld";
+import { LandingFunnelBeacon } from "./landing-funnel";
+import { ProductBoard } from "./product-board";
+import { SiteChrome } from "./site-chrome";
+import { StatusBand } from "./status-band";
+import { TrustStrip } from "./trust-strip";
+import { currentUser } from "@/lib/auth";
 import styles from "./landing.module.css";
 
 function GateMark({ className }: { className?: string }) {
@@ -27,37 +32,9 @@ export default async function HomePage() {
   const user = await currentUser();
 
   return (
-    <div className={styles.page}>
-      <div className={styles.atmosphere} aria-hidden="true">
-        <div className={styles.atmWash} />
-        <div className={styles.atmGrid} />
-        <div className={styles.atmGrain} />
-      </div>
-
-      <header className={styles.nav}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className={styles.navBrand}
-          src="/logo-lockup-white.svg"
-          alt="Coppergate"
-          width={148}
-          height={32}
-        />
-        <div className={styles.navActions}>
-          {user ? (
-            <>
-              <Link className={styles.navLink} href="/workspaces">
-                Workspaces
-              </Link>
-              <LogoutButton />
-            </>
-          ) : (
-            <Link className={styles.navCta} href="/login">
-              Sign in
-            </Link>
-          )}
-        </div>
-      </header>
+    <SiteChrome>
+      <LandingFunnelBeacon />
+      <JsonLd />
 
       <section className={styles.hero}>
         <div className={styles.heroStack}>
@@ -77,72 +54,19 @@ export default async function HomePage() {
             evidence — you open the gate for what ships.
           </p>
 
-          <div className={styles.ctaBlock}>
+          <div id="early-access" className={styles.ctaBlock}>
             <EarlyAccessForm signedInLogin={user?.login ?? null} />
-            <p className={styles.ctaNote}>Private beta · GitHub-native · Human approval required</p>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.product} aria-labelledby="product-title">
-        <div className={styles.productInner}>
-          <div className={styles.productIntro}>
-            <h2 id="product-title" className={styles.productTitle}>
-              Delivery you can verify.
-            </h2>
-            <p className={styles.productLede}>
-              Not another chat thread. A controlled path from brief to a passing
-              pull request — with cost, checks, and merge under your hand.
+            <p className={styles.ctaNote}>
+              Private beta · GitHub-native · Human approval required
             </p>
           </div>
-
-          <div className={styles.board} aria-hidden="true">
-            <div className={styles.boardRail}>
-              <span className={styles.boardStep}>
-                <em>01</em> Idea
-              </span>
-              <span className={styles.boardStep}>
-                <em>02</em> Brief
-              </span>
-              <span className={styles.boardStep}>
-                <em>03</em> PR + CI
-              </span>
-              <span className={`${styles.boardStep} ${styles.boardStepActive}`}>
-                <em>04</em> You open the gate
-              </span>
-            </div>
-
-            <div className={styles.prPanel}>
-              <div className={styles.prMeta}>
-                <span className={styles.prBadge}>Open</span>
-                <span className={styles.prId}>#128</span>
-                <span className={styles.prTitle}>
-                  feat: subscription tracker MVP
-                </span>
-              </div>
-              <div className={styles.prChecks}>
-                <span className={styles.checkPass}>CI · passing</span>
-                <span className={styles.checkPass}>Tests · 24</span>
-                <span className={styles.checkCost}>$1.84 run</span>
-              </div>
-              <div className={styles.prDiff}>
-                <span className={styles.diffAdd}>+182</span>
-                <span className={styles.diffDel}>−14</span>
-                <span className={styles.diffFiles}>12 files</span>
-              </div>
-              <div className={styles.prGate}>
-                <span>Merge locked</span>
-                <span className={styles.prGateAction}>Awaiting your approval</span>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
-      <footer className={styles.footer}>
-        <span>Ship when you open it.</span>
-        <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>
-      </footer>
-    </div>
+      <TrustStrip />
+      <HowItWorks />
+      <ProductBoard />
+      <StatusBand />
+    </SiteChrome>
   );
 }

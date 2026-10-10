@@ -5,7 +5,7 @@ import path from "node:path";
 
 /**
  * Rolls back migrations newest-first
- * (waitlist → github → workspaces → users → baseline).
+ * (run_events → agent_runs → budgets → … → baseline).
  */
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -15,6 +15,17 @@ if (!url) {
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "drizzle");
 const downs = [
+  "0015_deletion.down.sql",
+  "0014_artifacts.down.sql",
+  "0013_run_events.down.sql",
+  "0012_agent_runs.down.sql",
+  "0011_budgets.down.sql",
+  "0010_approvals.down.sql",
+  "0009_task_transitions.down.sql",
+  "0008_plan.down.sql",
+  "0007_briefs.down.sql",
+  "0006_projects.down.sql",
+  "0005_webhooks.down.sql",
   "0004_waitlist.down.sql",
   "0003_github.down.sql",
   "0002_workspaces.down.sql",

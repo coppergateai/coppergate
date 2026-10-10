@@ -10,6 +10,12 @@ export {
   type Logger,
 } from "./logger.js";
 export {
+  FUNNEL_STAGES,
+  trackFunnelEvent,
+  type FunnelEventInput,
+  type FunnelStage,
+} from "./funnel.js";
+export {
   getTracer,
   initTelemetry,
   resetTelemetryForTests,

@@ -1,34 +1,66 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "@fontsource/space-grotesk/400.css";
 import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/600.css";
 import "./globals.css";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0a0a0a",
+};
+
+const siteUrl =
+  process.env.APP_URL?.replace(/\/$/, "") || "https://www.coppergate.ai";
+
+const title = "Coppergate — From idea to reviewed PR";
+const description =
+  "An AI product studio that plans, codes, and opens pull requests with evidence — you open the gate for what ships.";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.APP_URL?.replace(/\/$/, "") || "https://coppergate.ai",
-  ),
+  metadataBase: new URL(siteUrl),
   title: {
-    default: "Coppergate — From idea to reviewed PR",
+    default: title,
     template: "%s · Coppergate",
   },
-  description:
-    "Direct an AI product team that plans, codes, and opens pull requests. You open the gate for what ships.",
+  description,
+  applicationName: "Coppergate",
+  keywords: [
+    "AI product studio",
+    "pull requests",
+    "GitHub",
+    "AI coding",
+    "software delivery",
+    "code review",
+  ],
+  authors: [{ name: "Coppergate", url: siteUrl }],
+  creator: "Coppergate",
+  publisher: "Coppergate",
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
   openGraph: {
-    title: "Coppergate — From idea to reviewed PR",
-    description:
-      "Direct an AI product team that plans, codes, and opens pull requests. You open the gate for what ships.",
+    title,
+    description,
+    url: "/",
     siteName: "Coppergate",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Coppergate" }],
+    locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Coppergate — From idea to reviewed PR",
-    description:
-      "Direct an AI product team that plans, codes, and opens pull requests. You open the gate for what ships.",
-    images: ["/og.png"],
+    title,
+    description,
   },
   icons: {
     icon: [
