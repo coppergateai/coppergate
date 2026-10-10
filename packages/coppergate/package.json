@@ -1,0 +1,29 @@
+{
+  "name": "coppergate",
+  "version": "0.0.0",
+  "description": "Coppergate — AI-native product execution. Placeholder package reserving the name.",
+  "license": "UNLICENSED",
+  "private": false,
+  "author": "Coppergate <hello@coppergate.ai>",
+  "homepage": "https://coppergate.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coppergateai/coppergate.git",
+    "directory": "packages/coppergate"
+  },
+  "bugs": {
+    "url": "https://github.com/coppergateai/coppergate/issues"
+  },
+  "keywords": [
+    "coppergate",
+    "ai",
+    "agents",
+    "product-execution"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "README.md"
+  ]
+}
