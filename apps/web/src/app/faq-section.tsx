@@ -9,6 +9,10 @@ const faqs = [
     a: "Chat agents help you write code in a thread. Coppergate runs a controlled path from brief to a GitHub pull request — with plan approval, budget, CI evidence, and a human merge gate. The output is a reviewable PR, not a paste buffer.",
   },
   {
+    q: "Why not just use Cursor chat or a generic coding agent?",
+    a: "Those tools are excellent for interactive editing. Coppergate is for delivery you can verify: an approved brief and plan, a budgeted run, a PR with checks and cost, and a merge gate you control. It complements an IDE agent — it does not replace your editor.",
+  },
+  {
     q: "Does Coppergate merge automatically?",
     a: "No. Merge stays locked until you approve. Agents may open PRs and attach evidence; shipping remains a human decision.",
   },

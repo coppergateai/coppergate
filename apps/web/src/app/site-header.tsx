@@ -11,8 +11,9 @@ type Props = {
 
 const links = [
   { href: "/#how-it-works", label: "How it works" },
-  { href: "/#product-title", label: "Product" },
+  { href: "/#features", label: "Product" },
   { href: "/security", label: "Security" },
+  { href: "/#faq", label: "FAQ" },
 ] as const;
 
 export function SiteHeader({ signedIn }: Props) {

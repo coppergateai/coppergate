@@ -1,4 +1,10 @@
+import { ClosingCta } from "./closing-cta";
+import { CostDive } from "./cost-dive";
 import { EarlyAccessForm } from "./early-access-form";
+import { EvidenceDive } from "./evidence-dive";
+import { FaqSection } from "./faq-section";
+import { FeaturesGrid } from "./features-grid";
+import { GovernanceDive } from "./governance-dive";
 import { HowItWorks } from "./how-it-works";
 import { JsonLd } from "./json-ld";
 import { LandingFunnelBeacon } from "./landing-funnel";
@@ -65,8 +71,14 @@ export default async function HomePage() {
 
       <TrustStrip />
       <HowItWorks />
+      <FeaturesGrid />
       <ProductBoard />
+      <CostDive />
+      <GovernanceDive />
+      <EvidenceDive />
       <StatusBand />
+      <FaqSection />
+      <ClosingCta signedInLogin={user?.login ?? null} />
     </SiteChrome>
   );
 }

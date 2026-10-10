@@ -32,15 +32,21 @@ export function SiteFooter() {
             <nav className={styles.footerCol} aria-label="Product">
               <h2 className={styles.footerHeading}>Product</h2>
               <Link href="/#how-it-works">How it works</Link>
+              <Link href="/#features">Features</Link>
               <Link href="/#product-title">Delivery</Link>
-              <Link href="/security">Security</Link>
-              <Link href="/login">Sign in</Link>
+              <Link href="/#cost">Cost control</Link>
+              <Link href="/#governance">Governance</Link>
+              <Link href="/#evidence">Evidence</Link>
+              <Link href="/#faq">FAQ</Link>
             </nav>
             <nav className={styles.footerCol} aria-label="Company">
               <h2 className={styles.footerHeading}>Company</h2>
+              <Link href="/security">Security</Link>
+              <Link href="/changelog">Changelog</Link>
               <a href="mailto:hello@coppergate.ai">Contact</a>
               <Link href="/privacy">Privacy</Link>
               <Link href="/terms">Terms</Link>
+              <Link href="/login">Sign in</Link>
             </nav>
           </div>
         </div>
