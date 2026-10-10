@@ -75,6 +75,8 @@ Public `/` is the early-access landing (Phase 0). Signups go to `waitlist_signup
 4. Migrate prod DB: `DATABASE_URL=… pnpm db:migrate`.
 5. Attach `coppergate.ai` (Cloudflare DNS — see architecture `EMAIL.md`).
 
+**Staging (TASK033):** see [`docs/STAGING.md`](./docs/STAGING.md) — web + worker + `GITHUB_DELIVERY_MODE=http` + `scripts/staging-smoke.mjs`.
+
 ## Status
 
 **TASK001–032** complete (MVP). Phase 2 planned as **TASK033–047** in architecture `MVP_BACKLOG.md` (Slices I–K). See `docs/PRIVATE_BETA.md` and `docs/OPS_RUNBOOK.md`.

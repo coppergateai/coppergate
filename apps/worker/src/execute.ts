@@ -26,11 +26,9 @@ import {
   type Database,
   type Task,
 } from "@coppergate/db";
-import {
-  FakeGithubDelivery,
-  type GithubDeliveryClient,
-} from "@coppergate/github";
+import type { GithubDeliveryClient } from "@coppergate/github";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
+import { resolveGithubDelivery } from "./github-delivery.js";
 
 /**
  * Execute a claimed run with CodingAgent.
@@ -51,7 +49,6 @@ export async function executeClaimedRun(
 ): Promise<"review_required" | "failed" | "cancelled" | "validation_failed"> {
   const { run, workerId, log, leaseMs } = input;
   const agent = input.agent ?? new FakeCodingAgent();
-  const github = input.github ?? new FakeGithubDelivery();
 
   const task = await getTaskById(db, run.taskId);
   if (!task) {
@@ -245,18 +242,34 @@ export async function executeClaimedRun(
     return "validation_failed";
   }
 
-  // Deliver PR via GitHub port (fake by default) — never default branch.
+  // Deliver PR via GitHub port — fake by default; `GITHUB_DELIVERY_MODE=http` for staging.
+  let github: GithubDeliveryClient;
+  let repo = { owner: "example", repo: "repo", defaultBranch: "main" };
+  let baseSha = run.baseSha;
+  if (input.github) {
+    github = input.github;
+  } else {
+    const resolved = await resolveGithubDelivery(db, {
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      baseSha: run.baseSha,
+    });
+    github = resolved.client;
+    repo = resolved.repo;
+    baseSha = resolved.baseSha;
+    log.info("github delivery resolved", {
+      mode: resolved.mode,
+      repo: `${repo.owner}/${repo.repo}`,
+    });
+  }
+
   const delivery = await github.deliverPullRequest({
-    repo: {
-      owner: "example",
-      repo: "repo",
-      defaultBranch: "main",
-    },
+    repo,
     branchName: completion.branchName,
-    baseSha: run.baseSha,
+    baseSha,
     commitMessage: `Coppergate: ${task.title}`,
     prTitle: `Coppergate: ${task.title}`,
-    prBody: `Task \`${task.id}\` · run \`${run.id}\``,
+    prBody: `Task \`${task.id}\` · run \`${run.id}\` · repo \`${repo.owner}/${repo.repo}\``,
     files: (completion.filesChanged.length
       ? completion.filesChanged
       : ["README.md"]
