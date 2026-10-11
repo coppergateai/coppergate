@@ -172,7 +172,6 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
   async deliverPullRequest(input: DeliverPrInput): Promise<DeliverPrResult> {
     assertSafeBranch(input.branchName, input.repo.defaultBranch);
     const { owner, repo } = input.repo;
-    const api = "https://api.github.com";
 
     // Idempotency: existing open PR with same head
     const existing = await this.findPrByHead(owner, repo, input.branchName);
