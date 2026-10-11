@@ -14,7 +14,7 @@ const PATTERNS: RegExp[] = [
   /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/g, // GitHub tokens
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/gi,
   /\bsk-[A-Za-z0-9]{20,}\b/g, // OpenAI-style
-  /\bBearer\s+[A-Za-z0-9._\-+=\/]{8,}/gi,
+  /\bBearer\s+[A-Za-z0-9._\-+=/]{8,}/gi,
   /\b(xox[baprs]-[A-Za-z0-9-]{10,})\b/g, // Slack
   /\bAKIA[0-9A-Z]{16}\b/g, // AWS access key id
   /\b-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
