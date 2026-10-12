@@ -14,7 +14,7 @@ export default function PrivacyPage() {
     <SiteChrome>
       <article className={styles.legal}>
         <h1 className={styles.legalTitle}>Privacy</h1>
-        <p className={styles.legalUpdated}>Last updated: October 10, 2026</p>
+        <p className={styles.legalUpdated}>Last updated: October 12, 2026</p>
 
         <div className={styles.legalBody}>
           <section>
@@ -46,6 +46,11 @@ export default function PrivacyPage() {
               <li>
                 <strong>Technical logs:</strong> basic request and error logs
                 needed to operate and secure the service.
+              </li>
+              <li>
+                <strong>Analytics:</strong> aggregated site usage via Google
+                Analytics (page views and similar events). This helps us
+                understand traffic on the marketing site and product surface.
               </li>
             </ul>
           </section>

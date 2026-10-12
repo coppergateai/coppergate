@@ -18,7 +18,8 @@
     "LLM_API_KEY",
     "LLM_BASE_URL",
     "LLM_MODEL",
-    "OPENAI_API_KEY"
+    "OPENAI_API_KEY",
+    "NEXT_PUBLIC_GA_MEASUREMENT_ID"
   ],
 
   "tasks": {
