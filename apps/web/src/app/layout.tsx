@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import "@fontsource/space-grotesk/400.css";
 import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/600.css";
+import { DeferredGoogleAnalytics } from "@/components/deferred-google-analytics";
+import { GA_MEASUREMENT_ID } from "@/lib/ga";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -76,7 +78,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        {GA_MEASUREMENT_ID ? (
+          <DeferredGoogleAnalytics gaId={GA_MEASUREMENT_ID} />
+        ) : null}
+      </body>
     </html>
   );
 }
