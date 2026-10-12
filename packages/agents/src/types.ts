@@ -16,6 +16,8 @@ export type AgentRunInput = {
   spendCapMicros: number;
   /** Architecture / brief context (non-secret). */
   architectureContext?: string;
+  /** Contender strategy — blitz | fortress | balanced. */
+  strategy?: string;
   /** Cooperative cancel check between events. */
   isCancelRequested?: () => boolean | Promise<boolean>;
 };

@@ -6,19 +6,23 @@ import styles from "./marketing.module.css";
 const faqs = [
   {
     q: "How is Coppergate different from Paperclip or OpenClaw?",
-    a: "Paperclip is a company OS with org charts and hired agents. OpenClaw is a personal/team assistant gateway. Coppergate is a Survivor arena: multiple contenders compete, critics score, fitness decides, and losers lose budget.",
+    a: "Paperclip is a company OS with org charts and hired agents. OpenClaw is a personal/team assistant gateway. Coppergate is a game-theoretic Survivor arena: contenders compete in an all-pay efficiency contest, critics score, payoff decides, and losers lose budget.",
   },
   {
     q: "How is this different from a coding chat agent?",
-    a: "Chat agents help you write code in a thread. Coppergate runs an autonomous tournament toward a goal — with budgets, elimination, and fitness evidence (CI/tests/critic). The output is a promoted survivor path, not a paste buffer.",
+    a: "Chat agents help you write code in a thread. Coppergate runs selection pressure toward a goal — with budgets, efficiency payoff, elimination, and fitness evidence (CI/tests/critic). The output is a promoted survivor path, not a paste buffer.",
+  },
+  {
+    q: "Why not just one agent?",
+    a: "A single agent has no selection pressure — it can burn tokens, skip tests, or ship vibes. Contenders compete; efficiency payoff (fitness / spend^α) breaks the degenerate “spend more to win” equilibrium. Selection scales; supervision does not.",
   },
   {
     q: "Do I approve every task and merge?",
-    a: "No — that is not the north star. You set the goal, policy, and spend cap, and you hold a kill-switch. Private beta still ships a GitHub fitness wedge while we harden the loop; production / default-branch writes stay policy-gated.",
+    a: "No — that is not the north star. You set the goal, policy, and spend cap, and you hold a kill-switch. Selection over supervision: fitness and efficiency gate promotion; production / default-branch writes stay policy-gated.",
   },
   {
-    q: "Is the full Survivor tournament live today?",
-    a: "Not yet as the default. Contenders, critic scoring, and budget elimination are the product north star. Today’s private beta proves GitHub fitness (PR + CI), spend caps, and kill-switch — then we open the arena loop.",
+    q: "Is the efficiency contest live today?",
+    a: "Yes for armed arenas: N contenders fan out, the worker auto-resolves by efficiency payoff, and losers lose budget. Private beta still uses GitHub PR + CI as the fitness wedge; kill-switch and spend caps remain first-class.",
   },
   {
     q: "What happens when an agent hits its budget?",

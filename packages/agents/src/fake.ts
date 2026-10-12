@@ -1,3 +1,7 @@
+import {
+  isContenderStrategy,
+  strategySpendFraction,
+} from "./strategy.js";
 import type {
   AgentEvent,
   AgentRunInput,
@@ -92,18 +96,25 @@ export class FakeCodingAgent implements CodingAgent {
       return;
     }
 
+    const rawStrategy = input.strategy ?? "balanced";
+    const strategy = isContenderStrategy(rawStrategy)
+      ? rawStrategy
+      : "balanced";
+    const fraction = strategySpendFraction(strategy);
+    const baseCost = Math.floor(25_000 * fraction);
     const costMicros = Math.min(
-      25_000,
-      input.spendCapMicros > 0 ? input.spendCapMicros : 25_000,
+      baseCost,
+      input.spendCapMicros > 0 ? input.spendCapMicros : baseCost,
     );
     yield {
       kind: "cost",
       message: "Token usage estimate",
       payload: {
-        estimatedTokens: 1_200,
+        estimatedTokens: Math.floor(1_200 * fraction),
         costMicros,
         provider: "fake",
         model: "fake-coding-agent-v1",
+        strategy,
       },
     };
     if (await cancelled()) {

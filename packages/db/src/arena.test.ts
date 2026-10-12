@@ -7,12 +7,14 @@ import {
   assertAtMostOneWinner,
   assertNonNegativeBudget,
   canContenderEnqueue,
+  computeEfficiencyPayoff,
   createTournament,
   debitContenderBudget,
   ensureArenaForProject,
   killArena,
   resolveTournamentByFitness,
   selectWinnerByFitness,
+  selectWinnerByPayoff,
 } from "./arena.js";
 import { closeDb, createDb } from "./client.js";
 import { approveBrief, createBriefDraft } from "./briefs.js";
@@ -61,6 +63,45 @@ describe("arena invariants (pure)", () => {
         ]),
       ArenaError,
     );
+  });
+
+  it("efficiency payoff zeros CI failures and prefers cheaper equal fitness", () => {
+    assert.equal(
+      computeEfficiencyPayoff({
+        fitness: 0.9,
+        spendMicros: 1_000_000,
+        alpha: 0.5,
+        ciPassed: false,
+      }),
+      0,
+    );
+    const cheap = computeEfficiencyPayoff({
+      fitness: 0.9,
+      spendMicros: 100_000,
+      alpha: 0.5,
+      ciPassed: true,
+    });
+    const expensive = computeEfficiencyPayoff({
+      fitness: 0.9,
+      spendMicros: 1_000_000,
+      alpha: 0.5,
+      ciPassed: true,
+    });
+    assert.ok(cheap > expensive);
+
+    const winner = selectWinnerByPayoff([
+      {
+        runId: "expensive",
+        efficiencyScore: expensive,
+        fitnessScore: 0.9,
+      },
+      {
+        runId: "cheap",
+        efficiencyScore: cheap,
+        fitnessScore: 0.9,
+      },
+    ]);
+    assert.equal(winner.runId, "cheap");
   });
 
   it("allows at most one winner", () => {

@@ -9,12 +9,14 @@ type ArenaView = {
   minHuman: boolean;
   prodWritesEnabled: boolean;
   defaultContenderN: number;
+  payoffAlpha: number;
   killedAt: string | null;
 };
 
 type ContenderView = {
   id: string;
   profileKey: string;
+  strategy: string;
   budgetMicrosRemaining: number;
   status: string;
 };
@@ -86,8 +88,9 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
         Survivor arena
       </h2>
       <p className={styles.sectionLede}>
-        Contenders compete; fitness decides. Kill-switch freezes the arena.
-        min_human skips per-task approve (opt-in; default off).
+        Selection pressure active — contenders compete; efficiency payoff
+        decides. Kill-switch freezes the arena. min_human skips per-task approve
+        (opt-in; default off).
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -130,6 +133,9 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
             </span>
             <span>N={arena.defaultContenderN}</span>
             <span>
+              α={arena.payoffAlpha ?? 0.5}
+            </span>
+            <span>
               min_human <strong>{arena.minHuman ? "on" : "off"}</strong>
             </span>
             {arena.killedAt ? (
@@ -141,6 +147,7 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
             {contenders.map((c) => (
               <li key={c.id} className={styles.arenaItem}>
                 <strong>{c.profileKey}</strong>
+                <span>{c.strategy}</span>
                 <span>{c.status}</span>
                 <span>{c.budgetMicrosRemaining} µUSD</span>
               </li>

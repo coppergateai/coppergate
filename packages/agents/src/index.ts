@@ -24,3 +24,10 @@ export {
   createCodingAgent,
   type CreateCodingAgentOptions,
 } from "./create-agent.js";
+export {
+  CONTENDER_STRATEGIES,
+  isContenderStrategy,
+  strategyGuidance,
+  strategySpendFraction,
+  type ContenderStrategy,
+} from "./strategy.js";

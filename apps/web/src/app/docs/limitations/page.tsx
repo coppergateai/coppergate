@@ -19,17 +19,18 @@ export default function LimitationsPage() {
         <h1 className={styles.pageTitle}>Limitations &amp; non-goals</h1>
         <div className={styles.prose}>
           <p>
-            North star: autonomous Survivor arena (tournament, critic,
-            elimination). Private beta ships a GitHub fitness wedge first — not
-            the full tournament loop yet.
+            North star: autonomous Survivor arena with selection over
+            supervision (efficiency contest, critic, elimination). Private beta
+            ships GitHub fitness (PR + CI) as the evidence wedge; armed arenas
+            run N≤2 efficiency contests today.
           </p>
 
           <section>
             <h2>Wedge limitations</h2>
             <ul>
               <li>
-                One coding run per repo concurrency (multi-contender tournament
-                is the arena roadmap, not the default today)
+                Tournament fan-out hard-capped at N≤2 ContenderRuns per task
+                until concurrency policy relaxes
               </li>
               <li>
                 Brief/plan gates remain in the wedge; per-task approval is not

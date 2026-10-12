@@ -13,6 +13,16 @@ export const metadata: Metadata = {
 const entries = [
   {
     date: "2026-10-12",
+    title: "The Arena Thesis — Selection over Supervision",
+    items: [
+      "Efficiency contest: payoff e = fitness / spend^α promotes winners",
+      "Worker auto-resolves tournaments when ContenderRuns finish",
+      "Contender strategies (blitz / fortress / balanced) + payoff board",
+      "Public thesis: selection pressure, not an approval inbox",
+    ],
+  },
+  {
+    date: "2026-10-12",
     title: "Premium marketing surface",
     items: [
       "Control-plane hero preview with contender fitness demo",

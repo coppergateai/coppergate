@@ -24,12 +24,12 @@ const steps = [
   },
   {
     n: "02",
-    stage: "Tournament",
+    stage: "Contest",
     title: "Contenders race",
-    body: "Multiple agents attack the same objective in parallel. Weak paths burn budget; strong paths continue.",
+    body: "An all-pay contest: every contender spends budget on the same objective. Only the fittest efficient path can win.",
     visual: (
       <div className={`${styles.stepVisual} ${styles.stepVisualTournament}`}>
-        <span className={styles.miniLabel}>Parallel execution</span>
+        <span className={styles.miniLabel}>Parallel contest</span>
         <ul className={styles.tourProgress}>
           <li>
             <div className={styles.tourProgressTop}>
@@ -64,15 +64,15 @@ const steps = [
   },
   {
     n: "03",
-    stage: "Fitness",
-    title: "Fitness decides",
-    body: "Critics score. CI and tests validate. Policy compliance is checked before anything promotes.",
+    stage: "Efficiency",
+    title: "Efficiency decides",
+    body: "Critics score fitness. Spend is priced in. Payoff e = f / spend^α breaks the token-race equilibrium before anything promotes.",
     visual: (
       <div className={`${styles.stepVisual} ${styles.stepVisualFitness}`}>
-        <span className={styles.miniLabel}>Evaluation pack</span>
+        <span className={styles.miniLabel}>Payoff pack</span>
         <div className={styles.fitnessMiniScore}>
-          <span>Critic</span>
-          <strong>0.91</strong>
+          <span>Efficiency</span>
+          <strong>2.87</strong>
         </div>
         <ul className={styles.checkList}>
           <li>
@@ -129,13 +129,12 @@ export function SurvivorWorkflow() {
         <header className={styles.workflowHead}>
           <p className={styles.sectionEyebrow}>How it works</p>
           <h2 id="how-title" className={styles.sectionTitle}>
-            A Survivor loop, not an approval inbox.
+            Selection over supervision.
           </h2>
           <p className={styles.sectionLede}>
-            Define the goal and boundaries. Coppergate orchestrates contenders,
-            evaluates outcomes, and promotes the strongest validated result.
-            Full tournament is the north star — private beta ships the GitHub
-            fitness path today.
+            Define the goal and boundaries. Coppergate runs an efficiency
+            contest: contenders compete, payoff promotes the survivor, losers
+            lose budget. Not an approval inbox — a selection pressure loop.
           </p>
         </header>
 

@@ -322,6 +322,8 @@ export const arenas = pgTable(
     minHuman: boolean("min_human").notNull().default(false),
     prodWritesEnabled: boolean("prod_writes_enabled").notNull().default(false),
     defaultContenderN: integer("default_contender_n").notNull().default(2),
+    /** Efficiency payoff exponent α — GAME_THEORY.md (default 0.5). */
+    payoffAlpha: doublePrecision("payoff_alpha").notNull().default(0.5),
     /** ARMED | RUNNING | KILLED | PAUSED */
     status: text("status").notNull().default("ARMED"),
     killedAt: timestamp("killed_at", { withTimezone: true }),
@@ -350,6 +352,8 @@ export const contenders = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     profileKey: text("profile_key").notNull().default("engineer"),
+    /** blitz | fortress | balanced — GAME_THEORY.md §5 */
+    strategy: text("strategy").notNull().default("balanced"),
     budgetMicrosRemaining: bigint("budget_micros_remaining", { mode: "number" })
       .notNull()
       .default(0),
@@ -453,6 +457,8 @@ export const agentRuns = pgTable(
       onDelete: "set null",
     }),
     fitnessScore: doublePrecision("fitness_score"),
+    /** Efficiency payoff e = f / spend^α */
+    efficiencyScore: doublePrecision("efficiency_score"),
     fitnessEvidenceRef: text("fitness_evidence_ref"),
     /** WINNER | LOSER | CANCELLED */
     tournamentResult: text("tournament_result"),

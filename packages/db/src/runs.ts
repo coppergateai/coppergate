@@ -52,6 +52,8 @@ function mapRow(row: Record<string, unknown>): AgentRun {
     contenderId: row.contender_id == null ? null : String(row.contender_id),
     fitnessScore:
       row.fitness_score == null ? null : Number(row.fitness_score),
+    efficiencyScore:
+      row.efficiency_score == null ? null : Number(row.efficiency_score),
     fitnessEvidenceRef:
       row.fitness_evidence_ref == null
         ? null
