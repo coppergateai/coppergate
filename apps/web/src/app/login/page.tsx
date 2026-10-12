@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
+import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
-import styles from "../landing.module.css";
 
 export const metadata: Metadata = {
   title: "Sign in",

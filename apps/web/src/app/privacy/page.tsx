@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
+import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
-import styles from "../landing.module.css";
 
 export const metadata: Metadata = {
   title: "Privacy",
@@ -12,11 +12,12 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <SiteChrome>
-      <article className={styles.legal}>
-        <h1 className={styles.legalTitle}>Privacy</h1>
-        <p className={styles.legalUpdated}>Last updated: October 12, 2026</p>
+      <article className={styles.contentPage}>
+        <p className={styles.pageEyebrow}>Legal</p>
+        <h1 className={styles.pageTitle}>Privacy</h1>
+        <p className={styles.pageLede}>Last updated: October 12, 2026</p>
 
-        <div className={styles.legalBody}>
+        <div className={styles.prose}>
           <section>
             <h2>Who we are</h2>
             <p>
@@ -61,8 +62,12 @@ export default function PrivacyPage() {
             <ul>
               <li>Manage the waitlist and communicate about early access</li>
               <li>Authenticate you and operate your workspaces</li>
-              <li>Generate plans, run agents, and open pull requests you request</li>
-              <li>Improve reliability, prevent abuse, and meet legal obligations</li>
+              <li>
+                Generate plans, run agents, and open pull requests you request
+              </li>
+              <li>
+                Improve reliability, prevent abuse, and meet legal obligations
+              </li>
             </ul>
             <p>
               We do not sell your personal information. Production writes stay

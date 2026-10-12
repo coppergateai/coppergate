@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
-import styles from "../landing.module.css";
 
 export const metadata: Metadata = {
   title: "Security",
@@ -13,13 +13,14 @@ export const metadata: Metadata = {
 export default function SecurityPage() {
   return (
     <SiteChrome>
-      <article className={styles.legal}>
-        <h1 className={styles.legalTitle}>Security</h1>
-        <p className={styles.legalUpdated}>
+      <article className={styles.contentPage}>
+        <p className={styles.pageEyebrow}>Trust</p>
+        <h1 className={styles.pageTitle}>Security</h1>
+        <p className={styles.pageLede}>
           How autonomy, access, and kill-switches work in private beta
         </p>
 
-        <div className={styles.legalBody}>
+        <div className={styles.prose}>
           <section>
             <h2>Fitness is the gate</h2>
             <p>
@@ -37,9 +38,9 @@ export default function SecurityPage() {
             <h2>GitHub identity first</h2>
             <p>
               Sign-in uses GitHub OAuth for identity. Repository access is
-              granted separately through the GitHub App you install on the
-              orgs and repos you choose. You can revoke either side from GitHub
-              at any time.
+              granted separately through the GitHub App you install on the orgs
+              and repos you choose. You can revoke either side from GitHub at
+              any time.
             </p>
           </section>
 

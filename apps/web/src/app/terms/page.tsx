@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
-import styles from "../landing.module.css";
 
 export const metadata: Metadata = {
   title: "Terms",
@@ -13,11 +13,12 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <SiteChrome>
-      <article className={styles.legal}>
-        <h1 className={styles.legalTitle}>Terms</h1>
-        <p className={styles.legalUpdated}>Last updated: October 10, 2026</p>
+      <article className={styles.contentPage}>
+        <p className={styles.pageEyebrow}>Legal</p>
+        <h1 className={styles.pageTitle}>Terms</h1>
+        <p className={styles.pageLede}>Last updated: October 10, 2026</p>
 
-        <div className={styles.legalBody}>
+        <div className={styles.prose}>
           <section>
             <h2>Private beta</h2>
             <p>

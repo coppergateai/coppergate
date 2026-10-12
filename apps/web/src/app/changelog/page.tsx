@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
-import styles from "../landing.module.css";
 
 export const metadata: Metadata = {
   title: "Changelog",
@@ -11,6 +11,15 @@ export const metadata: Metadata = {
 };
 
 const entries = [
+  {
+    date: "2026-10-12",
+    title: "Premium marketing surface",
+    items: [
+      "Control-plane hero preview with contender fitness demo",
+      "Survivor workflow pipeline and capability strip",
+      "Google Analytics + contact email updates",
+    ],
+  },
   {
     date: "2026-10-10",
     title: "Landing, gates, and evidence narrative",
@@ -35,15 +44,19 @@ const entries = [
 export default function ChangelogPage() {
   return (
     <SiteChrome>
-      <article className={styles.legal}>
-        <h1 className={styles.legalTitle}>Changelog</h1>
-        <p className={styles.legalUpdated}>
+      <article className={styles.contentPage}>
+        <p className={styles.pageEyebrow}>Product</p>
+        <h1 className={styles.pageTitle}>Changelog</h1>
+        <p className={styles.pageLede}>
           Private beta notes — what shipped recently
         </p>
 
         <div className={styles.changelogList}>
           {entries.map((entry) => (
-            <section key={`${entry.date}-${entry.title}`} className={styles.changelogEntry}>
+            <section
+              key={`${entry.date}-${entry.title}`}
+              className={styles.changelogEntry}
+            >
               <p className={styles.changelogDate}>{entry.date}</p>
               <h2 className={styles.changelogTitle}>{entry.title}</h2>
               <ul>
@@ -56,8 +69,7 @@ export default function ChangelogPage() {
         </div>
 
         <p className={styles.changelogMore}>
-          Want a seat?{" "}
-          <Link href="/#early-access">Request access</Link>
+          Want a seat? <Link href="/#early-access">Request access</Link>
           {" · "}
           <a href="mailto:muhtalipdede@gmail.com">Contact</a>
         </p>
