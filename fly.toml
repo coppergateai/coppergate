@@ -1,0 +1,21 @@
+# Coppergate worker — TASK033 staging
+# Deploy from repo root: fly deploy
+
+app = "coppergate-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.worker"
+
+[env]
+  NODE_ENV = "production"
+  GITHUB_DELIVERY_MODE = "http"
+  APP_URL = "https://www.coppergate.ai"
+
+[processes]
+  worker = "pnpm start"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["worker"]
