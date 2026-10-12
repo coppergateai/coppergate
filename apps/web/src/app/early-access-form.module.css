@@ -6,7 +6,7 @@
   width: 100%;
   padding: 0.4rem;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 3px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.42);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
@@ -59,9 +59,9 @@
 }
 
 .input:focus {
-  background: rgba(184, 115, 51, 0.08);
-  border-color: rgba(184, 115, 51, 0.55);
-  box-shadow: 0 0 0 3px rgba(184, 115, 51, 0.15);
+  background: rgba(200, 137, 73, 0.08);
+  border-color: rgba(200, 137, 73, 0.55);
+  box-shadow: 0 0 0 3px rgba(200, 137, 73, 0.15);
 }
 
 .submit {
@@ -69,7 +69,7 @@
   height: 2.9rem;
   padding: 0 1.2rem;
   border: none;
-  border-radius: 2px;
+  border-radius: 999px;
   background: var(--paper);
   color: var(--ink);
   font: inherit;
