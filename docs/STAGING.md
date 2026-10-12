@@ -2,14 +2,15 @@
 
 Goal: open and accept **one real PR** from a staging Coppergate stack without operator DB surgery.
 
-## Architecture
+## Architecture (live)
 
-| Piece | Suggested host |
+| Piece | Host |
 |---|---|
-| `apps/web` | Vercel preview/staging project (`apps/web` root) |
-| Postgres | Neon / RDS / Compose on a small VM |
-| `apps/worker` | Railway / Fly / same VM (`Dockerfile.worker`) |
-| GitHub App | Throwaway org; webhook → `https://<staging>/api/integrations/github/webhook` |
+| `apps/web` | Vercel project `coppergate` → `https://www.coppergate.ai` |
+| Postgres | Fly Postgres `coppergate-db` (web via `coppergate-db.fly.dev` + `sslmode=require`; worker via `.flycast`) |
+| `apps/worker` | Fly app `coppergate-worker` (`Dockerfile.worker` + [`fly.toml`](../fly.toml)) |
+| GitHub App | `coppergatelocal` on org `coppergateai` |
+| Smoke repo | [`coppergateai/coppergate-staging-smoke`](https://github.com/coppergateai/coppergate-staging-smoke) |
 
 ## Required env (web + worker)
 
@@ -17,8 +18,8 @@ Copy from `.env.example`, then set:
 
 ```bash
 NODE_ENV=production
-APP_URL=https://staging.example.com
-DATABASE_URL=postgresql://…
+APP_URL=https://www.coppergate.ai
+DATABASE_URL=postgresql://…          # same logical DB; host may differ (fly.dev vs flycast)
 SESSION_SECRET=<≥32 random chars>
 CREDENTIALS_ENCRYPTION_KEY=<64 hex chars>
 GITHUB_CLIENT_ID=…
@@ -35,28 +36,43 @@ GITHUB_DELIVERY_MODE=http
 # LLM_MODEL=gpt-4.1-mini
 ```
 
-Web and worker **must** share `DATABASE_URL` and `CREDENTIALS_ENCRYPTION_KEY`.
+Web and worker **must** share the same database and `CREDENTIALS_ENCRYPTION_KEY`.
+
+Sync helper (local `.env` → Vercel + optional Fly): [`scripts/task033-sync-secrets.sh`](../scripts/task033-sync-secrets.sh).
+
+## GitHub App URLs (`coppergatelocal`)
+
+Settings: https://github.com/organizations/coppergateai/settings/apps/coppergatelocal
+
+| Field | Value |
+|---|---|
+| Homepage | `https://www.coppergate.ai` |
+| Callback URL | `https://www.coppergate.ai/api/integrations/github/callback` |
+| Setup URL | `https://www.coppergate.ai/api/integrations/github/callback` |
+| Webhook Active | ✓ |
+| Webhook URL | `https://www.coppergate.ai/api/integrations/github/webhook` |
+| Webhook secret | same as `GITHUB_WEBHOOK_SECRET` |
+
+OAuth App (identity login) callback is already `https://www.coppergate.ai/api/auth/github/callback`.
 
 ## Deploy steps
 
 1. Provision Postgres; run `DATABASE_URL=… pnpm db:migrate`.
 2. Deploy web (Vercel): Root Directory `apps/web`; set env; `APP_URL` = public HTTPS origin.
-3. Configure GitHub OAuth callback: `{APP_URL}/api/auth/github/callback`.
-4. Configure GitHub App Setup URL: `{APP_URL}/api/integrations/github/callback`.
-5. Configure webhook: `{APP_URL}/api/integrations/github/webhook` + same `GITHUB_WEBHOOK_SECRET`.
-6. Deploy worker with `GITHUB_DELIVERY_MODE=http` (see `Dockerfile.worker`).
-7. Smoke: `STAGING_URL=https://… node scripts/staging-smoke.mjs`
-8. Manual path: `scripts/manual-real-pr-path.md`
+3. Configure GitHub OAuth + App URLs (table above).
+4. Deploy worker: `fly deploy` from repo root (`GITHUB_DELIVERY_MODE=http`).
+5. Smoke: `STAGING_URL=https://www.coppergate.ai node scripts/staging-smoke.mjs`
+6. Real PR seed (or UI path): `apps/worker/scripts/task033-seed-real-pr.mjs` / [`scripts/manual-real-pr-path.md`](../scripts/manual-real-pr-path.md)
 
 ## Pass criteria (TASK033)
 
-- [ ] `/health` and `/ready` green on staging
-- [ ] GitHub App install + one repo connected
-- [ ] Worker logs `github delivery resolved` with `mode: "http"`
-- [ ] Real PR on `coppergate/task-…` (non-default branch)
-- [ ] Accept → task `DONE` in UI without SQL fixes
+- [x] `/health` and `/ready` green on staging (`https://www.coppergate.ai`)
+- [x] GitHub App install + one repo connected (`coppergate-staging-smoke`)
+- [x] Worker logs `github delivery resolved` with `mode: "http"`
+- [x] Real PR on `coppergate/task-…` — [PR #1](https://github.com/coppergateai/coppergate-staging-smoke/pull/1)
+- [x] Accept → task `DONE` without operator SQL surgery
 
 ## Rollback
 
-- Set worker `GITHUB_DELIVERY_MODE=fake` to stop remote writes.
+- Set worker `GITHUB_DELIVERY_MODE=fake` to stop remote writes (`fly secrets set GITHUB_DELIVERY_MODE=fake -a coppergate-worker`).
 - Soft-delete workspace from settings to purge sealed tokens.
