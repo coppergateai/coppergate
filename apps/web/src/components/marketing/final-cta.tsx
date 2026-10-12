@@ -42,14 +42,21 @@ export function FinalCta({ signedInLogin = null }: Props) {
           </a>
         </div>
 
-        <div id="early-access" style={{ marginTop: "1.75rem" }}>
-          <EarlyAccessForm signedInLogin={signedInLogin} />
-        </div>
-
-        <p className={styles.finalNote}>
-          No fake signup — waitlist and GitHub auth are the real paths into
-          private beta.
-        </p>
+        {signedIn ? (
+          <p id="early-access" className={styles.finalNote}>
+            Signed in as @{signedInLogin}. Open workspaces above to continue.
+          </p>
+        ) : (
+          <>
+            <div id="early-access" className={styles.finalForm}>
+              <EarlyAccessForm />
+            </div>
+            <p className={styles.finalNote}>
+              No fake signup — waitlist and GitHub auth are the real paths into
+              private beta.
+            </p>
+          </>
+        )}
       </div>
     </section>
   );

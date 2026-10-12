@@ -1,6 +1,6 @@
 import Link from "next/link";
+import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "./site-chrome";
-import styles from "./landing.module.css";
 
 export default function NotFound() {
   return (
