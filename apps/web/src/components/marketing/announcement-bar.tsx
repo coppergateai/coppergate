@@ -11,7 +11,7 @@ export function AnnouncementBar() {
             development.
           </p>
         </div>
-        <a className={styles.announceLink} href="mailto:hello@coppergate.ai">
+        <a className={styles.announceLink} href="mailto:muhtalipdede@gmail.com">
           Talk to us
         </a>
       </div>

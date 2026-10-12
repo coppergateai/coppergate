@@ -70,8 +70,8 @@ export default function SecurityPage() {
               Coppergate is in private beta. Controls and providers may evolve
               as we onboard design partners. If you need a security review for
               your org, write to{" "}
-              <a href="mailto:hello@coppergate.ai?subject=Security%20review">
-                hello@coppergate.ai
+              <a href="mailto:muhtalipdede@gmail.com?subject=Security%20review">
+                muhtalipdede@gmail.com
               </a>
               .
             </p>

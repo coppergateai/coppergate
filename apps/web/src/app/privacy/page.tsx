@@ -23,7 +23,7 @@ export default function PrivacyPage() {
               Coppergate (“we”, “us”) is a private-beta autonomous multi-agent
               arena that runs competitive agent work against GitHub fitness
               signals, with spend caps and a kill-switch. Contact:{" "}
-              <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
+              <a href="mailto:muhtalipdede@gmail.com">muhtalipdede@gmail.com</a>.
             </p>
           </section>
 
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
               Waitlist and account data are kept while the beta is active and as
               needed for security and legal reasons. You can ask us to delete
               waitlist or account data by emailing{" "}
-              <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
+              <a href="mailto:muhtalipdede@gmail.com">muhtalipdede@gmail.com</a>.
             </p>
           </section>
 
@@ -105,7 +105,7 @@ export default function PrivacyPage() {
             <p>
               This notice may change as Coppergate moves beyond private beta. We
               will update the date above when we do. For questions, write to{" "}
-              <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
+              <a href="mailto:muhtalipdede@gmail.com">muhtalipdede@gmail.com</a>.
             </p>
           </section>
         </div>
