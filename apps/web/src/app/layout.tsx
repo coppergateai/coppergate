@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import "@fontsource/space-grotesk/400.css";
-import "@fontsource/space-grotesk/500.css";
-import "@fontsource/space-grotesk/600.css";
+import { GeistSans } from "geist/font/sans";
 import { DeferredGoogleAnalytics } from "@/components/deferred-google-analytics";
 import { GA_MEASUREMENT_ID } from "@/lib/ga";
 import "./globals.css";
@@ -11,7 +9,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0a0a0a",
+  themeColor: "#090a0c",
 };
 
 const siteUrl =
@@ -19,7 +17,7 @@ const siteUrl =
 
 const title = "Coppergate — Agents compete. Survivors ship.";
 const description =
-  "An autonomous multi-agent arena. Contenders race, critics score, fitness decides — you set the budget and hold the kill-switch.";
+  "An autonomous multi-agent arena. Contenders race, critics evaluate, and fitness determines what moves forward — with budgets and a kill-switch you control.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -77,7 +75,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={GeistSans.variable}>
       <body>
         {children}
         {GA_MEASUREMENT_ID ? (

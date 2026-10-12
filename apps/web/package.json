@@ -19,8 +19,8 @@
     "@coppergate/github": "workspace:*",
     "@coppergate/llm": "workspace:*",
     "@coppergate/telemetry": "workspace:*",
-    "@fontsource/space-grotesk": "5",
     "@next/third-parties": "^15.3.2",
+    "geist": "^1.7.2",
     "next": "^15.3.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

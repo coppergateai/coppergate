@@ -1,14 +1,25 @@
 :root {
-  --ink: #0a0a0a;
-  --ink-soft: #121212;
-  --paper: #ffffff;
-  --mute: #c2c2c2;
-  --mute-strong: #e8e8e8;
-  --mute-soft: #9a9a9a;
-  --copper: #b87333;
-  --copper-dim: rgba(184, 115, 51, 0.35);
-  --line: rgba(255, 255, 255, 0.08);
-  --font: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  --ink: #090a0c;
+  --ink-soft: #101114;
+  --surface: #121316;
+  --surface-elevated: #15171b;
+  --paper: #f5f5f3;
+  --mute: #a1a1aa;
+  --mute-strong: #e4e4e7;
+  --mute-soft: #71717a;
+  --copper: #c88949;
+  --copper-hot: #e3a76a;
+  --copper-dim: rgba(200, 137, 73, 0.28);
+  --success: #6fbf8a;
+  --danger: #d46a6a;
+  --line: #26282d;
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --font: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --max: 1440px;
+  --gutter: clamp(1.25rem, 4vw, 2.5rem);
+  --section-y: clamp(5rem, 12vw, 8.5rem);
+  --radius: 10px;
+  --radius-sm: 8px;
 }
 
 *,
@@ -27,11 +38,18 @@ body {
   background: var(--ink);
   color: var(--paper);
   font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
 a {
   color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 3px;
 }
 
 .sr-only {
@@ -54,7 +72,7 @@ a {
 @keyframes cg-rise {
   from {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -65,28 +83,14 @@ a {
 @keyframes cg-glow {
   0%,
   100% {
-    opacity: 0.45;
+    opacity: 0.4;
   }
   50% {
-    opacity: 0.9;
+    opacity: 0.75;
   }
 }
 
-@keyframes cg-gate-in {
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes cg-gate-in-mobile {
-  to {
-    opacity: 1;
-    transform: translate(50%, 0) scale(1);
-  }
-}
-
-@keyframes cg-rail {
+@keyframes cg-bar {
   from {
     transform: scaleX(0);
   }
@@ -97,23 +101,23 @@ a {
 
 .cg-rise {
   opacity: 0;
-  animation: cg-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: cg-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .cg-rise-delay-1 {
-  animation-delay: 0.12s;
+  animation-delay: 0.1s;
 }
 
 .cg-rise-delay-2 {
-  animation-delay: 0.24s;
+  animation-delay: 0.2s;
 }
 
 .cg-rise-delay-3 {
-  animation-delay: 0.36s;
+  animation-delay: 0.3s;
 }
 
 .cg-rise-delay-4 {
-  animation-delay: 0.48s;
+  animation-delay: 0.4s;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -121,8 +125,7 @@ a {
     scroll-behavior: auto;
   }
 
-  .cg-rise,
-  .cg-path-rail {
+  .cg-rise {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
