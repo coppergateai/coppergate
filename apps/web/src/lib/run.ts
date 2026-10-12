@@ -28,6 +28,7 @@ export function serializeRun(run: AgentRun) {
     tournamentId: run.tournamentId,
     contenderId: run.contenderId,
     fitnessScore: run.fitnessScore,
+    efficiencyScore: run.efficiencyScore,
     fitnessEvidenceRef: run.fitnessEvidenceRef,
     tournamentResult: run.tournamentResult,
     createdAt: run.createdAt.toISOString(),

@@ -127,6 +127,13 @@
       "when": 1728568100000,
       "tag": "0017_arena",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1728568200000,
+      "tag": "0018_game_theory",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,9 @@
 import {
   FakeCodingAgent,
+  isContenderStrategy,
   isFakeCompletionPayload,
   runFakeValidation,
+  strategyGuidance,
   type CodingAgent,
   type FakeCompletionPayload,
 } from "@coppergate/agents";
@@ -13,11 +15,13 @@ import {
   buildDeliveryReport,
   buildDiffSummary,
   createArtifact,
+  getContenderById,
   getTaskById,
   isRunCancelRequested,
   markRunAwaitingReview,
   markRunFailed,
   markRunValidating,
+  maybeScoreAndResolveTournament,
   parseJsonArray,
   persistDeliveryArtifacts,
   renewRunLease,
@@ -29,6 +33,34 @@ import {
 import type { GithubDeliveryClient } from "@coppergate/github";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
 import { resolveGithubDelivery } from "./github-delivery.js";
+
+async function maybeResolveTournamentAfterRun(
+  db: Database,
+  run: AgentRun,
+  workerId: string,
+  log: Logger,
+): Promise<void> {
+  if (!run.tournamentId) return;
+  try {
+    const resolved = await maybeScoreAndResolveTournament(db, {
+      workspaceId: run.workspaceId,
+      tournamentId: run.tournamentId,
+      actor: `worker:${workerId}`,
+    });
+    if (resolved) {
+      log.info("tournament resolved by efficiency payoff", {
+        tournamentId: run.tournamentId,
+        winnerRunId: resolved.winnerRunId,
+        scores: resolved.scores,
+      });
+    }
+  } catch (err) {
+    log.warn("tournament auto-resolve skipped", {
+      tournamentId: run.tournamentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 /**
  * Execute a claimed run with CodingAgent.
@@ -78,6 +110,7 @@ export async function executeClaimedRun(
       errorMessage: message.slice(0, 500),
     });
     await safeTaskTransition(db, task, "FAILED", workerId, log);
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
     return "failed";
   }
 
@@ -102,6 +135,19 @@ export async function executeClaimedRun(
   let actualCost = 0;
   let sawCancel = false;
 
+  let strategy = "balanced";
+  let strategyContext: string | undefined;
+  if (run.contenderId) {
+    const contender = await getContenderById(db, {
+      workspaceId: run.workspaceId,
+      contenderId: run.contenderId,
+    });
+    if (contender && isContenderStrategy(contender.strategy)) {
+      strategy = contender.strategy;
+      strategyContext = strategyGuidance(contender.strategy);
+    }
+  }
+
   try {
     for await (const event of agent.run({
       runId: run.id,
@@ -115,6 +161,8 @@ export async function executeClaimedRun(
       baseSha: run.baseSha,
       toolAllowlist: parseJsonArray(run.toolAllowlist),
       spendCapMicros: run.spendCapMicros,
+      strategy,
+      architectureContext: strategyContext,
       isCancelRequested: () => isRunCancelRequested(db, run.id),
     })) {
       await renewRunLease(db, run.id, workerId, leaseMs);
@@ -158,6 +206,7 @@ export async function executeClaimedRun(
       errorMessage: message.slice(0, 500),
     });
     await safeTaskTransition(db, task, "FAILED", workerId, log);
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
     return "failed";
   }
 
@@ -177,6 +226,7 @@ export async function executeClaimedRun(
       workerId,
       log,
     );
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
     return sawCancel ? "cancelled" : "failed";
   }
 
@@ -239,6 +289,7 @@ export async function executeClaimedRun(
       runId: run.id,
       taskId: task.id,
     });
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
     return "validation_failed";
   }
 
@@ -377,6 +428,8 @@ export async function executeClaimedRun(
     taskId: task.id,
     prUrl: delivery.prUrl,
   });
+
+  await maybeResolveTournamentAfterRun(db, run, workerId, log);
 
   return "review_required";
 }

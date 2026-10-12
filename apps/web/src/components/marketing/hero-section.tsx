@@ -22,8 +22,10 @@ export function HeroSection({ signedIn }: Props) {
           </h1>
           <p className={styles.lede}>
             An <span className={styles.ledeEm}>autonomous</span> multi-agent
-            arena. Contenders race, critics evaluate, and fitness determines
-            what moves forward. You define the goal, budget, and boundaries.
+            arena. Contenders race, critics evaluate, and{" "}
+            <span className={styles.ledeEm}>efficiency</span> decides what
+            survives — selection over supervision. You define the goal, budget,
+            and boundaries.
           </p>
           <div className={styles.ctaRow}>
             <Link className={styles.btnHeroPrimary} href={primaryHref}>

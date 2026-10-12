@@ -1,14 +1,25 @@
 import { and, eq } from "drizzle-orm";
 import {
   ArenaError,
+  claimTournamentForScoring,
+  computeEfficiencyPayoff,
+  DEFAULT_PAYOFF_ALPHA,
   debitTournamentLosers,
+  getArenaForProject,
+  isTerminalRunStatus,
   listRunsForTournament,
   resolveTournamentByFitness,
 } from "./arena.js";
 import { createArtifact, listArtifactsForRun } from "./artifacts.js";
 import type { Database } from "./client.js";
 import { listRunEvents } from "./run-events.js";
-import { agentRuns, auditEvents, type AgentRun, type Tournament } from "./schema.js";
+import {
+  agentRuns,
+  auditEvents,
+  tournaments,
+  type AgentRun,
+  type Tournament,
+} from "./schema.js";
 
 export type CriticSignals = {
   ciPassed: boolean | null;
@@ -148,6 +159,12 @@ export async function collectCriticSignals(
   };
 }
 
+function spendMicrosForRun(run: AgentRun): number {
+  if (run.actualCostMicros > 0) return run.actualCostMicros;
+  if (run.estimatedCostMicros > 0) return run.estimatedCostMicros;
+  return run.spendCapMicros > 0 ? run.spendCapMicros : 0;
+}
+
 export async function persistContenderFitness(
   db: Database,
   input: {
@@ -155,10 +172,25 @@ export async function persistContenderFitness(
     run: AgentRun;
     actor: string;
     score?: CriticScore;
+    alpha?: number;
   },
-): Promise<{ run: AgentRun; score: CriticScore; artifactId: string }> {
+): Promise<{
+  run: AgentRun;
+  score: CriticScore;
+  efficiency: number;
+  artifactId: string;
+}> {
   const signals = await collectCriticSignals(db, input.run);
   const score = input.score ?? scoreWithRulesCritic(signals);
+  const alpha = input.alpha ?? DEFAULT_PAYOFF_ALPHA;
+  const spendMicros = spendMicrosForRun(input.run);
+  const efficiency = computeEfficiencyPayoff({
+    fitness: score.score,
+    spendMicros,
+    alpha,
+    ciPassed: signals.ciPassed,
+  });
+
   const artifact = await createArtifact(db, {
     workspaceId: input.run.workspaceId,
     projectId: input.run.projectId,
@@ -169,10 +201,16 @@ export async function persistContenderFitness(
       scorer: "rules-critic-v1",
       signals,
       ...score,
+      efficiency,
+      spendMicros,
+      alpha,
+      mechanism: "efficiency_payoff",
     },
     meta: {
       scorer: "rules-critic-v1",
       score: score.score,
+      efficiency,
+      alpha,
       summary: score.reasons.join(","),
     },
   });
@@ -182,6 +220,7 @@ export async function persistContenderFitness(
     .update(agentRuns)
     .set({
       fitnessScore: score.score,
+      efficiencyScore: efficiency,
       fitnessEvidenceRef: artifact.id,
       updatedAt: now,
     })
@@ -204,16 +243,19 @@ export async function persistContenderFitness(
     targetId: input.run.id,
     meta: JSON.stringify({
       score: score.score,
+      efficiency,
+      spendMicros,
+      alpha,
       artifactId: artifact.id,
       reasons: score.reasons,
     }),
   });
 
-  return { run: updated, score, artifactId: artifact.id };
+  return { run: updated, score, efficiency, artifactId: artifact.id };
 }
 
 /**
- * Score all ContenderRuns in a tournament, then promote the winner.
+ * Score all ContenderRuns in a tournament, then promote the winner by efficiency.
  */
 export async function scoreAndResolveTournament(
   db: Database,
@@ -225,8 +267,26 @@ export async function scoreAndResolveTournament(
 ): Promise<{
   tournament: Tournament;
   winnerRunId: string;
-  scores: Array<{ runId: string; score: number }>;
+  scores: Array<{ runId: string; score: number; efficiency: number }>;
 }> {
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(
+      and(
+        eq(tournaments.id, input.tournamentId),
+        eq(tournaments.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!tournament) throw new ArenaError("not_found", "tournament not found");
+
+  const arena = await getArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: tournament.projectId,
+  });
+  const alpha = arena?.payoffAlpha ?? DEFAULT_PAYOFF_ALPHA;
+
   const runs = await listRunsForTournament(db, {
     workspaceId: input.workspaceId,
     tournamentId: input.tournamentId,
@@ -235,14 +295,16 @@ export async function scoreAndResolveTournament(
     throw new ArenaError("invalid", "tournament has no runs to score");
   }
 
-  const scores: Array<{ runId: string; score: number }> = [];
+  const scores: Array<{ runId: string; score: number; efficiency: number }> =
+    [];
   for (const run of runs) {
-    const { score } = await persistContenderFitness(db, {
+    const { score, efficiency } = await persistContenderFitness(db, {
       workspaceId: input.workspaceId,
       run,
       actor: input.actor,
+      alpha,
     });
-    scores.push({ runId: run.id, score: score.score });
+    scores.push({ runId: run.id, score: score.score, efficiency });
   }
 
   const resolved = await resolveTournamentByFitness(db, {
@@ -263,4 +325,68 @@ export async function scoreAndResolveTournament(
     winnerRunId: resolved.winnerRunId,
     scores,
   };
+}
+
+/**
+ * TASK056 — if all ContenderRuns are terminal, score + resolve (idempotent).
+ * Returns null when the tournament is not ready or already resolved by a peer.
+ */
+export async function maybeScoreAndResolveTournament(
+  db: Database,
+  input: {
+    workspaceId: string;
+    tournamentId: string;
+    actor: string;
+  },
+): Promise<{
+  tournament: Tournament;
+  winnerRunId: string;
+  scores: Array<{ runId: string; score: number; efficiency: number }>;
+} | null> {
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(
+      and(
+        eq(tournaments.id, input.tournamentId),
+        eq(tournaments.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!tournament) return null;
+  if (tournament.status === "RESOLVED" || tournament.status === "CANCELLED") {
+    return null;
+  }
+
+  const runs = await listRunsForTournament(db, {
+    workspaceId: input.workspaceId,
+    tournamentId: tournament.id,
+  });
+  if (runs.length === 0) return null;
+  if (!runs.every((r) => isTerminalRunStatus(r.status))) return null;
+
+  const { claimed, tournament: claimedTournament } =
+    await claimTournamentForScoring(db, {
+      workspaceId: input.workspaceId,
+      tournamentId: tournament.id,
+    });
+
+  if (!claimed) {
+    if (claimedTournament.status === "RESOLVED") return null;
+    // Peer is scoring, or we raced; if still SCORING with all terminal, finish.
+    if (claimedTournament.status !== "SCORING") return null;
+  }
+
+  try {
+    return await scoreAndResolveTournament(db, {
+      workspaceId: input.workspaceId,
+      tournamentId: tournament.id,
+      actor: input.actor,
+    });
+  } catch (err) {
+    if (err instanceof ArenaError && err.code === "conflict") {
+      return null;
+    }
+    throw err;
+  }
 }

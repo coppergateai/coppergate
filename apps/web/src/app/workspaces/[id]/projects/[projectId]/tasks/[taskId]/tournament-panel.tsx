@@ -14,6 +14,7 @@ type ContenderRun = {
   status: string;
   branchName: string | null;
   fitnessScore: number | null;
+  efficiencyScore: number | null;
   tournamentResult: string | null;
   prUrl: string | null;
   agentProfileKey: string;
@@ -68,21 +69,49 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
   }
 
   const sorted = [...runs].sort((a, b) => {
+    const ea = a.efficiencyScore ?? -1;
+    const eb = b.efficiencyScore ?? -1;
+    if (eb !== ea) return eb - ea;
     const sa = a.fitnessScore ?? -1;
     const sb = b.fitnessScore ?? -1;
     return sb - sa;
   });
 
+  const winner = sorted.find(
+    (r) =>
+      r.tournamentResult === "WINNER" || r.id === tournament.winnerRunId,
+  );
+
   return (
     <section style={{ marginTop: "2rem" }}>
       <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-        Tournament
+        Efficiency contest
       </h2>
       <p style={{ margin: "0 0 0.85rem", color: "#737373", fontSize: "0.875rem" }}>
-        Status <strong style={{ color: "#E5E5E5" }}>{tournament.status}</strong>
+        Selection pressure active · Status{" "}
+        <strong style={{ color: "#E5E5E5" }}>{tournament.status}</strong>
         {" · "}N={tournament.n}
         {tournament.winnerRunId ? " · winner selected" : null}
       </p>
+
+      {winner && tournament.status === "RESOLVED" ? (
+        <p style={whyWon}>
+          Why this won: efficiency{" "}
+          <strong>
+            {winner.efficiencyScore == null
+              ? "—"
+              : winner.efficiencyScore.toFixed(3)}
+          </strong>
+          {" · "}fitness{" "}
+          {winner.fitnessScore == null ? "—" : winner.fitnessScore.toFixed(2)}
+          {" · "}spend $
+          {(
+            (winner.actualCostMicros || winner.estimatedCostMicros) /
+            1_000_000
+          ).toFixed(4)}
+          {" · "}payoff e = f / spend^α
+        </p>
+      ) : null}
 
       <ul style={list}>
         {sorted.map((run) => {
@@ -110,9 +139,19 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
                     ? "—"
                     : run.fitnessScore.toFixed(2)}
                 </span>
+                <span>
+                  efficiency{" "}
+                  {run.efficiencyScore == null
+                    ? "—"
+                    : run.efficiencyScore.toFixed(3)}
+                </span>
                 <span>{run.branchName ?? "no branch"}</span>
                 <span>
-                  ${(run.actualCostMicros || run.estimatedCostMicros) / 1_000_000}
+                  $
+                  {(
+                    (run.actualCostMicros || run.estimatedCostMicros) /
+                    1_000_000
+                  ).toFixed(4)}
                 </span>
               </div>
               {run.prUrl ? (
@@ -144,6 +183,17 @@ function pill(result: string | null): CSSProperties {
     color: tone.fg,
   };
 }
+
+const whyWon: CSSProperties = {
+  margin: "0 0 0.85rem",
+  padding: "0.65rem 0.8rem",
+  border: "1px solid #262626",
+  borderRadius: 8,
+  background: "#0A0A0A",
+  color: "#A3A3A3",
+  fontSize: "0.8rem",
+  lineHeight: 1.5,
+};
 
 const list: CSSProperties = {
   listStyle: "none",

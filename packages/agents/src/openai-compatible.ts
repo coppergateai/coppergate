@@ -171,12 +171,21 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
 }
 
 function buildPrompt(input: AgentRunInput): string {
-  return [
+  const lines = [
     `Goal: ${input.goal}`,
     `Scope: ${input.scope}`,
     `Allowed paths: ${input.allowedPaths.join(", ") || "(none)"}`,
     `Acceptance: ${input.acceptanceCriteria.join("; ")}`,
     `Base SHA: ${input.baseSha}`,
+  ];
+  if (input.strategy) {
+    lines.push(`Strategy: ${input.strategy}`);
+  }
+  if (input.architectureContext?.trim()) {
+    lines.push(`Context: ${input.architectureContext.trim()}`);
+  }
+  lines.push(
     "Propose the smallest change that satisfies acceptance criteria.",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }

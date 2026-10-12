@@ -26,6 +26,26 @@ import {
  */
 export const MAX_TOURNAMENT_FANOUT = 2;
 
+/** Default spend exponent for efficiency payoff — GAME_THEORY.md */
+export const DEFAULT_PAYOFF_ALPHA = 0.5;
+
+export const CONTENDER_STRATEGIES = ["balanced", "blitz", "fortress"] as const;
+export type ContenderStrategy = (typeof CONTENDER_STRATEGIES)[number];
+
+export function isContenderStrategy(value: string): value is ContenderStrategy {
+  return (CONTENDER_STRATEGIES as readonly string[]).includes(value);
+}
+
+export const TERMINAL_RUN_STATUSES = new Set([
+  "REVIEW_REQUIRED",
+  "FAILED",
+  "CANCELLED",
+]);
+
+export function isTerminalRunStatus(status: string): boolean {
+  return TERMINAL_RUN_STATUSES.has(status);
+}
+
 export class ArenaError extends Error {
   readonly code:
     | "not_found"
@@ -83,6 +103,67 @@ export function selectWinnerByFitness(
   return [...scored].sort((a, b) => {
     const diff = (b.fitnessScore as number) - (a.fitnessScore as number);
     if (diff !== 0) return diff;
+    return a.runId.localeCompare(b.runId);
+  })[0]!;
+}
+
+/** Floor spend (USD) so efficiency stays finite. */
+const SPEND_USD_EPSILON = 1e-6;
+
+/**
+ * Mechanism payoff: e = f / spend_usd^α.
+ * Hard gate: CI fail ⇒ 0 (token race cannot buy a green check).
+ */
+export function computeEfficiencyPayoff(input: {
+  fitness: number;
+  spendMicros: number;
+  alpha?: number;
+  ciPassed?: boolean | null;
+}): number {
+  if (input.ciPassed === false) return 0;
+  const fitness = input.fitness;
+  if (!Number.isFinite(fitness) || fitness < 0) return 0;
+  const alpha =
+    input.alpha != null && Number.isFinite(input.alpha)
+      ? Math.max(0, input.alpha)
+      : DEFAULT_PAYOFF_ALPHA;
+  const spendUsd = Math.max(input.spendMicros / 1_000_000, SPEND_USD_EPSILON);
+  const payoff = fitness / spendUsd ** alpha;
+  return Number.isFinite(payoff) ? payoff : 0;
+}
+
+export type PayoffCandidate = {
+  runId: string;
+  efficiencyScore: number | null;
+  fitnessScore: number | null;
+};
+
+/** Pure: highest efficiency wins; ties → higher fitness → lex runId. */
+export function selectWinnerByPayoff(
+  candidates: PayoffCandidate[],
+): PayoffCandidate {
+  if (candidates.length === 0) {
+    throw new ArenaError("invalid", "tournament has no candidates");
+  }
+  const scored = candidates.filter(
+    (c) => c.efficiencyScore != null && Number.isFinite(c.efficiencyScore),
+  );
+  if (scored.length === 0) {
+    throw new ArenaError("invalid", "no scored candidates");
+  }
+  return [...scored].sort((a, b) => {
+    const eDiff =
+      (b.efficiencyScore as number) - (a.efficiencyScore as number);
+    if (eDiff !== 0) return eDiff;
+    const fA =
+      a.fitnessScore != null && Number.isFinite(a.fitnessScore)
+        ? a.fitnessScore
+        : -1;
+    const fB =
+      b.fitnessScore != null && Number.isFinite(b.fitnessScore)
+        ? b.fitnessScore
+        : -1;
+    if (fB !== fA) return fB - fA;
     return a.runId.localeCompare(b.runId);
   })[0]!;
 }
@@ -188,6 +269,7 @@ export async function ensureArenaForProject(
 
   const pool: Contender[] = [];
   for (let i = 0; i < contenderCount; i++) {
+    const strategy = CONTENDER_STRATEGIES[i % CONTENDER_STRATEGIES.length]!;
     const [c] = await db
       .insert(contenders)
       .values({
@@ -195,6 +277,7 @@ export async function ensureArenaForProject(
         arenaId,
         workspaceId: input.workspaceId,
         profileKey: i === 0 ? "engineer" : `engineer_${i + 1}`,
+        strategy,
         budgetMicrosRemaining: budgetEach,
         status: "ACTIVE",
         createdAt: now,
@@ -659,8 +742,12 @@ export async function resolveTournamentByFitness(
     .from(agentRuns)
     .where(eq(agentRuns.tournamentId, tournament.id));
 
-  const winner = selectWinnerByFitness(
-    runs.map((r) => ({ runId: r.id, fitnessScore: r.fitnessScore })),
+  const winner = selectWinnerByPayoff(
+    runs.map((r) => ({
+      runId: r.id,
+      efficiencyScore: r.efficiencyScore,
+      fitnessScore: r.fitnessScore,
+    })),
   );
 
   const now = new Date();
@@ -683,8 +770,25 @@ export async function resolveTournamentByFitness(
       winnerRunId: winner.runId,
       updatedAt: now,
     })
-    .where(eq(tournaments.id, tournament.id))
+    .where(
+      and(
+        eq(tournaments.id, tournament.id),
+        inArray(tournaments.status, ["OPEN", "SCORING"]),
+      ),
+    )
     .returning();
+
+  if (!updated) {
+    const [again] = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, tournament.id))
+      .limit(1);
+    if (again?.status === "RESOLVED" && again.winnerRunId) {
+      return { tournament: again, winnerRunId: again.winnerRunId };
+    }
+    throw new ArenaError("conflict", "failed to resolve tournament");
+  }
 
   await db.insert(auditEvents).values({
     id: crypto.randomUUID(),
@@ -693,10 +797,65 @@ export async function resolveTournamentByFitness(
     action: "tournament.resolve",
     targetType: "tournament",
     targetId: tournament.id,
-    meta: JSON.stringify({ winnerRunId: winner.runId }),
+    meta: JSON.stringify({
+      winnerRunId: winner.runId,
+      mechanism: "efficiency_payoff",
+      winnerEfficiency: winner.efficiencyScore,
+      winnerFitness: winner.fitnessScore,
+    }),
   });
 
-  return { tournament: updated!, winnerRunId: winner.runId };
+  return { tournament: updated, winnerRunId: winner.runId };
+}
+
+/** Claim OPEN → SCORING for idempotent resolve (TASK056). */
+export async function claimTournamentForScoring(
+  db: Database,
+  input: { workspaceId: string; tournamentId: string },
+): Promise<{ claimed: boolean; tournament: Tournament }> {
+  const now = new Date();
+  const [claimed] = await db
+    .update(tournaments)
+    .set({ status: "SCORING", updatedAt: now })
+    .where(
+      and(
+        eq(tournaments.id, input.tournamentId),
+        eq(tournaments.workspaceId, input.workspaceId),
+        eq(tournaments.status, "OPEN"),
+      ),
+    )
+    .returning();
+  if (claimed) return { claimed: true, tournament: claimed };
+
+  const [tournament] = await db
+    .select()
+    .from(tournaments)
+    .where(
+      and(
+        eq(tournaments.id, input.tournamentId),
+        eq(tournaments.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!tournament) throw new ArenaError("not_found", "tournament not found");
+  return { claimed: false, tournament };
+}
+
+export async function getContenderById(
+  db: Database,
+  input: { workspaceId: string; contenderId: string },
+): Promise<Contender | null> {
+  const [row] = await db
+    .select()
+    .from(contenders)
+    .where(
+      and(
+        eq(contenders.id, input.contenderId),
+        eq(contenders.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
 }
 
 export async function killArena(
