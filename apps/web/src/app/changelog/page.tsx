@@ -59,7 +59,7 @@ export default function ChangelogPage() {
           Want a seat?{" "}
           <Link href="/#early-access">Request access</Link>
           {" · "}
-          <a href="mailto:hello@coppergate.ai">Contact</a>
+          <a href="mailto:muhtalipdede@gmail.com">Contact</a>
         </p>
       </article>
     </SiteChrome>

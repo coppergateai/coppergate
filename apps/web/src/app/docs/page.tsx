@@ -72,8 +72,8 @@ export default function DocsIndexPage() {
             Join the waitlist
           </Link>{" "}
           or email{" "}
-          <a href="mailto:hello@coppergate.ai" style={{ color: "#A3A3A3" }}>
-            hello@coppergate.ai
+          <a href="mailto:muhtalipdede@gmail.com" style={{ color: "#A3A3A3" }}>
+            muhtalipdede@gmail.com
           </a>
           .
         </p>

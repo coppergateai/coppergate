@@ -31,8 +31,8 @@ export default function PricingPage() {
         </ul>
         <p style={{ marginTop: "1.5rem", color: "#A3A3A3" }}>
           Interested in a paid pilot?{" "}
-          <a href="mailto:hello@coppergate.ai" style={{ color: "#FFFFFF" }}>
-            hello@coppergate.ai
+          <a href="mailto:muhtalipdede@gmail.com" style={{ color: "#FFFFFF" }}>
+            muhtalipdede@gmail.com
           </a>{" "}
           or{" "}
           <Link href="/#early-access" style={{ color: "#FFFFFF" }}>

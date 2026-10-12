@@ -11,7 +11,7 @@ export function StatusBand() {
         </p>
         <a
           className={styles.statusLink}
-          href="mailto:hello@coppergate.ai?subject=Design%20partner"
+          href="mailto:muhtalipdede@gmail.com?subject=Design%20partner"
         >
           Talk to us
         </a>

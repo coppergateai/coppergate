@@ -3,37 +3,60 @@ import styles from "./marketing.module.css";
 const steps = [
   {
     n: "01",
+    stage: "Arena",
     title: "Set the arena",
     body: "Define the goal, repository, budget, policies, and execution boundaries before contenders start.",
     visual: (
-      <div className={styles.miniUi}>
+      <div className={`${styles.stepVisual} ${styles.stepVisualArena}`}>
         <span className={styles.miniLabel}>Goal configuration</span>
-        <p className={styles.miniLine}>Build a subscription tracker MVP</p>
-        <span className={styles.miniMeta}>
-          Repo bound · Budget $50 · Kill-switch armed
-        </span>
+        <div className={styles.arenaField}>
+          Build a subscription tracker MVP
+        </div>
+        <div className={styles.chipRow}>
+          <span className={styles.chip}>Repo bound</span>
+          <span className={styles.chip}>Budget $50</span>
+          <span className={`${styles.chip} ${styles.chipAccent}`}>
+            Kill-switch
+          </span>
+        </div>
       </div>
     ),
   },
   {
     n: "02",
+    stage: "Tournament",
     title: "Contenders race",
     body: "Multiple agents attack the same objective in parallel. Weak paths burn budget; strong paths continue.",
     visual: (
-      <div className={styles.miniUi}>
-        <span className={styles.miniLabel}>Tournament</span>
-        <ul className={styles.miniList}>
+      <div className={`${styles.stepVisual} ${styles.stepVisualTournament}`}>
+        <span className={styles.miniLabel}>Parallel execution</span>
+        <ul className={styles.tourProgress}>
           <li>
-            <span>Contender A</span>
-            <span className={styles.tagRun}>Running</span>
+            <div className={styles.tourProgressTop}>
+              <span>Contender A</span>
+              <span className={styles.tagRun}>Running</span>
+            </div>
+            <div className={styles.barTrack}>
+              <div className={styles.barFill} style={{ width: "78%" }} />
+            </div>
           </li>
           <li>
-            <span>Contender B</span>
-            <span className={styles.tagRun}>Running</span>
+            <div className={styles.tourProgressTop}>
+              <span>Contender B</span>
+              <span className={styles.tagRun}>Running</span>
+            </div>
+            <div className={styles.barTrack}>
+              <div className={styles.barFill} style={{ width: "62%" }} />
+            </div>
           </li>
           <li>
-            <span>Contender C</span>
-            <span className={styles.tagOut}>Low fitness</span>
+            <div className={styles.tourProgressTop}>
+              <span>Contender C</span>
+              <span className={styles.tagOut}>Low fitness</span>
+            </div>
+            <div className={styles.barTrack}>
+              <div className={styles.barFillMuted} style={{ width: "28%" }} />
+            </div>
           </li>
         </ul>
       </div>
@@ -41,30 +64,46 @@ const steps = [
   },
   {
     n: "03",
+    stage: "Fitness",
     title: "Fitness decides",
     body: "Critics score. CI and tests validate. Policy compliance is checked before anything promotes.",
     visual: (
-      <div className={styles.miniUi}>
-        <span className={styles.miniLabel}>Fitness evaluation</span>
-        <p className={styles.miniLine}>
-          Critic 0.91 · <span className={styles.tagRun}>CI pass</span>
-        </p>
-        <span className={styles.miniMeta}>Tests · Policy · Evidence packed</span>
+      <div className={`${styles.stepVisual} ${styles.stepVisualFitness}`}>
+        <span className={styles.miniLabel}>Evaluation pack</span>
+        <div className={styles.fitnessMiniScore}>
+          <span>Critic</span>
+          <strong>0.91</strong>
+        </div>
+        <ul className={styles.checkList}>
+          <li>
+            <span className={styles.checkOk} />
+            CI passing
+          </li>
+          <li>
+            <span className={styles.checkOk} />
+            Tests green
+          </li>
+          <li>
+            <span className={styles.checkOk} />
+            Policy compliant
+          </li>
+        </ul>
       </div>
     ),
   },
   {
     n: "04",
+    stage: "Survivor",
     title: "Survive to ship",
     body: "The validated winner promotes with evidence. Eliminated contenders stop. You retain deployment control.",
     visual: (
-      <div className={styles.miniUi}>
+      <div className={`${styles.stepVisual} ${styles.stepVisualSurvivor}`}>
         <span className={styles.miniLabel}>Promotion</span>
+        <div className={styles.winnerCard}>
+          <span>Contender A</span>
+          <span className={styles.tagWin}>Winner</span>
+        </div>
         <ul className={styles.miniList}>
-          <li>
-            <span>Contender A</span>
-            <span className={styles.tagWin}>Winner</span>
-          </li>
           <li>
             <span>Contender B</span>
             <span className={styles.tagOut}>Eliminated</span>
@@ -101,10 +140,15 @@ export function SurvivorWorkflow() {
         </header>
 
         <ol className={styles.steps}>
-          {steps.map((step) => (
+          {steps.map((step, index) => (
             <li key={step.n} className={styles.step}>
-              <div>
-                <span className={styles.stepNum}>{step.n}</span>
+              {index > 0 ? (
+                <span className={styles.stepConnector} aria-hidden="true" />
+              ) : null}
+              <div className={styles.stepCopy}>
+                <span className={styles.stepNum}>
+                  {step.n} · {step.stage}
+                </span>
                 <h3 className={styles.stepTitle}>{step.title}</h3>
                 <p className={styles.stepBody}>{step.body}</p>
               </div>

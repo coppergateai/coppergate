@@ -17,9 +17,10 @@
   --font: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --max: 1440px;
   --gutter: clamp(1.25rem, 4vw, 2.5rem);
-  --section-y: clamp(5rem, 12vw, 8.5rem);
-  --radius: 10px;
+  --section-y: clamp(4rem, 9vw, 6.5rem);
+  --radius: 12px;
   --radius-sm: 8px;
+  --shadow-elevated: 0 24px 64px rgba(0, 0, 0, 0.42);
 }
 
 *,

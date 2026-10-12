@@ -23,8 +23,8 @@ export function MarketingFooter() {
               An autonomous multi-agent arena. Contenders compete, fitness
               decides — survivors ship.
             </p>
-            <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
-              hello@coppergate.ai
+            <a className={styles.footerEmail} href="mailto:muhtalipdede@gmail.com">
+              muhtalipdede@gmail.com
             </a>
           </div>
 
@@ -54,7 +54,7 @@ export function MarketingFooter() {
               <Link href="/security">Security</Link>
               <Link href="/privacy">Privacy</Link>
               <Link href="/terms">Terms</Link>
-              <a href="mailto:hello@coppergate.ai">Contact</a>
+              <a href="mailto:muhtalipdede@gmail.com">Contact</a>
             </nav>
           </div>
         </div>
