@@ -38,6 +38,8 @@ export function serializeWorkspace(access: WorkspaceWithRole) {
     name: workspace.name,
     slug: workspace.slug,
     autonomyDefault: workspace.autonomyDefault,
+    notifyWebhookUrl: workspace.notifyWebhookUrl,
+    notifyEmailEnabled: workspace.notifyEmailEnabled,
     status: workspace.status,
     role: role as MembershipRole,
     createdAt: workspace.createdAt.toISOString(),

@@ -134,6 +134,13 @@
       "when": 1728568200000,
       "tag": "0018_game_theory",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1728568300000,
+      "tag": "0019_expansion",
+      "breakpoints": true
     }
   ]
 }

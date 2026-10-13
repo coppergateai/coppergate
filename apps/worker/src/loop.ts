@@ -2,12 +2,42 @@ import { createCodingAgent } from "@coppergate/agents";
 import {
   claimNextRun,
   createDb,
+  getActiveLlmByok,
   purgeExpiredSoftDeletedWorkspaces,
   reapStaleRuns,
+  touchLlmByokUsed,
   type Database,
 } from "@coppergate/db";
+import { openSecret, parseEncryptionKey } from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
 import { executeClaimedRun } from "./execute.js";
+
+function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
+  return (async () => {
+    try {
+      const byok = await getActiveLlmByok(db, workspaceId);
+      const keyHex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
+      if (byok?.encryptedPayload && keyHex) {
+        const apiKey = openSecret(
+          byok.encryptedPayload,
+          parseEncryptionKey(keyHex),
+        );
+        await touchLlmByokUsed(db, workspaceId);
+        log.info("using workspace BYOK for coding agent", { workspaceId });
+        return createCodingAgent({
+          apiKey,
+          baseUrl: byok.baseUrl ?? undefined,
+          model: byok.model ?? undefined,
+        });
+      }
+    } catch (err) {
+      log.warn("BYOK resolve failed; falling back", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return createCodingAgent();
+  })();
+}
 
 export type WorkerLoopOptions = {
   databaseUrl: string;
@@ -63,12 +93,13 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           attempt: run.attempt,
         });
 
+        const agent = await resolveWorkerAgent(db, run.workspaceId, log);
         const outcome = await executeClaimedRun(db, {
           run,
           workerId,
           log,
           leaseMs,
-          agent: createCodingAgent(),
+          agent,
         });
 
         consecutiveErrors = 0;

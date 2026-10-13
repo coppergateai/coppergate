@@ -16,6 +16,8 @@ import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
 import { SiteChrome } from "../../../../site-chrome";
 import { ArenaPanel } from "./arena-panel";
+import { IssuesPanel } from "./issues-panel";
+import { MergePanel } from "./merge-panel";
 import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
 import { DeliveryBoard } from "./delivery-board";
@@ -206,6 +208,20 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           workspaceId={workspaceId}
           projectId={projectId}
           tasks={boardTasks}
+        />
+
+        <IssuesPanel
+          workspaceId={workspaceId}
+          projectId={projectId}
+          isOwner={access.role === "owner"}
+        />
+
+        <MergePanel
+          workspaceId={workspaceId}
+          projectId={projectId}
+          initialMergeEnabled={row.project.mergeEnabled}
+          autonomyLevel={row.project.autonomyLevel}
+          isOwner={access.role === "owner"}
         />
 
         <ArenaPanel

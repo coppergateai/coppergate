@@ -55,7 +55,7 @@ export default function DocsIndexPage() {
         <p className={styles.changelogMore}>
           Need an invite? <Link href="/#early-access">Join the waitlist</Link>{" "}
           or email{" "}
-          <a href="mailto:muhtalipdede@gmail.com">muhtalipdede@gmail.com</a>.
+          <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
         </p>
       </main>
     </SiteChrome>

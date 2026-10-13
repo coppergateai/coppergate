@@ -49,6 +49,14 @@ type DeliveryReport = {
   actualCostMicros: number;
   validationPassed: boolean;
   filesChanged: string[];
+  previewUrl?: string | null;
+  previewError?: string | null;
+};
+
+type ReviewFindings = {
+  kind: "review_findings";
+  summary: string;
+  findings: Array<{ severity: string; code: string; message: string }>;
 };
 
 type TaskView = {
@@ -241,6 +249,20 @@ export function TaskDetailPanel({
     return null;
   })();
 
+  const reviewFindings = (() => {
+    const row = artifacts.find((a) => a.kind === "review_findings");
+    if (!row) return null;
+    const body = parseInlineBody(row.meta);
+    if (
+      body &&
+      typeof body === "object" &&
+      (body as ReviewFindings).kind === "review_findings"
+    ) {
+      return body as ReviewFindings;
+    }
+    return null;
+  })();
+
   return (
     <div>
       <p style={{ margin: "0 0 0.35rem", color: "#A3A3A3", fontSize: "0.875rem" }}>
@@ -398,7 +420,90 @@ export function TaskDetailPanel({
               {(deliveryReport.actualCostMicros / 100).toFixed(2)}¢ · validation{" "}
               {deliveryReport.validationPassed ? "passed" : "failed"} ·{" "}
               {deliveryReport.branchName}
+              {deliveryReport.previewUrl ? (
+                <>
+                  {" · "}
+                  <a
+                    href={deliveryReport.previewUrl}
+                    style={{ color: "#A3A3A3" }}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Preview
+                  </a>
+                </>
+              ) : deliveryReport.previewError ? (
+                <> · preview: {deliveryReport.previewError}</>
+              ) : null}
             </p>
+          ) : null}
+          {reviewFindings ? (
+            <div style={{ marginBottom: "0.85rem" }}>
+              <p
+                style={{
+                  margin: "0 0 0.35rem",
+                  color: "#E5E5E5",
+                  fontSize: "0.8rem",
+                }}
+              >
+                Reviewer: {reviewFindings.summary}
+              </p>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: "1.1rem",
+                  color: "#A3A3A3",
+                  fontSize: "0.75rem",
+                }}
+              >
+                {reviewFindings.findings.map((f) => (
+                  <li key={`${f.code}-${f.message}`}>
+                    [{f.severity}] {f.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {selected && isOwner ? (
+            <button
+              type="button"
+              style={{
+                marginBottom: "0.75rem",
+                height: "2rem",
+                padding: "0 0.75rem",
+                borderRadius: 999,
+                border: "1px solid #404040",
+                background: "transparent",
+                color: "#E5E5E5",
+                fontSize: "0.8rem",
+                cursor: "pointer",
+              }}
+              onClick={() => {
+                void fetch(`/api/runs/${selected.id}/share`, {
+                  method: "POST",
+                  credentials: "same-origin",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ workspaceId }),
+                })
+                  .then(async (res) => {
+                    const body = (await res.json()) as {
+                      share?: { url?: string };
+                      error?: { message?: string };
+                    };
+                    if (!res.ok) {
+                      throw new Error(body.error?.message ?? "Share failed");
+                    }
+                    if (body.share?.url) {
+                      window.open(body.share.url, "_blank");
+                    }
+                  })
+                  .catch((err: unknown) =>
+                    setError(err instanceof Error ? err.message : String(err)),
+                  );
+              }}
+            >
+              Share redacted report
+            </button>
           ) : null}
           {diffSummary ? (
             <>

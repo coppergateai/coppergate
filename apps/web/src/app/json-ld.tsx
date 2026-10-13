@@ -9,9 +9,13 @@ const jsonLd = {
       "@id": `${siteUrl}/#organization`,
       name: "Coppergate",
       url: siteUrl,
-      email: "muhtalipdede@gmail.com",
+      email: "hello@coppergate.ai",
       logo: `${siteUrl}/og.png`,
-      sameAs: [],
+      sameAs: [
+        "https://x.com/coppergateai",
+        "https://www.instagram.com/coppergateai/",
+        "https://github.com/coppergateai",
+      ],
     },
     {
       "@type": "WebSite",

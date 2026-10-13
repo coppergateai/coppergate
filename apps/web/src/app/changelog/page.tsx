@@ -81,7 +81,7 @@ export default function ChangelogPage() {
         <p className={styles.changelogMore}>
           Want a seat? <Link href="/#early-access">Request access</Link>
           {" · "}
-          <a href="mailto:muhtalipdede@gmail.com">Contact</a>
+          <a href="mailto:hello@coppergate.ai">Contact</a>
         </p>
       </article>
     </SiteChrome>

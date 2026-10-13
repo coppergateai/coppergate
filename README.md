@@ -73,7 +73,7 @@ Public `/` is the early-access landing (Phase 0). Signups go to `waitlist_signup
 2. Set **Root Directory** to `apps/web` (uses `apps/web/vercel.json`).
 3. Env: `DATABASE_URL`, `APP_URL` (e.g. `https://coppergate.ai`), `SESSION_SECRET` (≥32 chars). OAuth optional until login is used.
 4. Migrate prod DB: `DATABASE_URL=… pnpm db:migrate`.
-5. Attach `coppergate.ai` (Cloudflare DNS — see architecture `EMAIL.md`).
+5. Attach `coppergate.ai` (Vercel DNS + ImprovMX — see architecture `EMAIL.md`).
 
 **Staging (TASK033):** see [`docs/STAGING.md`](./docs/STAGING.md) — web + worker + `GITHUB_DELIVERY_MODE=http` + `scripts/staging-smoke.mjs`.
 

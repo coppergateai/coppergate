@@ -30,6 +30,9 @@ export type DeliveryReportBody = {
   actualCostMicros: number;
   validationPassed: boolean;
   filesChanged: string[];
+  /** Optional preview URL (TASK038) — null/omitted when unavailable. */
+  previewUrl?: string | null;
+  previewError?: string | null;
 };
 
 export function buildDiffSummary(input: {
@@ -62,6 +65,8 @@ export function buildDeliveryReport(input: {
   actualCostMicros: number;
   validationPassed: boolean;
   filesChanged: string[];
+  previewUrl?: string | null;
+  previewError?: string | null;
 }): DeliveryReportBody {
   return {
     kind: "delivery_report",
@@ -74,6 +79,10 @@ export function buildDeliveryReport(input: {
     actualCostMicros: input.actualCostMicros,
     validationPassed: input.validationPassed,
     filesChanged: input.filesChanged.map(redactString),
+    previewUrl: input.previewUrl ?? null,
+    previewError: input.previewError
+      ? redactString(input.previewError)
+      : null,
   };
 }
 

@@ -5,4 +5,4 @@
 This package reserves the `coppergate` name on npm. The product SDK is not published yet.
 
 - Org: [github.com/coppergateai](https://github.com/coppergateai)
-- Contact: [muhtalipdede@gmail.com](mailto:muhtalipdede@gmail.com)
+- Contact: [hello@coppergate.ai](mailto:hello@coppergate.ai)

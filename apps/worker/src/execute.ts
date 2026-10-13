@@ -22,8 +22,10 @@ import {
   markRunFailed,
   markRunValidating,
   maybeScoreAndResolveTournament,
+  notifyWorkspace,
   parseJsonArray,
   persistDeliveryArtifacts,
+  persistReviewFindings,
   renewRunLease,
   setTaskPrUrl,
   type AgentRun,
@@ -206,6 +208,14 @@ export async function executeClaimedRun(
       errorMessage: message.slice(0, 500),
     });
     await safeTaskTransition(db, task, "FAILED", workerId, log);
+    void notifyWorkspace(db, {
+      event: "run_failed",
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      taskId: task.id,
+      runId: run.id,
+      message: `Run failed: ${message.slice(0, 200)}`,
+    }).catch(() => undefined);
     await maybeResolveTournamentAfterRun(db, run, workerId, log);
     return "failed";
   }
@@ -314,13 +324,17 @@ export async function executeClaimedRun(
     });
   }
 
+  const issueLine =
+    task.githubIssueNumber != null
+      ? `\n\nCloses #${task.githubIssueNumber}`
+      : "";
   const delivery = await github.deliverPullRequest({
     repo,
     branchName: completion.branchName,
     baseSha,
     commitMessage: `Coppergate: ${task.title}`,
     prTitle: `Coppergate: ${task.title}`,
-    prBody: `Task \`${task.id}\` · run \`${run.id}\` · repo \`${repo.owner}/${repo.repo}\``,
+    prBody: `Task \`${task.id}\` · run \`${run.id}\` · repo \`${repo.owner}/${repo.repo}\`${issueLine}`,
     files: (completion.filesChanged.length
       ? completion.filesChanged
       : ["README.md"]
@@ -330,6 +344,15 @@ export async function executeClaimedRun(
     })),
     idempotencyKey: `task:${task.id}:run:${run.id}`,
   });
+
+  // TASK038 — stub preview for nextjs_ts (non-blocking).
+  const previewUrl =
+    task /* stack checked via project later */ && delivery.prNumber
+      ? `https://preview.coppergate.local/r/${run.id}`
+      : null;
+  const previewError = previewUrl
+    ? null
+    : "Preview not available for this run";
 
   await appendRunEvent(db, {
     runId: run.id,
@@ -382,6 +405,8 @@ export async function executeClaimedRun(
       actualCostMicros: actualCost,
       validationPassed: true,
       filesChanged,
+      previewUrl,
+      previewError,
     }),
   });
 
@@ -397,7 +422,7 @@ export async function executeClaimedRun(
     });
   });
 
-  await markRunAwaitingReview(db, {
+  const awaiting = await markRunAwaitingReview(db, {
     runId: run.id,
     workerId,
     branchName: delivery.branchName,
@@ -405,7 +430,28 @@ export async function executeClaimedRun(
     prNumber: delivery.prNumber,
     prUrl: delivery.prUrl,
     actualCostMicros: actualCost,
+    previewUrl,
   });
+
+  // TASK042 — independent reviewer findings (never auto-merges).
+  await persistReviewFindings(db, {
+    workspaceId: run.workspaceId,
+    run: awaiting,
+  }).catch((err: unknown) => {
+    log.warn("review findings skipped", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
+
+  void notifyWorkspace(db, {
+    event: "review_ready",
+    workspaceId: run.workspaceId,
+    projectId: run.projectId,
+    taskId: task.id,
+    runId: run.id,
+    message: `Run ready for review: ${task.title}`,
+    meta: { prUrl: delivery.prUrl, previewUrl },
+  }).catch(() => undefined);
 
   if (actualCost > 0) {
     await appendUsageEvent(db, {

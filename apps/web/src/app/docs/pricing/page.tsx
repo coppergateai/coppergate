@@ -33,7 +33,7 @@ export default function PricingPage() {
           </ul>
           <p>
             Interested in a paid pilot?{" "}
-            <a href="mailto:muhtalipdede@gmail.com">muhtalipdede@gmail.com</a> or{" "}
+            <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a> or{" "}
             <Link href="/#early-access">join the waitlist</Link>.
           </p>
         </div>

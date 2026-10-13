@@ -71,6 +71,20 @@
   text-transform: uppercase;
 }
 
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.85rem 0 0;
+  color: var(--mute);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.checkRow input {
+  accent-color: var(--copper);
+}
+
 .sectionLede {
   margin: 0 0 1rem;
   color: var(--mute);
