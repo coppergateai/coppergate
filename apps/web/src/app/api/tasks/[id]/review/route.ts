@@ -71,7 +71,7 @@ export async function POST(request: Request, context: RouteContext) {
       decision: body.decision,
       status: result.task.status,
     });
-    let merge: { attempted: boolean; merged: boolean; message: string | null } =
+    const merge: { attempted: boolean; merged: boolean; message: string | null } =
       { attempted: false, merged: false, message: null };
 
     if (body.decision === "accept") {
