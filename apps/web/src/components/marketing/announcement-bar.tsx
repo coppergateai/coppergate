@@ -10,7 +10,7 @@ export function AnnouncementBar() {
             Private beta — efficiency contest live. Selection over supervision.
           </p>
         </div>
-        <a className={styles.announceLink} href="mailto:muhtalipdede@gmail.com">
+        <a className={styles.announceLink} href="mailto:hello@coppergate.ai">
           Talk to us
         </a>
       </div>

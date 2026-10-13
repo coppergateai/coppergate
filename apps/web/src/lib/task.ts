@@ -19,6 +19,7 @@ export function serializeTask(task: Task) {
     attemptCount: task.attemptCount,
     maxAttempts: task.maxAttempts,
     prUrl: task.prUrl,
+    githubIssueNumber: task.githubIssueNumber,
     updatedAt: task.updatedAt.toISOString(),
   };
 }

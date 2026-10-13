@@ -23,8 +23,8 @@ export function SiteFooter() {
               An autonomous multi-agent arena. Contenders compete, fitness
               decides — survivors ship.
             </p>
-            <a className={styles.footerEmail} href="mailto:muhtalipdede@gmail.com">
-              muhtalipdede@gmail.com
+            <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
+              hello@coppergate.ai
             </a>
           </div>
 
@@ -43,7 +43,21 @@ export function SiteFooter() {
               <Link href="/docs">Docs</Link>
               <Link href="/security">Security</Link>
               <Link href="/changelog">Changelog</Link>
-              <a href="mailto:muhtalipdede@gmail.com">Contact</a>
+              <a href="mailto:hello@coppergate.ai">Contact</a>
+              <a
+                href="https://x.com/coppergateai"
+                target="_blank"
+                rel="noreferrer"
+              >
+                X
+              </a>
+              <a
+                href="https://www.instagram.com/coppergateai/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Instagram
+              </a>
               <Link href="/privacy">Privacy</Link>
               <Link href="/terms">Terms</Link>
               <Link href="/login">Sign in</Link>

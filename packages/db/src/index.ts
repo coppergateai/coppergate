@@ -8,8 +8,10 @@ export {
   auditEvents,
   budgets,
   contenders,
+  deliveryShareTokens,
   githubInstallations,
   githubWebhookDeliveries,
+  integrationCredentials,
   memberships,
   milestones,
   productBriefs,
@@ -41,10 +43,12 @@ export {
   type BudgetStatus,
   type Contender,
   type ContenderStatus,
+  type DeliveryShareToken,
   type EstimateComplexity,
   type GithubInstallation,
   type GithubWebhookDelivery,
   type InstallationStatus,
+  type IntegrationCredential,
   type Membership,
   type MembershipRole,
   type Milestone,
@@ -302,3 +306,41 @@ export {
   type DiffFileSummary,
   type DiffSummaryBody,
 } from "./delivery-artifacts.js";
+export {
+  CredentialError,
+  getActiveLlmByok,
+  purgeLlmByokCredentials,
+  revokeLlmByok,
+  touchLlmByokUsed,
+  upsertLlmByok,
+  type LlmByokMeta,
+} from "./credentials.js";
+export {
+  notifyWorkspace,
+  updateWorkspaceNotifySettings,
+  type NotifyEvent,
+  type NotifyPayload,
+} from "./notify.js";
+export {
+  ShareError,
+  createDeliveryShareToken,
+  getPublicDeliveryShare,
+  revokeDeliveryShareToken,
+} from "./share-reports.js";
+export {
+  getRetentionSnapshot,
+  getWorkspaceCostAnalytics,
+  type CostAnalytics30d,
+  type RetentionSnapshot,
+} from "./analytics.js";
+export {
+  persistReviewFindings,
+  scoreWithRulesReviewer,
+  type ReviewFinding,
+  type ReviewFindingsReport,
+} from "./reviewer.js";
+export {
+  IssueImportError,
+  importGithubIssueAsTask,
+} from "./issue-import.js";
+export { setProjectMergeEnabled } from "./project-policy.js";

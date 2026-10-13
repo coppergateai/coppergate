@@ -30,6 +30,7 @@ export function serializeRun(run: AgentRun) {
     fitnessScore: run.fitnessScore,
     efficiencyScore: run.efficiencyScore,
     fitnessEvidenceRef: run.fitnessEvidenceRef,
+    previewUrl: run.previewUrl,
     tournamentResult: run.tournamentResult,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),

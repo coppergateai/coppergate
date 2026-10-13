@@ -26,6 +26,8 @@ export type CreateWorkspaceInput = {
 export type UpdateWorkspaceInput = {
   name?: string;
   autonomyDefault?: AutonomyLevel;
+  notifyWebhookUrl?: string | null;
+  notifyEmailEnabled?: boolean;
 };
 
 const AUTONOMY: ReadonlySet<string> = new Set(["L0", "L1", "L2"]);
@@ -182,6 +184,16 @@ export async function updateWorkspaceForOwner(
       throw new Error("Invalid autonomy_default");
     }
     patch.autonomyDefault = input.autonomyDefault;
+  }
+  if (input.notifyWebhookUrl !== undefined) {
+    const url = input.notifyWebhookUrl?.trim() || null;
+    if (url && !/^https:\/\//i.test(url)) {
+      throw new Error("notifyWebhookUrl must be https");
+    }
+    patch.notifyWebhookUrl = url;
+  }
+  if (input.notifyEmailEnabled !== undefined) {
+    patch.notifyEmailEnabled = input.notifyEmailEnabled;
   }
 
   const [workspace] = await db

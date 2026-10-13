@@ -31,6 +31,11 @@ export {
   type WebhookHandlerResult,
 } from "./handlers.js";
 export {
+  listOpenIssues,
+  mergePullRequest,
+  type GithubIssueSummary,
+} from "./issues.js";
+export {
   FakeGithubDelivery,
   GithubDeliveryError,
   HttpGithubDelivery,

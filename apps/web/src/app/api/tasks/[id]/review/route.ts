@@ -1,9 +1,18 @@
-import { decideTaskReview, type ReviewDecision } from "@coppergate/db";
+import {
+  decideTaskReview,
+  getInstallationForWorkspace,
+  getProjectForWorkspace,
+  listRunsForTask,
+  recordAuditEvent,
+  type ReviewDecision,
+} from "@coppergate/db";
+import { mergePullRequest } from "@coppergate/github";
 import { ApiError } from "@coppergate/errors";
 import { requireUser } from "@/lib/auth";
 import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
 import { trackFunnel } from "@/lib/funnel";
+import { resolveInstallationToken } from "@/lib/github-app";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import {
@@ -62,6 +71,9 @@ export async function POST(request: Request, context: RouteContext) {
       decision: body.decision,
       status: result.task.status,
     });
+    let merge: { attempted: boolean; merged: boolean; message: string | null } =
+      { attempted: false, merged: false, message: null };
+
     if (body.decision === "accept") {
       trackFunnel({
         stage: "pr_accepted",
@@ -71,6 +83,67 @@ export async function POST(request: Request, context: RouteContext) {
         userId: user.id,
         meta: { status: result.task.status },
       });
+
+      // TASK043 — optional L2 merge when project.mergeEnabled + autonomy L2.
+      try {
+        const bound = await getProjectForWorkspace(
+          db,
+          body.workspaceId,
+          result.task.projectId,
+        );
+        if (
+          bound?.project.mergeEnabled &&
+          bound.project.autonomyLevel === "L2"
+        ) {
+          const runs = await listRunsForTask(
+            db,
+            body.workspaceId,
+            taskId,
+          );
+          const latest = runs[0];
+          const prNumber = latest?.prNumber;
+          const installation = await getInstallationForWorkspace(
+            db,
+            body.workspaceId,
+          );
+          if (prNumber && installation) {
+            const [owner, name] =
+              bound.repository.baseRepoFullName.split("/");
+            if (owner && name) {
+              const token = await resolveInstallationToken(db, installation);
+              merge.attempted = true;
+              const merged = await mergePullRequest({
+                token,
+                owner,
+                repo: name,
+                prNumber,
+              });
+              merge.merged = merged.merged;
+              merge.message = merged.message;
+              await recordAuditEvent(db, {
+                workspaceId: body.workspaceId,
+                actor: user.id,
+                action: "merge.attempt",
+                targetType: "merge",
+                targetId: taskId,
+                meta: {
+                  prNumber,
+                  merged: merged.merged,
+                  message: merged.message,
+                  sha: merged.sha,
+                },
+              });
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn("optional L2 merge skipped", {
+          correlationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        merge.message =
+          err instanceof Error ? err.message : "merge attempt failed";
+      }
     }
 
     return jsonOk(
@@ -78,6 +151,7 @@ export async function POST(request: Request, context: RouteContext) {
         task: serializeTask(result.task),
         transition: serializeTransition(result.transition),
         decision: body.decision,
+        merge,
       },
       { correlationId },
     );

@@ -45,12 +45,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = (await request.json().catch(() => null)) as {
       name?: unknown;
       autonomyDefault?: unknown;
+      notifyWebhookUrl?: unknown;
+      notifyEmailEnabled?: unknown;
     } | null;
     if (!body) {
       throw new ApiError("bad_request", "JSON body required");
     }
 
-    const patch: { name?: string; autonomyDefault?: AutonomyLevel } = {};
+    const patch: {
+      name?: string;
+      autonomyDefault?: AutonomyLevel;
+      notifyWebhookUrl?: string | null;
+      notifyEmailEnabled?: boolean;
+    } = {};
     if (body.name !== undefined) {
       if (typeof body.name !== "string") {
         throw new ApiError("bad_request", "name must be a string");
@@ -66,7 +73,24 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
       patch.autonomyDefault = body.autonomyDefault;
     }
-    if (patch.name === undefined && patch.autonomyDefault === undefined) {
+    if (body.notifyWebhookUrl !== undefined) {
+      if (body.notifyWebhookUrl !== null && typeof body.notifyWebhookUrl !== "string") {
+        throw new ApiError("bad_request", "notifyWebhookUrl must be string or null");
+      }
+      patch.notifyWebhookUrl = body.notifyWebhookUrl;
+    }
+    if (body.notifyEmailEnabled !== undefined) {
+      if (typeof body.notifyEmailEnabled !== "boolean") {
+        throw new ApiError("bad_request", "notifyEmailEnabled must be boolean");
+      }
+      patch.notifyEmailEnabled = body.notifyEmailEnabled;
+    }
+    if (
+      patch.name === undefined &&
+      patch.autonomyDefault === undefined &&
+      patch.notifyWebhookUrl === undefined &&
+      patch.notifyEmailEnabled === undefined
+    ) {
       throw new ApiError("bad_request", "No updatable fields provided");
     }
 

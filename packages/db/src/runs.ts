@@ -58,6 +58,7 @@ function mapRow(row: Record<string, unknown>): AgentRun {
       row.fitness_evidence_ref == null
         ? null
         : String(row.fitness_evidence_ref),
+    previewUrl: row.preview_url == null ? null : String(row.preview_url),
     tournamentResult:
       row.tournament_result == null ? null : String(row.tournament_result),
     createdAt: new Date(String(row.created_at)),

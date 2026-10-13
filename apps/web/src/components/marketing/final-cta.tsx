@@ -37,7 +37,7 @@ export function FinalCta({ signedInLogin = null }: Props) {
             Open workspaces
             <IconArrow />
           </Link>
-          <a className={styles.btnSecondary} href="mailto:muhtalipdede@gmail.com">
+          <a className={styles.btnSecondary} href="mailto:hello@coppergate.ai">
             Contact us
           </a>
         </div>

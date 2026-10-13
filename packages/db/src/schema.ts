@@ -67,6 +67,9 @@ export const workspaces = pgTable(
     slug: text("slug").notNull().unique(),
     /** L0 | L1 | L2 */
     autonomyDefault: text("autonomy_default").notNull().default("L0"),
+    /** Outbound webhook for review/fail/eliminate (TASK041). */
+    notifyWebhookUrl: text("notify_webhook_url"),
+    notifyEmailEnabled: boolean("notify_email_enabled").notNull().default(false),
     /** active | suspended | deleted */
     status: text("status").notNull().default("active"),
     /** Set when status becomes deleted — retention / purge clock (TASK028). */
@@ -149,6 +152,8 @@ export const projects = pgTable(
     spentMicros: bigint("spent_micros", { mode: "number" })
       .notNull()
       .default(0),
+    /** L2 merge opt-in after accept + green CI (TASK043). Default OFF. */
+    mergeEnabled: boolean("merge_enabled").notNull().default(false),
     /** Pointer to approved brief revision — TASK008 */
     currentBriefId: uuid("current_brief_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -294,6 +299,8 @@ export const tasks = pgTable(
     attemptCount: integer("attempt_count").notNull().default(0),
     maxAttempts: integer("max_attempts").notNull().default(3),
     prUrl: text("pr_url"),
+    /** Linked GitHub issue number when imported (TASK040). */
+    githubIssueNumber: integer("github_issue_number"),
     priority: integer("priority").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -319,7 +326,7 @@ export const arenas = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    minHuman: boolean("min_human").notNull().default(false),
+    minHuman: boolean("min_human").notNull().default(true),
     prodWritesEnabled: boolean("prod_writes_enabled").notNull().default(false),
     defaultContenderN: integer("default_contender_n").notNull().default(2),
     /** Efficiency payoff exponent α — GAME_THEORY.md (default 0.5). */
@@ -460,6 +467,8 @@ export const agentRuns = pgTable(
     /** Efficiency payoff e = f / spend^α */
     efficiencyScore: doublePrecision("efficiency_score"),
     fitnessEvidenceRef: text("fitness_evidence_ref"),
+    /** Preview deployment URL when available (TASK038). */
+    previewUrl: text("preview_url"),
     /** WINNER | LOSER | CANCELLED */
     tournamentResult: text("tournament_result"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -779,6 +788,71 @@ export const githubWebhookDeliveries = pgTable(
   ],
 );
 
+/** Sealed BYOK / integration secrets — TASK037. */
+export const integrationCredentials = pgTable(
+  "integration_credentials",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    /** llm_byok | … */
+    provider: text("provider").notNull().default("llm_byok"),
+    label: text("label").notNull().default("default"),
+    encryptedPayload: text("encrypted_payload").notNull(),
+    baseUrl: text("base_url"),
+    model: text("model"),
+    /** active | revoked */
+    status: text("status").notNull().default("active"),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("integration_credentials_ws_provider_uidx").on(
+      t.workspaceId,
+      t.provider,
+    ),
+    index("integration_credentials_workspace_id_idx").on(t.workspaceId),
+  ],
+);
+
+/** Public share tokens for redacted delivery reports — TASK044. */
+export const deliveryShareTokens = pgTable(
+  "delivery_share_tokens",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("delivery_share_tokens_token_uidx").on(t.token),
+    index("delivery_share_tokens_run_id_idx").on(t.runId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Workspace = typeof workspaces.$inferSelect;
@@ -804,6 +878,8 @@ export type Artifact = typeof artifacts.$inferSelect;
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
 export type PilotInvite = typeof pilotInvites.$inferSelect;
 export type GithubWebhookDelivery = typeof githubWebhookDeliveries.$inferSelect;
+export type IntegrationCredential = typeof integrationCredentials.$inferSelect;
+export type DeliveryShareToken = typeof deliveryShareTokens.$inferSelect;
 
 export type ArenaStatus = "ARMED" | "RUNNING" | "KILLED" | "PAUSED";
 export type ContenderStatus = "ACTIVE" | "ELIMINATED";

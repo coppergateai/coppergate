@@ -10,8 +10,11 @@ import {
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { SiteChrome } from "../../../site-chrome";
+import { AnalyticsPanel } from "./analytics-panel";
+import { ByokPanel } from "./byok-panel";
 import { DangerZone } from "./danger-zone";
 import { GithubPanel } from "./github-panel";
+import { NotifyPanel } from "./notify-panel";
 import {
   ProjectsBudgetPanel,
   type ProjectBudgetRow,
@@ -117,6 +120,20 @@ export default async function WorkspaceSettingsPage({
           workspaceId={workspace.id}
           isOwner={role === "owner"}
           initialProjects={budgetRows}
+        />
+
+        <ByokPanel workspaceId={workspace.id} isOwner={role === "owner"} />
+
+        <NotifyPanel
+          workspaceId={workspace.id}
+          isOwner={role === "owner"}
+          initialWebhookUrl={workspace.notifyWebhookUrl}
+          initialEmailEnabled={workspace.notifyEmailEnabled}
+        />
+
+        <AnalyticsPanel
+          workspaceId={workspace.id}
+          isOwner={role === "owner"}
         />
 
         <GithubPanel

@@ -24,7 +24,8 @@ import {
  * Hard-cap until TASK039 relaxes parallel-repo policy.
  * ContenderRuns still isolate via distinct run rows + branch names.
  */
-export const MAX_TOURNAMENT_FANOUT = 2;
+/** Hard-cap raised with TASK039 (was 2). Independent tasks also parallelize. */
+export const MAX_TOURNAMENT_FANOUT = 3;
 
 /** Default spend exponent for efficiency payoff — GAME_THEORY.md */
 export const DEFAULT_PAYOFF_ALPHA = 0.5;
@@ -258,7 +259,7 @@ export async function ensureArenaForProject(
       id: arenaId,
       workspaceId: input.workspaceId,
       projectId: input.projectId,
-      minHuman: input.minHuman ?? false,
+      minHuman: input.minHuman ?? true,
       prodWritesEnabled: false,
       defaultContenderN: n,
       status: "ARMED",
@@ -315,7 +316,7 @@ export async function listContendersForArena(
     );
 }
 
-/** TASK053 — toggle min_human (default remains false until G1b). */
+/** TASK053 — toggle min_human (default on after G1b 2026-10-12). */
 export async function setArenaMinHuman(
   db: Database,
   input: {

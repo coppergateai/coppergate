@@ -146,20 +146,21 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
     await closeDb(db);
   });
 
-  it("spawns N=2 ContenderRuns with unique branches and shared task context", async () => {
+  it("spawns N=MAX ContenderRuns, clamps n>MAX, unique branches", async () => {
+    assert.equal(MAX_TOURNAMENT_FANOUT, 3);
+
     const first = await startTournamentFanout(db, {
       workspaceId,
       taskId,
       actor,
-      n: 2,
+      n: 99,
     });
     assert.equal(first.created, true);
-    assert.equal(first.runs.length, 2);
-    assert.equal(first.tournament.n, 2);
-    assert.ok(first.tournament.n <= MAX_TOURNAMENT_FANOUT);
+    assert.equal(first.runs.length, MAX_TOURNAMENT_FANOUT);
+    assert.equal(first.tournament.n, MAX_TOURNAMENT_FANOUT);
 
     const branches = new Set(first.runs.map((r) => r.branchName));
-    assert.equal(branches.size, 2);
+    assert.equal(branches.size, MAX_TOURNAMENT_FANOUT);
     for (const run of first.runs) {
       assert.equal(run.taskId, taskId);
       assert.equal(run.tournamentId, first.tournament.id);
@@ -170,16 +171,16 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
     }
 
     const contenderIds = new Set(first.runs.map((r) => r.contenderId));
-    assert.equal(contenderIds.size, 2);
+    assert.equal(contenderIds.size, MAX_TOURNAMENT_FANOUT);
 
     const second = await startTournamentFanout(db, {
       workspaceId,
       taskId,
       actor,
-      n: 2,
+      n: MAX_TOURNAMENT_FANOUT,
     });
     assert.equal(second.created, false);
     assert.equal(second.tournament.id, first.tournament.id);
-    assert.equal(second.runs.length, 2);
+    assert.equal(second.runs.length, MAX_TOURNAMENT_FANOUT);
   });
 });

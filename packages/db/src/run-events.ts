@@ -145,6 +145,7 @@ export async function markRunAwaitingReview(
     prNumber: number;
     prUrl: string;
     actualCostMicros: number;
+    previewUrl?: string | null;
   },
 ): Promise<AgentRun> {
   const now = new Date();
@@ -157,6 +158,7 @@ export async function markRunAwaitingReview(
       prNumber: input.prNumber,
       prUrl: input.prUrl,
       actualCostMicros: input.actualCostMicros,
+      previewUrl: input.previewUrl ?? null,
       leaseOwner: null,
       leaseUntil: null,
       finishedAt: now,

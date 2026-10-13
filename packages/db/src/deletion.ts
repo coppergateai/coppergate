@@ -1,6 +1,7 @@
 import { and, eq, isNotNull, lt, ne } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { recordAuditEvent } from "./briefs.js";
+import { purgeLlmByokCredentials } from "./credentials.js";
 import { markInstallationRemoved } from "./github.js";
 import { projects, workspaces, type Project, type Workspace } from "./schema.js";
 
@@ -26,15 +27,16 @@ export async function purgeWorkspaceCredentials(
   actor: string,
 ): Promise<{ purged: boolean }> {
   const removed = await markInstallationRemoved(db, workspaceId);
+  const byokPurged = await purgeLlmByokCredentials(db, workspaceId);
   await recordAuditEvent(db, {
     workspaceId,
     actor,
     action: "credentials.purged",
     targetType: "workspace",
     targetId: workspaceId,
-    meta: { hadInstallation: Boolean(removed) },
+    meta: { hadInstallation: Boolean(removed), byokPurged },
   });
-  return { purged: Boolean(removed) };
+  return { purged: Boolean(removed) || byokPurged };
 }
 
 /**

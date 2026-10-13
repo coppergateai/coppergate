@@ -164,14 +164,20 @@ describe("arena min_human (TASK053)", { skip: !url }, () => {
       contenderBudgetMicros: 200_000,
     });
     arenaId = ensured.arena.id;
-    assert.equal(ensured.arena.minHuman, false);
+    assert.equal(ensured.arena.minHuman, true);
   });
 
   after(async () => {
     await closeDb(db);
   });
 
-  it("defaults min_human off — submit stops at READY_FOR_APPROVAL", async () => {
+  it("when min_human off — submit stops at READY_FOR_APPROVAL", async () => {
+    await setArenaMinHuman(db, {
+      workspaceId,
+      arenaId,
+      minHuman: false,
+      actor,
+    });
     const result = await submitTaskForApproval(db, {
       workspaceId,
       taskId: taskOffId,
@@ -181,7 +187,7 @@ describe("arena min_human (TASK053)", { skip: !url }, () => {
     assert.equal(result.autoQueued, undefined);
   });
 
-  it("when min_human on — submit auto-queues and fans out", async () => {
+  it("when min_human on (default) — submit auto-queues and fans out", async () => {
     await setArenaMinHuman(db, {
       workspaceId,
       arenaId,
