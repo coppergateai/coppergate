@@ -1,4 +1,4 @@
-import styles from "../workspaces/[id]/inbox/inbox.module.css";
+import styles from "../../workspaces/[id]/inbox/inbox.module.css";
 
 export const dynamic = "force-dynamic";
 
