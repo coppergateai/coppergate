@@ -50,7 +50,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
 
   function projectRows(
     items: typeof projects,
-    statusClass: string,
+    statusClass: string | undefined,
   ) {
     return (
       <ul className={styles.list}>
@@ -61,7 +61,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
               className={styles.rowLink}
             >
               <span
-                className={`${styles.statusRing} ${statusClass}`}
+                className={`${styles.statusRing} ${statusClass ?? ""}`}
                 aria-hidden
               />
               <span className={styles.rowId}>{project.stack}</span>
@@ -213,7 +213,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                   <li key={r.id} className={styles.row}>
                     <div className={styles.rowStatic}>
                       <span
-                        className={`${styles.statusRing} ${styles.statusIdle}`}
+                        className={`${styles.statusRing} ${styles.statusIdle ?? ""}`}
                         aria-hidden
                       />
                       <span className={styles.rowId}>repo</span>
