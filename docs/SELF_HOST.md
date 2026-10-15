@@ -1,7 +1,7 @@
 # Self-host Coppergate
 
 Run Coppergate on your own infrastructure (community / MIT tier).  
-Example enterprise hostname: `https://coppergate.trendyol.com`.
+Example enterprise hostname: `https://coppergate.shopify.com`.
 
 Managed SaaS remains the supported pilot path; this guide is the **community self-host** packaging (D4 / D9).
 
@@ -69,11 +69,11 @@ OAuth scopes: `read:user`, `user:email` (identity only). Repo access is via the 
 
 ## GitLab (gitlab.com or self-managed)
 
-Self-managed example (Trendyol-style):
+Self-managed example (Shopify-style):
 
 ```bash
-APP_URL=https://coppergate.trendyol.com
-GITLAB_BASE_URL=https://gitlab.trendyol.com
+APP_URL=https://coppergate.shopify.com
+GITLAB_BASE_URL=https://gitlab.shopify.com
 ```
 
 | Field | Value |
@@ -87,11 +87,11 @@ After login, connect a GitLab project from workspace settings (Project Access To
 
 `GITLAB_BASE_URL` must be the origin only (no `/api/v4` suffix).
 
-## Trendyol-style checklist
+## Enterprise checklist (Shopify-style)
 
-1. DNS `coppergate.trendyol.com` → your LB with TLS.
-2. Set `APP_URL=https://coppergate.trendyol.com`.
-3. If GitLab-internal: set `GITLAB_BASE_URL=https://gitlab.trendyol.com` and register OAuth + webhooks there.
+1. DNS `coppergate.shopify.com` → your LB with TLS.
+2. Set `APP_URL=https://coppergate.shopify.com`.
+3. If GitLab-internal: set `GITLAB_BASE_URL=https://gitlab.shopify.com` and register OAuth + webhooks there.
 4. If GitHub.com org: register OAuth App + GitHub App with the URLs above.
 5. `docker compose -f docker-compose.selfhost.yml --env-file .env.selfhost up -d --build`.
 6. Sign in → create workspace → connect SCM → set BYOK if needed → run a task with `SCM_DELIVERY_MODE=http`.

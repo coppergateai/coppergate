@@ -69,7 +69,7 @@ const envSchema = z.object({
    * When set, overrides GITHUB_DELIVERY_MODE for both providers.
    */
   SCM_DELIVERY_MODE: z.enum(["fake", "http"]).optional(),
-  /** GitLab origin — gitlab.com or self-managed (e.g. https://gitlab.trendyol.com). */
+  /** GitLab origin — gitlab.com or self-managed (e.g. https://gitlab.shopify.com). */
   GITLAB_BASE_URL: z.string().url().default("https://gitlab.com"),
   /** Optional until GitLab OAuth login is used. */
   GITLAB_CLIENT_ID: z.string().min(1).optional(),
