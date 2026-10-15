@@ -22,6 +22,7 @@ export function ArenaPreviewSection() {
   const selected =
     ILLUSTRATIVE_CONTENDERS.find((c) => c.id === activeId) ?? fallback;
   const winner = ILLUSTRATIVE_CONTENDERS.find((c) => c.statusTone === "win");
+  const isWinner = Boolean(winner && selected.id === winner.id);
 
   return (
     <section
@@ -36,14 +37,15 @@ export function ArenaPreviewSection() {
             Contenders compete. One survivor ships.
           </h2>
           <p className={styles.sectionLede}>
-            An Arena is a bounded tournament around a single engineering task.
-            Each contender produces an attempt; Coppergate verifies results,
-            prices spend, and promotes the strongest qualifying path.
+            A bounded tournament around one engineering task. Contenders
+            attempt the work; Coppergate verifies results, prices spend, and
+            promotes the strongest qualifying path.
           </p>
           <p className={styles.demoNotice}>
-            <span className={styles.demoNoticeMark}>{ILLUSTRATIVE_ARENA.label}</span>
-            Sample metrics below show how selection reads in product UI — not a
-            live run.
+            <span className={styles.demoNoticeMark}>
+              {ILLUSTRATIVE_ARENA.label}
+            </span>
+            Sample metrics — not a live run.
           </p>
         </header>
 
@@ -52,112 +54,115 @@ export function ArenaPreviewSection() {
             <div>
               <p className={styles.arenaTaskLabel}>Task</p>
               <h3 className={styles.arenaTask}>{ILLUSTRATIVE_ARENA.task}</h3>
-              <p className={styles.arenaRepo}>
-                {ILLUSTRATIVE_ARENA.repo} · {ILLUSTRATIVE_ARENA.branch}
-              </p>
+              <p className={styles.arenaRepo}>{ILLUSTRATIVE_ARENA.repo}</p>
             </div>
-            <dl className={styles.arenaHeadStats}>
-              <div>
-                <dt>Budget</dt>
-                <dd>
-                  {formatUsd(ILLUSTRATIVE_ARENA.totalSpendUsd)} /{" "}
-                  {formatUsd(ILLUSTRATIVE_ARENA.budgetUsd)}
-                </dd>
-              </div>
-              <div>
-                <dt>Duration</dt>
-                <dd>{ILLUSTRATIVE_ARENA.duration}</dd>
-              </div>
-              <div>
-                <dt>State</dt>
-                <dd>{ILLUSTRATIVE_ARENA.runState}</dd>
-              </div>
-            </dl>
+            <p className={styles.arenaHeadQuiet}>
+              {formatUsd(ILLUSTRATIVE_ARENA.totalSpendUsd)} of{" "}
+              {formatUsd(ILLUSTRATIVE_ARENA.budgetUsd)} ·{" "}
+              {ILLUSTRATIVE_ARENA.duration} · {ILLUSTRATIVE_ARENA.runState}
+            </p>
           </div>
 
           <div className={styles.arenaGrid}>
-            <ul className={styles.arenaContenders} role="list">
-              {ILLUSTRATIVE_CONTENDERS.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    className={`${styles.arenaCard} ${
-                      activeId === c.id ? styles.arenaCardActive : ""
-                    } ${c.muted ? styles.arenaCardMuted : ""}`}
-                    onClick={() => setActiveId(c.id)}
-                    aria-pressed={activeId === c.id}
-                  >
-                    <div className={styles.arenaCardTop}>
-                      <span className={styles.arenaCardName}>{c.name}</span>
-                      <span
-                        className={`${styles.statusPill} ${toneClass(c.statusTone)}`}
+            <div className={styles.arenaCompare}>
+              <p className={styles.arenaColLabel}>Comparison</p>
+              <ul className={styles.arenaContenders} role="list">
+                {ILLUSTRATIVE_CONTENDERS.map((c) => {
+                  const selectedRow = activeId === c.id;
+                  const win = c.statusTone === "win";
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        className={`${styles.arenaRow} ${
+                          selectedRow ? styles.arenaRowActive : ""
+                        } ${win ? styles.arenaRowWin : ""} ${
+                          c.muted ? styles.arenaRowMuted : ""
+                        }`}
+                        onClick={() => setActiveId(c.id)}
+                        aria-pressed={selectedRow}
                       >
-                        {c.status}
-                      </span>
-                    </div>
-                    <dl className={styles.arenaMetrics}>
-                      <div>
-                        <dt>Fitness</dt>
-                        <dd>{c.fitness.toFixed(2)}</dd>
-                      </div>
-                      <div>
-                        <dt>Cost</dt>
-                        <dd>{formatUsd(c.spendUsd)}</dd>
-                      </div>
-                      <div>
-                        <dt>Efficiency</dt>
-                        <dd>{c.efficiency.toFixed(3)}</dd>
-                      </div>
-                      <div>
-                        <dt>Tests</dt>
-                        <dd>
-                          {c.testsPassed} passed
-                          {c.testsFailed > 0 ? ` · ${c.testsFailed} failed` : ""}
-                        </dd>
-                      </div>
-                    </dl>
-                    {c.rejectionReason ? (
-                      <p className={styles.arenaReject}>{c.rejectionReason}</p>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
+                        <span className={styles.arenaRowName}>{c.name}</span>
+                        <span className={styles.arenaRowMetric}>
+                          <span className={styles.arenaRowMetricKey}>
+                            Fitness
+                          </span>
+                          {c.fitness.toFixed(2)}
+                        </span>
+                        <span className={styles.arenaRowMetric}>
+                          <span className={styles.arenaRowMetricKey}>Cost</span>
+                          {formatUsd(c.spendUsd)}
+                        </span>
+                        <span className={styles.arenaRowMetric}>
+                          <span className={styles.arenaRowMetricKey}>
+                            Efficiency
+                          </span>
+                          {c.efficiency.toFixed(3)}
+                        </span>
+                        <span
+                          className={`${styles.statusPill} ${toneClass(c.statusTone)}`}
+                        >
+                          {c.status}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
 
             <aside className={styles.arenaDetail} aria-live="polite">
-              <p className={styles.previewLabel}>Inspecting {selected.name}</p>
-              <dl className={styles.arenaDetailList}>
-                <div>
-                  <dt>CI</dt>
-                  <dd>{selected.ci}</dd>
-                </div>
-                <div>
-                  <dt>Tests</dt>
-                  <dd>{selected.tests}</dd>
-                </div>
-                <div>
-                  <dt>Lint</dt>
-                  <dd>{selected.lint}</dd>
-                </div>
-                <div>
-                  <dt>Policy</dt>
-                  <dd>{selected.policy}</dd>
-                </div>
-                <div>
-                  <dt>Fitness</dt>
-                  <dd>{selected.fitness.toFixed(2)}</dd>
-                </div>
-                <div>
-                  <dt>Spend</dt>
-                  <dd>{formatUsd(selected.spendUsd)}</dd>
-                </div>
-                <div>
-                  <dt>Efficiency e = f / spend^α</dt>
-                  <dd>{selected.efficiency.toFixed(3)}</dd>
-                </div>
-              </dl>
+              <p className={styles.arenaColLabel}>{selected.name}</p>
 
-              {winner && selected.id === winner.id ? (
+              <div className={styles.arenaVerifyBlock}>
+                <h4>Verification</h4>
+                <ul className={styles.checkList}>
+                  <li>
+                    <span
+                      className={
+                        selected.ci === "Passing"
+                          ? styles.checkOk
+                          : styles.checkBad
+                      }
+                    />
+                    CI {selected.ci}
+                  </li>
+                  <li>
+                    <span
+                      className={
+                        selected.testsFailed > 0
+                          ? styles.checkBad
+                          : styles.checkOk
+                      }
+                    />
+                    Tests · {selected.tests}
+                  </li>
+                  <li>
+                    <span
+                      className={
+                        selected.lint === "Failed"
+                          ? styles.checkBad
+                          : selected.lint === "Warnings"
+                            ? styles.checkWarn
+                            : styles.checkOk
+                      }
+                    />
+                    Lint · {selected.lint}
+                  </li>
+                  <li>
+                    <span
+                      className={
+                        selected.policy === "Compliant"
+                          ? styles.checkOk
+                          : styles.checkBad
+                      }
+                    />
+                    Policy · {selected.policy}
+                  </li>
+                </ul>
+              </div>
+
+              {isWinner ? (
                 <div className={styles.selectionCallout}>
                   <p className={styles.selectionCalloutLabel}>
                     Why this survivor
@@ -174,6 +179,15 @@ export function ArenaPreviewSection() {
                   </p>
                 </div>
               ) : null}
+
+              <div className={styles.arenaNext}>
+                <p className={styles.arenaColLabel}>What happens next</p>
+                <p className={styles.arenaNextBody}>
+                  {isWinner
+                    ? `PR #${ILLUSTRATIVE_ARENA.prNumber} is ready for review on ${ILLUSTRATIVE_ARENA.branch}. Merge stays policy-gated.`
+                    : selected.promote}
+                </p>
+              </div>
             </aside>
           </div>
         </div>

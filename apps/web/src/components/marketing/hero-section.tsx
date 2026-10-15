@@ -7,25 +7,6 @@ type Props = {
   signedIn: boolean;
 };
 
-const workflow = [
-  {
-    label: "Task",
-    detail: "Brief or inbound signal defines the engineering goal.",
-  },
-  {
-    label: "Competing agents",
-    detail: "Multiple contenders attempt the same objective in parallel.",
-  },
-  {
-    label: "Verification",
-    detail: "Tests, CI, and policy checks score each attempt.",
-  },
-  {
-    label: "Selected PR",
-    detail: "The strongest qualifying result is prepared for review.",
-  },
-] as const;
-
 export function HeroSection({ signedIn }: Props) {
   const primaryHref = signedIn ? "/workspaces" : "/login";
 
@@ -40,26 +21,10 @@ export function HeroSection({ signedIn }: Props) {
             <span className={styles.headlineAccent}>Survivors ship.</span>
           </h1>
           <p className={styles.lede}>
-            Give Coppergate an engineering task. Multiple AI agents compete to
-            solve it. Coppergate tests their work, compares quality and cost,
-            and delivers the strongest verified result as a pull request.
+            Multiple AI agents compete to solve your engineering task.
+            Coppergate verifies their work, evaluates quality and cost, and
+            delivers the strongest result as a pull request.
           </p>
-
-          <ol className={styles.heroFlow} aria-label="Delivery workflow">
-            {workflow.map((step, i) => (
-              <li key={step.label} className={styles.heroFlowStep}>
-                {i > 0 ? (
-                  <span className={styles.heroFlowArrow} aria-hidden="true">
-                    →
-                  </span>
-                ) : null}
-                <div className={styles.heroFlowCard}>
-                  <span className={styles.heroFlowLabel}>{step.label}</span>
-                  <span className={styles.heroFlowDetail}>{step.detail}</span>
-                </div>
-              </li>
-            ))}
-          </ol>
 
           <div className={styles.ctaRow}>
             <Link className={styles.btnHeroPrimary} href={primaryHref}>
