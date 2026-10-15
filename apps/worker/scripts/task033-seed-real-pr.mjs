@@ -37,7 +37,12 @@ function loadDotEnv() {
     ];
     let text;
     for (const u of candidates) {
-      try { text = readFileSync(u, "utf8"); break; } catch {}
+      try {
+        text = readFileSync(u, "utf8");
+        break;
+      } catch {
+        /* try next candidate path */
+      }
     }
     if (!text) throw new Error("no .env");
     for (const line of text.split("\n")) {
