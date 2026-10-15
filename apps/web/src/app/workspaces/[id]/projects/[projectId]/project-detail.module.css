@@ -2,9 +2,9 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 56rem;
+  max-width: 64rem;
   margin: 0;
-  padding: 0 0 1.5rem;
+  padding: 0.85rem 1.15rem 2rem;
 }
 
 .nav {

@@ -14,6 +14,14 @@ import styles from "./projects.module.css";
 
 type PageProps = { params: Promise<{ id: string }> };
 
+function formatDate(d: Date) {
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default async function WorkspaceProjectsPage({ params }: PageProps) {
   const user = await currentUser();
   if (!user) {
@@ -40,39 +48,6 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
   const ready = projects.filter(({ project }) => project.currentBriefId);
   const setup = projects.filter(({ project }) => !project.currentBriefId);
 
-  const createBlock =
-    access.role === "owner" ? (
-      <section
-        id="create-project"
-        className={styles.section}
-        aria-labelledby="create-heading"
-      >
-        <h2 id="create-heading" className={styles.sectionLabel}>
-          New project
-        </h2>
-        {unbound.length === 0 ? (
-          <p className={styles.muted}>
-            Connect an unbound repository in{" "}
-            <Link
-              href={`/workspaces/${id}/settings`}
-              className={styles.inlineLink}
-            >
-              settings
-            </Link>{" "}
-            first.
-          </p>
-        ) : (
-          <CreateProjectForm
-            workspaceId={id}
-            repositories={unbound.map((r) => ({
-              id: r.id,
-              fullName: r.baseRepoFullName,
-            }))}
-          />
-        )}
-      </section>
-    ) : null;
-
   function projectRows(
     items: typeof projects,
     statusClass: string,
@@ -89,21 +64,20 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                 className={`${styles.statusRing} ${statusClass}`}
                 aria-hidden
               />
-              <div className={styles.rowMain}>
-                <span className={styles.rowId}>
-                  {project.stack}
-                </span>
-                <span className={styles.rowTitle}>{project.name}</span>
-              </div>
+              <span className={styles.rowId}>{project.stack}</span>
+              <span className={styles.rowTitle}>{project.name}</span>
               <span className={styles.rowMeta}>
                 {repository.baseRepoFullName}
               </span>
+              <span className={styles.rowMode}>{project.mode}</span>
               {project.currentBriefId ? (
                 <span className={styles.rowPill}>Brief</span>
               ) : (
                 <span className={styles.rowPillMuted}>Setup</span>
               )}
-              <span className={styles.rowAction}>Open</span>
+              <span className={styles.rowDate}>
+                {formatDate(project.updatedAt)}
+              </span>
             </Link>
           </li>
         ))}
@@ -113,31 +87,52 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
 
   return (
     <main className={styles.main}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Projects</h1>
-        <div className={styles.toolbar}>
+      <header className={styles.pageBar}>
+        <div className={styles.pageBarLeft}>
+          <h1 className={styles.title}>Projects</h1>
+          <div className={styles.chips}>
+            <span className={styles.chip}>{access.workspace.name}</span>
+            <span className={styles.chip}>{projects.length} projects</span>
+            <span className={styles.chip}>{ready.length} ready</span>
+            <span className={styles.chip}>{setup.length} setup</span>
+            <span className={styles.chip}>{unbound.length} unbound</span>
+          </div>
+        </div>
+        <div id="create-project" className={styles.pageBarCreate}>
           {canCreate ? (
-            <a href="#create-project" className={styles.toolbarPrimary}>
-              + New project
-            </a>
+            <CreateProjectForm
+              workspaceId={id}
+              repositories={unbound.map((r) => ({
+                id: r.id,
+                fullName: r.baseRepoFullName,
+              }))}
+              compact
+            />
           ) : access.role === "owner" ? (
             <Link
               href={`/workspaces/${id}/settings`}
               className={styles.toolbarPrimary}
             >
-              Connect repo
+              Connect repo in settings
             </Link>
           ) : null}
-          <span className={styles.toolbarMeta}>
-            {access.workspace.name}
-            {!empty ? ` · ${projects.length}` : ""}
-          </span>
         </div>
       </header>
 
       {empty ? (
-        <>
-          {createBlock}
+        <div className={styles.bodyPad}>
+          {!canCreate && access.role === "owner" ? (
+            <p className={styles.muted}>
+              Connect an unbound repository in{" "}
+              <Link
+                href={`/workspaces/${id}/settings`}
+                className={styles.inlineLink}
+              >
+                settings
+              </Link>{" "}
+              first.
+            </p>
+          ) : null}
           <div className={styles.path}>
             <OnboardingGuide
               compact
@@ -154,7 +149,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                 {
                   id: "project",
                   title: "Create your first project",
-                  detail: "Bind the repo below. Supported stack: nextjs_ts.",
+                  detail: "Bind the repo above. Supported stack: nextjs_ts.",
                   done: false,
                 },
                 {
@@ -174,31 +169,70 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
               ]}
             />
           </div>
-        </>
+        </div>
       ) : (
-        <>
+        <div className={styles.body}>
+          <div className={styles.colHead} aria-hidden>
+            <span className={styles.colStatus} />
+            <span>Stack</span>
+            <span>Name</span>
+            <span>Repository</span>
+            <span>Mode</span>
+            <span>State</span>
+            <span className={styles.colDate}>Updated</span>
+          </div>
+
           {ready.length > 0 ? (
-            <section className={styles.section} aria-labelledby="ready-heading">
+            <section aria-labelledby="ready-heading">
               <h2 id="ready-heading" className={styles.groupLabel}>
                 Ready
                 <span className={styles.groupCount}>{ready.length}</span>
               </h2>
-              {projectRows(ready, styles.statusActive ?? "")}
+              {projectRows(ready, styles.statusActive)}
             </section>
           ) : null}
 
           {setup.length > 0 ? (
-            <section className={styles.section} aria-labelledby="setup-heading">
+            <section aria-labelledby="setup-heading">
               <h2 id="setup-heading" className={styles.groupLabel}>
                 Setup
                 <span className={styles.groupCount}>{setup.length}</span>
               </h2>
-              {projectRows(setup, styles.statusIdle ?? "")}
+              {projectRows(setup, styles.statusIdle)}
             </section>
           ) : null}
 
-          {createBlock}
-        </>
+          {unbound.length > 0 ? (
+            <section aria-labelledby="unbound-heading">
+              <h2 id="unbound-heading" className={styles.groupLabel}>
+                Unbound repositories
+                <span className={styles.groupCount}>{unbound.length}</span>
+              </h2>
+              <ul className={styles.list}>
+                {unbound.map((r) => (
+                  <li key={r.id} className={styles.row}>
+                    <div className={styles.rowStatic}>
+                      <span
+                        className={`${styles.statusRing} ${styles.statusIdle}`}
+                        aria-hidden
+                      />
+                      <span className={styles.rowId}>repo</span>
+                      <span className={styles.rowTitle}>
+                        {r.baseRepoFullName}
+                      </span>
+                      <span className={styles.rowMeta}>Available to bind</span>
+                      <span className={styles.rowMode}>—</span>
+                      <span className={styles.rowPillMuted}>Unbound</span>
+                      <a href="#create-project" className={styles.rowBind}>
+                        Bind
+                      </a>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
       )}
     </main>
   );

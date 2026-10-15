@@ -80,10 +80,12 @@ export default async function WorkspaceSettingsPage({
 
   return (
       <main className={styles.main}>
-        <h1 className={styles.title}>Settings</h1>
-        <p className={styles.meta}>
-          {workspace.name} · /{workspace.slug} · {role}
-        </p>
+        <div className={styles.pageHead}>
+          <h1 className={styles.title}>Settings</h1>
+          <p className={styles.meta}>
+            {workspace.name} · /{workspace.slug} · {role}
+          </p>
+        </div>
 
         <section className={styles.section} aria-labelledby="workspace-heading">
           <h2 id="workspace-heading" className={styles.sectionLabel}>
