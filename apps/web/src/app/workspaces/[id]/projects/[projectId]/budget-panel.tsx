@@ -20,6 +20,13 @@ type Props = {
   isOwner: boolean;
 };
 
+function dollars(micros: number): string {
+  const d = micros / 1_000_000;
+  if (d === 0) return "0";
+  if (Math.abs(d) < 0.01) return d.toFixed(4);
+  return d.toFixed(2);
+}
+
 export function BudgetPanel({
   workspaceId,
   projectId,
@@ -38,11 +45,11 @@ export function BudgetPanel({
     setPending(true);
     setError(null);
     try {
-      const dollars = Number(capDollars);
-      if (!Number.isFinite(dollars) || dollars < 0) {
+      const dollarsNum = Number(capDollars);
+      if (!Number.isFinite(dollarsNum) || dollarsNum < 0) {
         throw new Error("Enter a valid non-negative dollar amount");
       }
-      const capMicros = Math.round(dollars * 1_000_000);
+      const capMicros = Math.round(dollarsNum * 1_000_000);
       const res = await fetch(`/api/projects/${projectId}/budget`, {
         method: "PUT",
         credentials: "same-origin",
@@ -78,17 +85,76 @@ export function BudgetPanel({
     }
   }
 
+  const cap = Math.max(usage.capMicros, 0);
+  const spentPct =
+    cap > 0 ? Math.min(100, (usage.spentMicros / cap) * 100) : 0;
+  const reservedPct =
+    cap > 0 ? Math.min(100 - spentPct, (usage.reservedMicros / cap) * 100) : 0;
+  const paused = usage.budgetStatus === "paused";
+
   return (
-    <section className={styles.section} aria-labelledby="budget-heading">
-      <h2 id="budget-heading" className={styles.sectionLabel}>
-        Budget
-      </h2>
+    <section
+      id="budget"
+      className={styles.section}
+      aria-labelledby="budget-heading"
+    >
+      <div className={styles.sectionHead}>
+        <h2 id="budget-heading" className={styles.sectionLabel}>
+          Budget
+        </h2>
+        <span
+          className={
+            paused
+              ? `${styles.statusPill} ${styles.statusPillPaused}`
+              : `${styles.statusPill} ${styles.statusPillActive}`
+          }
+        >
+          {paused ? "Paused" : "Active"}
+        </span>
+      </div>
       <p className={styles.sectionLede}>
-        Cap {usage.capMicros / 1_000_000} {usage.currency} · spent{" "}
-        {usage.spentMicros / 1_000_000} · reserved{" "}
-        {usage.reservedMicros / 1_000_000} · available{" "}
-        {usage.availableMicros / 1_000_000} · {usage.budgetStatus}
+        Hard stop for agent spend. Pause blocks new worker claims.
       </p>
+
+      <div className={styles.meterBlock}>
+        <div className={styles.meterTrack} aria-hidden>
+          <span
+            className={styles.meterSpent}
+            style={{ width: `${spentPct}%` }}
+          />
+          <span
+            className={styles.meterReserved}
+            style={{ width: `${reservedPct}%`, left: `${spentPct}%` }}
+          />
+        </div>
+        <div className={styles.meterStats}>
+          <div>
+            <span className={styles.meterStatLabel}>Cap</span>
+            <span className={styles.meterStatValue}>
+              {dollars(usage.capMicros)} {usage.currency}
+            </span>
+          </div>
+          <div>
+            <span className={styles.meterStatLabel}>Spent</span>
+            <span className={styles.meterStatValue}>
+              {dollars(usage.spentMicros)}
+            </span>
+          </div>
+          <div>
+            <span className={styles.meterStatLabel}>Reserved</span>
+            <span className={styles.meterStatValue}>
+              {dollars(usage.reservedMicros)}
+            </span>
+          </div>
+          <div>
+            <span className={styles.meterStatLabel}>Available</span>
+            <span className={styles.meterStatValue}>
+              {dollars(usage.availableMicros)}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {isOwner ? (
         <div className={styles.panel}>
           <div className={styles.btnRow}>
@@ -114,10 +180,10 @@ export function BudgetPanel({
               className={styles.ghostBtn}
               disabled={pending}
               onClick={() =>
-                void save(usage.budgetStatus === "paused" ? "active" : "paused")
+                void save(paused ? "active" : "paused")
               }
             >
-              {usage.budgetStatus === "paused" ? "Resume spend" : "Pause spend"}
+              {paused ? "Resume spend" : "Pause spend"}
             </button>
           </div>
         </div>

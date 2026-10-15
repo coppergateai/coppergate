@@ -21,7 +21,11 @@ import {
   FakeGitlabDelivery,
   HttpGitlabDelivery,
 } from "@coppergate/gitlab";
-import type { ScmDeliveryClient } from "@coppergate/scm";
+import {
+  createScmDeliveryClient,
+  type ScmDeliveryClient,
+  type ScmProviderId,
+} from "@coppergate/scm";
 
 export type DeliveryMode = "fake" | "http";
 
@@ -203,11 +207,19 @@ export async function resolveGithubDelivery(
   };
 }
 
-/** Prefer FakeGitlabDelivery when workspace is GitLab but mode is fake. */
+/** Prefer provider-native fake when mode is fake (TASK117/118). */
 export function fakeClientForProvider(
-  provider: "github" | "gitlab",
+  provider: ScmProviderId,
 ): ScmDeliveryClient {
-  return provider === "gitlab"
-    ? new FakeGitlabDelivery()
-    : new FakeGithubDelivery();
+  if (provider === "gitlab") return new FakeGitlabDelivery();
+  if (provider === "bitbucket") {
+    return createScmDeliveryClient({ provider: "bitbucket", mode: "fake" });
+  }
+  if (provider === "azure_devops") {
+    return createScmDeliveryClient({
+      provider: "azure_devops",
+      mode: "fake",
+    });
+  }
+  return new FakeGithubDelivery();
 }

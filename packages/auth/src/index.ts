@@ -19,3 +19,12 @@ export {
   requireSessionUser,
   resolveSessionUser,
 } from "./session.js";
+export {
+  oidcAuthorizeUrl,
+  scimProvisionUserStub,
+  validateSsoIdpConfig,
+  type ScimProvisionResult,
+  type ScimUserPayload,
+  type SsoIdpConfig,
+  type SsoProtocol,
+} from "./sso.js";

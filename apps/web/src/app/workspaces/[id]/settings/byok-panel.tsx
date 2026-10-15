@@ -57,7 +57,7 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
       <h2 id="byok-heading" className={styles.sectionLabel}>
         LLM BYOK
       </h2>
-      <p className={styles.note}>
+      <p className={styles.sectionLede}>
         Bring your own OpenAI-compatible API key. Keys are sealed at rest and
         never returned in plaintext.
       </p>
@@ -71,26 +71,38 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
       ) : (
         <p className={styles.note}>No BYOK key configured — worker uses platform FakeAgent / LLM_API_KEY.</p>
       )}
+      <div className={styles.panel}>
+      <div className={styles.fieldGrid}>
+        <label className={styles.field}>
+          API key
+          <input
+            className={styles.input}
+            type="password"
+            placeholder="sk-…"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+          />
+        </label>
+        <label className={styles.field}>
+          Base URL
+          <input
+            className={styles.input}
+            placeholder="Optional"
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+          />
+        </label>
+        <label className={styles.field}>
+          Model
+          <input
+            className={styles.input}
+            placeholder="Optional"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          />
+        </label>
+      </div>
       <div className={styles.btnRow}>
-        <input
-          className={styles.input}
-          type="password"
-          placeholder="API key"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-        />
-        <input
-          className={styles.input}
-          placeholder="Base URL (optional)"
-          value={baseUrl}
-          onChange={(e) => setBaseUrl(e.target.value)}
-        />
-        <input
-          className={styles.input}
-          placeholder="Model (optional)"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-        />
         <button
           type="button"
           className={styles.primaryBtn}
@@ -145,6 +157,7 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
             Revoke
           </button>
         ) : null}
+      </div>
       </div>
     </section>
   );

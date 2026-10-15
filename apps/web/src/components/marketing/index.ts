@@ -8,4 +8,5 @@ export { MarketingFooter } from "./marketing-footer";
 export { MarketingHeader } from "./marketing-header";
 export { ProductPreview } from "./product-preview";
 export { SecuritySection } from "./security-section";
+export { SignalAdaptersSection } from "./signal-adapters-section";
 export { SurvivorWorkflow } from "./survivor-workflow";

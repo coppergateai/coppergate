@@ -5,7 +5,7 @@ import { SiteChrome } from "../../site-chrome";
 export const metadata = {
   title: "Supported stack · Coppergate Docs",
   description:
-    "Current GitHub fitness wedge for the Coppergate Survivor arena — template, auth, delivery.",
+    "SCM delivery, Signal Adapters, and fitness evidence for the Coppergate Survivor arena.",
 };
 
 export default function SupportedStackPage() {
@@ -19,9 +19,9 @@ export default function SupportedStackPage() {
         <h1 className={styles.pageTitle}>Supported stack</h1>
         <div className={styles.prose}>
           <p>
-            First arena surface: GitHub-native fitness (branch/PR + checks).
-            Tournament concurrency lands later; the wedge proves evidence,
-            spend, and kill-switch.
+            Arena surface: SCM PR/MR delivery plus production Signal Adapters
+            that arm bounded tournaments. Spend caps and kill-switch stay
+            first-class.
           </p>
           <ul>
             <li>
@@ -29,28 +29,41 @@ export default function SupportedStackPage() {
               <a href="https://github.com/coppergateai/coppergate-examples">
                 coppergate-examples
               </a>
-              )
+              ) for new-product projects
             </li>
             <li>
-              <strong>Auth:</strong> GitHub OAuth (user) + GitHub App (selected
-              repos)
+              <strong>Existing repos:</strong> stack detected on bind (root
+              markers + Languages API). Labels include <code>nextjs_ts</code>,{" "}
+              <code>node</code>, <code>go</code>, <code>rust</code>,{" "}
+              <code>python</code>, and <code>unknown</code>. Use{" "}
+              <em>Re-detect stacks</em> on the projects page to backfill.
             </li>
             <li>
-              <strong>Agent:</strong> FakeCodingAgent by default; optional
-              OpenAI-compatible provider via <code>LLM_*</code> env
+              <strong>Auth:</strong> GitHub or GitLab OAuth (user) + GitHub App /
+              GitLab project connect
             </li>
             <li>
-              <strong>Delivery:</strong> branch + PR only (never default
-              branch). Staging uses <code>GITHUB_DELIVERY_MODE=http</code>
+              <strong>Delivery:</strong> branch + PR/MR only (never default
+              branch). GitHub, GitLab, Bitbucket, and Azure DevOps clients
             </li>
             <li>
-              <strong>Fitness:</strong> validation artifacts + GitHub check
-              evidence; critic / elimination scoring is the arena roadmap
+              <strong>Signals:</strong> Sonar, Jira/Linear/Azure Boards, Sentry/
+              PagerDuty, CI reverse (GitHub Actions, CircleCI, …) — see{" "}
+              <code>docs/SIGNALS.md</code>
+            </li>
+            <li>
+              <strong>Fitness:</strong> CI checks, Sonar gate, coverage, e2e,
+              perf, visual regress, preview smoke + critic scoring
+            </li>
+            <li>
+              <strong>Agent:</strong> FakeCodingAgent by default; OpenAI-
+              compatible + ContenderHarness BYO stubs
             </li>
           </ul>
           <p>
-            Existing repositories are best-effort with compatibility checks —
-            prefer the template for first PR.
+            Prefer the <code>nextjs_ts</code> template for first PR. Other
+            detected stacks bind freely; the coding agent remains best-effort
+            outside <code>nextjs_ts</code>.
           </p>
         </div>
       </main>

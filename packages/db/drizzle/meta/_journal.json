@@ -148,6 +148,20 @@
       "when": 1728568400000,
       "tag": "0020_scm",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1728568500000,
+      "tag": "0021_signals",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1728568600000,
+      "tag": "0022_agent_profiles",
+      "breakpoints": true
     }
   ]
 }

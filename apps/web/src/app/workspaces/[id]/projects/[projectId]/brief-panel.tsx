@@ -185,12 +185,16 @@ export function BriefPanel({
   }
 
   return (
-    <section className={styles.section} aria-labelledby="brief-heading">
+    <section
+      id="brief"
+      className={styles.section}
+      aria-labelledby="brief-heading"
+    >
       <h2 id="brief-heading" className={styles.sectionLabel}>
         Product brief
       </h2>
       <p className={styles.sectionLede}>
-        Approve a brief before tasks can start (FR-02).
+        Approve a brief before tasks can start.
         {brief ? (
           <>
             {" "}

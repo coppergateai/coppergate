@@ -25,13 +25,16 @@ export function MergePanel({
   const [pending, setPending] = useState(false);
 
   return (
-    <section className={styles.section} aria-labelledby="merge-heading">
+    <section
+      id="merge"
+      className={styles.section}
+      aria-labelledby="merge-heading"
+    >
       <h2 id="merge-heading" className={styles.sectionLabel}>
         L2 merge (opt-in)
       </h2>
       <p className={styles.sectionLede}>
-        When enabled and project autonomy is L2, accepting a review attempts to
-        merge the PR. Default off — survivors still stop at human accept.
+        At autonomy L2, accepting a review can merge the PR. Default off.
         Current autonomy: {autonomyLevel}.
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}

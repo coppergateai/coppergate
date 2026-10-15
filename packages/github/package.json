@@ -17,6 +17,7 @@
     "prepare": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@coppergate/scm": "workspace:*",
     "jose": "^6.0.11"
   },
   "devDependencies": {

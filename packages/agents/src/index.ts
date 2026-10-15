@@ -31,3 +31,19 @@ export {
   strategySpendFraction,
   type ContenderStrategy,
 } from "./strategy.js";
+export {
+  CursorCloudHarnessStub,
+  NativeFakeHarness,
+  NativeOpenAiHarness,
+  OpenHandsHarnessStub,
+  createContenderHarness,
+  harnessAsCodingAgent,
+  type ContenderHarness,
+  type ContenderHarnessKind,
+  type CreateHarnessOptions,
+} from "./harness.js";
+export {
+  HARNESS_CAPABILITY_MATRIX,
+  harnessCapability,
+  type HarnessCapability,
+} from "./capability-matrix.js";

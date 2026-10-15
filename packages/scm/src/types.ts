@@ -1,5 +1,5 @@
-/** SCM provider discriminator (D12). */
-export type ScmProviderId = "github" | "gitlab";
+/** SCM provider discriminator (D12 + TASK117/118). */
+export type ScmProviderId = "github" | "gitlab" | "bitbucket" | "azure_devops";
 
 export type ScmRepoRef = {
   owner: string;
@@ -7,6 +7,11 @@ export type ScmRepoRef = {
   defaultBranch: string;
   /** Optional provider-native project path (GitLab path_with_namespace). */
   fullPath?: string;
+  /**
+   * TASK119 — GitHub Enterprise Server / self-hosted API host override.
+   * e.g. https://github.example.com/api/v3
+   */
+  apiBaseUrl?: string;
 };
 
 export type ScmFileChange = {

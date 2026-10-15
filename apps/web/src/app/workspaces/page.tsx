@@ -93,6 +93,10 @@ export default async function WorkspacesPage() {
                     detail: inviteRequired
                       ? "Public beta is invite-only. Use the code from your welcome email."
                       : "Name your workspace — you’ll connect GitHub next.",
+                    href: "#create-workspace",
+                    ctaLabel: inviteRequired
+                      ? "Enter invite above"
+                      : "Create workspace above",
                     done: false,
                   },
                   {

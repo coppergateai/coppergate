@@ -29,6 +29,7 @@ describe("rules critic (pure)", () => {
       hasPr: true,
       hasDiffEvidence: true,
       blockingFailure: false,
+      sonarPassed: true,
     });
     const bad = scoreWithRulesCritic({
       ciPassed: false,
@@ -36,10 +37,15 @@ describe("rules critic (pure)", () => {
       hasPr: false,
       hasDiffEvidence: false,
       blockingFailure: true,
+      sonarPassed: false,
     });
     assert.ok(good.score > bad.score);
     assert.ok(good.score <= 1);
     assert.ok(bad.score >= 0);
+    assert.ok(good.breakdown.sonar >= 0);
+    assert.equal(bad.breakdown.sonar, 0);
+    assert.ok("coverage" in good.breakdown);
+    assert.ok("e2e" in good.breakdown);
   });
 });
 

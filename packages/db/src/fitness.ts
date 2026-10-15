@@ -27,6 +27,12 @@ export type CriticSignals = {
   hasPr: boolean;
   hasDiffEvidence: boolean;
   blockingFailure: boolean;
+  /** Sonar / quality-gate fitness (TASK069). null = unknown. */
+  sonarPassed?: boolean | null;
+  /** Coverage delta (TASK074). */
+  coveragePassed?: boolean | null;
+  /** E2E suite (TASK095). */
+  e2ePassed?: boolean | null;
 };
 
 export type CriticScore = {
@@ -36,17 +42,23 @@ export type CriticScore = {
     validation: number;
     delivery: number;
     criticPenalty: number;
+    sonar: number;
+    coverage: number;
+    e2e: number;
   };
   reasons: string[];
 };
 
-/** Rules-based critic (TASK050). LLM critic can wrap the same score shape later. */
+/** Rules-based critic (TASK050 + quality/e2e fitness gates). */
 export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   const reasons: string[] = [];
   let ci = 0;
   let validation = 0;
   let delivery = 0;
   let criticPenalty = 0;
+  let sonar = 0;
+  let coverage = 0;
+  let e2e = 0;
 
   if (signals.blockingFailure) {
     criticPenalty -= 0.5;
@@ -54,44 +66,86 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   }
 
   if (signals.ciPassed === true) {
-    ci = 0.45;
+    ci = 0.3;
     reasons.push("ci_passed");
   } else if (signals.ciPassed === false) {
     ci = 0;
     reasons.push("ci_failed");
   } else {
-    ci = 0.1;
+    ci = 0.08;
     reasons.push("ci_unknown");
   }
 
   if (signals.validationPassed === true) {
-    validation = 0.3;
+    validation = 0.18;
     reasons.push("validation_passed");
   } else if (signals.validationPassed === false) {
     validation = 0;
     reasons.push("validation_failed");
   } else {
-    validation = 0.05;
+    validation = 0.04;
     reasons.push("validation_unknown");
   }
 
+  if (signals.sonarPassed === true) {
+    sonar = 0.1;
+    reasons.push("sonar_passed");
+  } else if (signals.sonarPassed === false) {
+    sonar = 0;
+    reasons.push("sonar_failed");
+  } else {
+    sonar = 0.03;
+    reasons.push("sonar_unknown");
+  }
+
+  if (signals.coveragePassed === true) {
+    coverage = 0.08;
+    reasons.push("coverage_passed");
+  } else if (signals.coveragePassed === false) {
+    coverage = 0;
+    reasons.push("coverage_failed");
+  } else {
+    coverage = 0.02;
+    reasons.push("coverage_unknown");
+  }
+
+  if (signals.e2ePassed === true) {
+    e2e = 0.12;
+    reasons.push("e2e_passed");
+  } else if (signals.e2ePassed === false) {
+    e2e = 0;
+    reasons.push("e2e_failed");
+  } else {
+    e2e = 0.03;
+    reasons.push("e2e_unknown");
+  }
+
   if (signals.hasPr) {
-    delivery += 0.15;
+    delivery += 0.12;
     reasons.push("has_pr");
   }
   if (signals.hasDiffEvidence) {
-    delivery += 0.1;
+    delivery += 0.08;
     reasons.push("has_diff");
   } else {
-    criticPenalty -= 0.15;
+    criticPenalty -= 0.12;
     reasons.push("missing_diff");
   }
 
-  const raw = ci + validation + delivery + criticPenalty;
+  const raw =
+    ci + validation + delivery + criticPenalty + sonar + coverage + e2e;
   const score = Math.min(1, Math.max(0, raw));
   return {
     score,
-    breakdown: { ci, validation, delivery, criticPenalty },
+    breakdown: {
+      ci,
+      validation,
+      delivery,
+      criticPenalty,
+      sonar,
+      coverage,
+      e2e,
+    },
     reasons,
   };
 }
@@ -105,6 +159,9 @@ export async function collectCriticSignals(
 
   let ciPassed: boolean | null = null;
   let validationPassed: boolean | null = null;
+  let sonarPassed: boolean | null = null;
+  let coveragePassed: boolean | null = null;
+  let e2ePassed: boolean | null = null;
   let hasDiffEvidence = false;
   let blockingFailure = false;
 
@@ -122,10 +179,42 @@ export async function collectCriticSignals(
           if (typeof body.passed === "boolean") {
             validationPassed = body.passed;
             if (body.source === "github_check") ciPassed = body.passed;
+            if (body.source === "sonar_quality_gate") {
+              sonarPassed = body.passed;
+              if (body.passed === false) blockingFailure = true;
+            }
+            if (body.source === "coverage_delta") {
+              coveragePassed = body.passed;
+              if (body.passed === false) blockingFailure = true;
+            }
+            if (body.source === "e2e") {
+              e2ePassed = body.passed;
+              if (body.passed === false) blockingFailure = true;
+            }
             if (body.blocksAccept && body.passed === false) {
               blockingFailure = true;
             }
           }
+        }
+        if (meta.validator === "sonar-quality-gate-v1" && typeof meta.passed === "boolean") {
+          sonarPassed = meta.passed;
+          if (!meta.passed) blockingFailure = true;
+        }
+        if (
+          typeof meta.validator === "string" &&
+          meta.validator.includes("coverage") &&
+          typeof meta.passed === "boolean"
+        ) {
+          coveragePassed = meta.passed;
+          if (!meta.passed) blockingFailure = true;
+        }
+        if (
+          typeof meta.validator === "string" &&
+          meta.validator.startsWith("e2e-") &&
+          typeof meta.passed === "boolean"
+        ) {
+          e2ePassed = meta.passed;
+          if (!meta.passed) blockingFailure = true;
         }
       } catch {
         /* ignore malformed meta */
@@ -156,6 +245,9 @@ export async function collectCriticSignals(
     hasPr: Boolean(run.prUrl || run.prNumber),
     hasDiffEvidence,
     blockingFailure,
+    sonarPassed,
+    coveragePassed,
+    e2ePassed,
   };
 }
 

@@ -247,6 +247,57 @@
   background: var(--surface);
 }
 
+.userRowLink {
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.userRowLink:hover {
+  border-color: rgba(200, 137, 73, 0.4);
+  background: rgba(200, 137, 73, 0.06);
+}
+
+.userRowActive {
+  border-color: rgba(200, 137, 73, 0.45);
+  background: rgba(200, 137, 73, 0.1);
+}
+
+.profileHint {
+  flex-shrink: 0;
+  color: var(--mute-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.userRowLink:hover .profileHint,
+.userRowActive .profileHint {
+  color: var(--copper-hot);
+}
+
+.logoutLinkFooter {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mute);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.logoutLinkFooter:hover {
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .userAvatar,
 .userAvatarFallback {
   width: 1.75rem;

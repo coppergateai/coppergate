@@ -2050,3 +2050,170 @@
   width: auto;
   padding: 0 1.25rem;
 }
+
+/* —— Signal → Arena / Popular integrations (marquee) —— */
+.signals {
+  background:
+    radial-gradient(
+      55% 40% at 12% 20%,
+      rgba(200, 137, 73, 0.08) 0%,
+      transparent 60%
+    ),
+    linear-gradient(180deg, transparent, rgba(16, 17, 20, 0.55), transparent);
+  overflow: hidden;
+}
+
+.signals > .sectionInner {
+  margin-bottom: clamp(1.5rem, 3.5vw, 2.25rem);
+}
+
+.integrationRows {
+  display: grid;
+  gap: 1rem;
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+}
+
+.integrationRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+  min-width: 0;
+  align-items: center;
+}
+
+.integrationCat {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.integrationTrack {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 3%,
+    #000 92%,
+    transparent 100%
+  );
+}
+
+.integrationPills {
+  list-style: none;
+  margin: 0;
+  padding: 0.2rem 0;
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
+  gap: 0.55rem;
+  animation-name: cg-marquee;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.integrationTrackReverse .integrationPills {
+  animation-name: cg-marquee-reverse;
+}
+
+.integrationTrack:hover .integrationPills {
+  animation-play-state: paused;
+}
+
+.integrationPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem 0.5rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  flex-shrink: 0;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.integrationPill:hover {
+  border-color: rgba(200, 137, 73, 0.45);
+  background: var(--surface-elevated);
+}
+
+.integrationLogo {
+  display: grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.integrationLogo svg {
+  display: block;
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.integrationName {
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--fg, #f2f2f0);
+  white-space: nowrap;
+}
+
+.integrationKind {
+  font-size: 0.72rem;
+  color: var(--mute);
+  white-space: nowrap;
+}
+
+@keyframes cg-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes cg-marquee-reverse {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 860px) {
+  .integrationRow {
+    grid-template-columns: 10.5rem minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .integrationCat {
+    text-align: right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .integrationPills {
+    animation: none !important;
+    flex-wrap: wrap;
+    width: auto;
+    padding-right: max(var(--gutter), env(safe-area-inset-right));
+  }
+
+  .integrationTrack {
+    overflow: visible;
+    mask-image: none;
+  }
+}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
   getInstallationForWorkspace,
@@ -10,6 +11,8 @@ import { currentUser } from "@/lib/auth";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
 import { CreateProjectForm } from "./create-project-form";
+import { RedetectStacksButton } from "./redetect-stacks-button";
+import { UnboundReposPanel } from "./unbound-repos-panel";
 import styles from "./projects.module.css";
 
 type PageProps = { params: Promise<{ id: string }> };
@@ -44,9 +47,22 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
     connections.length > 0;
   const empty = projects.length === 0;
   const canCreate = access.role === "owner" && unbound.length > 0;
+  const canManage = access.role === "owner";
 
   const ready = projects.filter(({ project }) => project.currentBriefId);
   const setup = projects.filter(({ project }) => !project.currentBriefId);
+
+  const unboundPanel = (
+    <UnboundReposPanel
+      workspaceId={id}
+      canManage={canManage}
+      repositories={unbound.map((r) => ({
+        id: r.id,
+        fullName: r.baseRepoFullName,
+        defaultBranch: r.defaultBranch,
+      }))}
+    />
+  );
 
   function projectRows(
     items: typeof projects,
@@ -99,21 +115,26 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
           </div>
         </div>
         <div id="create-project" className={styles.pageBarCreate}>
+          {canManage && projects.length > 0 ? (
+            <RedetectStacksButton workspaceId={id} />
+          ) : null}
           {canCreate ? (
-            <CreateProjectForm
-              workspaceId={id}
-              repositories={unbound.map((r) => ({
-                id: r.id,
-                fullName: r.baseRepoFullName,
-              }))}
-              compact
-            />
-          ) : access.role === "owner" ? (
+            <Suspense fallback={null}>
+              <CreateProjectForm
+                workspaceId={id}
+                repositories={unbound.map((r) => ({
+                  id: r.id,
+                  fullName: r.baseRepoFullName,
+                }))}
+                compact
+              />
+            </Suspense>
+          ) : access.role === "owner" && unbound.length === 0 && projects.length === 0 ? (
             <Link
-              href={`/workspaces/${id}/settings`}
+              href={`/workspaces/${id}/settings?tab=connections`}
               className={styles.toolbarPrimary}
             >
-              Connect repo in settings
+              Connect repo
             </Link>
           ) : null}
         </div>
@@ -121,118 +142,141 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
 
       {empty ? (
         <div className={styles.bodyPad}>
-          {!canCreate && access.role === "owner" ? (
-            <p className={styles.muted}>
-              Connect an unbound repository in{" "}
-              <Link
-                href={`/workspaces/${id}/settings`}
-                className={styles.inlineLink}
-              >
-                settings
-              </Link>{" "}
-              first.
-            </p>
-          ) : null}
-          <div className={styles.path}>
-            <OnboardingGuide
-              compact
-              title="Project setup"
-              steps={[
-                {
-                  id: "github",
-                  title: "Connect GitHub App + select a repo",
-                  detail:
-                    "Settings → Install → Connect an unbound repository.",
-                  href: `/workspaces/${id}/settings`,
-                  done: githubReady,
-                },
-                {
-                  id: "project",
-                  title: "Create your first project",
-                  detail: "Bind the repo above. Supported stack: nextjs_ts.",
-                  done: false,
-                },
-                {
-                  id: "budget",
-                  title: "Set a spend cap",
-                  detail:
-                    "Open the project and raise the budget before queueing work.",
-                  done: false,
-                },
-                {
-                  id: "brief",
-                  title: "Approve brief → plan → task",
-                  detail:
-                    "Keep the first task tiny so the first PR lands in one session.",
-                  done: false,
-                },
-              ]}
-            />
-          </div>
+          {unbound.length === 0 && access.role === "owner" ? (
+            <div className={styles.wizardShell}>
+              <div className={styles.wizardIntro}>
+                <p className={styles.wizardEyebrow}>Empty workspace</p>
+                <h2 className={styles.wizardHeading}>
+                  Ship your first arena in four steps.
+                </h2>
+                <p className={styles.wizardLede}>
+                  Connect a repo, bind a project, set a spend cap, then approve
+                  a tiny brief. Coppergate handles the contest from there.
+                </p>
+              </div>
+              <OnboardingGuide
+                compact
+                title="Project setup"
+                steps={[
+                  {
+                    id: "github",
+                    title: "Connect GitHub App + select a repo",
+                    detail:
+                      "Install the Coppergate GitHub App on an org or personal account, then connect at least one repository to this workspace.",
+                    href: `/workspaces/${id}/settings?tab=connections`,
+                    ctaLabel: "Connect GitHub",
+                    done: githubReady,
+                  },
+                  {
+                    id: "project",
+                    title: "Bind a repository into a project",
+                    detail:
+                      "After repos are connected, return here and bind one — stack is detected from the repository.",
+                    done: false,
+                  },
+                  {
+                    id: "budget",
+                    title: "Set a spend cap",
+                    detail:
+                      "Open the project budget panel and raise a hard stop before queueing agent work.",
+                    done: false,
+                  },
+                  {
+                    id: "brief",
+                    title: "Approve brief → plan → task",
+                    detail:
+                      "Keep the first task tiny so the first PR lands in one session.",
+                    done: false,
+                  },
+                ]}
+              />
+            </div>
+          ) : (
+            <div className={styles.wizardShell}>
+              <div className={styles.wizardIntro}>
+                <p className={styles.wizardEyebrow}>Repos ready</p>
+                <h2 className={styles.wizardHeading}>
+                  Bind a repository to create your first project.
+                </h2>
+                <p className={styles.wizardLede}>
+                  Connected repos below are unbound. Bind one to unlock budget,
+                  brief, and the arena loop.
+                </p>
+              </div>
+              <OnboardingGuide
+                compact
+                title="Project setup"
+                steps={[
+                  {
+                    id: "github",
+                    title: "Connect GitHub App + select a repo",
+                    detail: "Repositories are connected to this workspace.",
+                    done: true,
+                  },
+                  {
+                    id: "project",
+                    title: "Bind a repository into a project",
+                    detail:
+                      "Use Bind all or pick a single repo in the panel below.",
+                    done: false,
+                  },
+                  {
+                    id: "budget",
+                    title: "Set a spend cap",
+                    detail:
+                      "Open the project and raise the budget before queueing work.",
+                    done: false,
+                  },
+                  {
+                    id: "brief",
+                    title: "Approve brief → plan → task",
+                    detail:
+                      "Keep the first task tiny so the first PR lands in one session.",
+                    done: false,
+                  },
+                ]}
+              />
+              {unboundPanel}
+            </div>
+          )}
         </div>
       ) : (
-        <div className={styles.body}>
-          <div className={styles.colHead} aria-hidden>
-            <span className={styles.colStatus} />
-            <span>Stack</span>
-            <span>Name</span>
-            <span>Repository</span>
-            <span>Mode</span>
-            <span>State</span>
-            <span className={styles.colDate}>Updated</span>
+        <>
+          <div className={styles.body}>
+            <div className={styles.colHead} aria-hidden>
+              <span className={styles.colStatus} />
+              <span>Stack</span>
+              <span>Name</span>
+              <span>Repository</span>
+              <span>Mode</span>
+              <span>State</span>
+              <span className={styles.colDate}>Updated</span>
+            </div>
+
+            {ready.length > 0 ? (
+              <section aria-labelledby="ready-heading">
+                <h2 id="ready-heading" className={styles.groupLabel}>
+                  Ready
+                  <span className={styles.groupCount}>{ready.length}</span>
+                </h2>
+                {projectRows(ready, styles.statusActive ?? "")}
+              </section>
+            ) : null}
+
+            {setup.length > 0 ? (
+              <section aria-labelledby="setup-heading">
+                <h2 id="setup-heading" className={styles.groupLabel}>
+                  Setup
+                  <span className={styles.groupCount}>{setup.length}</span>
+                </h2>
+                {projectRows(setup, styles.statusIdle ?? "")}
+              </section>
+            ) : null}
           </div>
-
-          {ready.length > 0 ? (
-            <section aria-labelledby="ready-heading">
-              <h2 id="ready-heading" className={styles.groupLabel}>
-                Ready
-                <span className={styles.groupCount}>{ready.length}</span>
-              </h2>
-              {projectRows(ready, styles.statusActive ?? "")}
-            </section>
-          ) : null}
-
-          {setup.length > 0 ? (
-            <section aria-labelledby="setup-heading">
-              <h2 id="setup-heading" className={styles.groupLabel}>
-                Setup
-                <span className={styles.groupCount}>{setup.length}</span>
-              </h2>
-              {projectRows(setup, styles.statusIdle ?? "")}
-            </section>
-          ) : null}
-
           {unbound.length > 0 ? (
-            <section aria-labelledby="unbound-heading">
-              <h2 id="unbound-heading" className={styles.groupLabel}>
-                Unbound repositories
-                <span className={styles.groupCount}>{unbound.length}</span>
-              </h2>
-              <ul className={styles.list}>
-                {unbound.map((r) => (
-                  <li key={r.id} className={styles.row}>
-                    <div className={styles.rowStatic}>
-                      <span
-                        className={`${styles.statusRing} ${styles.statusIdle ?? ""}`}
-                        aria-hidden
-                      />
-                      <span className={styles.rowId}>repo</span>
-                      <span className={styles.rowTitle}>
-                        {r.baseRepoFullName}
-                      </span>
-                      <span className={styles.rowMeta}>Available to bind</span>
-                      <span className={styles.rowMode}>—</span>
-                      <span className={styles.rowPillMuted}>Unbound</span>
-                      <a href="#create-project" className={styles.rowBind}>
-                        Bind
-                      </a>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <div className={styles.unboundWrap}>{unboundPanel}</div>
           ) : null}
-        </div>
+        </>
       )}
     </main>
   );

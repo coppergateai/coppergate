@@ -52,27 +52,29 @@ export function WorkspaceSettingsForm({
           .finally(() => setPending(false));
       }}
     >
-      <label className={styles.field}>
-        Name
-        <input
-          required
-          className={styles.input}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </label>
-      <label className={styles.field}>
-        Autonomy default
-        <select
-          className={styles.select}
-          value={autonomyDefault}
-          onChange={(e) => setAutonomyDefault(e.target.value)}
-        >
-          <option value="L0">L0 — approve everything</option>
-          <option value="L1">L1 — approve high-risk</option>
-          <option value="L2">L2 — autonomous within budget</option>
-        </select>
-      </label>
+      <div className={styles.fieldGridTwo}>
+        <label className={styles.field}>
+          Name
+          <input
+            required
+            className={styles.input}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <label className={styles.field}>
+          Autonomy default
+          <select
+            className={styles.select}
+            value={autonomyDefault}
+            onChange={(e) => setAutonomyDefault(e.target.value)}
+          >
+            <option value="L0">L0 — approve everything</option>
+            <option value="L1">L1 — approve high-risk</option>
+            <option value="L2">L2 — autonomous within budget</option>
+          </select>
+        </label>
+      </div>
       {error ? <p className={styles.error}>{error}</p> : null}
       {saved ? <p className={styles.ok}>Saved.</p> : null}
       <button type="submit" className={styles.submit} disabled={pending}>

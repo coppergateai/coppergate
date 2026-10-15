@@ -12,6 +12,16 @@ export const metadata: Metadata = {
 
 const entries = [
   {
+    date: "2026-10-15",
+    title: "Signal → Arena production adapters",
+    items: [
+      "Inbound adapters: Sonar, Jira/Linear, Sentry/PagerDuty, CI reverse path, and more",
+      "Fitness expansion: coverage, e2e, perf, visual regress, preview smoke",
+      "Notify: Slack / Teams / Discord; bounded role spawn (fixer, security, …)",
+      "SCM delivery paths for Bitbucket and Azure DevOps alongside GitHub/GitLab",
+    ],
+  },
+  {
     date: "2026-10-12",
     title: "The Arena Thesis — Selection over Supervision",
     items: [

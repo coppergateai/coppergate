@@ -83,14 +83,17 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
   }
 
   return (
-    <section className={styles.section} aria-labelledby="arena-heading">
+    <section
+      id="arena"
+      className={styles.section}
+      aria-labelledby="arena-heading"
+    >
       <h2 id="arena-heading" className={styles.sectionLabel}>
         Survivor arena
       </h2>
       <p className={styles.sectionLede}>
-        Selection pressure active — contenders compete; efficiency payoff
-        decides. Kill-switch freezes the arena. min_human skips per-task approve
-        (opt-in; default off).
+        Contenders compete; efficiency payoff decides. Kill-switch freezes the
+        arena.
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}

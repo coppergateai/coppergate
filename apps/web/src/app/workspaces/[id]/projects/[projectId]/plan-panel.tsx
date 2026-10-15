@@ -115,13 +115,13 @@ export function PlanPanel({
   }
 
   return (
-    <section className={styles.section} aria-labelledby="plan-heading">
+    <section id="plan" className={styles.section} aria-labelledby="plan-heading">
       <h2 id="plan-heading" className={styles.sectionLabel}>
         Delivery plan
       </h2>
       <p className={styles.sectionLede}>
-        Milestones and tasks from the approved brief (FR-03). Each task includes
-        scope, dependencies, estimate, and acceptance criteria.
+        Milestones and tasks from the approved brief — scope, estimates, and
+        acceptance criteria.
       </p>
 
       {isOwner ? (

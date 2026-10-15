@@ -55,13 +55,16 @@ const COLUMNS: { key: string; label: string; match: (s: string) => boolean }[] =
 
 export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
   return (
-    <section className={styles.section} aria-labelledby="board-heading">
+    <section
+      id="board"
+      className={styles.section}
+      aria-labelledby="board-heading"
+    >
       <h2 id="board-heading" className={styles.sectionLabel}>
         Delivery board
       </h2>
       <p className={styles.sectionLede}>
-        Tasks by workflow status. Open a task to watch fake-agent events and
-        cost.
+        Tasks by status. Open one to watch runs and cost.
       </p>
 
       {tasks.length === 0 ? (

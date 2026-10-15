@@ -13,13 +13,13 @@ const items = [
     Icon: IconArena,
   },
   {
-    title: "GitHub Native",
-    body: "Your repositories, workflows, and delivery process.",
+    title: "Signal → Arena",
+    body: "Jira, Sonar, Sentry, CI failures arm bounded contests.",
     Icon: IconGithubNative,
   },
   {
     title: "Evidence Driven",
-    body: "Tests, CI, critic evaluations, and fitness scores.",
+    body: "CI, Sonar, coverage, e2e, and critic fitness scores.",
     Icon: IconEvidence,
   },
   {

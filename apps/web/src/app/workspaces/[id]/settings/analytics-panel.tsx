@@ -53,27 +53,38 @@ export function AnalyticsPanel({ workspaceId, isOwner }: Props) {
       <h2 id="analytics-heading" className={styles.sectionLabel}>
         Cost analytics (30d)
       </h2>
+      <p className={styles.sectionLede}>
+        Spend and acceptance across arenas in this workspace.
+      </p>
       {error ? <p className={styles.error}>{error}</p> : null}
       {data ? (
-        <ul className={styles.readOnly} style={{ listStyle: "none", padding: 0 }}>
-          <li>
-            Total spend: <strong>{usd(data.totalSpendMicros)}</strong>
-          </li>
-          <li>
-            Median accepted PR:{" "}
-            <strong>{usd(data.medianAcceptedPrCostMicros)}</strong>
-          </li>
-          <li>
-            Accepted PRs: <strong>{data.acceptedPrCount}</strong>
-          </li>
-          <li>
-            Failed run spend: <strong>{usd(data.failedRunSpendMicros)}</strong> (
-            {data.failedRunCount} runs)
-          </li>
-          <li>
-            Runs: <strong>{data.runCount}</strong>
-          </li>
-        </ul>
+        <div className={styles.statGrid}>
+          <div className={styles.statCard}>
+            <p className={styles.statLabel}>Total spend</p>
+            <p className={styles.statValue}>{usd(data.totalSpendMicros)}</p>
+          </div>
+          <div className={styles.statCard}>
+            <p className={styles.statLabel}>Median accepted PR</p>
+            <p className={styles.statValue}>
+              {usd(data.medianAcceptedPrCostMicros)}
+            </p>
+          </div>
+          <div className={styles.statCard}>
+            <p className={styles.statLabel}>Accepted PRs</p>
+            <p className={styles.statValue}>{data.acceptedPrCount}</p>
+          </div>
+          <div className={styles.statCard}>
+            <p className={styles.statLabel}>Failed run spend</p>
+            <p className={styles.statValue}>
+              {usd(data.failedRunSpendMicros)}
+            </p>
+            <p className={styles.statHint}>{data.failedRunCount} failed runs</p>
+          </div>
+          <div className={styles.statCard}>
+            <p className={styles.statLabel}>Runs</p>
+            <p className={styles.statValue}>{data.runCount}</p>
+          </div>
+        </div>
       ) : (
         <p className={styles.note}>Loading…</p>
       )}

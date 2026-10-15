@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { projectNameFromRepo } from "./bind-repo";
 import styles from "./projects.module.css";
 
 type Props = {
@@ -16,13 +17,30 @@ export function CreateProjectForm({
   compact = false,
 }: Props) {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const searchParams = useSearchParams();
+  const bindId = searchParams.get("bind");
+  const preferred =
+    (bindId && repositories.find((r) => r.id === bindId)) || repositories[0];
+
+  const [name, setName] = useState(() =>
+    preferred ? projectNameFromRepo(preferred.fullName) : "",
+  );
   const [mode, setMode] = useState<"new_product" | "existing_repo">(
     "existing_repo",
   );
   const [repositoryConnectionId, setRepositoryConnectionId] = useState(
-    repositories[0]?.id ?? "",
+    preferred?.id ?? "",
   );
+
+  useEffect(() => {
+    if (!bindId) return;
+    const match = repositories.find((r) => r.id === bindId);
+    if (!match) return;
+    setRepositoryConnectionId(match.id);
+    setName((current) =>
+      current.trim() ? current : projectNameFromRepo(match.fullName),
+    );
+  }, [bindId, repositories]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -41,10 +59,17 @@ export function CreateProjectForm({
         })
           .then(async (res) => {
             const body = (await res.json()) as {
+              project?: { id: string };
               error?: { message: string };
             };
             if (!res.ok) {
               throw new Error(body.error?.message ?? "Create failed");
+            }
+            const projectId = body.project?.id;
+            if (projectId) {
+              router.push(`/workspaces/${workspaceId}/projects/${projectId}`);
+              router.refresh();
+              return;
             }
             router.refresh();
             setName("");
@@ -139,8 +164,8 @@ export function CreateProjectForm({
             </select>
           </label>
           <p className={styles.hint}>
-            Stack is fixed to <code>nextjs_ts</code> for MVP. Each repo can bind
-            to only one project.
+            Stack is detected from the repository on bind. Each repo can bind to
+            only one project.
           </p>
           {error ? <p className={styles.error}>{error}</p> : null}
           <button
