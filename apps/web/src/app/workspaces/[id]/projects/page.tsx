@@ -188,7 +188,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                 Ready
                 <span className={styles.groupCount}>{ready.length}</span>
               </h2>
-              {projectRows(ready, styles.statusActive)}
+              {projectRows(ready, styles.statusActive ?? "")}
             </section>
           ) : null}
 
@@ -198,7 +198,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                 Setup
                 <span className={styles.groupCount}>{setup.length}</span>
               </h2>
-              {projectRows(setup, styles.statusIdle)}
+              {projectRows(setup, styles.statusIdle ?? "")}
             </section>
           ) : null}
 
