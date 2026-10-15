@@ -21,22 +21,34 @@ export const schemaMeta = pgTable("schema_meta", {
     .defaultNow(),
 });
 
-/** GitHub-authenticated users — TASK003. */
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey(),
-  githubUserId: text("github_user_id").notNull().unique(),
-  login: text("login").notNull(),
-  email: text("email"),
-  name: text("name"),
-  avatarUrl: text("avatar_url"),
-  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+/** SCM-authenticated users — TASK003 / D12 (GitHub + GitLab). */
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey(),
+    /** github | gitlab */
+    authProvider: text("auth_provider").notNull().default("github"),
+    /** Provider-stable user id (GitHub user id or GitLab user id). */
+    githubUserId: text("github_user_id").notNull(),
+    login: text("login").notNull(),
+    email: text("email"),
+    name: text("name"),
+    avatarUrl: text("avatar_url"),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("users_auth_provider_external_uidx").on(
+      t.authProvider,
+      t.githubUserId,
+    ),
+  ],
+);
 
 /** Server-side sessions — opaque token hash in cookie. */
 export const sessions = pgTable(
@@ -107,13 +119,20 @@ export const memberships = pgTable(
   ],
 );
 
-/** GitHub App installation bound to a workspace — TASK005. */
+/**
+ * SCM installation bound to a workspace — TASK005 / D12.
+ * Table name remains github_installations for migration continuity;
+ * `provider` discriminates github | gitlab.
+ */
 export const githubInstallations = pgTable("github_installations", {
   id: uuid("id").primaryKey(),
   workspaceId: uuid("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" })
     .unique(),
+  /** github | gitlab */
+  provider: text("provider").notNull().default("github"),
+  /** GitHub installation id or GitLab project/group binding id. */
   githubInstallationId: text("github_installation_id").notNull().unique(),
   accountLogin: text("account_login").notNull(),
   accountType: text("account_type"),
@@ -705,6 +724,9 @@ export const repositoryConnections = pgTable(
     installationId: uuid("installation_id")
       .notNull()
       .references(() => githubInstallations.id, { onDelete: "cascade" }),
+    /** github | gitlab */
+    provider: text("provider").notNull().default("github"),
+    /** GitHub repo id or GitLab project id. */
     githubRepoId: text("github_repo_id").notNull(),
     owner: text("owner").notNull(),
     name: text("name").notNull(),
@@ -770,6 +792,8 @@ export const githubWebhookDeliveries = pgTable(
   "github_webhook_deliveries",
   {
     id: uuid("id").primaryKey(),
+    /** github | gitlab */
+    provider: text("provider").notNull().default("github"),
     deliveryId: text("delivery_id").notNull().unique(),
     event: text("event").notNull(),
     action: text("action"),
@@ -858,6 +882,10 @@ export type Session = typeof sessions.$inferSelect;
 export type Workspace = typeof workspaces.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
 export type GithubInstallation = typeof githubInstallations.$inferSelect;
+/** Alias — installations are provider-agnostic (D12). */
+export type ScmInstallation = GithubInstallation;
+export type ScmProvider = "github" | "gitlab";
+export type AuthProvider = ScmProvider;
 export type RepositoryConnection = typeof repositoryConnections.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type ProductBrief = typeof productBriefs.$inferSelect;

@@ -67,6 +67,18 @@ pnpm --filter @coppergate/worker dev
 
 Public `/` is the early-access landing (Phase 0). Signups go to `waitlist_signups` via `POST /api/waitlist`.
 
+## Self-host (community / MIT)
+
+Run web + worker + Postgres on your own domain (e.g. `https://coppergate.trendyol.com`) with GitHub and/or GitLab:
+
+```bash
+cp .env.selfhost.example .env.selfhost
+docker compose -f docker-compose.selfhost.yml --env-file .env.selfhost up -d --build
+```
+
+Full guide (DNS, GitHub App + GitLab OAuth URLs, limitations): [`docs/SELF_HOST.md`](./docs/SELF_HOST.md).  
+License: MIT. Hosted SaaS remains the commercial offering — see architecture [`DECISIONS.md`](https://github.com/coppergateai/coppergate-architecture/blob/main/docs/DECISIONS.md) (D4 / D9 / D12).
+
 ## Deploy (Vercel)
 
 1. Import [`coppergateai/coppergate`](https://github.com/coppergateai/coppergate).

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   getInstallationForWorkspace,
@@ -9,11 +8,11 @@ import {
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { SiteChrome } from "../../../site-chrome";
 import { AnalyticsPanel } from "./analytics-panel";
 import { ByokPanel } from "./byok-panel";
 import { DangerZone } from "./danger-zone";
 import { GithubPanel } from "./github-panel";
+import { GitlabPanel } from "./gitlab-panel";
 import { NotifyPanel } from "./notify-panel";
 import {
   ProjectsBudgetPanel,
@@ -45,7 +44,13 @@ export default async function WorkspaceSettingsPage({
   const { workspace, role } = access;
   const query = await searchParams;
   const githubFlag = typeof query.github === "string" ? query.github : undefined;
-  const initialQuery = githubFlag ? `github=${githubFlag}` : undefined;
+  const gitlabFlag = typeof query.gitlab === "string" ? query.gitlab : undefined;
+  const initialQuery = [
+    githubFlag ? `github=${githubFlag}` : null,
+    gitlabFlag ? `gitlab=${gitlabFlag}` : null,
+  ]
+    .filter(Boolean)
+    .join("&") || undefined;
 
   // Warm path for SSR consistency (panel still refetches client-side).
   await getInstallationForWorkspace(db, workspace.id);
@@ -74,21 +79,10 @@ export default async function WorkspaceSettingsPage({
   );
 
   return (
-    <SiteChrome>
       <main className={styles.main}>
-        <Link href="/workspaces" className={styles.back}>
-          ← Workspaces
-        </Link>
-        <p className={styles.eyebrow}>Settings</p>
-        <h1 className={styles.title}>{workspace.name}</h1>
+        <h1 className={styles.title}>Settings</h1>
         <p className={styles.meta}>
-          /{workspace.slug} · you are {role} ·{" "}
-          <Link
-            href={`/workspaces/${workspace.id}/projects`}
-            className={styles.metaLink}
-          >
-            Projects
-          </Link>
+          {workspace.name} · /{workspace.slug} · {role}
         </p>
 
         <section className={styles.section} aria-labelledby="workspace-heading">
@@ -142,12 +136,17 @@ export default async function WorkspaceSettingsPage({
           initialQuery={initialQuery}
         />
 
+        <GitlabPanel
+          workspaceId={workspace.id}
+          canManage={role === "owner"}
+          initialQuery={initialQuery}
+        />
+
         <DangerZone
           workspaceId={workspace.id}
           workspaceName={workspace.name}
           isOwner={role === "owner"}
         />
       </main>
-    </SiteChrome>
   );
 }

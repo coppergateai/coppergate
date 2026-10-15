@@ -30,23 +30,27 @@ export async function GET(request: Request, context: RouteContext) {
 
     return jsonOk(
       {
-        installation: installation
-          ? {
-              id: installation.id,
-              githubInstallationId: installation.githubInstallationId,
-              accountLogin: installation.accountLogin,
-              accountType: installation.accountType,
-              status: installation.status,
-            }
-          : null,
-        repositories: connections.map((c) => ({
-          id: c.id,
-          owner: c.owner,
-          name: c.name,
-          fullName: c.baseRepoFullName,
-          defaultBranch: c.defaultBranch,
-          status: c.installationStatus,
-        })),
+        installation:
+          installation && installation.provider !== "gitlab"
+            ? {
+                id: installation.id,
+                provider: installation.provider ?? "github",
+                githubInstallationId: installation.githubInstallationId,
+                accountLogin: installation.accountLogin,
+                accountType: installation.accountType,
+                status: installation.status,
+              }
+            : null,
+        repositories: connections
+          .filter((c) => c.provider !== "gitlab")
+          .map((c) => ({
+            id: c.id,
+            owner: c.owner,
+            name: c.name,
+            fullName: c.baseRepoFullName,
+            defaultBranch: c.defaultBranch,
+            status: c.installationStatus,
+          })),
       },
       { correlationId },
     );
@@ -63,6 +67,11 @@ export async function DELETE(request: Request, context: RouteContext) {
     const user = await requireUser(request);
     const { id: workspaceId } = await context.params;
     await requireWorkspaceOwner(db, workspaceId, user.id);
+
+    const installation = await getInstallationForWorkspace(db, workspaceId);
+    if (installation && installation.provider === "gitlab") {
+      return jsonOk({ ok: true, skipped: true }, { correlationId });
+    }
 
     const removed = await markInstallationRemoved(db, workspaceId);
     logger.info("github app disconnected", {

@@ -2,13 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
+import { isGitlabConfigured } from "@/lib/gitlab";
+import { env } from "@/lib/env";
 import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
 
 export const metadata: Metadata = {
   title: "Sign in",
   description:
-    "Sign in to Coppergate with GitHub. Identity first — repository access comes later via the GitHub App.",
+    "Sign in to Coppergate with GitHub or GitLab. Identity first — repository access comes later via SCM install.",
   robots: { index: false, follow: false },
   alternates: { canonical: "/login" },
 };
@@ -18,6 +20,9 @@ export default async function LoginPage() {
   if (user) {
     redirect("/workspaces");
   }
+
+  const githubReady = Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET);
+  const gitlabReady = isGitlabConfigured();
 
   return (
     <SiteChrome>
@@ -33,13 +38,30 @@ export default async function LoginPage() {
           />
           <h1 className={styles.authTitle}>Sign in to Coppergate</h1>
           <p className={styles.authLede}>
-            Continue with GitHub to open your workspaces. We only request
-            identity scopes — repository access comes later via the GitHub App,
-            under your control.
+            Continue with GitHub or GitLab to open your workspaces. We only
+            request identity scopes — repository access comes later under your
+            control.
           </p>
-          <a className={styles.authCta} href="/api/auth/github">
-            Continue with GitHub
-          </a>
+          {githubReady ? (
+            <a className={styles.authCta} href="/api/auth/github">
+              Continue with GitHub
+            </a>
+          ) : null}
+          {gitlabReady ? (
+            <a
+              className={styles.authCta}
+              href="/api/auth/gitlab"
+              style={githubReady ? { marginTop: "0.75rem" } : undefined}
+            >
+              Continue with GitLab
+            </a>
+          ) : null}
+          {!githubReady && !gitlabReady ? (
+            <p className={styles.authNote}>
+              OAuth is not configured. Set GitHub and/or GitLab client
+              credentials.
+            </p>
+          ) : null}
           <p className={styles.authNote}>
             Private beta · Kill-switch + spend caps · Policy-gated prod
           </p>

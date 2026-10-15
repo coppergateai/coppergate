@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   getLatestBriefForProject,
@@ -14,7 +13,6 @@ import {
 import { currentUser } from "@/lib/auth";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
-import { SiteChrome } from "../../../../site-chrome";
 import { ArenaPanel } from "./arena-panel";
 import { IssuesPanel } from "./issues-panel";
 import { MergePanel } from "./merge-panel";
@@ -116,23 +114,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     !hasApprovedBrief || !hasPlan || !hasBudget || !hasQueuedOrBeyond;
 
   return (
-    <SiteChrome>
       <main className={styles.main}>
-        <p className={styles.nav}>
-          <Link
-            href={`/workspaces/${workspaceId}/projects`}
-            className={styles.navLink}
-          >
-            ← Projects
-          </Link>
-          <span aria-hidden="true">·</span>
-          <Link
-            href={`/workspaces/${workspaceId}/inbox`}
-            className={styles.navLink}
-          >
-            Inbox
-          </Link>
-        </p>
         <p className={styles.eyebrow}>Project</p>
         <h1 className={styles.title}>{row.project.name}</h1>
         <p className={styles.lede}>
@@ -230,6 +212,5 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           isOwner={access.role === "owner"}
         />
       </main>
-    </SiteChrome>
   );
 }

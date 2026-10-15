@@ -12,4 +12,14 @@ describe("resolveDeliveryMode", () => {
     assert.equal(resolveDeliveryMode({ GITHUB_DELIVERY_MODE: "http" }), "http");
     assert.equal(resolveDeliveryMode({ GITHUB_DELIVERY_MODE: "HTTP" }), "http");
   });
+
+  it("prefers SCM_DELIVERY_MODE when set", () => {
+    assert.equal(
+      resolveDeliveryMode({
+        GITHUB_DELIVERY_MODE: "fake",
+        SCM_DELIVERY_MODE: "http",
+      }),
+      "http",
+    );
+  });
 });

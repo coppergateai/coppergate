@@ -1,0 +1,368 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 15.5rem;
+  height: 100vh;
+  padding: 0.85rem 0.65rem 0.75rem;
+  border-right: 1px solid var(--line);
+  background: var(--ink-soft);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.55rem 0.85rem;
+  text-decoration: none;
+  color: var(--paper);
+}
+
+.brandMark {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+}
+
+.brandName {
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.workspaceChip {
+  display: block;
+  margin: 0 0.35rem 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--mute-strong);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.workspaceChip:hover {
+  border-color: rgba(200, 137, 73, 0.45);
+  color: var(--paper);
+}
+
+.workspaceChipName {
+  display: block;
+  color: var(--paper);
+  font-weight: 600;
+  font-size: 0.84rem;
+  letter-spacing: -0.02em;
+}
+
+.workspaceChipMeta {
+  color: var(--mute-soft);
+  font-size: 0.72rem;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 0.2rem;
+}
+
+.sectionLabel {
+  margin: 0.85rem 0.55rem 0.35rem;
+  color: var(--mute-soft);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sectionLabel:first-child {
+  margin-top: 0.15rem;
+}
+
+.navItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.34rem 0.5rem 0.34rem 0.55rem;
+  border-radius: 6px;
+  color: var(--mute);
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.navItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--mute-strong);
+}
+
+.navItemActive {
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--paper);
+  padding-left: 0.85rem;
+}
+
+.navItemActive::before {
+  content: "";
+  position: absolute;
+  left: 0.28rem;
+  top: 50%;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 50%;
+  background: var(--copper);
+  transform: translateY(-50%);
+}
+
+.navDot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--copper);
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.navItemActive .navDot {
+  opacity: 0;
+  width: 0;
+  margin: 0;
+}
+
+.navItemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  min-width: 1.15rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(200, 137, 73, 0.2);
+  color: var(--copper-hot);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.2rem 0.15rem;
+  border-top: 1px solid var(--line);
+  margin-top: auto;
+}
+
+.footerItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.42rem 0.55rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mute);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.footerItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--mute-strong);
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+  padding: 0.45rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.userAvatar,
+.userAvatarFallback {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.userAvatarFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(200, 137, 73, 0.22);
+  color: var(--copper-hot);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.userMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.userName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--paper);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.userLogin {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mute-soft);
+  font-size: 0.68rem;
+}
+
+.logoutLink {
+  flex-shrink: 0;
+  padding: 0.25rem 0.4rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--mute);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.logoutLink:hover {
+  color: var(--paper);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(9, 10, 12, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--paper);
+  cursor: pointer;
+}
+
+.topbarBrand {
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content {
+  flex: 1;
+  width: min(100%, 72rem);
+  margin: 0;
+  padding: 1.15rem clamp(1rem, 3vw, 1.75rem) 2rem;
+}
+
+.backdrop {
+  display: none;
+}
+
+/* Mobile */
+@media (max-width: 959px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .topbar {
+    display: flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 50;
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    border: none;
+    background: rgba(0, 0, 0, 0.55);
+    cursor: pointer;
+  }
+}

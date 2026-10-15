@@ -8,6 +8,7 @@ import {
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { TaskDetailPanel } from "./task-detail-panel";
+import styles from "./task-detail.module.css";
 
 type PageProps = {
   params: Promise<{ id: string; projectId: string; taskId: string }>;
@@ -36,24 +37,17 @@ export default async function TaskDetailPage({ params }: PageProps) {
   }
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
-      <p style={{ margin: 0 }}>
+    <main className={styles.main}>
+      <p className={styles.crumb}>
         <Link
           href={`/workspaces/${workspaceId}/projects/${projectId}`}
-          style={{ color: "#A3A3A3" }}
+          className={styles.crumbLink}
         >
-          ← {project.project.name}
-        </Link>
-        {" · "}
-        <Link
-          href={`/workspaces/${workspaceId}/inbox`}
-          style={{ color: "#A3A3A3" }}
-        >
-          Inbox
+          {project.project.name}
         </Link>
       </p>
 
-      <div style={{ marginTop: "1.25rem" }}>
+      <div className={styles.panel}>
         <TaskDetailPanel
           workspaceId={workspaceId}
           projectId={projectId}
