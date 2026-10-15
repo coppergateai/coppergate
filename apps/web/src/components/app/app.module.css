@@ -12,9 +12,9 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  width: 15.5rem;
+  width: 14.75rem;
   height: 100vh;
-  padding: 0.85rem 0.65rem 0.75rem;
+  padding: 0.7rem 0.55rem 0.65rem;
   border-right: 1px solid var(--line);
   background: var(--ink-soft);
 }
@@ -22,10 +22,39 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.35rem 0.55rem 0.85rem;
+  gap: 0.5rem;
+  padding: 0.2rem 0.45rem 0.55rem;
   text-decoration: none;
   color: var(--paper);
+}
+
+.quickAction {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0.2rem 0.55rem;
+  padding: 0.38rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--paper);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.quickAction:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(200, 137, 73, 0.45);
+}
+
+.quickActionMark {
+  color: var(--copper-hot);
+  font-weight: 700;
 }
 
 .brandMark {
@@ -323,9 +352,10 @@
 
 .content {
   flex: 1;
-  width: min(100%, 72rem);
+  width: 100%;
   margin: 0;
-  padding: 1.15rem clamp(1rem, 3vw, 1.75rem) 2rem;
+  padding: 0;
+  min-height: 0;
 }
 
 .backdrop {

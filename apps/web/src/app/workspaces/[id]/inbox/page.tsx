@@ -34,30 +34,30 @@ export default async function WorkspaceInboxPage({ params }: PageProps) {
 
   return (
     <main className={styles.main}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Inbox</h1>
-        <div className={styles.toolbar}>
-          <Link
-            href={`/workspaces/${id}/projects`}
-            className={styles.toolbarGhost}
-          >
-            Projects
-          </Link>
-          <span className={styles.toolbarMeta}>
-            {access.workspace.name}
-            {pending.length > 0
-              ? ` · ${pending.length} pending`
-              : " · clear"}
-          </span>
+      <header className={styles.pageBar}>
+        <div className={styles.pageBarLeft}>
+          <h1 className={styles.title}>Inbox</h1>
+          <div className={styles.chips}>
+            <span className={styles.chip}>{access.workspace.name}</span>
+            <span className={styles.chip}>
+              {pending.length} pending
+            </span>
+          </div>
         </div>
+        <Link
+          href={`/workspaces/${id}/projects`}
+          className={styles.toolbarGhost}
+        >
+          Projects
+        </Link>
       </header>
 
-      <section className={styles.section} aria-label="Pending approvals">
+      <div className={styles.body}>
         {pending.length === 0 ? (
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>No pending approvals</p>
             <p className={styles.emptyBody}>
-              When a brief or task needs a human gate, it shows up here.{" "}
+              Human gates for briefs and tasks land here.{" "}
               <Link
                 href={`/workspaces/${id}/projects`}
                 className={styles.emptyLink}
@@ -67,34 +67,41 @@ export default async function WorkspaceInboxPage({ params }: PageProps) {
             </p>
           </div>
         ) : (
-          <ul className={styles.list}>
-            {pending.map((a) => {
-              const href = `/workspaces/${id}/projects/${a.projectId}`;
-              const label =
-                a.riskSummary?.trim() ||
-                `${a.targetType} ${a.targetId.slice(0, 8)}`;
-              return (
-                <li key={a.id} className={styles.row}>
-                  <Link href={href} className={styles.rowLink}>
-                    <span
-                      className={`${styles.statusRing} ${styles.statusPending}`}
-                      aria-hidden
-                    />
-                    <div className={styles.rowMain}>
+          <>
+            <div className={styles.colHead} aria-hidden>
+              <span className={styles.colStatus} />
+              <span>Type</span>
+              <span>Summary</span>
+              <span>State</span>
+              <span className={styles.colDate}>Requested</span>
+            </div>
+            <ul className={styles.list}>
+              {pending.map((a) => {
+                const href = `/workspaces/${id}/projects/${a.projectId}`;
+                const label =
+                  a.riskSummary?.trim() ||
+                  `${a.targetType} ${a.targetId.slice(0, 8)}`;
+                return (
+                  <li key={a.id} className={styles.row}>
+                    <Link href={href} className={styles.rowLink}>
+                      <span
+                        className={`${styles.statusRing} ${styles.statusPending}`}
+                        aria-hidden
+                      />
                       <span className={styles.rowId}>{a.targetType}</span>
                       <span className={styles.rowTitle}>{label}</span>
-                    </div>
-                    <span className={styles.rowPill}>Pending</span>
-                    <span className={styles.rowDate}>
-                      {formatDate(a.createdAt)}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                      <span className={styles.rowPill}>Pending</span>
+                      <span className={styles.rowDate}>
+                        {formatDate(a.createdAt)}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
-      </section>
+      </div>
     </main>
   );
 }

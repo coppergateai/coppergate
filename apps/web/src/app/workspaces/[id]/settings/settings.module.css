@@ -2,9 +2,9 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 44rem;
+  max-width: 52rem;
   margin: 0;
-  padding: 0 0 1.5rem;
+  padding: 0.85rem 1.15rem 2rem;
 }
 
 .back {
@@ -20,17 +20,25 @@
   color: var(--paper);
 }
 
+.pageHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
 .title {
   margin: 0;
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--paper);
 }
 
 .meta {
-  margin: 0.85rem 0 0;
+  margin: 0;
   color: var(--mute-soft);
   font-size: 0.78rem;
   line-height: 1.45;

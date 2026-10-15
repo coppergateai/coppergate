@@ -90,6 +90,30 @@ export function AppSidebar({
         </Link>
       ) : null}
 
+      {onWorkspaceHome || !workspaceId ? (
+        <a
+          href="#create-workspace"
+          className={styles.quickAction}
+          onClick={onClose}
+        >
+          <span className={styles.quickActionMark} aria-hidden>
+            +
+          </span>
+          New workspace
+        </a>
+      ) : (
+        <a
+          href="#create-project"
+          className={styles.quickAction}
+          onClick={onClose}
+        >
+          <span className={styles.quickActionMark} aria-hidden>
+            +
+          </span>
+          New project
+        </a>
+      )}
+
       <nav className={styles.nav}>
         {onWorkspaceHome || !workspaceId ? (
           <>

@@ -7,9 +7,14 @@ import styles from "./workspaces.module.css";
 type Props = {
   /** When true, invite code field is required (TASK035). */
   inviteRequired?: boolean;
+  /** Inline toolbar strip instead of stacked panel. */
+  compact?: boolean;
 };
 
-export function CreateWorkspaceForm({ inviteRequired = false }: Props) {
+export function CreateWorkspaceForm({
+  inviteRequired = false,
+  compact = false,
+}: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -18,7 +23,7 @@ export function CreateWorkspaceForm({ inviteRequired = false }: Props) {
 
   return (
     <form
-      className={`${styles.panel} ${styles.panelWide}`}
+      className={compact ? styles.inlineForm : `${styles.panel} ${styles.panelWide}`}
       onSubmit={(e) => {
         e.preventDefault();
         setPending(true);
@@ -51,41 +56,79 @@ export function CreateWorkspaceForm({ inviteRequired = false }: Props) {
           });
       }}
     >
-      <label className={styles.field}>
-        Name
-        <input
-          required
-          className={styles.input}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Acme"
-        />
-      </label>
-      {inviteRequired ? (
-        <label className={styles.field}>
-          Pilot invite code
+      {compact ? (
+        <>
           <input
             required
-            className={styles.input}
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-            placeholder="CG-…"
-            autoComplete="off"
+            className={styles.inlineInput}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Workspace name"
+            aria-label="Workspace name"
           />
-        </label>
-      ) : null}
-      {error ? <p className={styles.error}>{error}</p> : null}
-      <button
-        type="submit"
-        className={styles.submit}
-        disabled={
-          pending ||
-          !name.trim() ||
-          (inviteRequired && !inviteCode.trim())
-        }
-      >
-        {pending ? "Creating…" : "Create workspace"}
-      </button>
+          {inviteRequired ? (
+            <input
+              required
+              className={styles.inlineInput}
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              placeholder="Invite code"
+              autoComplete="off"
+              aria-label="Pilot invite code"
+            />
+          ) : null}
+          <button
+            type="submit"
+            className={styles.inlineSubmit}
+            disabled={
+              pending ||
+              !name.trim() ||
+              (inviteRequired && !inviteCode.trim())
+            }
+          >
+            {pending ? "…" : "Create"}
+          </button>
+          {error ? <p className={styles.inlineError}>{error}</p> : null}
+        </>
+      ) : (
+        <>
+          <label className={styles.field}>
+            Name
+            <input
+              required
+              className={styles.input}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Acme"
+            />
+          </label>
+          {inviteRequired ? (
+            <label className={styles.field}>
+              Pilot invite code
+              <input
+                required
+                className={styles.input}
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="CG-…"
+                autoComplete="off"
+              />
+            </label>
+          ) : null}
+          {error ? <p className={styles.error}>{error}</p> : null}
+          <button
+            type="submit"
+            className={styles.submit}
+            disabled={
+              pending ||
+              !name.trim() ||
+              (inviteRequired && !inviteCode.trim())
+            }
+          >
+            {pending ? "Creating…" : "Create workspace"}
+          </button>
+        </>
+      )}
     </form>
   );
 }
