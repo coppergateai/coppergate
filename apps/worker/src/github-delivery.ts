@@ -17,12 +17,24 @@ import {
   type GithubDeliveryClient,
   type RepoRef,
 } from "@coppergate/github";
+import {
+  FakeGitlabDelivery,
+  HttpGitlabDelivery,
+} from "@coppergate/gitlab";
+import type { ScmDeliveryClient } from "@coppergate/scm";
 
 export type DeliveryMode = "fake" | "http";
 
 export function resolveDeliveryMode(
-  env: { GITHUB_DELIVERY_MODE?: string } = loadEnv(),
+  env: {
+    GITHUB_DELIVERY_MODE?: string;
+    SCM_DELIVERY_MODE?: string;
+  } = loadEnv(),
 ): DeliveryMode {
+  const unified = (env.SCM_DELIVERY_MODE ?? "").toLowerCase();
+  if (unified === "http" || unified === "fake") {
+    return unified;
+  }
   const raw = (env.GITHUB_DELIVERY_MODE ?? "fake").toLowerCase();
   return raw === "http" ? "http" : "fake";
 }
@@ -65,6 +77,15 @@ async function resolveInstallationToken(
   return minted.token;
 }
 
+function resolveGitlabToken(installation: GithubInstallation): string {
+  const env = loadEnv();
+  if (!installation.encryptedToken) {
+    throw new Error("GitLab installation is missing a sealed access token");
+  }
+  const key = parseEncryptionKey(env.CREDENTIALS_ENCRYPTION_KEY);
+  return openSecret(installation.encryptedToken, key);
+}
+
 export async function fetchDefaultBranchHeadSha(
   token: string,
   repo: RepoRef,
@@ -94,7 +115,7 @@ export async function fetchDefaultBranchHeadSha(
 
 /**
  * Build delivery client + repo context for a project.
- * Default remains FakeGithubDelivery (CI / local without App).
+ * Routes to GitHub PR or GitLab MR based on installation.provider (D12).
  */
 export async function resolveGithubDelivery(
   db: Database,
@@ -105,10 +126,11 @@ export async function resolveGithubDelivery(
     mode?: DeliveryMode;
   },
 ): Promise<{
-  client: GithubDeliveryClient;
+  client: GithubDeliveryClient | ScmDeliveryClient;
   repo: RepoRef;
   baseSha: string;
   mode: DeliveryMode;
+  provider: "github" | "gitlab";
 }> {
   const mode = input.mode ?? resolveDeliveryMode();
   if (mode === "fake") {
@@ -117,6 +139,7 @@ export async function resolveGithubDelivery(
       repo: { owner: "example", repo: "repo", defaultBranch: "main" },
       baseSha: input.baseSha === "unknown" ? "0".repeat(40) : input.baseSha,
       mode,
+      provider: "github",
     };
   }
 
@@ -126,7 +149,7 @@ export async function resolveGithubDelivery(
     input.projectId,
   );
   if (!project) {
-    throw new Error("Project not found for GitHub delivery");
+    throw new Error("Project not found for SCM delivery");
   }
   const repo: RepoRef = {
     owner: project.repository.owner,
@@ -139,7 +162,30 @@ export async function resolveGithubDelivery(
     input.workspaceId,
   );
   if (!installation || installation.status !== "active") {
-    throw new Error("Active GitHub App installation required for http delivery");
+    throw new Error("Active SCM installation required for http delivery");
+  }
+
+  const provider =
+    installation.provider === "gitlab" ? "gitlab" : "github";
+
+  if (provider === "gitlab") {
+    const env = loadEnv();
+    const token = resolveGitlabToken(installation);
+    const projectId =
+      project.repository.githubRepoId || installation.githubInstallationId;
+    return {
+      client: new HttpGitlabDelivery(token, env.GITLAB_BASE_URL, projectId),
+      repo: {
+        ...repo,
+        // HttpGitlabDelivery reads owner/repo; full path used in fake URLs only
+      },
+      baseSha:
+        !input.baseSha || input.baseSha === "unknown"
+          ? "0".repeat(40)
+          : input.baseSha,
+      mode,
+      provider,
+    };
   }
 
   const token = await resolveInstallationToken(db, installation);
@@ -153,5 +199,15 @@ export async function resolveGithubDelivery(
     repo,
     baseSha,
     mode,
+    provider,
   };
+}
+
+/** Prefer FakeGitlabDelivery when workspace is GitLab but mode is fake. */
+export function fakeClientForProvider(
+  provider: "github" | "gitlab",
+): ScmDeliveryClient {
+  return provider === "gitlab"
+    ? new FakeGitlabDelivery()
+    : new FakeGithubDelivery();
 }

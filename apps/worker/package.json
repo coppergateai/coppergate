@@ -16,6 +16,8 @@
     "@coppergate/config": "workspace:*",
     "@coppergate/db": "workspace:*",
     "@coppergate/github": "workspace:*",
+    "@coppergate/gitlab": "workspace:*",
+    "@coppergate/scm": "workspace:*",
     "@coppergate/telemetry": "workspace:*"
   },
   "devDependencies": {

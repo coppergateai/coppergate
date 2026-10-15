@@ -16,6 +16,7 @@ apps/web/next-env.d.ts.bak
 .env
 .env.*
 !.env.example
+!.env.selfhost.example
 
 # OS / IDE
 .DS_Store
@@ -31,4 +32,3 @@ apps/web/next-env.d.ts.bak
 tmp/
 temp/
 .vercel
-.env*

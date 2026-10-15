@@ -1,6 +1,14 @@
 "use client";
 
-export function LogoutButton({ className }: { className?: string }) {
+import type { ReactNode } from "react";
+
+export function LogoutButton({
+  className,
+  children = "Log out",
+}: {
+  className?: string;
+  children?: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -14,7 +22,7 @@ export function LogoutButton({ className }: { className?: string }) {
         });
       }}
     >
-      Sign out
+      {children}
     </button>
   );
 }

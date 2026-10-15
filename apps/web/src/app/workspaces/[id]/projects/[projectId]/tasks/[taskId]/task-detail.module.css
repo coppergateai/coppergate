@@ -1,0 +1,21 @@
+.main {
+  width: 100%;
+}
+
+.crumb {
+  margin: 0 0 1rem;
+}
+
+.crumbLink {
+  color: var(--mute);
+  font-size: 0.86rem;
+  text-decoration: none;
+}
+
+.crumbLink:hover {
+  color: var(--paper);
+}
+
+.panel {
+  margin-top: 0.25rem;
+}

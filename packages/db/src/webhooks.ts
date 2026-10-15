@@ -9,6 +9,8 @@ import {
 } from "./schema.js";
 
 export type RecordWebhookInput = {
+  /** github | gitlab */
+  provider?: "github" | "gitlab";
   deliveryId: string;
   event: string;
   action?: string | null;
@@ -43,6 +45,7 @@ export async function recordWebhookDelivery(
     .insert(githubWebhookDeliveries)
     .values({
       id: crypto.randomUUID(),
+      provider: input.provider ?? "github",
       deliveryId: input.deliveryId,
       event: input.event,
       action: input.action ?? null,

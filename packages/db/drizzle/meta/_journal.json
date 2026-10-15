@@ -141,6 +141,13 @@
       "when": 1728568300000,
       "tag": "0019_expansion",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1728568400000,
+      "tag": "0020_scm",
+      "breakpoints": true
     }
   ]
 }

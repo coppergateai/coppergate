@@ -9,7 +9,6 @@ import {
 import { currentUser } from "@/lib/auth";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
-import { SiteChrome } from "../../../site-chrome";
 import { CreateProjectForm } from "./create-project-form";
 import styles from "./projects.module.css";
 
@@ -36,12 +35,20 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
     installation.status === "active" &&
     connections.length > 0;
   const empty = projects.length === 0;
+  const canCreate = access.role === "owner" && unbound.length > 0;
+
+  const ready = projects.filter(({ project }) => project.currentBriefId);
+  const setup = projects.filter(({ project }) => !project.currentBriefId);
 
   const createBlock =
     access.role === "owner" ? (
-      <section className={styles.section} aria-labelledby="create-heading">
+      <section
+        id="create-project"
+        className={styles.section}
+        aria-labelledby="create-heading"
+      >
         <h2 id="create-heading" className={styles.sectionLabel}>
-          Create project
+          New project
         </h2>
         {unbound.length === 0 ? (
           <p className={styles.muted}>
@@ -66,95 +73,133 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
       </section>
     ) : null;
 
-  return (
-    <SiteChrome>
-      <main className={styles.main}>
-        <p className={styles.nav}>
-          <Link
-            href={`/workspaces/${id}/settings`}
-            className={styles.navLink}
-          >
-            ← Settings
-          </Link>
-          <span aria-hidden="true">·</span>
-          <Link href={`/workspaces/${id}/inbox`} className={styles.navLink}>
-            Inbox
-          </Link>
-        </p>
-        <p className={styles.eyebrow}>Projects</p>
-        <h1 className={styles.title}>{access.workspace.name}</h1>
-        <p className={styles.lede}>
-          One GitHub repo per project · stack <code>nextjs_ts</code>
-        </p>
-
-        {empty ? (
-          <>
-            {createBlock}
-            <div className={styles.path}>
-              <OnboardingGuide
-                compact
-                title="Project setup"
-                steps={[
-                  {
-                    id: "github",
-                    title: "Connect GitHub App + select a repo",
-                    detail:
-                      "Settings → Install → Connect an unbound repository.",
-                    href: `/workspaces/${id}/settings`,
-                    done: githubReady,
-                  },
-                  {
-                    id: "project",
-                    title: "Create your first project",
-                    detail: "Bind the repo below. Supported stack: nextjs_ts.",
-                    done: false,
-                  },
-                  {
-                    id: "budget",
-                    title: "Set a spend cap",
-                    detail:
-                      "Open the project and raise the budget before queueing work.",
-                    done: false,
-                  },
-                  {
-                    id: "brief",
-                    title: "Approve brief → plan → task",
-                    detail:
-                      "Keep the first task tiny so the first PR lands in one session.",
-                    done: false,
-                  },
-                ]}
+  function projectRows(
+    items: typeof projects,
+    statusClass: string,
+  ) {
+    return (
+      <ul className={styles.list}>
+        {items.map(({ project, repository }) => (
+          <li key={project.id} className={styles.row}>
+            <Link
+              href={`/workspaces/${id}/projects/${project.id}`}
+              className={styles.rowLink}
+            >
+              <span
+                className={`${styles.statusRing} ${statusClass}`}
+                aria-hidden
               />
-            </div>
-          </>
-        ) : (
-          <>
-            <section className={styles.section} aria-labelledby="list-heading">
-              <h2 id="list-heading" className={styles.sectionLabel}>
-                Your projects
+              <div className={styles.rowMain}>
+                <span className={styles.rowId}>
+                  {project.stack}
+                </span>
+                <span className={styles.rowTitle}>{project.name}</span>
+              </div>
+              <span className={styles.rowMeta}>
+                {repository.baseRepoFullName}
+              </span>
+              {project.currentBriefId ? (
+                <span className={styles.rowPill}>Brief</span>
+              ) : (
+                <span className={styles.rowPillMuted}>Setup</span>
+              )}
+              <span className={styles.rowAction}>Open</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <main className={styles.main}>
+      <header className={styles.header}>
+        <h1 className={styles.title}>Projects</h1>
+        <div className={styles.toolbar}>
+          {canCreate ? (
+            <a href="#create-project" className={styles.toolbarPrimary}>
+              + New project
+            </a>
+          ) : access.role === "owner" ? (
+            <Link
+              href={`/workspaces/${id}/settings`}
+              className={styles.toolbarPrimary}
+            >
+              Connect repo
+            </Link>
+          ) : null}
+          <span className={styles.toolbarMeta}>
+            {access.workspace.name}
+            {!empty ? ` · ${projects.length}` : ""}
+          </span>
+        </div>
+      </header>
+
+      {empty ? (
+        <>
+          {createBlock}
+          <div className={styles.path}>
+            <OnboardingGuide
+              compact
+              title="Project setup"
+              steps={[
+                {
+                  id: "github",
+                  title: "Connect GitHub App + select a repo",
+                  detail:
+                    "Settings → Install → Connect an unbound repository.",
+                  href: `/workspaces/${id}/settings`,
+                  done: githubReady,
+                },
+                {
+                  id: "project",
+                  title: "Create your first project",
+                  detail: "Bind the repo below. Supported stack: nextjs_ts.",
+                  done: false,
+                },
+                {
+                  id: "budget",
+                  title: "Set a spend cap",
+                  detail:
+                    "Open the project and raise the budget before queueing work.",
+                  done: false,
+                },
+                {
+                  id: "brief",
+                  title: "Approve brief → plan → task",
+                  detail:
+                    "Keep the first task tiny so the first PR lands in one session.",
+                  done: false,
+                },
+              ]}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {ready.length > 0 ? (
+            <section className={styles.section} aria-labelledby="ready-heading">
+              <h2 id="ready-heading" className={styles.groupLabel}>
+                Ready
+                <span className={styles.groupCount}>{ready.length}</span>
               </h2>
-              <ul className={styles.list}>
-                {projects.map(({ project, repository }) => (
-                  <li key={project.id} className={styles.row}>
-                    <Link
-                      href={`/workspaces/${id}/projects/${project.id}`}
-                      className={styles.rowLink}
-                    >
-                      <div className={styles.rowName}>{project.name}</div>
-                      <div className={styles.rowMeta}>
-                        {repository.baseRepoFullName} · {project.mode} ·{" "}
-                        {project.stack}
-                        {project.currentBriefId ? " · brief approved" : ""}
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              {projectRows(ready, styles.statusActive ?? "")}
             </section>
-            {createBlock}
-          </>
-        )}
-      </main>
-    </SiteChrome>
+          ) : null}
+
+          {setup.length > 0 ? (
+            <section className={styles.section} aria-labelledby="setup-heading">
+              <h2 id="setup-heading" className={styles.groupLabel}>
+                Setup
+                <span className={styles.groupCount}>{setup.length}</span>
+              </h2>
+              {projectRows(setup, styles.statusIdle ?? "")}
+            </section>
+          ) : null}
+
+          {createBlock}
+        </>
+      )}
+    </main>
   );
 }

@@ -65,6 +65,18 @@ const envSchema = z.object({
    */
   GITHUB_DELIVERY_MODE: z.enum(["fake", "http"]).default("fake"),
   /**
+   * Unified SCM delivery for GitHub PR + GitLab MR.
+   * When set, overrides GITHUB_DELIVERY_MODE for both providers.
+   */
+  SCM_DELIVERY_MODE: z.enum(["fake", "http"]).optional(),
+  /** GitLab origin — gitlab.com or self-managed (e.g. https://gitlab.trendyol.com). */
+  GITLAB_BASE_URL: z.string().url().default("https://gitlab.com"),
+  /** Optional until GitLab OAuth login is used. */
+  GITLAB_CLIENT_ID: z.string().min(1).optional(),
+  GITLAB_CLIENT_SECRET: z.string().min(1).optional(),
+  /** Webhook shared token — optional until GitLab webhook endpoint is used. */
+  GITLAB_WEBHOOK_SECRET: z.string().min(8).optional(),
+  /**
    * When true, POST /api/workspaces requires a valid pilot invite code (TASK035).
    * Local/dev default false; staging/public beta should set true.
    */

@@ -10,6 +10,8 @@ import {
 
 export type UpsertInstallationInput = {
   workspaceId: string;
+  /** github | gitlab — default github */
+  provider?: "github" | "gitlab";
   githubInstallationId: string;
   accountLogin: string;
   accountType?: string | null;
@@ -25,12 +27,14 @@ export async function upsertGithubInstallation(
   const now = new Date();
   const id = crypto.randomUUID();
   const status = input.status ?? "active";
+  const provider = input.provider ?? "github";
 
   const [row] = await db
     .insert(githubInstallations)
     .values({
       id,
       workspaceId: input.workspaceId,
+      provider,
       githubInstallationId: input.githubInstallationId,
       accountLogin: input.accountLogin,
       accountType: input.accountType ?? null,
@@ -43,6 +47,7 @@ export async function upsertGithubInstallation(
     .onConflictDoUpdate({
       target: githubInstallations.workspaceId,
       set: {
+        provider,
         githubInstallationId: input.githubInstallationId,
         accountLogin: input.accountLogin,
         accountType: input.accountType ?? null,
@@ -54,9 +59,12 @@ export async function upsertGithubInstallation(
     })
     .returning();
 
-  if (!row) throw new Error("Failed to upsert GitHub installation");
+  if (!row) throw new Error("Failed to upsert SCM installation");
   return row;
 }
+
+/** Alias for multi-SCM call sites. */
+export const upsertScmInstallation = upsertGithubInstallation;
 
 export async function getInstallationForWorkspace(
   db: Database,
@@ -119,6 +127,8 @@ export async function markInstallationRemoved(
 export type ConnectRepoInput = {
   workspaceId: string;
   installationId: string;
+  /** github | gitlab — default github */
+  provider?: "github" | "gitlab";
   githubRepoId: string;
   owner: string;
   name: string;
@@ -132,12 +142,14 @@ export async function connectRepository(
   input: ConnectRepoInput,
 ): Promise<RepositoryConnection> {
   const now = new Date();
+  const provider = input.provider ?? "github";
   const [row] = await db
     .insert(repositoryConnections)
     .values({
       id: crypto.randomUUID(),
       workspaceId: input.workspaceId,
       installationId: input.installationId,
+      provider,
       githubRepoId: input.githubRepoId,
       owner: input.owner,
       name: input.name,
@@ -157,6 +169,7 @@ export async function connectRepository(
       ],
       set: {
         installationId: input.installationId,
+        provider,
         owner: input.owner,
         name: input.name,
         defaultBranch: input.defaultBranch,

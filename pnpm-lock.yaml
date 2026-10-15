@@ -32,9 +32,15 @@ importers:
       '@coppergate/github':
         specifier: workspace:*
         version: link:../../packages/github
+      '@coppergate/gitlab':
+        specifier: workspace:*
+        version: link:../../packages/gitlab
       '@coppergate/llm':
         specifier: workspace:*
         version: link:../../packages/llm
+      '@coppergate/scm':
+        specifier: workspace:*
+        version: link:../../packages/scm
       '@coppergate/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -93,6 +99,12 @@ importers:
       '@coppergate/github':
         specifier: workspace:*
         version: link:../../packages/github
+      '@coppergate/gitlab':
+        specifier: workspace:*
+        version: link:../../packages/gitlab
+      '@coppergate/scm':
+        specifier: workspace:*
+        version: link:../../packages/scm
       '@coppergate/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -293,6 +305,31 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
+  packages/gitlab:
+    dependencies:
+      '@coppergate/scm':
+        specifier: workspace:*
+        version: link:../scm
+    devDependencies:
+      '@coppergate/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@coppergate/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.21
+        version: 22.20.5
+      eslint:
+        specifier: ^9.27.0
+        version: 9.39.5
+      tsx:
+        specifier: ^4.19.4
+        version: 4.23.15
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
   packages/llm:
     devDependencies:
       '@coppergate/eslint-config':
@@ -315,6 +352,27 @@ importers:
         version: 5.9.3
 
   packages/sandbox:
+    devDependencies:
+      '@coppergate/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@coppergate/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.21
+        version: 22.20.5
+      eslint:
+        specifier: ^9.27.0
+        version: 9.39.5
+      tsx:
+        specifier: ^4.19.4
+        version: 4.23.15
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  packages/scm:
     devDependencies:
       '@coppergate/eslint-config':
         specifier: workspace:*

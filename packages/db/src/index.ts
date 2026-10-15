@@ -45,8 +45,11 @@ export {
   type ContenderStatus,
   type DeliveryShareToken,
   type EstimateComplexity,
+  type AuthProvider,
   type GithubInstallation,
   type GithubWebhookDelivery,
+  type ScmInstallation,
+  type ScmProvider,
   type InstallationStatus,
   type IntegrationCredential,
   type Membership,
@@ -136,7 +139,13 @@ export {
   hashSessionToken,
   mintSessionToken,
 } from "./sessions.js";
-export { getUserById, upsertGithubUser, type UpsertGithubUserInput } from "./users.js";
+export {
+  getUserById,
+  upsertGithubUser,
+  upsertScmUser,
+  type UpsertGithubUserInput,
+  type UpsertScmUserInput,
+} from "./users.js";
 export { slugify, withSlugSuffix } from "./slug.js";
 export {
   createWorkspaceWithOwner,
@@ -166,6 +175,7 @@ export {
   revokeRepositoryConnection,
   updateInstallationToken,
   upsertGithubInstallation,
+  upsertScmInstallation,
   type ConnectRepoInput,
   type UpsertInstallationInput,
 } from "./github.js";
