@@ -174,6 +174,17 @@ export function AppSidebar({
               ) : null}
             </Link>
             <Link
+              href={`/workspaces/${workspaceId}/activity`}
+              className={`${styles.navItem} ${
+                isActive(pathname, `/workspaces/${workspaceId}/activity`)
+                  ? styles.navItemActive
+                  : ""
+              }`}
+              onClick={onClose}
+            >
+              <span className={styles.navItemLabel}>Activity</span>
+            </Link>
+            <Link
               href={`/workspaces/${workspaceId}/settings`}
               className={`${styles.navItem} ${
                 isActive(pathname, `/workspaces/${workspaceId}/settings`)

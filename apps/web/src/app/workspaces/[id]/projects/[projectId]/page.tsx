@@ -6,6 +6,7 @@ import {
   getProjectPlan,
   getProjectSpendSummary,
   getWorkspaceForMember,
+  listPendingApprovalsForWorkspace,
   parseClarifyingAnswers,
   parseJsonArray,
   serializeAllowedPaths,
@@ -15,12 +16,14 @@ import { currentUser } from "@/lib/auth";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
 import { ArenaPanel } from "./arena-panel";
+import { CostExplorerStrip } from "./cost-explorer";
 import { IssuesPanel } from "./issues-panel";
 import { MergePanel } from "./merge-panel";
 import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
 import { DeliveryBoard } from "./delivery-board";
 import { PlanPanel } from "./plan-panel";
+import { PolicyPresetsPanel } from "./policy-presets";
 import {
   parseProjectTab,
   ProjectShell,
@@ -127,6 +130,27 @@ export default async function ProjectDetailPage({
 
   const isOwner = access.role === "owner";
   const basePath = `/workspaces/${workspaceId}/projects/${projectId}`;
+  const pendingAll = await listPendingApprovalsForWorkspace(db, workspaceId);
+  const pendingApprovals = pendingAll.filter(
+    (a) => a.projectId === projectId,
+  ).length;
+  const lastRunStatus =
+    boardTasks.find((t) =>
+      ["QUEUED", "RUNNING", "WAITING_CI", "IN_REVIEW", "FAILED", "DONE"].includes(
+        t.status,
+      ),
+    )?.status ?? null;
+
+  const stackHint =
+    row.project.stack === "go"
+      ? "Go tip: keep the first task to one package and a small test."
+      : row.project.stack === "python"
+        ? "Python tip: scope the first task to one module + pytest."
+        : row.project.stack === "node"
+          ? "Node tip: one route or script change is enough for the smoke path."
+          : row.project.stack !== "nextjs_ts"
+            ? "Best-effort agent on this stack — keep the first task tiny."
+            : null;
 
   return (
     <Suspense fallback={null}>
@@ -142,9 +166,14 @@ export default async function ProjectDetailPage({
         capMicros={usage.capMicros}
         currency={usage.currency}
         taskCount={boardTasks.length}
+        pendingApprovals={pendingApprovals}
+        lastRunStatus={lastRunStatus}
         initialTab={parseProjectTab(sp.tab)}
         overview={
           <>
+            {stackHint ? (
+              <p className={styles.stackHint}>{stackHint}</p>
+            ) : null}
             {showGuide ? (
               <div className={styles.path}>
                 <OnboardingGuide
@@ -208,6 +237,10 @@ export default async function ProjectDetailPage({
               }}
               isOwner={isOwner}
             />
+            <CostExplorerStrip
+              workspaceId={workspaceId}
+              projectId={projectId}
+            />
             <BriefPanel
               workspaceId={workspaceId}
               projectId={projectId}
@@ -241,6 +274,13 @@ export default async function ProjectDetailPage({
         }
         more={
           <>
+            <PolicyPresetsPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              initialAutonomy={row.project.autonomyLevel}
+              initialMergeEnabled={row.project.mergeEnabled}
+              isOwner={isOwner}
+            />
             <IssuesPanel
               workspaceId={workspaceId}
               projectId={projectId}

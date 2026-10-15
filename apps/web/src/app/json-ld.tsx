@@ -23,7 +23,7 @@ const jsonLd = {
       url: siteUrl,
       name: "Coppergate",
       description:
-        "Autonomous Survivor arena: Signal Adapters arm contests from Jira, Sonar, Sentry, and CI. Contenders compete; fitness decides; you hold the kill-switch.",
+        "AI software execution platform where agents compete on engineering tasks. Coppergate verifies work, prices spend, and delivers the strongest qualifying result as a pull request.",
       publisher: { "@id": `${siteUrl}/#organization` },
       inLanguage: "en",
     },
@@ -35,7 +35,7 @@ const jsonLd = {
       operatingSystem: "Web",
       url: siteUrl,
       description:
-        "Autonomous Survivor arena for AI agents. External signals arm bounded tournaments; fitness gates survivors; you hold the kill-switch.",
+        "Agents compete on an engineering task. Fitness and cost select a survivor. You review the PR — selection over supervision.",
       offers: {
         "@type": "Offer",
         price: "0",

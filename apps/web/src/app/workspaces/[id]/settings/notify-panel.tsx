@@ -23,6 +23,8 @@ export function NotifyPanel({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
 
   if (!isOwner) {
     return (
@@ -96,9 +98,51 @@ export function NotifyPanel({
         </label>
         {error ? <p className={styles.error}>{error}</p> : null}
         {saved ? <p className={styles.ok}>Saved.</p> : null}
-        <button type="submit" className={styles.submit} disabled={pending}>
-          {pending ? "Saving…" : "Save notifications"}
-        </button>
+        {testMsg ? <p className={styles.ok}>{testMsg}</p> : null}
+        <div className={styles.btnRow}>
+          <button type="submit" className={styles.submit} disabled={pending}>
+            {pending ? "Saving…" : "Save notifications"}
+          </button>
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            disabled={testing || pending || !webhookUrl.trim()}
+            onClick={() => {
+              setTesting(true);
+              setTestMsg(null);
+              setError(null);
+              void fetch(`/api/workspaces/${workspaceId}/notify/test`, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: "{}",
+              })
+                .then(async (res) => {
+                  const body = (await res.json()) as {
+                    error?: { message?: string };
+                    webhook?: boolean;
+                    email?: boolean;
+                    slack?: boolean;
+                  };
+                  if (!res.ok) {
+                    throw new Error(body.error?.message ?? "Test failed");
+                  }
+                  const parts = [
+                    body.webhook ? "webhook ok" : null,
+                    body.email ? "email ok" : null,
+                    body.slack ? "slack" : null,
+                  ].filter(Boolean);
+                  setTestMsg(`Test sent (${parts.join(", ") || "ok"})`);
+                })
+                .catch((err: unknown) =>
+                  setError(err instanceof Error ? err.message : String(err)),
+                )
+                .finally(() => setTesting(false));
+            }}
+          >
+            {testing ? "Sending…" : "Send test"}
+          </button>
+        </div>
       </form>
     </section>
   );

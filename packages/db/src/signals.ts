@@ -259,7 +259,11 @@ async function resolveProjectId(
     );
     if (match) return match.project.id;
   }
-  const rows = await listProjectsForWorkspace(db, workspaceId);
+  const rows = await listProjectsForWorkspace(db, workspaceId).then((r) =>
+    r.filter((x) => x.project.status !== "archived"),
+  );
+  // Prefer exact single-project workspaces for auto-arm.
+  if (rows.length === 1) return rows[0]!.project.id;
   return rows[0]?.project.id ?? null;
 }
 

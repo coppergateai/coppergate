@@ -17,7 +17,7 @@ const siteUrl =
 
 const title = "Coppergate — Agents compete. Survivors ship.";
 const description =
-  "An autonomous multi-agent arena. Contenders race, critics evaluate, and fitness determines what moves forward — with budgets and a kill-switch you control.";
+  "Give Coppergate an engineering task. Multiple AI agents compete to solve it. Coppergate verifies quality and cost, then delivers the strongest qualifying result as a pull request.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

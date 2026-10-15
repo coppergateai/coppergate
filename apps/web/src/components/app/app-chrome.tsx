@@ -6,6 +6,7 @@ import {
   type SidebarUser,
   type SidebarWorkspace,
 } from "./app-sidebar";
+import { CommandPalette } from "./command-palette";
 import styles from "./app.module.css";
 
 export function AppChrome({
@@ -55,6 +56,7 @@ export function AppChrome({
         </div>
         <div className={styles.content}>{children}</div>
       </div>
+      <CommandPalette />
     </div>
   );
 }

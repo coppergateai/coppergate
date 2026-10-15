@@ -1,0 +1,90 @@
+import { listAuditEventsForWorkspace } from "@coppergate/db";
+import { requireUser } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
+import { requireWorkspaceMember } from "@/lib/workspace";
+
+export const dynamic = "force-dynamic";
+
+type RouteContext = { params: Promise<{ id: string }> };
+
+function parseMeta(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function activityHref(
+  workspaceId: string,
+  action: string,
+  meta: Record<string, unknown> | null,
+  targetType: string | null,
+  targetId: string | null,
+): string | null {
+  const projectId =
+    typeof meta?.projectId === "string" ? meta.projectId : null;
+  const taskId = typeof meta?.taskId === "string" ? meta.taskId : null;
+  if (taskId && projectId) {
+    return `/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}`;
+  }
+  if (projectId) {
+    return `/workspaces/${workspaceId}/projects/${projectId}`;
+  }
+  if (targetType === "task" && targetId && projectId) {
+    return `/workspaces/${workspaceId}/projects/${projectId}/tasks/${targetId}`;
+  }
+  if (action.startsWith("signal.")) {
+    return `/workspaces/${workspaceId}/settings?tab=signals`;
+  }
+  return null;
+}
+
+/** Workspace activity timeline from audit_events. */
+export async function GET(request: Request, context: RouteContext) {
+  const correlationId = correlationIdFrom(request);
+  try {
+    const user = await requireUser(request);
+    const { id: workspaceId } = await context.params;
+    await requireWorkspaceMember(db, workspaceId, user.id);
+
+    const url = new URL(request.url);
+    const before = url.searchParams.get("before");
+    const limitRaw = Number(url.searchParams.get("limit") ?? "50");
+    const limit = Number.isFinite(limitRaw) ? limitRaw : 50;
+
+    const rows = await listAuditEventsForWorkspace(db, workspaceId, {
+      limit,
+      before,
+    });
+
+    return jsonOk(
+      {
+        events: rows.map((r) => {
+          const meta = parseMeta(r.meta);
+          return {
+            id: r.id,
+            actor: r.actor,
+            action: r.action,
+            targetType: r.targetType,
+            targetId: r.targetId,
+            meta,
+            href: activityHref(
+              workspaceId,
+              r.action,
+              meta,
+              r.targetType,
+              r.targetId,
+            ),
+            createdAt: r.createdAt.toISOString(),
+          };
+        }),
+      },
+      { correlationId },
+    );
+  } catch (err) {
+    return jsonError(err, correlationId);
+  }
+}

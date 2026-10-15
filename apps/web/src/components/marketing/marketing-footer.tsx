@@ -20,8 +20,7 @@ export function MarketingFooter() {
               />
             </Link>
             <p className={styles.footerLede}>
-              An autonomous multi-agent arena. Contenders compete, fitness
-              decides — survivors ship.
+              Agents compete. Survivors ship. Selection over supervision.
             </p>
             <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
               hello@coppergate.ai
@@ -31,11 +30,12 @@ export function MarketingFooter() {
           <div className={styles.footerCols}>
             <nav className={styles.footerCol} aria-label="Product">
               <h2>Product</h2>
+              <Link href="/#arena">Arena</Link>
               <Link href="/#how-it-works">How it works</Link>
-              <Link href="/#signals">Signals</Link>
-              <Link href="/#features">Features</Link>
               <Link href="/#evidence">Evidence</Link>
-              <Link href="/#control">Cost &amp; control</Link>
+              <Link href="/#fitness">Fitness</Link>
+              <Link href="/#signals">Integrations</Link>
+              <Link href="/#controls">Controls</Link>
               <Link href="/#faq">FAQ</Link>
             </nav>
             <nav className={styles.footerCol} aria-label="Resources">

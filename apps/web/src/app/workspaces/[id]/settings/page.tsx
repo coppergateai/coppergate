@@ -11,7 +11,9 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AnalyticsPanel } from "./analytics-panel";
 import { ByokPanel } from "./byok-panel";
+import { CostExplorerPanel } from "./cost-explorer";
 import { DangerZone } from "./danger-zone";
+import { DemoSeedPanel } from "./demo-seed-panel";
 import { GithubPanel } from "./github-panel";
 import { GitlabPanel } from "./gitlab-panel";
 import { NotifyPanel } from "./notify-panel";
@@ -116,6 +118,17 @@ export default async function WorkspaceSettingsPage({
         isOwner={role === "owner"}
         initialProjects={budgetRows}
       />
+      {process.env.NODE_ENV !== "production" ||
+      process.env.ALLOW_DEMO_SEED === "1" ? (
+        <DemoSeedPanel
+          workspaceId={workspace.id}
+          isOwner={role === "owner"}
+          projects={projectRows.map(({ project }) => ({
+            id: project.id,
+            name: project.name,
+          }))}
+        />
+      ) : null}
     </div>
   );
 
@@ -136,7 +149,14 @@ export default async function WorkspaceSettingsPage({
 
   const signals = (
     <div className={styles.stackWide}>
-      <SignalsPanel workspaceId={workspace.id} isOwner={role === "owner"} />
+      <SignalsPanel
+        workspaceId={workspace.id}
+        isOwner={role === "owner"}
+        projects={projectRows.map(({ project }) => ({
+          id: project.id,
+          name: project.name,
+        }))}
+      />
       <NotifyPanel
         workspaceId={workspace.id}
         isOwner={role === "owner"}
@@ -168,10 +188,13 @@ export default async function WorkspaceSettingsPage({
               />
             ),
             analytics: (
-              <AnalyticsPanel
-                workspaceId={workspace.id}
-                isOwner={role === "owner"}
-              />
+              <div className={styles.stackWide}>
+                <CostExplorerPanel workspaceId={workspace.id} />
+                <AnalyticsPanel
+                  workspaceId={workspace.id}
+                  isOwner={role === "owner"}
+                />
+              </div>
             ),
             danger: (
               <DangerZone

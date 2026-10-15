@@ -222,6 +222,11 @@ export {
   type BriefContentInput,
   type ClarifyingAnswer,
 } from "./briefs.js";
+export {
+  countAuditEventsForWorkspace,
+  listAuditEventsForWorkspace,
+  type ListAuditOptions,
+} from "./audit.js";
 export { hasCycle, wouldCreateCycle, type GraphEdge } from "./graph.js";
 export {
   PlanError,
@@ -357,9 +362,12 @@ export {
   revokeDeliveryShareToken,
 } from "./share-reports.js";
 export {
+  getProjectCostExplorer,
   getRetentionSnapshot,
   getWorkspaceCostAnalytics,
+  getWorkspaceCostExplorer,
   type CostAnalytics30d,
+  type ProjectCostExplorer,
   type RetentionSnapshot,
 } from "./analytics.js";
 export {
@@ -372,7 +380,10 @@ export {
   IssueImportError,
   importGithubIssueAsTask,
 } from "./issue-import.js";
-export { setProjectMergeEnabled } from "./project-policy.js";
+export {
+  setProjectAutonomyLevel,
+  setProjectMergeEnabled,
+} from "./project-policy.js";
 export {
   SignalError,
   armSignalEvent,

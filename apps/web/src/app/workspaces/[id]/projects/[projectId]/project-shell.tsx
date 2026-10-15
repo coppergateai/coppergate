@@ -18,6 +18,8 @@ type Props = {
   capMicros: number;
   currency: string;
   taskCount: number;
+  pendingApprovals: number;
+  lastRunStatus: string | null;
   initialTab: ProjectTab;
   overview: ReactNode;
   delivery: ReactNode;
@@ -53,6 +55,8 @@ export function ProjectShell({
   capMicros,
   currency,
   taskCount,
+  pendingApprovals,
+  lastRunStatus,
   initialTab,
   overview,
   delivery,
@@ -115,6 +119,14 @@ export function ProjectShell({
               {budgetStatus === "paused" ? "Paused" : "Budget"}{" "}
               {formatCap(capMicros, currency)}
             </span>
+            {pendingApprovals > 0 ? (
+              <span className={`${styles.chip} ${styles.chipWarn}`}>
+                {pendingApprovals} pending
+              </span>
+            ) : null}
+            {lastRunStatus ? (
+              <span className={styles.chip}>Run {lastRunStatus}</span>
+            ) : null}
             {stack !== "nextjs_ts" ? (
               <span className={`${styles.chip} ${styles.chipMute}`}>
                 Agent best-effort

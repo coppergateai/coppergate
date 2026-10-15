@@ -7,7 +7,7 @@ export function AnnouncementBar() {
         <div className={styles.announceLeft}>
           <span className={styles.announceDot} aria-hidden="true" />
           <p className={styles.announceText}>
-            Private beta — Signal→Arena live. Selection over supervision.
+            Private beta — Agents compete. Survivors ship.
           </p>
         </div>
         <a className={styles.announceLink} href="mailto:hello@coppergate.ai">

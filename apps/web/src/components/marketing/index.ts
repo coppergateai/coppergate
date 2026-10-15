@@ -1,8 +1,11 @@
 export { AnnouncementBar } from "./announcement-bar";
+export { ArenaPreviewSection } from "./arena-preview-section";
 export { CapabilityStrip } from "./capability-strip";
+export { EvidenceSection } from "./evidence-section";
 export { FaqBlock } from "./faq-block";
 export { FeatureShowcase } from "./feature-showcase";
 export { FinalCta } from "./final-cta";
+export { FitnessSection } from "./fitness-section";
 export { HeroSection } from "./hero-section";
 export { MarketingFooter } from "./marketing-footer";
 export { MarketingHeader } from "./marketing-header";

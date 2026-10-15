@@ -23,18 +23,23 @@ type RuleRow = {
   armArena: boolean;
 };
 
+type ProjectOption = { id: string; name: string };
+
 type Props = {
   workspaceId: string;
   isOwner: boolean;
+  projects: ProjectOption[];
 };
 
-export function SignalsPanel({ workspaceId, isOwner }: Props) {
+export function SignalsPanel({ workspaceId, isOwner, projects }: Props) {
   const router = useRouter();
   const [events, setEvents] = useState<SignalRow[]>([]);
   const [rules, setRules] = useState<RuleRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [testTitle, setTestTitle] = useState("Fake high-sev signal");
+  const [armProjectId, setArmProjectId] = useState(projects[0]?.id ?? "");
+  const [armError, setArmError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     void fetch(`/api/workspaces/${workspaceId}/signals`, {
@@ -59,6 +64,12 @@ export function SignalsPanel({ workspaceId, isOwner }: Props) {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!armProjectId && projects[0]?.id) {
+      setArmProjectId(projects[0].id);
+    }
+  }, [projects, armProjectId]);
+
   if (!isOwner) {
     return (
       <section className={styles.section}>
@@ -74,6 +85,30 @@ export function SignalsPanel({ workspaceId, isOwner }: Props) {
 
   function copyText(value: string) {
     void navigator.clipboard?.writeText(value);
+  }
+
+  function armSignal(signalId: string) {
+    setArmError(null);
+    if (!armProjectId) {
+      setArmError("Select a project to arm into (needs an approved brief).");
+      return;
+    }
+    void fetch(`/api/workspaces/${workspaceId}/signals/${signalId}/arm`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId: armProjectId }),
+    })
+      .then(async (res) => {
+        const body = (await res.json()) as { error?: { message?: string } };
+        if (!res.ok) {
+          throw new Error(body.error?.message ?? "Arm failed");
+        }
+        load();
+      })
+      .catch((err: unknown) =>
+        setArmError(err instanceof Error ? err.message : String(err)),
+      );
   }
 
   return (
@@ -147,14 +182,19 @@ export function SignalsPanel({ workspaceId, isOwner }: Props) {
                   title: testTitle,
                   severity: "high",
                   body: "Owner test ingest from settings",
+                  projectId: armProjectId || undefined,
                 }),
               })
                 .then(async (res) => {
                   const body = (await res.json()) as {
                     error?: { message?: string };
+                    event?: { status?: string; errorMessage?: string | null };
                   };
                   if (!res.ok) {
                     throw new Error(body.error?.message ?? "Ingest failed");
+                  }
+                  if (body.event?.status === "failed" && body.event.errorMessage) {
+                    setError(body.event.errorMessage);
                   }
                   load();
                   router.refresh();
@@ -228,60 +268,71 @@ export function SignalsPanel({ workspaceId, isOwner }: Props) {
 
         <div className={styles.panel}>
           <h3 className={styles.sectionLabel}>Inbox</h3>
+          {projects.length > 0 ? (
+            <label className={styles.field}>
+              Arm into project
+              <select
+                className={styles.select}
+                value={armProjectId}
+                onChange={(e) => setArmProjectId(e.target.value)}
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className={styles.note}>
+              Bind a project first, then approve a brief before arming.
+            </p>
+          )}
+          {armError ? <p className={styles.error}>{armError}</p> : null}
           {events.length === 0 ? (
             <p className={styles.note}>No signals received.</p>
           ) : (
             <ul className={styles.signalList}>
               {events.map((ev) => (
                 <li key={ev.id} className={styles.signalItem}>
-                <strong>
-                  [{ev.status}] {ev.provider}/{ev.severity}
-                </strong>
-                <div>{ev.title}</div>
-                <div className={styles.note}>
-                  {new Date(ev.receivedAt).toLocaleString()}
-                  {ev.taskId ? ` · task ${ev.taskId}` : null}
-                  {ev.errorMessage ? ` · ${ev.errorMessage}` : null}
-                </div>
-                {ev.status === "received" || ev.status === "failed" ? (
-                  <div className={styles.btnRow}>
-                    <button
-                      type="button"
-                      className={styles.primaryBtn}
-                      onClick={() => {
-                        void fetch(
-                          `/api/workspaces/${workspaceId}/signals/${ev.id}/arm`,
-                          {
-                            method: "POST",
-                            credentials: "same-origin",
-                            headers: { "Content-Type": "application/json" },
-                            body: "{}",
-                          },
-                        ).then(() => load());
-                      }}
-                    >
-                      Arm arena
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.ghostBtn}
-                      onClick={() => {
-                        void fetch(
-                          `/api/workspaces/${workspaceId}/signals/${ev.id}/arm`,
-                          {
-                            method: "DELETE",
-                            credentials: "same-origin",
-                          },
-                        ).then(() => load());
-                      }}
-                    >
-                      Dismiss
-                    </button>
+                  <strong>
+                    [{ev.status}] {ev.provider}/{ev.severity}
+                  </strong>
+                  <div>{ev.title}</div>
+                  <div className={styles.note}>
+                    {new Date(ev.receivedAt).toLocaleString()}
+                    {ev.taskId ? ` · task ${ev.taskId}` : null}
+                    {ev.errorMessage ? ` · ${ev.errorMessage}` : null}
                   </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+                  {ev.status === "received" || ev.status === "failed" ? (
+                    <div className={styles.btnRow}>
+                      <button
+                        type="button"
+                        className={styles.primaryBtn}
+                        onClick={() => armSignal(ev.id)}
+                      >
+                        Arm
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.ghostBtn}
+                        onClick={() => {
+                          void fetch(
+                            `/api/workspaces/${workspaceId}/signals/${ev.id}/arm`,
+                            {
+                              method: "DELETE",
+                              credentials: "same-origin",
+                            },
+                          ).then(() => load());
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>
