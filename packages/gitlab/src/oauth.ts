@@ -7,7 +7,7 @@ export type GitlabProfile = {
 };
 
 export type GitlabOAuthConfig = {
-  /** Origin only, e.g. https://gitlab.com or https://gitlab.trendyol.com */
+  /** Origin only, e.g. https://gitlab.com or https://gitlab.shopify.com */
   baseUrl: string;
   clientId: string;
   clientSecret: string;

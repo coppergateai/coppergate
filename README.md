@@ -69,7 +69,7 @@ Public `/` is the early-access landing (Phase 0). Signups go to `waitlist_signup
 
 ## Self-host (community / MIT)
 
-Run web + worker + Postgres on your own domain (e.g. `https://coppergate.trendyol.com`) with GitHub and/or GitLab:
+Run web + worker + Postgres on your own domain (e.g. `https://coppergate.shopify.com`) with GitHub and/or GitLab:
 
 ```bash
 cp .env.selfhost.example .env.selfhost
