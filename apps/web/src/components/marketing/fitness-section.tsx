@@ -10,7 +10,7 @@ export function FitnessSection() {
   return (
     <section
       id="fitness"
-      className={`${styles.section} ${styles.fitnessSection}`}
+      className={`${styles.section} ${styles.fitnessSection} ${styles.sectionQuiet}`}
       aria-labelledby="fitness-title"
     >
       <div className={styles.sectionInnerNarrow}>

@@ -6,9 +6,7 @@ export function AnnouncementBar() {
       <div className={styles.announceInner}>
         <div className={styles.announceLeft}>
           <span className={styles.announceDot} aria-hidden="true" />
-          <p className={styles.announceText}>
-            Private beta — Agents compete. Survivors ship.
-          </p>
+          <p className={styles.announceText}>Private beta · design partners</p>
         </div>
         <a className={styles.announceLink} href="mailto:hello@coppergate.ai">
           Talk to us
