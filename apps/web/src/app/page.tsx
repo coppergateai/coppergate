@@ -1,8 +1,10 @@
 import {
+  ArenaPreviewSection,
   CapabilityStrip,
+  EvidenceSection,
   FaqBlock,
-  FeatureShowcase,
   FinalCta,
+  FitnessSection,
   HeroSection,
   SecuritySection,
   SignalAdaptersSection,
@@ -22,9 +24,11 @@ export default async function HomePage() {
       <JsonLd />
       <HeroSection signedIn={Boolean(user)} />
       <CapabilityStrip />
+      <ArenaPreviewSection />
       <SurvivorWorkflow />
+      <EvidenceSection />
+      <FitnessSection />
       <SignalAdaptersSection />
-      <FeatureShowcase />
       <SecuritySection />
       <FaqBlock />
       <FinalCta signedInLogin={user?.login ?? null} />

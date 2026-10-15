@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import type { SerializedApproval } from "@/lib/approval";
 import styles from "./inbox.module.css";
@@ -228,6 +234,45 @@ export function InboxShell({
     }
   }
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (pendingAction) return;
+
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const idx = rows.findIndex((r) => r.id === selected?.id);
+        const next = rows[Math.min(rows.length - 1, Math.max(0, idx) + 1)];
+        if (next) selectRow(next.id);
+        return;
+      }
+      if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const idx = rows.findIndex((r) => r.id === selected?.id);
+        const next = rows[Math.max(0, (idx < 0 ? 0 : idx) - 1)];
+        if (next) selectRow(next.id);
+        return;
+      }
+      if (e.key === "Enter" && selected?.href) {
+        e.preventDefault();
+        router.push(selected.href);
+        return;
+      }
+      if (e.key === "a" && canManage) {
+        e.preventDefault();
+        void approveSelected();
+        return;
+      }
+      if (e.key === "r" && canManage) {
+        e.preventDefault();
+        void resolveSelected("rejected");
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const counts = {
     pending: pending.length,
     brief: pending.filter((a) => a.targetType === "brief").length,
@@ -268,12 +313,19 @@ export function InboxShell({
             </span>
           </div>
         </div>
-        <Link
-          href={`/workspaces/${workspaceId}/projects`}
-          className={styles.toolbarGhost}
-        >
-          Projects
-        </Link>
+        <div className={styles.pageBarRight}>
+          {canManage ? (
+            <span className={styles.kbdHint}>j/k · a approve · r reject · ↵</span>
+          ) : (
+            <span className={styles.kbdHint}>j/k · ↵ open</span>
+          )}
+          <Link
+            href={`/workspaces/${workspaceId}/projects`}
+            className={styles.toolbarGhost}
+          >
+            Projects
+          </Link>
+        </div>
       </header>
 
       <div className={styles.tabs} role="tablist" aria-label="Inbox filters">

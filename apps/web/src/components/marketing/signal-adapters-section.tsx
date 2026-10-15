@@ -40,6 +40,28 @@ type Category = {
   durationSec: number;
 };
 
+/** Outcome-first examples — adapters exist in `@coppergate/signals`. */
+const workflows = [
+  {
+    source: "Sentry",
+    path: "Error detected → Arena → Verified fix PR",
+    status: "Private beta",
+    note: "Inbound webhook arms a bounded fixer tournament when configured.",
+  },
+  {
+    source: "Jira",
+    path: "Engineering issue → Arena → Candidate implementation",
+    status: "Private beta",
+    note: "Issue webhooks map to tasks; delivery is still PR/MR review.",
+  },
+  {
+    source: "GitHub CI",
+    path: "Failed workflow → Arena → Proposed repair",
+    status: "Private beta",
+    note: "CI failure adapters can arm repair contests against the failing SHA.",
+  },
+] as const;
+
 const categories: Category[] = [
   {
     label: "Quality & security",
@@ -100,7 +122,6 @@ const categories: Category[] = [
   },
 ];
 
-/** Enough copies that half the strip stays wider than the viewport. */
 function loopItems(items: Integration[]): Integration[] {
   const copies = items.length <= 3 ? 6 : items.length <= 5 ? 4 : 3;
   return Array.from({ length: copies }, () => items).flat();
@@ -132,20 +153,35 @@ export function SignalAdaptersSection() {
       aria-labelledby="signals-title"
     >
       <div className={styles.sectionInner}>
-        <p className={styles.sectionEyebrow}>Signal → Arena</p>
+        <p className={styles.sectionEyebrow}>Integrations</p>
         <h2 id="signals-title" className={styles.sectionTitle}>
-          Popular integrations
+          From signal to verified PR.
         </h2>
         <p className={styles.sectionLede}>
-          Webhooks from tools you already run — verified, deduped, then armed as
-          a bounded tournament. Survivors ship as PRs.
+          Webhooks from tools you already run can arm a bounded Arena. Delivery
+          is still a reviewable PR or MR — not an unattended merge.
         </p>
+
+        <ul className={styles.workflowOutcomes}>
+          {workflows.map((w) => (
+            <li key={w.source} className={styles.workflowOutcome}>
+              <div className={styles.workflowOutcomeTop}>
+                <h3>{w.source}</h3>
+                <span className={styles.statusQuiet}>{w.status}</span>
+              </div>
+              <p className={styles.workflowPath}>{w.path}</p>
+              <p className={styles.workflowNote}>{w.note}</p>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className={styles.integrationRows}>
+        <p className={styles.integrationRowsCaption}>
+          Adapter surface in private beta — enable per workspace after invite.
+        </p>
         {categories.map((cat) => {
           const loop = loopItems(cat.items);
-          const mid = loop.length / 2;
           return (
             <div key={cat.label} className={styles.integrationRow}>
               <h3 className={styles.integrationCat}>{cat.label}</h3>
@@ -163,7 +199,7 @@ export function SignalAdaptersSection() {
                     <Pill
                       key={`${item.name}-${i}`}
                       item={item}
-                      decorative={i >= mid}
+                      decorative={i >= loop.length / 2}
                     />
                   ))}
                 </ul>

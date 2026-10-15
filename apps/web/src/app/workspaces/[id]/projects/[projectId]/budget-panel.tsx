@@ -175,6 +175,45 @@ export function BudgetPanel({
             >
               {pending ? "Saving…" : "Save cap"}
             </button>
+            {usage.capMicros === 0 ? (
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                disabled={pending}
+                onClick={() => {
+                  setCapDollars("5.00");
+                  setPending(true);
+                  setError(null);
+                  void fetch(`/api/projects/${projectId}/budget`, {
+                    method: "PUT",
+                    credentials: "same-origin",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      workspaceId,
+                      capMicros: 5_000_000,
+                      status: "active",
+                    }),
+                  })
+                    .then(async (res) => {
+                      const body = (await res.json()) as {
+                        error?: { message: string };
+                      };
+                      if (!res.ok) {
+                        throw new Error(body.error?.message ?? "Save failed");
+                      }
+                      router.refresh();
+                    })
+                    .catch((err: unknown) =>
+                      setError(
+                        err instanceof Error ? err.message : "Save failed",
+                      ),
+                    )
+                    .finally(() => setPending(false));
+                }}
+              >
+                Set $5 cap
+              </button>
+            ) : null}
             <button
               type="button"
               className={styles.ghostBtn}

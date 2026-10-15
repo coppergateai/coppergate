@@ -1,64 +1,37 @@
 "use client";
 
 import { useState } from "react";
+import {
+  ILLUSTRATIVE_ARENA,
+  ILLUSTRATIVE_CONTENDERS,
+  formatUsd,
+} from "./arena-demo-data";
 import styles from "./marketing.module.css";
 
-const contenders = [
-  {
-    id: "a",
-    name: "Contender A",
-    status: "Survivor",
-    statusTone: "win" as const,
-    fitness: 0.91,
-    spend: 14.2,
-    ci: "Passing",
-    tests: "42 passed",
-    policy: "Compliant",
-    promote: "Ready · PR #128",
-  },
-  {
-    id: "b",
-    name: "Contender B",
-    status: "Running",
-    statusTone: "run" as const,
-    fitness: 0.76,
-    spend: 11.8,
-    ci: "Passing",
-    tests: "38 passed",
-    policy: "Compliant",
-    promote: "Competing",
-  },
-  {
-    id: "c",
-    name: "Contender C",
-    status: "Eliminated",
-    statusTone: "out" as const,
-    fitness: 0.41,
-    spend: 9.4,
-    ci: "Failed",
-    tests: "3 failed",
-    policy: "Blocked path",
-    promote: "Stopped",
-    muted: true,
-  },
-] as const;
+type Props = {
+  /** Slimmer chrome for the hero column. */
+  compact?: boolean;
+};
 
-const tabs = ["Overview", "Contenders", "Evidence", "Delivery"] as const;
+function toneClass(tone: string) {
+  if (tone === "win") return styles.statusPillWin;
+  if (tone === "out") return styles.statusPillOut;
+  if (tone === "reject") return styles.statusPillReject;
+  return styles.statusPillRun;
+}
 
-const timeline = [
-  { id: "armed", label: "Arena armed", state: "done" as const },
-  { id: "fanout", label: "Tournament", state: "done" as const },
-  { id: "fitness", label: "Fitness", state: "active" as const },
-  { id: "promote", label: "Survivor", state: "next" as const },
-];
-
-export function ProductPreview() {
+export function ProductPreview({ compact = false }: Props) {
   const [active, setActive] = useState("a");
-  const selected = contenders.find((c) => c.id === active) ?? contenders[0];
+  const fallback = ILLUSTRATIVE_CONTENDERS[0]!;
+  const selected =
+    ILLUSTRATIVE_CONTENDERS.find((c) => c.id === active) ?? fallback;
 
   return (
-    <div className={styles.previewShell} aria-hidden="true">
-      <span className={styles.previewDemo}>Demo data</span>
+    <div
+      className={`${styles.previewShell} ${compact ? styles.previewCompact : ""}`}
+      aria-hidden="true"
+    >
+      <span className={styles.previewDemo}>{ILLUSTRATIVE_ARENA.label}</span>
 
       <div className={styles.previewChrome}>
         <div className={styles.previewDots}>
@@ -67,36 +40,24 @@ export function ProductPreview() {
           <span />
         </div>
         <p className={styles.previewCrumb}>
-          Arena <span>/</span> Subscription Tracker
+          Arena <span>/</span> Checkout race
         </p>
-        <span className={styles.previewBadge}>Live · demo</span>
-      </div>
-
-      <div className={styles.previewTabs}>
-        {tabs.map((tab) => (
-          <span
-            key={tab}
-            className={
-              tab === "Contenders"
-                ? `${styles.previewTab} ${styles.previewTabActive}`
-                : styles.previewTab
-            }
-          >
-            {tab}
-          </span>
-        ))}
+        <span className={styles.previewBadge}>Illustrative</span>
       </div>
 
       <div className={styles.previewTop}>
         <div>
-          <p className={styles.previewTitle}>Subscription Tracker MVP</p>
+          <p className={styles.previewTitle}>{ILLUSTRATIVE_ARENA.task}</p>
           <p className={styles.previewRepo}>
-            acme / subscription-tracker · goal bound · kill-switch armed
+            {ILLUSTRATIVE_ARENA.repo} · goal bound · kill-switch armed
           </p>
         </div>
         <div className={styles.previewBudgetChip}>
           <span>Budget</span>
-          <strong>$35.4 / $50</strong>
+          <strong>
+            {formatUsd(ILLUSTRATIVE_ARENA.totalSpendUsd)} /{" "}
+            {formatUsd(ILLUSTRATIVE_ARENA.budgetUsd)}
+          </strong>
         </div>
       </div>
 
@@ -104,7 +65,7 @@ export function ProductPreview() {
         <div className={styles.previewMain}>
           <p className={styles.previewLabel}>Contenders</p>
           <ul className={styles.contenderList}>
-            {contenders.map((c) => (
+            {ILLUSTRATIVE_CONTENDERS.map((c) => (
               <li key={c.id}>
                 <button
                   type="button"
@@ -115,13 +76,7 @@ export function ProductPreview() {
                   <div className={styles.contenderTop}>
                     <span className={styles.contenderName}>{c.name}</span>
                     <span
-                      className={`${styles.statusPill} ${
-                        c.statusTone === "win"
-                          ? styles.statusPillWin
-                          : c.statusTone === "out"
-                            ? styles.statusPillOut
-                            : styles.statusPillRun
-                      }`}
+                      className={`${styles.statusPill} ${toneClass(c.statusTone)}`}
                     >
                       {c.status}
                     </span>
@@ -130,12 +85,13 @@ export function ProductPreview() {
                     <span className={styles.contenderFitness}>
                       {c.fitness.toFixed(2)}
                     </span>
-                    <span className={styles.contenderSpend}>${c.spend}</span>
+                    <span className={styles.contenderSpend}>
+                      {formatUsd(c.spendUsd)}
+                    </span>
                   </div>
                   <div className={styles.barTrack}>
                     <div
-                      key={`${active}-${c.id}`}
-                      className={`${styles.barFill} ${"muted" in c && c.muted ? styles.barFillMuted : ""}`}
+                      className={`${styles.barFill} ${c.muted ? styles.barFillMuted : ""}`}
                       style={{ width: `${Math.round(c.fitness * 100)}%` }}
                     />
                   </div>
@@ -166,9 +122,7 @@ export function ProductPreview() {
             <li>
               <span
                 className={
-                  selected.tests.includes("failed")
-                    ? styles.checkBad
-                    : styles.checkOk
+                  selected.testsFailed > 0 ? styles.checkBad : styles.checkOk
                 }
               />
               Tests · {selected.tests}
@@ -185,46 +139,11 @@ export function ProductPreview() {
             </li>
           </ul>
 
-          <div className={styles.budgetBlock}>
-            <div className={styles.budgetTop}>
-              <span>Spend</span>
-              <span>
-                ${selected.spend.toFixed(1)} used · $12.0 reserved · $50 total
-              </span>
-            </div>
-            <div className={styles.barTrack}>
-              <div
-                key={`budget-${selected.id}`}
-                className={styles.barFill}
-                style={{ width: `${(selected.spend / 50) * 100}%` }}
-              />
-            </div>
-          </div>
-
           <div className={styles.promoteLine}>
-            <span>Promotion</span>
+            <span>Outcome</span>
             <strong>{selected.promote}</strong>
           </div>
         </aside>
-      </div>
-
-      <div className={styles.pipeline}>
-        {timeline.map((node, i) => (
-          <div
-            key={node.id}
-            className={`${styles.pipelineNode} ${
-              node.state === "active"
-                ? styles.pipelineActive
-                : node.state === "done"
-                  ? styles.pipelineDone
-                  : styles.pipelineNext
-            }`}
-          >
-            {i > 0 ? <span className={styles.pipelineWire} /> : null}
-            <span className={styles.pipelineDot} />
-            <span className={styles.pipelineLabel}>{node.label}</span>
-          </div>
-        ))}
       </div>
     </div>
   );

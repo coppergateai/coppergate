@@ -1,6 +1,6 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
-import { agentRuns, tasks, usageEvents } from "./schema.js";
+import { agentRuns, projects, tasks, usageEvents } from "./schema.js";
 
 export type CostAnalytics30d = {
   windowDays: number;
@@ -95,6 +95,146 @@ export type RetentionSnapshot = {
   tasksAccepted: number;
   tasksWithPr: number;
 };
+
+export type ProjectCostExplorer = {
+  windowDays: number;
+  spentMicros: number;
+  topTasks: Array<{
+    taskId: string;
+    title: string | null;
+    spentMicros: number;
+  }>;
+};
+
+/** Project spend strip: N-day total + top tasks by usage. */
+export async function getProjectCostExplorer(
+  db: Database,
+  input: { workspaceId: string; projectId: string; days?: number },
+): Promise<ProjectCostExplorer> {
+  const days = input.days ?? 7;
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const [bound] = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(
+      and(
+        eq(projects.id, input.projectId),
+        eq(projects.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!bound) {
+    return { windowDays: days, spentMicros: 0, topTasks: [] };
+  }
+
+  const usage = await db
+    .select({
+      taskId: usageEvents.taskId,
+      cost: usageEvents.costMicros,
+    })
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.workspaceId, input.workspaceId),
+        eq(usageEvents.projectId, input.projectId),
+        gte(usageEvents.createdAt, since),
+      ),
+    );
+
+  const spentMicros = usage.reduce((s, u) => s + (u.cost || 0), 0);
+  const byTask = new Map<string, number>();
+  for (const u of usage) {
+    if (!u.taskId) continue;
+    byTask.set(u.taskId, (byTask.get(u.taskId) ?? 0) + (u.cost || 0));
+  }
+
+  const ranked = [...byTask.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const taskIds = ranked.map(([id]) => id);
+  const titleById = new Map<string, string>();
+  if (taskIds.length) {
+    const rows = await db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(inArray(tasks.id, taskIds));
+    for (const r of rows) titleById.set(r.id, r.title);
+  }
+
+  return {
+    windowDays: days,
+    spentMicros,
+    topTasks: ranked.map(([taskId, cost]) => ({
+      taskId,
+      title: titleById.get(taskId) ?? null,
+      spentMicros: cost,
+    })),
+  };
+}
+
+/** Workspace rollup for cost strip: 7d spend per project. */
+export async function getWorkspaceCostExplorer(
+  db: Database,
+  input: { workspaceId: string; days?: number },
+): Promise<{
+  windowDays: number;
+  spentMicros: number;
+  projects: Array<{
+    projectId: string;
+    name: string;
+    spentMicros: number;
+  }>;
+}> {
+  const days = input.days ?? 7;
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const usage = await db
+    .select({
+      projectId: usageEvents.projectId,
+      cost: usageEvents.costMicros,
+    })
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.workspaceId, input.workspaceId),
+        gte(usageEvents.createdAt, since),
+      ),
+    );
+
+  const byProject = new Map<string, number>();
+  for (const u of usage) {
+    byProject.set(
+      u.projectId,
+      (byProject.get(u.projectId) ?? 0) + (u.cost || 0),
+    );
+  }
+
+  const projectIds = [...byProject.keys()];
+  const nameById = new Map<string, string>();
+  if (projectIds.length) {
+    const rows = await db
+      .select({ id: projects.id, name: projects.name })
+      .from(projects)
+      .where(inArray(projects.id, projectIds));
+    for (const r of rows) nameById.set(r.id, r.name);
+  }
+
+  const projectRows = [...byProject.entries()]
+    .map(([projectId, spent]) => ({
+      projectId,
+      name: nameById.get(projectId) ?? "Project",
+      spentMicros: spent,
+    }))
+    .sort((a, b) => b.spentMicros - a.spentMicros);
+
+  return {
+    windowDays: days,
+    spentMicros: projectRows.reduce((s, p) => s + p.spentMicros, 0),
+    projects: projectRows,
+  };
+}
 
 /** TASK047 — lightweight retention snapshot for operators. */
 export async function getRetentionSnapshot(

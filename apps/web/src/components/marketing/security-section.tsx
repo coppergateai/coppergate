@@ -5,46 +5,52 @@ const items = [
   {
     title: "Repository boundaries",
     body: "GitHub App installs are scoped to the orgs and repos you choose. Identity OAuth stays separate from repo access.",
+    availability: "Available",
   },
   {
     title: "Budget enforcement",
     body: "Project spend caps and reservations stop runaway work. Exhausted paths exit the pool instead of burning unlimited credits.",
+    availability: "Available",
   },
   {
     title: "Execution policies",
-    body: "Forbidden paths, secrets, and production-write gates constrain what agents can touch while the arena runs.",
+    body: "Forbidden paths, secrets, and production-write gates constrain what agents can touch while the Arena runs.",
+    availability: "Available",
   },
   {
     title: "Evidence-based evaluation",
-    body: "CI, Sonar, coverage, e2e, and critic signals travel with runs so promotion decisions are inspectable after the fact.",
+    body: "CI, Sonar, coverage, e2e, and critic signals travel with runs so promotion decisions stay inspectable.",
+    availability: "Available",
   },
   {
-    title: "Kill-switch behavior",
-    body: "Cooperative cancel and arena-level stop are first-class. You can halt work without waiting for an agent to finish politely.",
+    title: "Kill-switch",
+    body: "Cooperative cancel and Arena-level stop are first-class. You can halt work without waiting for an agent to finish.",
+    availability: "Available",
   },
   {
     title: "Signal ingress controls",
-    body: "Webhook secrets, fingerprint dedupe, and per-workspace / provider storm quotas keep inbound floods from burning budget.",
+    body: "Webhook secrets, fingerprint dedupe, and per-workspace storm quotas keep inbound floods from burning budget.",
+    availability: "Private beta",
   },
 ] as const;
 
 export function SecuritySection() {
   return (
     <section
-      id="security-overview"
+      id="controls"
       className={styles.section}
-      aria-labelledby="security-title"
+      aria-labelledby="controls-title"
     >
       <div className={styles.sectionInner}>
-        <p className={styles.sectionEyebrow}>Trust</p>
-        <h2 id="security-title" className={styles.sectionTitle}>
-          Autonomy with boundaries.
+        <p className={styles.sectionEyebrow}>Controls & safety</p>
+        <h2 id="controls-title" className={styles.sectionTitle}>
+          Autonomy with hard boundaries.
         </h2>
         <p className={styles.sectionLede}>
-          Coppergate is built for controlled autonomy — not unbounded agent
-          access.{" "}
-          <Link href="/security" style={{ color: "var(--copper-hot)" }}>
-            Read the security overview
+          Coppergate is built for controlled competition — not unbounded agent
+          access. Status labels below reflect what ships in private beta today.{" "}
+          <Link href="/security" className={styles.inlineDocLink}>
+            Security overview
           </Link>
           .
         </p>
@@ -52,7 +58,10 @@ export function SecuritySection() {
         <div className={styles.securityGrid}>
           {items.map((item) => (
             <article key={item.title} className={styles.securityItem}>
-              <h3>{item.title}</h3>
+              <div className={styles.securityItemTop}>
+                <h3>{item.title}</h3>
+                <span className={styles.statusQuiet}>{item.availability}</span>
+              </div>
               <p>{item.body}</p>
             </article>
           ))}

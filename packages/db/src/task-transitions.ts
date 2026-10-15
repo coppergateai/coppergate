@@ -16,6 +16,7 @@ import {
 import type { Database } from "./client.js";
 import { assertCanStartTasks, recordAuditEvent } from "./briefs.js";
 import { runHasBlockingCi } from "./ci-evidence.js";
+import { notifyWorkspace } from "./notify.js";
 import { enqueueAgentRun, listRunsForTask } from "./runs.js";
 import {
   githubInstallations,
@@ -279,6 +280,14 @@ export async function submitTaskForApproval(
     requestedBy: input.actor,
     riskSummary: ready.task.title,
   });
+
+  void notifyWorkspace(db, {
+    event: "approval_needed",
+    workspaceId: input.workspaceId,
+    projectId: ready.task.projectId,
+    taskId: ready.task.id,
+    message: `Task ready for approval: ${ready.task.title}`,
+  }).catch(() => undefined);
 
   return ready;
 }

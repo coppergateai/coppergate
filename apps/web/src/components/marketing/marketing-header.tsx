@@ -12,12 +12,12 @@ type Props = {
 };
 
 const links = [
+  { href: "/#arena", label: "Arena" },
   { href: "/#how-it-works", label: "How it works" },
-  { href: "/#signals", label: "Signals" },
-  { href: "/#features", label: "Product" },
-  { href: "/security", label: "Security" },
+  { href: "/#evidence", label: "Evidence" },
+  { href: "/#signals", label: "Integrations" },
+  { href: "/#controls", label: "Controls" },
   { href: "/#faq", label: "FAQ" },
-  { href: "/changelog", label: "Changelog" },
 ] as const;
 
 export function MarketingHeader({ signedIn }: Props) {

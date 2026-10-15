@@ -8,30 +8,30 @@ import styles from "./marketing.module.css";
 
 const items = [
   {
-    title: "AI Agent Arena",
-    body: "Multiple agents. One goal. Measurable competition.",
+    title: "Compete",
+    body: "Multiple agents attempt one engineering task in parallel.",
     Icon: IconArena,
   },
   {
-    title: "Signal → Arena",
-    body: "Jira, Sonar, Sentry, CI failures arm bounded contests.",
-    Icon: IconGithubNative,
-  },
-  {
-    title: "Evidence Driven",
-    body: "CI, Sonar, coverage, e2e, and critic fitness scores.",
+    title: "Verify",
+    body: "CI, tests, and policy gates qualify what can win.",
     Icon: IconEvidence,
   },
   {
-    title: "Human in Control",
-    body: "Spending limits, policies, and kill-switch.",
+    title: "Select",
+    body: "Efficiency ranks validated work — spend is priced in.",
+    Icon: IconGithubNative,
+  },
+  {
+    title: "Control",
+    body: "Budgets, policies, and kill-switch stay in your hands.",
     Icon: IconControl,
   },
 ] as const;
 
 export function CapabilityStrip() {
   return (
-    <section className={styles.caps} aria-label="Capabilities">
+    <section className={styles.caps} aria-label="Product pillars">
       <div className={styles.capsInner}>
         {items.map(({ title, body, Icon }) => (
           <div key={title} className={styles.capItem}>

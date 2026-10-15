@@ -6,6 +6,7 @@ import {
   resolvePendingApproval,
 } from "./approvals.js";
 import type { Database } from "./client.js";
+import { notifyWorkspace } from "./notify.js";
 import { redactPayload, redactString } from "./redact.js";
 import {
   auditEvents,
@@ -182,7 +183,7 @@ export async function createBriefDraft(
     content: BriefContentInput;
   },
 ): Promise<ProductBrief> {
-  return db.transaction(async (tx) => {
+  const brief = await db.transaction(async (tx) => {
     const [project] = await tx
       .select()
       .from(projects)
@@ -285,6 +286,16 @@ export async function createBriefDraft(
 
     return brief;
   });
+
+  void notifyWorkspace(db, {
+    event: "approval_needed",
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    message: `Brief ready for approval: ${brief.title}`,
+    meta: { briefId: brief.id, revision: brief.revision },
+  }).catch(() => undefined);
+
+  return brief;
 }
 
 export async function updateBriefDraft(
