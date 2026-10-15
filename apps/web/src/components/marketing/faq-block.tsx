@@ -22,15 +22,19 @@ const faqs = [
   },
   {
     q: "Is the efficiency contest live today?",
-    a: "Yes for armed arenas: N contenders fan out, the worker auto-resolves by efficiency payoff, and losers lose budget. Private beta still uses GitHub PR + CI as the fitness wedge; kill-switch and spend caps remain first-class.",
+    a: "Yes for armed arenas: N contenders fan out, the worker auto-resolves by efficiency payoff, and losers lose budget. Fitness now spans CI, Sonar, coverage, e2e, preview smoke, and more — kill-switch and spend caps stay first-class.",
+  },
+  {
+    q: "What are Signal Adapters?",
+    a: "Inbound webhooks from tools you already run — Jira, Linear, Sonar, Sentry, PagerDuty, CI failures, and others. Coppergate verifies and dedupes the event, then arms a bounded role tournament (fixer, engineer, security…). Notify goes out via Slack, Teams, or Discord.",
   },
   {
     q: "What happens when an agent hits its budget?",
     a: "Budget is natural selection. Weak contenders burn spend and drop out of the pool. Arena-level caps hard-stop runaway cost; you can kill the whole arena anytime.",
   },
   {
-    q: "What GitHub access do you need?",
-    a: "Sign-in uses GitHub OAuth for identity. Repository access comes through the GitHub App you install on the orgs and repos you choose. You can revoke either side from GitHub.",
+    q: "What SCM access do you need?",
+    a: "Sign-in uses GitHub or GitLab OAuth for identity. Repo delivery is PR/MR based (GitHub App, GitLab, with Bitbucket and Azure DevOps delivery paths). You choose which orgs and repos to connect and can revoke anytime.",
   },
   {
     q: "Can I stop a runaway arena?",

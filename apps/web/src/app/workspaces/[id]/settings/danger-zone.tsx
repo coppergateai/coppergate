@@ -20,21 +20,22 @@ export function DangerZone({ workspaceId, workspaceName, isOwner }: Props) {
 
   return (
     <section className={styles.section} aria-labelledby="danger-heading">
-      <h2 id="danger-heading" className={styles.sectionLabel}>
+      <h2 id="danger-heading" className={styles.sectionLabelDanger}>
         Danger zone
       </h2>
       <p className={styles.sectionLede}>
-        Soft-delete this workspace. GitHub credentials are revoked immediately.
-        Data is retained for 30 days, then purged.
+        Soft-delete this workspace. Connected SCM credentials are revoked
+        immediately. Data is retained for 30 days, then purged.
       </p>
       <div className={styles.dangerPanel}>
         <label className={styles.field}>
-          Type workspace name to confirm
+          Type <strong>{workspaceName}</strong> to confirm
           <input
             className={styles.input}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             placeholder={workspaceName}
+            autoComplete="off"
           />
         </label>
         <button

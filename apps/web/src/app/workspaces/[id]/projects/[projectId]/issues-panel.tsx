@@ -46,13 +46,16 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
   }, [load]);
 
   return (
-    <section className={styles.section} aria-labelledby="issues-heading">
+    <section
+      id="issues"
+      className={styles.section}
+      aria-labelledby="issues-heading"
+    >
       <h2 id="issues-heading" className={styles.sectionLabel}>
         GitHub issues → tasks
       </h2>
       <p className={styles.sectionLede}>
-        Import an open issue as a DRAFT task. Approve and run as usual; the PR
-        will include Closes #N.
+        Import an open issue as a draft task. The PR will include Closes #N.
         {repo ? ` · ${repo}` : null}
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}

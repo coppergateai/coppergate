@@ -99,3 +99,24 @@ export async function getUserById(
   const [row] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   return row;
 }
+
+/** Display name only — login/email/avatar stay SCM-sourced. */
+export async function updateUserDisplayName(
+  db: Database,
+  userId: string,
+  name: string | null,
+): Promise<User> {
+  const trimmed = name?.trim() || null;
+  const [row] = await db
+    .update(users)
+    .set({
+      name: trimmed,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId))
+    .returning();
+  if (!row) {
+    throw new Error("User not found");
+  }
+  return row;
+}

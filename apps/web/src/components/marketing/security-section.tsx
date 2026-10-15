@@ -16,15 +16,15 @@ const items = [
   },
   {
     title: "Evidence-based evaluation",
-    body: "CI, tests, and critic signals travel with runs so promotion decisions are inspectable after the fact.",
+    body: "CI, Sonar, coverage, e2e, and critic signals travel with runs so promotion decisions are inspectable after the fact.",
   },
   {
     title: "Kill-switch behavior",
     body: "Cooperative cancel and arena-level stop are first-class. You can halt work without waiting for an agent to finish politely.",
   },
   {
-    title: "GitHub delivery controls",
-    body: "PR-based fitness is the default wedge. Default-branch writes stay policy-gated until you explicitly enable them.",
+    title: "Signal ingress controls",
+    body: "Webhook secrets, fingerprint dedupe, and per-workspace / provider storm quotas keep inbound floods from burning budget.",
   },
 ] as const;
 

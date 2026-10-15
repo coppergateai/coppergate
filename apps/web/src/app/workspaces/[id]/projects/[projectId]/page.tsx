@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
   getLatestBriefForProject,
@@ -20,17 +21,28 @@ import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
 import { DeliveryBoard } from "./delivery-board";
 import { PlanPanel } from "./plan-panel";
+import {
+  parseProjectTab,
+  ProjectShell,
+} from "./project-shell";
 import styles from "./project-detail.module.css";
 
-type PageProps = { params: Promise<{ id: string; projectId: string }> };
+type PageProps = {
+  params: Promise<{ id: string; projectId: string }>;
+  searchParams: Promise<{ tab?: string }>;
+};
 
-export default async function ProjectDetailPage({ params }: PageProps) {
+export default async function ProjectDetailPage({
+  params,
+  searchParams,
+}: PageProps) {
   const user = await currentUser();
   if (!user) {
     redirect("/login");
   }
 
   const { id: workspaceId, projectId } = await params;
+  const sp = await searchParams;
   const access = await getWorkspaceForMember(db, workspaceId, user.id);
   if (!access) {
     notFound();
@@ -113,104 +125,137 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const showGuide =
     !hasApprovedBrief || !hasPlan || !hasBudget || !hasQueuedOrBeyond;
 
+  const isOwner = access.role === "owner";
+  const basePath = `/workspaces/${workspaceId}/projects/${projectId}`;
+
   return (
-      <main className={styles.main}>
-        <p className={styles.eyebrow}>Project</p>
-        <h1 className={styles.title}>{row.project.name}</h1>
-        <p className={styles.lede}>
-          {row.repository.baseRepoFullName} · {row.project.mode} ·{" "}
-          {row.project.stack}
-        </p>
-
-        {showGuide ? (
-          <div className={styles.path}>
-            <OnboardingGuide
-              compact
-              title="Path to first PR"
-              steps={[
-                {
-                  id: "budget",
-                  title: "Set an active spend cap",
-                  detail: "Budget panel below — pause blocks the worker.",
-                  done: hasBudget,
-                },
-                {
-                  id: "brief",
-                  title: "Generate and approve a brief",
-                  detail: "Keep scope tiny for the first delivery.",
-                  done: hasApprovedBrief,
-                },
-                {
-                  id: "plan",
-                  title: "Generate a plan",
-                  detail: "One small task is enough for the smoke path.",
-                  done: hasPlan,
-                },
-                {
-                  id: "task",
-                  title: "Submit + approve a task",
-                  detail: "Requires autonomy ≥ L1 and a running worker.",
-                  done: hasQueuedOrBeyond,
-                },
-              ]}
+    <Suspense fallback={null}>
+      <ProjectShell
+        workspaceId={workspaceId}
+        projectId={projectId}
+        name={row.project.name}
+        repoFullName={row.repository.baseRepoFullName}
+        mode={row.project.mode}
+        stack={row.project.stack}
+        autonomyLevel={row.project.autonomyLevel}
+        budgetStatus={usage.budgetStatus}
+        capMicros={usage.capMicros}
+        currency={usage.currency}
+        taskCount={boardTasks.length}
+        initialTab={parseProjectTab(sp.tab)}
+        overview={
+          <>
+            {showGuide ? (
+              <div className={styles.path}>
+                <OnboardingGuide
+                  compact
+                  title="Path to first PR"
+                  steps={[
+                    {
+                      id: "budget",
+                      title: "Set an active spend cap",
+                      detail:
+                        "Pause blocks the worker from claiming new runs.",
+                      href: hasBudget ? undefined : `${basePath}?tab=overview#budget`,
+                      ctaLabel: "Go to budget",
+                      done: hasBudget,
+                    },
+                    {
+                      id: "brief",
+                      title: "Generate and approve a brief",
+                      detail: "Keep scope tiny for the first delivery.",
+                      href: hasApprovedBrief
+                        ? undefined
+                        : `${basePath}?tab=overview#brief`,
+                      ctaLabel: "Go to brief",
+                      done: hasApprovedBrief,
+                    },
+                    {
+                      id: "plan",
+                      title: "Generate a plan",
+                      detail: "One small task is enough for the smoke path.",
+                      href: hasPlan
+                        ? undefined
+                        : `${basePath}?tab=delivery#plan`,
+                      ctaLabel: "Go to plan",
+                      done: hasPlan,
+                    },
+                    {
+                      id: "task",
+                      title: "Submit + approve a task",
+                      detail:
+                        "Requires autonomy ≥ L1 and a running worker.",
+                      href: hasQueuedOrBeyond
+                        ? undefined
+                        : `${basePath}?tab=delivery`,
+                      ctaLabel: "Open delivery",
+                      done: hasQueuedOrBeyond,
+                    },
+                  ]}
+                />
+              </div>
+            ) : null}
+            <BudgetPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              initialUsage={{
+                capMicros: usage.capMicros,
+                spentMicros: usage.spentMicros,
+                reservedMicros: usage.reservedMicros,
+                availableMicros: usage.availableMicros,
+                currency: usage.currency,
+                budgetStatus: usage.budgetStatus,
+              }}
+              isOwner={isOwner}
             />
-          </div>
-        ) : null}
-
-        <BudgetPanel
-          workspaceId={workspaceId}
-          projectId={projectId}
-          initialUsage={{
-            capMicros: usage.capMicros,
-            spentMicros: usage.spentMicros,
-            reservedMicros: usage.reservedMicros,
-            availableMicros: usage.availableMicros,
-            currency: usage.currency,
-            budgetStatus: usage.budgetStatus,
-          }}
-          isOwner={access.role === "owner"}
-        />
-
-        <BriefPanel
-          workspaceId={workspaceId}
-          projectId={projectId}
-          initialBrief={initialBrief}
-          isOwner={access.role === "owner"}
-        />
-
-        <PlanPanel
-          workspaceId={workspaceId}
-          projectId={projectId}
-          initialPlan={initialPlan}
-          hasApprovedBrief={hasApprovedBrief}
-          isOwner={access.role === "owner"}
-        />
-
-        <DeliveryBoard
-          workspaceId={workspaceId}
-          projectId={projectId}
-          tasks={boardTasks}
-        />
-
-        <IssuesPanel
-          workspaceId={workspaceId}
-          projectId={projectId}
-          isOwner={access.role === "owner"}
-        />
-
-        <MergePanel
-          workspaceId={workspaceId}
-          projectId={projectId}
-          initialMergeEnabled={row.project.mergeEnabled}
-          autonomyLevel={row.project.autonomyLevel}
-          isOwner={access.role === "owner"}
-        />
-
-        <ArenaPanel
-          workspaceId={workspaceId}
-          projectId={projectId}
-          isOwner={access.role === "owner"}
-        />
-      </main>
+            <BriefPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              initialBrief={initialBrief}
+              isOwner={isOwner}
+            />
+          </>
+        }
+        delivery={
+          <>
+            <PlanPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              initialPlan={initialPlan}
+              hasApprovedBrief={hasApprovedBrief}
+              isOwner={isOwner}
+            />
+            <DeliveryBoard
+              workspaceId={workspaceId}
+              projectId={projectId}
+              tasks={boardTasks}
+            />
+          </>
+        }
+        arena={
+          <ArenaPanel
+            workspaceId={workspaceId}
+            projectId={projectId}
+            isOwner={isOwner}
+          />
+        }
+        more={
+          <>
+            <IssuesPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              isOwner={isOwner}
+            />
+            <MergePanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              initialMergeEnabled={row.project.mergeEnabled}
+              autonomyLevel={row.project.autonomyLevel}
+              isOwner={isOwner}
+            />
+          </>
+        }
+      />
+    </Suspense>
   );
 }

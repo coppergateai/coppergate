@@ -186,3 +186,36 @@ export async function purgeLlmByokCredentials(
     .returning({ id: integrationCredentials.id });
   return result.length > 0;
 }
+
+/**
+ * TASK126 — rotate BYOK: revoke active + upsert new ciphertext in one audit trail.
+ */
+export async function rotateLlmByokCredential(
+  db: Database,
+  input: {
+    workspaceId: string;
+    encryptedPayload: string;
+    actor: string;
+    label?: string | null;
+  },
+): Promise<LlmByokMeta> {
+  await revokeLlmByok(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+  });
+  const meta = await upsertLlmByok(db, {
+    workspaceId: input.workspaceId,
+    encryptedPayload: input.encryptedPayload,
+    actor: input.actor,
+    label: input.label?.trim() || "rotated",
+  });
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "credentials.llm_byok.rotate",
+    targetType: "credential",
+    targetId: meta.id,
+    meta: { label: input.label ?? "rotated" },
+  });
+  return meta;
+}

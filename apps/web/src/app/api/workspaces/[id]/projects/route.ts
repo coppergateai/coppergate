@@ -1,5 +1,6 @@
 import {
   createProjectWithRepo,
+  getRepositoryConnectionForWorkspace,
   listProjectsForWorkspace,
   type ProjectMode,
 } from "@coppergate/db";
@@ -7,6 +8,7 @@ import { ApiError } from "@coppergate/errors";
 import { requireUser } from "@/lib/auth";
 import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
+import { detectStackForConnection } from "@/lib/detect-stack";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { mapProjectBindError, serializeProject } from "@/lib/project";
@@ -67,11 +69,39 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError("bad_request", "repositoryConnectionId is required");
     }
 
+    const mode = body.mode as ProjectMode;
+    let stack: string | undefined;
+    let stackDetection: { source: string; detail: string } | undefined;
+
+    if (mode === "existing_repo") {
+      const connection = await getRepositoryConnectionForWorkspace(
+        db,
+        workspaceId,
+        body.repositoryConnectionId,
+      );
+      if (connection) {
+        const detected = await detectStackForConnection(db, connection);
+        stack = String(detected.stack);
+        stackDetection = {
+          source: detected.source,
+          detail: detected.detail,
+        };
+      } else {
+        stack = "unknown";
+        stackDetection = {
+          source: "unknown",
+          detail: "connection not found before detect",
+        };
+      }
+    }
+
     const created = await createProjectWithRepo(db, {
       workspaceId,
       name: body.name,
-      mode: body.mode as ProjectMode,
+      mode,
       repositoryConnectionId: body.repositoryConnectionId,
+      stack,
+      stackDetection,
     }).catch(mapProjectBindError);
 
     logger.info("project created", {

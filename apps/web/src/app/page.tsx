@@ -5,6 +5,7 @@ import {
   FinalCta,
   HeroSection,
   SecuritySection,
+  SignalAdaptersSection,
   SurvivorWorkflow,
 } from "@/components/marketing";
 import { currentUser } from "@/lib/auth";
@@ -22,6 +23,7 @@ export default async function HomePage() {
       <HeroSection signedIn={Boolean(user)} />
       <CapabilityStrip />
       <SurvivorWorkflow />
+      <SignalAdaptersSection />
       <FeatureShowcase />
       <SecuritySection />
       <FaqBlock />

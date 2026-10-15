@@ -55,6 +55,8 @@ const envSchema = z.object({
   GITHUB_APP_PRIVATE_KEY: z.string().min(1).optional(),
   /** Webhook HMAC secret — optional until webhook endpoint is used. */
   GITHUB_WEBHOOK_SECRET: z.string().min(8).optional(),
+  /** Shared secret for Signal Adapter webhooks (D13) — optional until signals used. */
+  SIGNAL_WEBHOOK_SECRET: z.string().min(8).optional(),
   /** Optional LLM provider (OpenAI-compatible). Absent → FakeCodingAgent. */
   LLM_API_KEY: z.string().min(1).optional(),
   LLM_BASE_URL: z.string().url().optional(),

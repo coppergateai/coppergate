@@ -57,6 +57,7 @@ export function AppSidebar({
     pathname.match(/^\/workspaces\/([^/]+)/)?.[1] ??
     null;
   const onWorkspaceHome = pathname === "/workspaces";
+  const onProfile = pathname === "/profile" || pathname.startsWith("/profile/");
   const displayName = user?.name?.trim() || user?.login || "Account";
 
   return (
@@ -181,7 +182,7 @@ export function AppSidebar({
               }`}
               onClick={onClose}
             >
-              <span className={styles.navItemLabel}>Settings</span>
+              <span className={styles.navItemLabel}>Workspace settings</span>
             </Link>
 
             {nav && nav.projects.length > 0 ? (
@@ -212,7 +213,14 @@ export function AppSidebar({
         <Link href="/docs" className={styles.footerItem} onClick={onClose}>
           Documentation
         </Link>
-        <div className={styles.userRow}>
+        <Link
+          href="/profile"
+          className={`${styles.userRow} ${styles.userRowLink} ${
+            onProfile ? styles.userRowActive : ""
+          }`}
+          onClick={onClose}
+          aria-current={onProfile ? "page" : undefined}
+        >
           {user?.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -233,8 +241,9 @@ export function AppSidebar({
               <span className={styles.userLogin}>@{user.login}</span>
             ) : null}
           </div>
-          <LogoutButton className={styles.logoutLink}>Log out</LogoutButton>
-        </div>
+          <span className={styles.profileHint}>Profile</span>
+        </Link>
+        <LogoutButton className={styles.logoutLinkFooter}>Log out</LogoutButton>
       </div>
     </aside>
   );

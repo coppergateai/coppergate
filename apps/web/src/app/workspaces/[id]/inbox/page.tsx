@@ -1,107 +1,63 @@
-import Link from "next/link";
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
   getWorkspaceForMember,
-  listPendingApprovalsForWorkspace,
+  listInboxApprovalsForWorkspace,
+  listRecentDecidedApprovalsForWorkspace,
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
+import { serializeApproval } from "@/lib/approval";
 import { db } from "@/lib/db";
-import styles from "./inbox.module.css";
+import { InboxShell, type InboxTab } from "./inbox-shell";
 
-type PageProps = { params: Promise<{ id: string }> };
+type PageProps = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ a?: string; tab?: string }>;
+};
 
-function formatDate(d: Date) {
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+function parseTab(raw: string | undefined): InboxTab {
+  if (raw === "brief" || raw === "task" || raw === "recent") return raw;
+  return "pending";
 }
 
-export default async function WorkspaceInboxPage({ params }: PageProps) {
+export default async function WorkspaceInboxPage({
+  params,
+  searchParams,
+}: PageProps) {
   const user = await currentUser();
   if (!user) {
     redirect("/login");
   }
 
   const { id } = await params;
+  const sp = await searchParams;
   const access = await getWorkspaceForMember(db, id, user.id);
   if (!access) {
     notFound();
   }
 
-  const pending = await listPendingApprovalsForWorkspace(db, id);
+  const [pendingRows, recentRows] = await Promise.all([
+    listInboxApprovalsForWorkspace(db, id, { status: "pending" }),
+    listRecentDecidedApprovalsForWorkspace(db, id),
+  ]);
+
+  const pending = pendingRows.map((r) => serializeApproval(r, id));
+  const recent = recentRows.map((r) => serializeApproval(r, id));
+  const initialTab = parseTab(sp.tab);
+  const initialSelectedId =
+    typeof sp.a === "string" && sp.a.length > 0 ? sp.a : null;
 
   return (
-    <main className={styles.main}>
-      <header className={styles.pageBar}>
-        <div className={styles.pageBarLeft}>
-          <h1 className={styles.title}>Inbox</h1>
-          <div className={styles.chips}>
-            <span className={styles.chip}>{access.workspace.name}</span>
-            <span className={styles.chip}>
-              {pending.length} pending
-            </span>
-          </div>
-        </div>
-        <Link
-          href={`/workspaces/${id}/projects`}
-          className={styles.toolbarGhost}
-        >
-          Projects
-        </Link>
-      </header>
-
-      <div className={styles.body}>
-        {pending.length === 0 ? (
-          <div className={styles.empty}>
-            <p className={styles.emptyTitle}>No pending approvals</p>
-            <p className={styles.emptyBody}>
-              Human gates for briefs and tasks land here.{" "}
-              <Link
-                href={`/workspaces/${id}/projects`}
-                className={styles.emptyLink}
-              >
-                Open projects
-              </Link>
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className={styles.colHead} aria-hidden>
-              <span className={styles.colStatus} />
-              <span>Type</span>
-              <span>Summary</span>
-              <span>State</span>
-              <span className={styles.colDate}>Requested</span>
-            </div>
-            <ul className={styles.list}>
-              {pending.map((a) => {
-                const href = `/workspaces/${id}/projects/${a.projectId}`;
-                const label =
-                  a.riskSummary?.trim() ||
-                  `${a.targetType} ${a.targetId.slice(0, 8)}`;
-                return (
-                  <li key={a.id} className={styles.row}>
-                    <Link href={href} className={styles.rowLink}>
-                      <span
-                        className={`${styles.statusRing} ${styles.statusPending}`}
-                        aria-hidden
-                      />
-                      <span className={styles.rowId}>{a.targetType}</span>
-                      <span className={styles.rowTitle}>{label}</span>
-                      <span className={styles.rowPill}>Pending</span>
-                      <span className={styles.rowDate}>
-                        {formatDate(a.createdAt)}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-      </div>
-    </main>
+    <Suspense fallback={null}>
+      <InboxShell
+        workspaceId={id}
+        workspaceName={access.workspace.name}
+        canManage={access.role === "owner"}
+        pending={pending}
+        recent={recent}
+        initialTab={initialTab}
+        initialSelectedId={initialSelectedId}
+      />
+    </Suspense>
   );
 }

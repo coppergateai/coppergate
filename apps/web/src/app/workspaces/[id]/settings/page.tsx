@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
   getInstallationForWorkspace,
@@ -18,6 +19,8 @@ import {
   ProjectsBudgetPanel,
   type ProjectBudgetRow,
 } from "./projects-budget-panel";
+import { SettingsShell } from "./settings-shell";
+import { SignalsPanel } from "./signals-panel";
 import { WorkspaceSettingsForm } from "./settings-form";
 import styles from "./settings.module.css";
 
@@ -45,6 +48,7 @@ export default async function WorkspaceSettingsPage({
   const query = await searchParams;
   const githubFlag = typeof query.github === "string" ? query.github : undefined;
   const gitlabFlag = typeof query.gitlab === "string" ? query.gitlab : undefined;
+  const tabParam = typeof query.tab === "string" ? query.tab : undefined;
   const initialQuery = [
     githubFlag ? `github=${githubFlag}` : null,
     gitlabFlag ? `gitlab=${gitlabFlag}` : null,
@@ -52,7 +56,6 @@ export default async function WorkspaceSettingsPage({
     .filter(Boolean)
     .join("&") || undefined;
 
-  // Warm path for SSR consistency (panel still refetches client-side).
   await getInstallationForWorkspace(db, workspace.id);
   await listRepositoryConnections(db, workspace.id);
 
@@ -78,77 +81,108 @@ export default async function WorkspaceSettingsPage({
     }),
   );
 
+  const general = (
+    <div className={styles.stackWide}>
+      <section className={styles.section} aria-labelledby="workspace-heading">
+        <h2 id="workspace-heading" className={styles.sectionLabel}>
+          Workspace & autonomy
+        </h2>
+        <p className={styles.sectionLede}>
+          Name the workspace and set the default autonomy gate for new arenas.
+        </p>
+        {role === "owner" ? (
+          <WorkspaceSettingsForm
+            workspaceId={workspace.id}
+            initialName={workspace.name}
+            initialAutonomy={workspace.autonomyDefault}
+          />
+        ) : (
+          <dl className={styles.readOnly}>
+            <div>
+              <dt>Name</dt>
+              <dd>{workspace.name}</dd>
+            </div>
+            <div>
+              <dt>Autonomy default</dt>
+              <dd>{workspace.autonomyDefault}</dd>
+            </div>
+            <p className={styles.note}>Only owners can change settings.</p>
+          </dl>
+        )}
+      </section>
+
+      <ProjectsBudgetPanel
+        workspaceId={workspace.id}
+        isOwner={role === "owner"}
+        initialProjects={budgetRows}
+      />
+    </div>
+  );
+
+  const connections = (
+    <div className={styles.splitGrid}>
+      <GithubPanel
+        workspaceId={workspace.id}
+        canManage={role === "owner"}
+        initialQuery={initialQuery}
+      />
+      <GitlabPanel
+        workspaceId={workspace.id}
+        canManage={role === "owner"}
+        initialQuery={initialQuery}
+      />
+    </div>
+  );
+
+  const signals = (
+    <div className={styles.stackWide}>
+      <SignalsPanel workspaceId={workspace.id} isOwner={role === "owner"} />
+      <NotifyPanel
+        workspaceId={workspace.id}
+        isOwner={role === "owner"}
+        initialWebhookUrl={workspace.notifyWebhookUrl}
+        initialEmailEnabled={workspace.notifyEmailEnabled}
+      />
+    </div>
+  );
+
   return (
-      <main className={styles.main}>
-        <div className={styles.pageHead}>
-          <h1 className={styles.title}>Settings</h1>
-          <p className={styles.meta}>
-            {workspace.name} · /{workspace.slug} · {role}
-          </p>
-        </div>
-
-        <section className={styles.section} aria-labelledby="workspace-heading">
-          <h2 id="workspace-heading" className={styles.sectionLabel}>
-            Workspace & autonomy
-          </h2>
-          {role === "owner" ? (
-            <WorkspaceSettingsForm
-              workspaceId={workspace.id}
-              initialName={workspace.name}
-              initialAutonomy={workspace.autonomyDefault}
-            />
-          ) : (
-            <dl className={styles.readOnly}>
-              <div>
-                <dt>Name</dt>
-                <dd>{workspace.name}</dd>
-              </div>
-              <div>
-                <dt>Autonomy default</dt>
-                <dd>{workspace.autonomyDefault}</dd>
-              </div>
-              <p className={styles.note}>Only owners can change settings.</p>
-            </dl>
-          )}
-        </section>
-
-        <ProjectsBudgetPanel
-          workspaceId={workspace.id}
-          isOwner={role === "owner"}
-          initialProjects={budgetRows}
-        />
-
-        <ByokPanel workspaceId={workspace.id} isOwner={role === "owner"} />
-
-        <NotifyPanel
-          workspaceId={workspace.id}
-          isOwner={role === "owner"}
-          initialWebhookUrl={workspace.notifyWebhookUrl}
-          initialEmailEnabled={workspace.notifyEmailEnabled}
-        />
-
-        <AnalyticsPanel
-          workspaceId={workspace.id}
-          isOwner={role === "owner"}
-        />
-
-        <GithubPanel
-          workspaceId={workspace.id}
-          canManage={role === "owner"}
-          initialQuery={initialQuery}
-        />
-
-        <GitlabPanel
-          workspaceId={workspace.id}
-          canManage={role === "owner"}
-          initialQuery={initialQuery}
-        />
-
-        <DangerZone
-          workspaceId={workspace.id}
+    <main className={styles.main}>
+      <Suspense fallback={null}>
+        <SettingsShell
           workspaceName={workspace.name}
-          isOwner={role === "owner"}
+          workspaceSlug={workspace.slug}
+          role={role}
+          initialTab={
+            tabParam ??
+            (githubFlag || gitlabFlag ? "connections" : undefined)
+          }
+          panels={{
+            connections,
+            general,
+            signals,
+            llm: (
+              <ByokPanel
+                workspaceId={workspace.id}
+                isOwner={role === "owner"}
+              />
+            ),
+            analytics: (
+              <AnalyticsPanel
+                workspaceId={workspace.id}
+                isOwner={role === "owner"}
+              />
+            ),
+            danger: (
+              <DangerZone
+                workspaceId={workspace.id}
+                workspaceName={workspace.name}
+                isOwner={role === "owner"}
+              />
+            ),
+          }}
         />
-      </main>
+      </Suspense>
+    </main>
   );
 }

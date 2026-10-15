@@ -32,6 +32,16 @@ export type CreateProjectInput = {
   mode: ProjectMode;
   repositoryConnectionId: string;
   autonomyLevel?: AutonomyLevel;
+  /**
+   * Detected stack label. For `new_product` defaults to `nextjs_ts`.
+   * For `existing_repo` defaults to `unknown` when omitted.
+   */
+  stack?: string;
+  /** Optional detection metadata for compatibility JSON. */
+  stackDetection?: {
+    source: string;
+    detail: string;
+  };
 };
 
 export type ProjectWithRepo = {
@@ -39,18 +49,29 @@ export type ProjectWithRepo = {
   repository: RepositoryConnection;
 };
 
-/** MVP stack for all new projects. */
+/** Default template stack for new_product projects. */
 export const MVP_STACK: ProjectStack = "nextjs_ts";
+
+export function resolveProjectStack(
+  mode: ProjectMode,
+  stack?: string,
+): string {
+  const trimmed = stack?.trim();
+  if (trimmed) return trimmed;
+  return mode === "new_product" ? MVP_STACK : "unknown";
+}
 
 export function buildCompatibility(
   mode: ProjectMode,
   repo: RepositoryConnection,
+  stack: string,
+  detection?: { source: string; detail: string },
 ): string {
   const checkedAt = new Date().toISOString();
   if (mode === "new_product") {
     return JSON.stringify({
       mode,
-      stack: MVP_STACK,
+      stack,
       template: "nextjs_ts",
       repo: repo.baseRepoFullName,
       checkedAt,
@@ -59,11 +80,17 @@ export function buildCompatibility(
   }
   return JSON.stringify({
     mode,
-    stack: MVP_STACK,
+    stack,
     repo: repo.baseRepoFullName,
     defaultBranch: repo.defaultBranch,
     checks: [
-      { id: "stack_hint", status: "assumed", detail: "MVP assumes nextjs_ts" },
+      {
+        id: "stack_detect",
+        status: detection?.source === "unknown" ? "unknown" : "ok",
+        detail: detection
+          ? `${detection.source}: ${detection.detail}`
+          : `stack=${stack}`,
+      },
       { id: "default_branch", status: "ok", detail: repo.defaultBranch },
     ],
     checkedAt,
@@ -131,7 +158,13 @@ export async function createProjectWithRepo(
 
     const now = new Date();
     const projectId = crypto.randomUUID();
-    const compatibility = buildCompatibility(input.mode, conn);
+    const stack = resolveProjectStack(input.mode, input.stack);
+    const compatibility = buildCompatibility(
+      input.mode,
+      conn,
+      stack,
+      input.stackDetection,
+    );
 
     const [project] = await tx
       .insert(projects)
@@ -141,7 +174,7 @@ export async function createProjectWithRepo(
         name,
         mode: input.mode,
         status: "draft",
-        stack: MVP_STACK,
+        stack,
         autonomyLevel: input.autonomyLevel ?? "L0",
         maxBudgetMicros: 0,
         spentMicros: 0,
@@ -233,4 +266,58 @@ export async function getProjectForWorkspace(
   const row = rows[0];
   if (!row) return undefined;
   return { project: row.project, repository: row.repository };
+}
+
+export type UpdateProjectStackInput = {
+  workspaceId: string;
+  projectId: string;
+  stack: string;
+  stackDetection?: { source: string; detail: string };
+};
+
+/** Update project stack + repository compatibility after re-detection. */
+export async function updateProjectStack(
+  db: Database,
+  input: UpdateProjectStackInput,
+): Promise<ProjectWithRepo | undefined> {
+  const stack = input.stack.trim() || "unknown";
+  const now = new Date();
+
+  return db.transaction(async (tx) => {
+    const [project] = await tx
+      .update(projects)
+      .set({ stack, updatedAt: now })
+      .where(
+        and(
+          eq(projects.id, input.projectId),
+          eq(projects.workspaceId, input.workspaceId),
+        ),
+      )
+      .returning();
+
+    if (!project) return undefined;
+
+    const [conn] = await tx
+      .select()
+      .from(repositoryConnections)
+      .where(eq(repositoryConnections.projectId, project.id))
+      .limit(1);
+
+    if (!conn) return undefined;
+
+    const compatibility = buildCompatibility(
+      project.mode as ProjectMode,
+      conn,
+      stack,
+      input.stackDetection,
+    );
+
+    const [repository] = await tx
+      .update(repositoryConnections)
+      .set({ compatibility, updatedAt: now })
+      .where(eq(repositoryConnections.id, conn.id))
+      .returning();
+
+    return { project, repository: repository ?? conn };
+  });
 }

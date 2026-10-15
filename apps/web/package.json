@@ -20,6 +20,7 @@
     "@coppergate/gitlab": "workspace:*",
     "@coppergate/llm": "workspace:*",
     "@coppergate/scm": "workspace:*",
+    "@coppergate/signals": "workspace:*",
     "@coppergate/telemetry": "workspace:*",
     "@next/third-parties": "^15.3.2",
     "geist": "^1.7.2",

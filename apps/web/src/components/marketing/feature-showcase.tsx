@@ -95,8 +95,9 @@ export function FeatureShowcase() {
               <p className={styles.sectionEyebrow}>Evidence</p>
               <h3>Decisions backed by evidence.</h3>
               <p>
-                Critic scores, tests, CI checks, and code diffs travel with the
-                survivor path so promotion is inspectable — not a black box.
+                Critic scores, CI, Sonar gates, coverage deltas, e2e, and diffs
+                travel with the survivor path — promotion is inspectable, not a
+                black box.
               </p>
             </div>
             <div className={styles.featureVisual} aria-hidden="true">
@@ -109,9 +110,9 @@ export function FeatureShowcase() {
                   </span>
                 </div>
                 <div className={styles.metric}>
-                  <span className={styles.metricKey}>Tests</span>
+                  <span className={styles.metricKey}>Sonar</span>
                   <span className={`${styles.metricVal} ${styles.metricOk}`}>
-                    42 passed
+                    Pass
                   </span>
                 </div>
                 <div className={styles.metric}>
@@ -121,8 +122,10 @@ export function FeatureShowcase() {
                   </span>
                 </div>
                 <div className={styles.metric}>
-                  <span className={styles.metricKey}>Diff</span>
-                  <span className={styles.metricVal}>+312 / −48</span>
+                  <span className={styles.metricKey}>E2E</span>
+                  <span className={`${styles.metricVal} ${styles.metricOk}`}>
+                    Pass
+                  </span>
                 </div>
               </div>
             </div>

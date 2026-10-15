@@ -32,6 +32,7 @@ export function MarketingFooter() {
             <nav className={styles.footerCol} aria-label="Product">
               <h2>Product</h2>
               <Link href="/#how-it-works">How it works</Link>
+              <Link href="/#signals">Signals</Link>
               <Link href="/#features">Features</Link>
               <Link href="/#evidence">Evidence</Link>
               <Link href="/#control">Cost &amp; control</Link>

@@ -83,6 +83,18 @@ export async function getInstallationForWorkspace(
   return row;
 }
 
+export async function getInstallationById(
+  db: Database,
+  installationId: string,
+): Promise<GithubInstallation | undefined> {
+  const [row] = await db
+    .select()
+    .from(githubInstallations)
+    .where(eq(githubInstallations.id, installationId))
+    .limit(1);
+  return row;
+}
+
 export async function updateInstallationToken(
   db: Database,
   installationId: string,

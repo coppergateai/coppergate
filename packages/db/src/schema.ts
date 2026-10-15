@@ -812,6 +812,125 @@ export const githubWebhookDeliveries = pgTable(
   ],
 );
 
+/** Bounded agent role catalog — D13 / TASK101. */
+export const agentProfiles = pgTable(
+  "agent_profiles",
+  {
+    id: uuid("id").primaryKey(),
+    /** null = system seed shared across workspaces */
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, {
+      onDelete: "cascade",
+    }),
+    key: text("key").notNull(),
+    displayName: text("display_name").notNull(),
+    promptGuidance: text("prompt_guidance").notNull().default(""),
+    toolAllowlistJson: text("tool_allowlist_json").notNull().default("[]"),
+    /** balanced | blitz | fortress */
+    strategyDefault: text("strategy_default").notNull().default("balanced"),
+    maxSpendMicros: bigint("max_spend_micros", { mode: "number" })
+      .notNull()
+      .default(100_000),
+    /** Cannot raise autonomy via profile editor (SECURITY) */
+    locked: boolean("locked").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("agent_profiles_ws_key_uidx").on(t.workspaceId, t.key),
+    index("agent_profiles_key_idx").on(t.key),
+  ],
+);
+
+/** Ingested external signals — D13 / TASK061. */
+export const signalEvents = pgTable(
+  "signal_events",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    /** fake | sonar | ci_failure | jira | … */
+    provider: text("provider").notNull(),
+    externalId: text("external_id").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    severity: text("severity").notNull().default("medium"),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    repoHint: text("repo_hint"),
+    urlsJson: text("urls_json").notNull().default("[]"),
+    labelsJson: text("labels_json").notNull().default("[]"),
+    rawRef: text("raw_ref"),
+    /** received | armed | ignored | failed */
+    status: text("status").notNull().default("received"),
+    taskId: uuid("task_id").references(() => tasks.id, {
+      onDelete: "set null",
+    }),
+    tournamentId: uuid("tournament_id").references(() => tournaments.id, {
+      onDelete: "set null",
+    }),
+    errorMessage: text("error_message"),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("signal_events_ws_provider_ext_uidx").on(
+      t.workspaceId,
+      t.provider,
+      t.externalId,
+    ),
+    index("signal_events_ws_fingerprint_idx").on(
+      t.workspaceId,
+      t.fingerprint,
+    ),
+    index("signal_events_workspace_id_idx").on(t.workspaceId),
+    index("signal_events_status_idx").on(t.status),
+  ],
+);
+
+/** Auto-arm rules for signal → task/arena — D13 / TASK064. */
+export const autoArmRules = pgTable(
+  "auto_arm_rules",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    /** * or specific provider */
+    provider: text("provider").notNull().default("*"),
+    minSeverity: text("min_severity").notNull().default("high"),
+    pathAllowlistJson: text("path_allowlist_json").notNull().default("[]"),
+    labelMatchJson: text("label_match_json").notNull().default("[]"),
+    enabled: boolean("enabled").notNull().default(true),
+    armArena: boolean("arm_arena").notNull().default(true),
+    profileKeysJson: text("profile_keys_json")
+      .notNull()
+      .default('["fixer"]'),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("auto_arm_rules_workspace_id_idx").on(t.workspaceId),
+  ],
+);
+
 /** Sealed BYOK / integration secrets — TASK037. */
 export const integrationCredentials = pgTable(
   "integration_credentials",
@@ -908,6 +1027,14 @@ export type PilotInvite = typeof pilotInvites.$inferSelect;
 export type GithubWebhookDelivery = typeof githubWebhookDeliveries.$inferSelect;
 export type IntegrationCredential = typeof integrationCredentials.$inferSelect;
 export type DeliveryShareToken = typeof deliveryShareTokens.$inferSelect;
+export type SignalEvent = typeof signalEvents.$inferSelect;
+export type AutoArmRule = typeof autoArmRules.$inferSelect;
+export type AgentProfile = typeof agentProfiles.$inferSelect;
+export type SignalEventStatus =
+  | "received"
+  | "armed"
+  | "ignored"
+  | "failed";
 
 export type ArenaStatus = "ARMED" | "RUNNING" | "KILLED" | "PAUSED";
 export type ContenderStatus = "ACTIVE" | "ELIMINATED";
@@ -920,7 +1047,19 @@ export type MembershipRole = "owner" | "member";
 export type InstallationStatus = "active" | "suspended" | "removed";
 export type ProjectMode = "new_product" | "existing_repo";
 export type ProjectStatus = "draft" | "active" | "archived";
-export type ProjectStack = "nextjs_ts";
+/** Known stacks; DB column is text so arbitrary detected labels are allowed. */
+export type ProjectStack =
+  | "nextjs_ts"
+  | "node"
+  | "go"
+  | "rust"
+  | "python"
+  | "ruby"
+  | "java"
+  | "php"
+  | "csharp"
+  | "unknown"
+  | (string & {});
 export type BriefStatus = "draft" | "approved" | "superseded";
 export type MilestoneStatus =
   | "draft"

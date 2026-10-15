@@ -19,6 +19,7 @@ describe("project repo binding", { skip: !url }, () => {
   let workspaceId = "";
   let connectionId = "";
   let connectionId2 = "";
+  let connectionId3 = "";
 
   before(async () => {
     const stamp = Date.now();
@@ -63,22 +64,47 @@ describe("project repo binding", { skip: !url }, () => {
         baseRepoFullName: "org-proj/app-b",
       })
     ).id;
+
+    connectionId3 = (
+      await connectRepository(db, {
+        workspaceId,
+        installationId: install.id,
+        githubRepoId: "203",
+        owner: "org-proj",
+        name: "app-c",
+        defaultBranch: "main",
+        baseRepoFullName: "org-proj/app-c",
+      })
+    ).id;
   });
 
   after(async () => {
     await closeDb(db);
   });
 
-  it("creates project with nextjs_ts stack and binds one repo", async () => {
+  it("creates project with detected stack and binds one repo", async () => {
     const created = await createProjectWithRepo(db, {
       workspaceId,
       name: "App A",
       mode: "existing_repo",
       repositoryConnectionId: connectionId,
+      stack: "go",
+      stackDetection: { source: "files", detail: "go.mod" },
     });
-    assert.equal(created.project.stack, "nextjs_ts");
+    assert.equal(created.project.stack, "go");
     assert.equal(created.repository.projectId, created.project.id);
     assert.ok(created.repository.compatibility?.includes("existing_repo"));
+    assert.ok(created.repository.compatibility?.includes("stack_detect"));
+  });
+
+  it("defaults existing_repo stack to unknown when omitted", async () => {
+    const created = await createProjectWithRepo(db, {
+      workspaceId,
+      name: "App B",
+      mode: "existing_repo",
+      repositoryConnectionId: connectionId2,
+    });
+    assert.equal(created.project.stack, "unknown");
   });
 
   it("cannot bind the same repo to a second project", async () => {
@@ -103,7 +129,7 @@ describe("project repo binding", { skip: !url }, () => {
           workspaceId,
           name: "Blocked",
           mode: "new_product",
-          repositoryConnectionId: connectionId2,
+          repositoryConnectionId: connectionId3,
         }),
       (err: unknown) =>
         err instanceof ProjectBindError && err.code === "install_inactive",

@@ -23,3 +23,4 @@ export {
   verifyGitlabWebhookToken,
   type ParsedGitlabWebhookHeaders,
 } from "./webhook.js";
+export { detectGitlabProjectStack } from "./stack.js";

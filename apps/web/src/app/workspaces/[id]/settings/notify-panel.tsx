@@ -38,8 +38,9 @@ export function NotifyPanel({
       <h2 id="notify-heading" className={styles.sectionLabel}>
         Notifications
       </h2>
-      <p className={styles.note}>
-        Webhook-first alerts for review-ready and run failures. HTTPS only.
+      <p className={styles.sectionLede}>
+        Webhook alerts for review-ready, run failures, and signal arm. HTTPS
+        only — Slack, Discord, and Teams formats are detected automatically.
       </p>
       <form
         className={styles.panel}
@@ -78,13 +79,20 @@ export function NotifyPanel({
             onChange={(e) => setWebhookUrl(e.target.value)}
           />
         </label>
-        <label className={styles.field}>
+        <label className={styles.toggleRow}>
+          <span className={styles.toggleCopy}>
+            <span className={styles.toggleTitle}>Email owner</span>
+            <span className={styles.toggleHint}>
+              On review / fail (log path until SMTP ships)
+            </span>
+          </span>
           <input
             type="checkbox"
+            className={styles.toggle}
             checked={emailEnabled}
             onChange={(e) => setEmailEnabled(e.target.checked)}
-          />{" "}
-          Email owner on review/fail (log path until SMTP ships)
+            aria-label="Email owner on review or fail"
+          />
         </label>
         {error ? <p className={styles.error}>{error}</p> : null}
         {saved ? <p className={styles.ok}>Saved.</p> : null}

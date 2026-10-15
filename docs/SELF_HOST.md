@@ -11,11 +11,16 @@ Managed SaaS remains the supported pilot path; this guide is the **community sel
 Browser → https://coppergate.example.com (TLS at your LB)
             → web (Next.js)  ─┐
             → worker         ─┴→ PostgreSQL
-            → GitHub.com and/or GitLab (gitlab.com or self-managed)
+            → GitHub.com / GHES and/or GitLab (gitlab.com or self-managed)
+            → optional Bitbucket Cloud / Azure DevOps (TASK117–119)
             → optional LLM provider (BYOK)
 ```
 
-Worker does **not** need a public ingress — only outbound to Postgres, GitHub/GitLab, and LLM.
+Worker does **not** need a public ingress — only outbound to Postgres, SCM hosts, and LLM.
+
+### GitHub Enterprise Server (TASK119)
+
+Set the installation / delivery API host via `ScmRepoRef.apiBaseUrl` (or provider config) — e.g. `https://github.example.com/api/v3`. Public default remains `https://api.github.com`.
 
 ## Prerequisites
 
@@ -111,4 +116,5 @@ After login, connect a GitLab project from workspace settings (Project Access To
 
 - Local dev: [README.md](../README.md)
 - Staging ops (Coppergate SaaS): [STAGING.md](./STAGING.md)
-- Architecture decisions: `coppergate-architecture` → `DECISIONS.md` (D4, D9, D12)
+- Signal Adapters (D13): [SIGNALS.md](./SIGNALS.md)
+- Architecture decisions: `coppergate-architecture` → `DECISIONS.md` (D4, D9, D12, D13)

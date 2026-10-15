@@ -12,6 +12,9 @@ export {
   githubInstallations,
   githubWebhookDeliveries,
   integrationCredentials,
+  signalEvents,
+  autoArmRules,
+  agentProfiles,
   memberships,
   milestones,
   productBriefs,
@@ -52,6 +55,10 @@ export {
   type ScmProvider,
   type InstallationStatus,
   type IntegrationCredential,
+  type SignalEvent,
+  type SignalEventStatus,
+  type AutoArmRule,
+  type AgentProfile,
   type Membership,
   type MembershipRole,
   type Milestone,
@@ -141,6 +148,7 @@ export {
 } from "./sessions.js";
 export {
   getUserById,
+  updateUserDisplayName,
   upsertGithubUser,
   upsertScmUser,
   type UpsertGithubUserInput,
@@ -168,6 +176,7 @@ export {
 } from "./deletion.js";
 export {
   connectRepository,
+  getInstallationById,
   getInstallationForWorkspace,
   getRepositoryConnectionForWorkspace,
   listRepositoryConnections,
@@ -192,8 +201,11 @@ export {
   createProjectWithRepo,
   getProjectForWorkspace,
   listProjectsForWorkspace,
+  resolveProjectStack,
+  updateProjectStack,
   type CreateProjectInput,
   type ProjectWithRepo,
+  type UpdateProjectStackInput,
 } from "./projects.js";
 export {
   BriefError,
@@ -254,9 +266,15 @@ export {
   ApprovalError,
   expirePendingApprovals,
   getApprovalForWorkspace,
+  getInboxApprovalForWorkspace,
+  listInboxApprovalsForWorkspace,
   listPendingApprovalsForWorkspace,
+  listRecentDecidedApprovalsForWorkspace,
   requestApproval,
+  resolveApprovalById,
   resolvePendingApproval,
+  type InboxApproval,
+  type ListInboxApprovalsOptions,
 } from "./approvals.js";
 export {
   BudgetError,
@@ -321,6 +339,7 @@ export {
   getActiveLlmByok,
   purgeLlmByokCredentials,
   revokeLlmByok,
+  rotateLlmByokCredential,
   touchLlmByokUsed,
   upsertLlmByok,
   type LlmByokMeta,
@@ -354,3 +373,70 @@ export {
   importGithubIssueAsTask,
 } from "./issue-import.js";
 export { setProjectMergeEnabled } from "./project-policy.js";
+export {
+  SignalError,
+  armSignalEvent,
+  countRecentSignalIngests,
+  countRecentSignalIngestsByProvider,
+  evaluateIngestQuota,
+  SIGNAL_INGEST_LIMITS,
+  dismissSignalEvent,
+  ensureDefaultAutoArmRule,
+  findWorkspacesForRepo,
+  getSignalEvent,
+  ingestSignal,
+  listAutoArmRules,
+  listSignalEvents,
+  recordSignalOutbound,
+  upsertAutoArmRule,
+  type SignalEnvelopeInput,
+} from "./signals.js";
+export { ingestSonarFitness } from "./sonar-fitness.js";
+export {
+  ingestCoverageFitness,
+  ingestE2eFitness,
+  ingestLoadBudgetFitness,
+  ingestPerfFitness,
+  ingestPreviewSmokeFitness,
+  ingestVisualRegressFitness,
+} from "./extra-fitness.js";
+export {
+  BOUNDED_KEYS,
+  DEFAULT_SPAWN_MATRIX,
+  ProfileError,
+  SYSTEM_PROFILE_SEEDS,
+  applySpawnProfilesToArena,
+  ensureSystemAgentProfiles,
+  listAgentProfiles,
+  resolveSpawnProfileKeys,
+  updateWorkspaceAgentProfile,
+} from "./profiles.js";
+export {
+  exportWorkspaceAuditBundle,
+  getSpendBySignalSource,
+  type SpendBySignalRow,
+} from "./signal-analytics.js";
+export {
+  pickStrategiesByPrior,
+  strategyPriorsForProvider,
+} from "./efficiency-leagues.js";
+export {
+  DEFAULT_MULTI_REPO_POLICY,
+  assertSecondaryRepoAllowed,
+  resolveMultiRepoPolicy,
+  type MultiRepoPolicy,
+} from "./multi-repo.js";
+export {
+  SIGNAL_SLOS,
+  isSloBurning,
+  type SloBurnInput,
+} from "./slo.js";
+export {
+  ConsoleEmailProvider,
+  ResendEmailProvider,
+  createEmailProvider,
+  renderNotifyEmail,
+  type EmailMessage,
+  type EmailProvider,
+  type EmailTemplate,
+} from "./email.js";

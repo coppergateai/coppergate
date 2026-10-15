@@ -53,3 +53,4 @@ export {
   type CheckRunConclusion,
   type NormalizedCheckEvidence,
 } from "./checks.js";
+export { detectGithubRepoStack } from "./stack.js";
