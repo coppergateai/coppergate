@@ -1,8 +1,9 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { createArtifact } from "./artifacts.js";
-import { appendRunEvent } from "./run-events.js";
-import { agentRuns, type AgentRun } from "./schema.js";
+import { appendRunEvent, listRunEvents } from "./run-events.js";
+import { agentRuns, artifacts, type AgentRun } from "./schema.js";
+
 export type CiEvidenceInput = {
   headSha: string | null;
   name: string;
@@ -13,6 +14,47 @@ export type CiEvidenceInput = {
   checkRunId: number | null;
   detailsUrl: string | null;
   repoFullName: string | null;
+};
+
+export type RunCiCheckSummary = {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  passed: boolean;
+  blocksAccept: boolean;
+  detailsUrl: string | null;
+  createdAt: Date;
+};
+
+export type RunCiFitness = {
+  checks: RunCiCheckSummary[];
+  /** Latest conclusion per check name is blocking. */
+  blocking: boolean;
+  /** At least one latest check passed. */
+  passed: boolean;
+  /** Worker emitted fitness-pending (live http delivery). */
+  awaitingLive: boolean;
+  /** Safe to Accept: not blocking; if awaiting live CI, must have passed evidence. */
+  acceptReady: boolean;
+};
+
+type CiArtifactMeta = {
+  blocksAccept?: boolean;
+  passed?: boolean;
+  summary?: string;
+  checkName?: string;
+  validator?: string;
+  inlineBody?: string;
+};
+
+type CiArtifactBody = {
+  source?: string;
+  name?: string;
+  status?: string;
+  conclusion?: string | null;
+  passed?: boolean;
+  blocksAccept?: boolean;
+  detailsUrl?: string | null;
 };
 
 /**
@@ -73,11 +115,13 @@ export async function ingestCiEvidence(
       blocksAccept: evidence.blocksAccept,
       summary: `CI ${evidence.name}: ${evidence.conclusion ?? evidence.status}`,
       validator: "github-check-v1",
+      checkName: evidence.name,
     },
   });
 
-  if (evidence.blocksAccept) {
-    // Flag run so accept UI/API (TASK024) can refuse ACCEPTED auto-path.
+  const fitness = await getRunCiFitness(db, run.id);
+
+  if (fitness.blocking) {
     await db
       .update(agentRuns)
       .set({
@@ -86,30 +130,131 @@ export async function ingestCiEvidence(
         updatedAt: new Date(),
       })
       .where(eq(agentRuns.id, run.id));
+  } else if (run.errorCode === "ci_failed") {
+    // A later green check for the same name cleared the only blocker.
+    await db
+      .update(agentRuns)
+      .set({
+        errorCode: null,
+        errorMessage: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(agentRuns.id, run.id));
   }
 
   return { run, attached: true };
 }
 
-/** True if any CI validation artifact for the run blocks accept. */
-export async function runHasBlockingCi(
+/** Latest CI check state per name (github_check validation_report artifacts). */
+export async function listRunCiChecks(
   db: Database,
   runId: string,
-): Promise<boolean> {
-  const { artifacts } = await import("./schema.js");
+): Promise<RunCiCheckSummary[]> {
   const rows = await db
     .select()
     .from(artifacts)
     .where(
       and(eq(artifacts.runId, runId), eq(artifacts.kind, "validation_report")),
-    );
+    )
+    .orderBy(desc(artifacts.createdAt));
+
+  const byName = new Map<string, RunCiCheckSummary>();
   for (const row of rows) {
+    let meta: CiArtifactMeta = {};
     try {
-      const meta = JSON.parse(row.meta) as { blocksAccept?: boolean };
-      if (meta.blocksAccept === true) return true;
+      meta = JSON.parse(row.meta) as CiArtifactMeta;
     } catch {
       /* ignore */
     }
+    let body: CiArtifactBody = {};
+    if (typeof meta.inlineBody === "string") {
+      try {
+        body = JSON.parse(meta.inlineBody) as CiArtifactBody;
+      } catch {
+        /* ignore */
+      }
+    }
+    // Skip in-worker FakeCodingAgent validation — live CI / Sonar gate Accept.
+    if (meta.validator === "fake-v1") continue;
+    // Include GitHub checks + other fitness gates (Sonar, etc.) that set accept flags.
+    const hasAcceptFlag =
+      typeof meta.blocksAccept === "boolean" ||
+      typeof meta.passed === "boolean" ||
+      typeof body.blocksAccept === "boolean" ||
+      typeof body.passed === "boolean";
+    if (!hasAcceptFlag) continue;
+    const source =
+      (typeof body.source === "string" && body.source) ||
+      (typeof meta.validator === "string" && meta.validator) ||
+      "check";
+    const shortName =
+      (typeof body.name === "string" && body.name) ||
+      (typeof meta.checkName === "string" && meta.checkName) ||
+      source;
+    const key = `${source}:${shortName}`;
+    if (byName.has(key)) continue;
+    byName.set(key, {
+      name: shortName,
+      status: typeof body.status === "string" ? body.status : "unknown",
+      conclusion:
+        typeof body.conclusion === "string" || body.conclusion === null
+          ? (body.conclusion ?? null)
+          : null,
+      passed: body.passed === true || meta.passed === true,
+      blocksAccept:
+        body.blocksAccept === true || meta.blocksAccept === true,
+      detailsUrl:
+        typeof body.detailsUrl === "string" ? body.detailsUrl : null,
+      createdAt: row.createdAt,
+    });
   }
-  return false;
+  return [...byName.values()];
+}
+
+export async function getRunCiFitness(
+  db: Database,
+  runId: string,
+): Promise<RunCiFitness> {
+  const checks = await listRunCiChecks(db, runId);
+  const blocking = checks.some((c) => c.blocksAccept);
+  const passed = checks.some((c) => c.passed && !c.blocksAccept);
+
+  let awaitingLive = false;
+  try {
+    const events = await listRunEvents(db, runId);
+    awaitingLive = events.some((e) => {
+      try {
+        const payload = JSON.parse(e.payload) as {
+          fitness?: unknown;
+        };
+        return payload.fitness === "pending";
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    awaitingLive = false;
+  }
+
+  const acceptReady = !blocking && (!awaitingLive || passed);
+
+  return { checks, blocking, passed, awaitingLive, acceptReady };
+}
+
+/** True if any latest CI check for the run blocks accept. */
+export async function runHasBlockingCi(
+  db: Database,
+  runId: string,
+): Promise<boolean> {
+  const fitness = await getRunCiFitness(db, runId);
+  return fitness.blocking;
+}
+
+/** True when Accept is allowed given live CI / evidence state. */
+export async function runCiAcceptReady(
+  db: Database,
+  runId: string,
+): Promise<boolean> {
+  const fitness = await getRunCiFitness(db, runId);
+  return fitness.acceptReady;
 }

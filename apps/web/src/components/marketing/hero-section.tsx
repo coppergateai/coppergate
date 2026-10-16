@@ -21,9 +21,9 @@ export function HeroSection({ signedIn }: Props) {
             <span className={styles.headlineAccent}>Survivors ship.</span>
           </h1>
           <p className={styles.lede}>
-            Multiple AI agents compete to solve your engineering task.
-            Coppergate verifies their work, evaluates quality and cost, and
-            delivers the strongest result as a pull request.
+            Start from a GitHub issue. Contenders compete; CI and cost decide.
+            The survivor opens a verified pull request — you hold the
+            kill-switch.
           </p>
 
           <div className={styles.ctaRow}>
@@ -36,7 +36,7 @@ export function HeroSection({ signedIn }: Props) {
             </a>
           </div>
           <p className={styles.metaRow}>
-            Private beta · GitHub-native delivery · Budget-controlled
+            Private beta · Issue → verified PR · Budget-controlled
           </p>
         </div>
 

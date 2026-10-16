@@ -97,6 +97,8 @@ export async function executeClaimedRun(
 ): Promise<"review_required" | "failed" | "cancelled" | "validation_failed"> {
   const { run, workerId, log, leaseMs } = input;
   const agent = input.agent ?? new FakeCodingAgent();
+  let usageProvider = "fake";
+  let usageModel = "fake-coding-agent-v1";
 
   const task = await getTaskById(db, run.taskId);
   if (!task) {
@@ -244,6 +246,17 @@ export async function executeClaimedRun(
 
         if (event.kind === "cost" && event.payload?.costMicros != null) {
           actualCost = Number(event.payload.costMicros) || actualCost;
+        }
+        if (event.payload) {
+          const p = event.payload;
+          if (typeof p.provider === "string" && p.provider) {
+            usageProvider = p.provider;
+          } else if (typeof p.harness === "string" && p.harness) {
+            usageProvider = p.harness;
+          }
+          if (typeof p.model === "string" && p.model) {
+            usageModel = p.model;
+          }
         }
 
         if (event.kind === "error" && event.payload?.code === "cancelled") {
@@ -554,15 +567,15 @@ export async function executeClaimedRun(
       kind: "llm_tokens",
       costMicros: actualCost,
       quantity: String(completion.estimatedTokens),
-      provider: "fake",
-      model: "fake-coding-agent-v1",
+      provider: usageProvider,
+      model: usageModel,
     });
   }
 
   await setTaskPrUrl(db, task.id, delivery.prUrl);
 
   // Fake-delivery closed loop: attach synthetic fitness for signal-sourced runs.
-  // Live http mode waits for real CI / Sonar webhooks.
+  // Live http mode waits for real GitHub check_run / Actions webhooks.
   if (deliveryMode === "fake") {
     await attachSyntheticSignalFitness(db, {
       workspaceId: run.workspaceId,
@@ -578,19 +591,20 @@ export async function executeClaimedRun(
       run.workspaceId,
       task.id,
     ).catch(() => null);
-    if (signal) {
-      await appendRunEvent(db, {
-        runId: run.id,
-        workspaceId: run.workspaceId,
-        kind: "evidence",
-        payload: {
-          message: `Awaiting live fitness from ${signal.provider}`,
-          signalId: signal.id,
-          provider: signal.provider,
-          fitness: "pending",
-        },
-      }).catch(() => undefined);
-    }
+    const awaitFrom = signal?.provider ?? "github_check_run";
+    await appendRunEvent(db, {
+      runId: run.id,
+      workspaceId: run.workspaceId,
+      kind: "evidence",
+      payload: {
+        message: `Awaiting live CI evidence (${awaitFrom})`,
+        signalId: signal?.id ?? null,
+        provider: awaitFrom,
+        fitness: "pending",
+        headSha: delivery.headSha,
+        prNumber: delivery.prNumber,
+      },
+    }).catch(() => undefined);
   }
 
   log.info("run awaiting review (not DONE)", {

@@ -16,6 +16,7 @@ import {
   credentialsKey,
   githubAppConfig,
   isSecureCookie,
+  verifyInstallState,
 } from "@/lib/github-install";
 import { trackFunnel } from "@/lib/funnel";
 import { correlationIdFrom, jsonError } from "@/lib/http";
@@ -41,15 +42,18 @@ export async function GET(request: Request) {
       throw new ApiError("bad_request", "Missing installation_id or state");
     }
 
+    // HMAC-signed state is authoritative (cookie often missing after GitHub → localhost).
+    // Cookie match is an extra fast-path when the browser kept it.
     const jar = await cookies();
-    const expected = jar.get(INSTALL_STATE_COOKIE)?.value;
-    if (!expected || expected !== state) {
-      throw new ApiError("forbidden", "Invalid install state");
-    }
+    const cookieState =
+      jar.get(INSTALL_STATE_COOKIE)?.value ??
+      cookieValue(request.headers.get("cookie"), INSTALL_STATE_COOKIE);
+    const workspaceId =
+      (cookieState && cookieState === state ? state.split(".")[0] : null) ??
+      verifyInstallState(state, env.SESSION_SECRET);
 
-    const [workspaceId] = state.split(".");
     if (!workspaceId) {
-      throw new ApiError("bad_request", "Malformed install state");
+      throw new ApiError("forbidden", "Invalid install state");
     }
 
     await requireWorkspaceOwner(db, workspaceId, user.id);
@@ -112,4 +116,19 @@ function clearStateCookie(res: NextResponse): void {
     path: "/",
     maxAge: 0,
   });
+}
+
+function cookieValue(
+  header: string | null,
+  name: string,
+): string | undefined {
+  if (!header) return undefined;
+  for (const part of header.split(";")) {
+    const [rawName, ...rest] = part.trim().split("=");
+    if (rawName === name) {
+      const value = rest.join("=");
+      return value ? decodeURIComponent(value) : undefined;
+    }
+  }
+  return undefined;
 }

@@ -95,7 +95,7 @@ export function OnboardingGuide({
         <div className={styles.complete}>
           <p className={styles.completeTitle}>You’re set.</p>
           <p className={styles.completeDetail}>
-            Approve a task when ready — the arena takes it from here.
+            Import an issue or approve a task — survivors ship the PR.
           </p>
         </div>
       ) : next ? (

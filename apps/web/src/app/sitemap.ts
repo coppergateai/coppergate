@@ -38,6 +38,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
+      url: `${siteUrl}/docs/recovery`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: `${siteUrl}/security`,
       lastModified,
       changeFrequency: "monthly",

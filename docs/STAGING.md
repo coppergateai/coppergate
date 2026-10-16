@@ -93,20 +93,29 @@ STAGING_ALLOW_LOCAL=1 SIGNAL_PROVIDER=sonar \
 
 (`SIGNAL_PROVIDER=ci_failure` for the CI reverse vertical.) Worker needs `GITHUB_DELIVERY_MODE=http`.
 
-**Proven:**
+**Proven (secondary Sonar vertical):**
 - [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) — Sonar → OpenHands → live PR → Accept → DONE (2026-10-16)
 - [PR #3](https://github.com/coppergateai/coppergate-staging-smoke/pull/3) — same path with **sandbox file bodies** in the diff (`app/page.tsx`, not README stub)
 
 **Fly worker (unattended):** `fly.toml` sets `GITHUB_DELIVERY_MODE=http`, `SANDBOX_MODE=local`, `CONTENDER_HARNESS=openhands`. Deployed 2026-10-16 (`fly deploy -a coppergate-worker`). Full remote-DB seed steps: [`scripts/fly-signal-closed-loop.md`](../scripts/fly-signal-closed-loop.md). Laptop worker must be stopped so Fly claims the run.
 
-Accept a reviewable task:
+### Primary wedge — issue → CI evidence (no seed script)
+
+1. Staging workspace: App install + `coppergate-staging-smoke` bound + brief approved + spend cap.
+2. Project → **Issues** → **Import → queue** on a small open issue.
+3. Worker claims (OpenHands default on http); PR opens with `Closes #N`.
+4. Task review shows **fitness pending** until GitHub `check_run` webhook hits `/api/integrations/github/webhook` → `ingestCiEvidence`.
+5. Accept stays disabled while CI pending/failed; enable when green → **Accept → DONE** in UI.
+6. Negative proof: force a failing check on the head SHA → Accept API returns policy error.
+
+Operator Accept fallback (secondary):
 
 ```bash
 LOOKUP_PR_URL='https://github.com/coppergateai/coppergate-staging-smoke/pull/N' \
   pnpm --filter @coppergate/worker exec node --import tsx scripts/accept-task-review.mjs
 ```
 
-**Manual path:**
+**Manual Sonar / CI-fail path (secondary):**
 
 1. Workspace has funded arena (`ensureArena` / Settings → Arena) + approved brief.
 2. Owner upserts auto-arm for `sonar` or `ci_failure` (`POST /api/workspaces/:id/signals`).
@@ -115,7 +124,7 @@ LOOKUP_PR_URL='https://github.com/coppergateai/coppergate-staging-smoke/pull/N' 
 5. Confirm PR on non-default branch + fitness evidence (CI check or Sonar gate artifact).
 6. Accept → `DONE`.
 
-Checklist: [`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-closed-loop.md).
+Checklist: [`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-closed-loop.md) · wedge: [`WEDGE.md`](./WEDGE.md).
 
 ## Pass criteria (TASK033)
 
@@ -124,6 +133,8 @@ Checklist: [`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-clo
 - [x] Worker logs `github delivery resolved` with `mode: "http"`
 - [x] Real PR on `coppergate/task-…` — [PR #1](https://github.com/coppergateai/coppergate-staging-smoke/pull/1)
 - [x] Accept → task `DONE` without operator SQL surgery
+- [ ] Issue import → queue → live CI evidence → Accept in UI (primary wedge)
+- [ ] Accept rejected while blocking CI fail is attached
 
 ## Rollback
 

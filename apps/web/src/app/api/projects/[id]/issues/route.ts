@@ -1,8 +1,10 @@
 import {
+  approveTask,
   getInstallationForWorkspace,
   getProjectForWorkspace,
   importGithubIssueAsTask,
   IssueImportError,
+  submitTaskForApproval,
 } from "@coppergate/db";
 import { listOpenIssues } from "@coppergate/github";
 import { ApiError } from "@coppergate/errors";
@@ -11,7 +13,8 @@ import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
 import { resolveInstallationToken } from "@/lib/github-app";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
-import { serializeTask } from "@/lib/task";
+import { mapTaskTransitionError, serializeTask } from "@/lib/task";
+import { trackFunnel } from "@/lib/funnel";
 import { requireWorkspaceMember, requireWorkspaceOwner } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +58,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 }
 
-/** POST import issue → DRAFT task. */
+/** POST import issue → DRAFT task (optional queue: submit + approve). */
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
@@ -65,6 +68,7 @@ export async function POST(request: Request, context: RouteContext) {
     const body = (await request.json().catch(() => null)) as {
       workspaceId?: unknown;
       issueNumber?: unknown;
+      queue?: unknown;
     } | null;
     if (!body || typeof body.workspaceId !== "string") {
       throw new ApiError("bad_request", "workspaceId required");
@@ -81,7 +85,7 @@ export async function POST(request: Request, context: RouteContext) {
     });
     const issue = issues.find((i) => i.number === body.issueNumber);
     if (!issue) throw new ApiError("not_found", "issue not found or not open");
-    const task = await importGithubIssueAsTask(db, {
+    let task = await importGithubIssueAsTask(db, {
       workspaceId: body.workspaceId,
       projectId,
       actor: user.id,
@@ -89,6 +93,42 @@ export async function POST(request: Request, context: RouteContext) {
       title: issue.title,
       body: issue.body,
     });
+    trackFunnel({
+      stage: "issue_imported",
+      workspaceId: body.workspaceId,
+      projectId,
+      taskId: task.id,
+      userId: user.id,
+      meta: { issueNumber: issue.number, correlationId },
+    });
+
+    if (body.queue === true) {
+      const submitted = await submitTaskForApproval(db, {
+        workspaceId: body.workspaceId,
+        taskId: task.id,
+        actor: user.id,
+      }).catch(mapTaskTransitionError);
+      task = submitted.task;
+      if (task.status === "READY_FOR_APPROVAL") {
+        const approved = await approveTask(db, {
+          workspaceId: body.workspaceId,
+          taskId: task.id,
+          actor: user.id,
+        }).catch(mapTaskTransitionError);
+        task = approved.task;
+      }
+      if (task.status === "QUEUED" || task.status === "RUNNING") {
+        trackFunnel({
+          stage: "task_started",
+          workspaceId: body.workspaceId,
+          projectId,
+          taskId: task.id,
+          userId: user.id,
+          meta: { status: task.status, from: "issue_import_queue" },
+        });
+      }
+    }
+
     return jsonOk({ task: serializeTask(task) }, { correlationId });
   } catch (err) {
     if (err instanceof IssueImportError) {

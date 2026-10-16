@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/auth";
 import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { trackFunnel } from "@/lib/funnel";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { serializeWorkspace } from "@/lib/workspace";
@@ -67,10 +68,26 @@ export async function POST(request: Request) {
         );
       }
       try {
-        await redeemPilotInvite(db, {
+        const invite = await redeemPilotInvite(db, {
           code: body.inviteCode,
           userId: user.id,
         });
+        trackFunnel({
+          stage: "invite_redeemed",
+          userId: user.id,
+          meta: {
+            kind: invite.kind,
+            paid: invite.kind === "paid_pilot",
+            correlationId,
+          },
+        });
+        if (invite.kind === "paid_pilot") {
+          trackFunnel({
+            stage: "paid_pilot_started",
+            userId: user.id,
+            meta: { via: "invite", correlationId },
+          });
+        }
       } catch (err) {
         if (err instanceof InviteError) {
           throw new ApiError(
@@ -85,9 +102,14 @@ export async function POST(request: Request) {
     } else if (typeof body.inviteCode === "string" && body.inviteCode.trim()) {
       // Optional redeem when gating is off (dev convenience).
       try {
-        await redeemPilotInvite(db, {
+        const invite = await redeemPilotInvite(db, {
           code: body.inviteCode,
           userId: user.id,
+        });
+        trackFunnel({
+          stage: "invite_redeemed",
+          userId: user.id,
+          meta: { kind: invite.kind, correlationId },
         });
       } catch {
         /* ignore optional invite failures in open mode */

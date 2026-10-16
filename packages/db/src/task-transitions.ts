@@ -15,7 +15,7 @@ import {
 } from "./budgets.js";
 import type { Database } from "./client.js";
 import { assertCanStartTasks, recordAuditEvent } from "./briefs.js";
-import { runHasBlockingCi } from "./ci-evidence.js";
+import { getRunCiFitness } from "./ci-evidence.js";
 import { notifyWorkspace } from "./notify.js";
 import { enqueueAgentRun, listRunsForTask } from "./runs.js";
 import {
@@ -564,17 +564,20 @@ export async function decideTaskReview(
   if (input.decision === "accept") {
     const runs = await listRunsForTask(db, input.workspaceId, task.id);
     const latest = runs[0];
-    if (latest && (await runHasBlockingCi(db, latest.id))) {
-      throw new TaskTransitionError(
-        "policy",
-        "Cannot accept: CI checks failed on the latest run",
-      );
-    }
-    if (latest?.errorCode === "ci_failed") {
-      throw new TaskTransitionError(
-        "policy",
-        "Cannot accept: latest run marked ci_failed",
-      );
+    if (latest) {
+      const fitness = await getRunCiFitness(db, latest.id);
+      if (fitness.blocking || latest.errorCode === "ci_failed") {
+        throw new TaskTransitionError(
+          "policy",
+          "Cannot accept: CI checks failed on the latest run",
+        );
+      }
+      if (fitness.awaitingLive && !fitness.passed) {
+        throw new TaskTransitionError(
+          "policy",
+          "Cannot accept: awaiting live CI evidence on the latest run",
+        );
+      }
     }
 
     const accepted = await applyTaskTransition(db, {

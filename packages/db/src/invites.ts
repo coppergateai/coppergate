@@ -23,6 +23,8 @@ export async function createPilotInvite(
   input?: {
     code?: string;
     note?: string;
+    /** invite (default) | paid_pilot */
+    kind?: "invite" | "paid_pilot";
     maxUses?: number;
     expiresAt?: Date | null;
   },
@@ -34,12 +36,14 @@ export async function createPilotInvite(
   if (code.length < 6) {
     throw new InviteError("invalid", "Invite code too short");
   }
+  const kind = input?.kind === "paid_pilot" ? "paid_pilot" : "invite";
   const now = new Date();
   const [row] = await db
     .insert(pilotInvites)
     .values({
       id: crypto.randomUUID(),
       code,
+      kind,
       note: input?.note ?? null,
       maxUses: input?.maxUses ?? 1,
       useCount: 0,

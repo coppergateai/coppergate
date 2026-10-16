@@ -8,7 +8,11 @@ Use with `PRODUCTION_SIGNAL_BACKLOG.md` Phase X. Do **not** claim “production 
 - [x] Staging E2E: Sonar → arena → **live** PR on smoke repo — [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) (2026-10-16; seed + local worker `GITHUB_DELIVERY_MODE=http`)
 - [x] Signal Accept → DONE — [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) + [PR #3](https://github.com/coppergateai/coppergate-staging-smoke/pull/3) (`accept-task-review.mjs`, 2026-10-16)
 - [x] Delivery uses sandbox workdir file bodies (`apps/worker/src/delivery-files.ts`; README not stub-overwritten) — proven on PR #3 (`app/page.tsx` real OpenHands content, `fromSandbox: 1`)
+- [x] Live CI gate: `check_run` → `ingestCiEvidence` → Accept blocked until green (`getRunCiFitness` / review UI)
+- [x] Issue import → queue product path (`Issues` panel **Import → queue**; Sonar seed = secondary)
+- [x] Pilot agent default: http delivery → BYOK/OpenAI else OpenHands; Fake only for fake delivery / CI
 - [ ] Fitness ingest: coverage, e2e, perf, preview, visual, load (under load)
+- [ ] Staging proof: issue import → live CI evidence → Accept in UI (see `docs/STAGING.md` / `docs/WEDGE.md`)
 - [ ] Provider storm shed + workspace ingest quotas verified under load
 
 ## Security & tenancy

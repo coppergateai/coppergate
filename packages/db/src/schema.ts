@@ -766,12 +766,14 @@ export const waitlistSignups = pgTable("waitlist_signups", {
     .defaultNow(),
 });
 
-/** Pilot invite codes — TASK035 public beta gating. */
+/** Pilot invite codes — TASK035 public beta gating + GTM paid_pilot kind. */
 export const pilotInvites = pgTable(
   "pilot_invites",
   {
     id: uuid("id").primaryKey(),
     code: text("code").notNull().unique(),
+    /** invite | paid_pilot */
+    kind: text("kind").notNull().default("invite"),
     note: text("note"),
     maxUses: integer("max_uses").notNull().default(1),
     useCount: integer("use_count").notNull().default(0),
@@ -785,6 +787,40 @@ export const pilotInvites = pgTable(
       .defaultNow(),
   },
   (t) => [index("pilot_invites_code_idx").on(t.code)],
+);
+
+/**
+ * Hosted SaaS subscription per workspace (Stripe).
+ * Absent row / plan=community → self-host / free tier posture.
+ */
+export const workspaceSubscriptions = pgTable(
+  "workspace_subscriptions",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" })
+      .unique(),
+    /** community | starter | pro | team */
+    plan: text("plan").notNull().default("community"),
+    /** incomplete | active | past_due | canceled | trialing */
+    status: text("status").notNull().default("incomplete"),
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    stripePriceId: text("stripe_price_id"),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("workspace_subscriptions_customer_idx").on(t.stripeCustomerId),
+    index("workspace_subscriptions_status_idx").on(t.status),
+  ],
 );
 
 /** Idempotent GitHub webhook delivery log — TASK006. */
@@ -1024,6 +1060,15 @@ export type AgentRunEvent = typeof agentRunEvents.$inferSelect;
 export type Artifact = typeof artifacts.$inferSelect;
 export type WaitlistSignup = typeof waitlistSignups.$inferSelect;
 export type PilotInvite = typeof pilotInvites.$inferSelect;
+export type WorkspaceSubscription = typeof workspaceSubscriptions.$inferSelect;
+export type BillingPlan = "community" | "starter" | "pro" | "team";
+export type SubscriptionStatus =
+  | "incomplete"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "trialing";
+export type PilotInviteKind = "invite" | "paid_pilot";
 export type GithubWebhookDelivery = typeof githubWebhookDeliveries.$inferSelect;
 export type IntegrationCredential = typeof integrationCredentials.$inferSelect;
 export type DeliveryShareToken = typeof deliveryShareTokens.$inferSelect;

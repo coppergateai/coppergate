@@ -168,8 +168,11 @@ export function TaskDetailPanel({
     );
     if (!selectedRunId) return;
     const active =
-      selected &&
-      ["QUEUED", "RUNNING", "VALIDATING"].includes(selected.status);
+      (selected &&
+        ["QUEUED", "RUNNING", "VALIDATING", "REVIEW_REQUIRED"].includes(
+          selected.status,
+        )) ||
+      task.status === "REVIEW_REQUIRED";
     if (!active) return;
     const t = setInterval(() => {
       void refreshRuns();
@@ -177,7 +180,14 @@ export function TaskDetailPanel({
       void refreshArtifacts();
     }, 2000);
     return () => clearInterval(t);
-  }, [refreshArtifacts, refreshEvents, refreshRuns, selected, selectedRunId]);
+  }, [
+    refreshArtifacts,
+    refreshEvents,
+    refreshRuns,
+    selected,
+    selectedRunId,
+    task.status,
+  ]);
 
   async function postAction(
     path: string,
@@ -263,6 +273,68 @@ export function TaskDetailPanel({
     return null;
   })();
 
+  const ciFitness = (() => {
+    const byName = new Map<
+      string,
+      {
+        name: string;
+        conclusion: string | null;
+        passed: boolean;
+        blocksAccept: boolean;
+        detailsUrl: string | null;
+      }
+    >();
+    for (const row of artifacts) {
+      if (row.kind !== "validation_report") continue;
+      const body = parseInlineBody(row.meta) as {
+        source?: string;
+        name?: string;
+        conclusion?: string | null;
+        passed?: boolean;
+        blocksAccept?: boolean;
+        detailsUrl?: string | null;
+      } | null;
+      const meta = row.meta as {
+        validator?: string;
+        passed?: boolean;
+        blocksAccept?: boolean;
+        checkName?: string;
+      };
+      if (meta.validator === "fake-v1") continue;
+      const isCi =
+        body?.source === "github_check" ||
+        body?.source === "sonar_quality_gate" ||
+        meta.validator === "github-check-v1" ||
+        typeof meta.blocksAccept === "boolean";
+      if (!isCi) continue;
+      const name = body?.name || meta.checkName || "check";
+      if (byName.has(name)) continue;
+      byName.set(name, {
+        name,
+        conclusion: body?.conclusion ?? null,
+        passed: body?.passed === true || meta.passed === true,
+        blocksAccept:
+          body?.blocksAccept === true || meta.blocksAccept === true,
+        detailsUrl:
+          typeof body?.detailsUrl === "string" ? body.detailsUrl : null,
+      });
+    }
+    const checks = [...byName.values()];
+    const blocking =
+      checks.some((c) => c.blocksAccept) ||
+      selected?.errorCode === "ci_failed";
+    const passed = checks.some((c) => c.passed && !c.blocksAccept);
+    const awaitingLive = events.some((e) => e.payload.fitness === "pending");
+    const acceptReady = !blocking && (!awaitingLive || passed);
+    return { checks, blocking, passed, awaitingLive, acceptReady };
+  })();
+
+  const acceptBlockedReason = !ciFitness.acceptReady
+    ? ciFitness.blocking
+      ? "CI checks failed — Accept disabled"
+      : "Awaiting live CI evidence — Accept disabled"
+    : null;
+
   return (
     <div>
       <p style={{ margin: "0 0 0.35rem", color: "#A3A3A3", fontSize: "0.875rem" }}>
@@ -271,10 +343,12 @@ export function TaskDetailPanel({
           <>
             {" · "}
             <a href={task.prUrl} style={{ color: "#A3A3A3" }}>
-              fake PR
+              PR
             </a>
           </>
         ) : null}
+        {" · "}
+        {(costMicros / 100).toFixed(2)}¢
       </p>
       <h1
         style={{
@@ -349,8 +423,13 @@ export function TaskDetailPanel({
             <>
               <button
                 type="button"
-                disabled={pending}
-                style={btn}
+                disabled={pending || !ciFitness.acceptReady}
+                style={
+                  !ciFitness.acceptReady
+                    ? { ...btn, opacity: 0.45, cursor: "not-allowed" }
+                    : btn
+                }
+                title={acceptBlockedReason ?? "Accept delivery"}
                 onClick={() =>
                   void postAction(`/api/tasks/${taskId}/review`, {
                     workspaceId,
@@ -390,6 +469,17 @@ export function TaskDetailPanel({
           ) : null}
         </div>
       ) : null}
+      {task.status === "REVIEW_REQUIRED" && acceptBlockedReason ? (
+        <p
+          style={{
+            margin: "0.5rem 0 0",
+            color: "#FBBF24",
+            fontSize: "0.8rem",
+          }}
+        >
+          {acceptBlockedReason}
+        </p>
+      ) : null}
 
       {error ? (
         <p style={{ marginTop: "0.75rem", color: "#F87171", fontSize: "0.875rem" }}>
@@ -399,11 +489,90 @@ export function TaskDetailPanel({
 
       <RecoveryCopy taskStatus={task.status} run={selected} />
 
-      {diffSummary || deliveryReport ? (
+      {diffSummary || deliveryReport || ciFitness.checks.length > 0 || ciFitness.awaitingLive ? (
         <section style={{ marginTop: "2rem" }}>
           <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>
             Delivery for review
           </h2>
+          <p
+            style={{
+              margin: "0.35rem 0 0.75rem",
+              color: "#A3A3A3",
+              fontSize: "0.8rem",
+            }}
+          >
+            Cost {(costMicros / 100).toFixed(2)}¢
+            {diffSummary ? ` · ${diffSummary.files.length} file(s)` : null}
+            {" · CI "}
+            {ciFitness.blocking
+              ? "failed"
+              : ciFitness.passed
+                ? "passed"
+                : ciFitness.awaitingLive
+                  ? "pending"
+                  : "n/a"}
+          </p>
+          {ciFitness.awaitingLive || ciFitness.checks.length > 0 ? (
+            <div style={{ marginBottom: "0.85rem" }}>
+              <p
+                style={{
+                  margin: "0 0 0.35rem",
+                  color: "#E5E5E5",
+                  fontSize: "0.8rem",
+                }}
+              >
+                CI evidence
+                {ciFitness.awaitingLive && !ciFitness.passed
+                  ? " — waiting for GitHub checks"
+                  : null}
+              </p>
+              {ciFitness.checks.length === 0 ? (
+                <p
+                  style={{
+                    margin: 0,
+                    color: "#737373",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  No check_run attached yet. Accept stays closed until checks
+                  report.
+                </p>
+              ) : (
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: "1.1rem",
+                    color: "#A3A3A3",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  {ciFitness.checks.map((c) => (
+                    <li key={c.name}>
+                      {c.name}: {c.conclusion ?? "unknown"}
+                      {c.blocksAccept
+                        ? " (blocks accept)"
+                        : c.passed
+                          ? " ✓"
+                          : ""}
+                      {c.detailsUrl ? (
+                        <>
+                          {" · "}
+                          <a
+                            href={c.detailsUrl}
+                            style={{ color: "#A3A3A3" }}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            details
+                          </a>
+                        </>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
           {deliveryReport ? (
             <p
               style={{
@@ -693,7 +862,10 @@ function RecoveryCopy({
           lineHeight: 1.45,
         }}
       >
-        {body}
+        {body}{" "}
+        <a href="/docs/recovery" style={{ color: "#D4A574" }}>
+          Recovery docs →
+        </a>
       </p>
     </section>
   );
