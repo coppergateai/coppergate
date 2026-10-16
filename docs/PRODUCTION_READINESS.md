@@ -6,6 +6,8 @@ Use with `PRODUCTION_SIGNAL_BACKLOG.md` Phase X. Do **not** claim “production 
 
 - [x] Closed-loop unit/integration: Sonar + CI-fail → arena → PR → fitness (`apps/worker/src/e2e-signal-closed-loop.test.ts`)
 - [x] Staging E2E: Sonar → arena → **live** PR on smoke repo — [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) (2026-10-16; seed + local worker `GITHUB_DELIVERY_MODE=http`)
+- [x] Signal Accept → DONE — [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) + [PR #3](https://github.com/coppergateai/coppergate-staging-smoke/pull/3) (`accept-task-review.mjs`, 2026-10-16)
+- [x] Delivery uses sandbox workdir file bodies (`apps/worker/src/delivery-files.ts`; README not stub-overwritten) — proven on PR #3 (`app/page.tsx` real OpenHands content, `fromSandbox: 1`)
 - [ ] Fitness ingest: coverage, e2e, perf, preview, visual, load (under load)
 - [ ] Provider storm shed + workspace ingest quotas verified under load
 

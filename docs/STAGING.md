@@ -9,7 +9,7 @@ Goal: open and accept **one real PR** from a staging Coppergate stack without op
 | `apps/web` | Vercel project `coppergate` → `https://www.coppergate.ai` |
 | Postgres | Fly Postgres `coppergate-db` (web via `coppergate-db.fly.dev` + `sslmode=require`; worker via `.flycast`) |
 | `apps/worker` | Fly app `coppergate-worker` (`Dockerfile.worker` + [`fly.toml`](../fly.toml)) |
-| GitHub App | `coppergatelocal` on org `coppergateai` |
+| GitHub App | `coppergateai` on org `coppergateai` |
 | Smoke repo | [`coppergateai/coppergate-staging-smoke`](https://github.com/coppergateai/coppergate-staging-smoke) |
 
 ## Required env (web + worker)
@@ -40,9 +40,9 @@ Web and worker **must** share the same database and `CREDENTIALS_ENCRYPTION_KEY`
 
 Sync helper (local `.env` → Vercel + optional Fly): [`scripts/task033-sync-secrets.sh`](../scripts/task033-sync-secrets.sh).
 
-## GitHub App URLs (`coppergatelocal`)
+## GitHub App URLs (`coppergateai`)
 
-Settings: https://github.com/organizations/coppergateai/settings/apps/coppergatelocal
+Settings: https://github.com/organizations/coppergateai/settings/apps/coppergateai
 
 | Field | Value |
 |---|---|
@@ -93,7 +93,18 @@ STAGING_ALLOW_LOCAL=1 SIGNAL_PROVIDER=sonar \
 
 (`SIGNAL_PROVIDER=ci_failure` for the CI reverse vertical.) Worker needs `GITHUB_DELIVERY_MODE=http`.
 
-**Proven:** [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) — Sonar signal seed → OpenHands sandbox → live PR (2026-10-16).
+**Proven:**
+- [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) — Sonar → OpenHands → live PR → Accept → DONE (2026-10-16)
+- [PR #3](https://github.com/coppergateai/coppergate-staging-smoke/pull/3) — same path with **sandbox file bodies** in the diff (`app/page.tsx`, not README stub)
+
+**Fly worker (unattended):** `fly.toml` sets `GITHUB_DELIVERY_MODE=http`, `SANDBOX_MODE=local`, `CONTENDER_HARNESS=openhands`. Deployed 2026-10-16 (`fly deploy -a coppergate-worker`). Full remote-DB seed steps: [`scripts/fly-signal-closed-loop.md`](../scripts/fly-signal-closed-loop.md). Laptop worker must be stopped so Fly claims the run.
+
+Accept a reviewable task:
+
+```bash
+LOOKUP_PR_URL='https://github.com/coppergateai/coppergate-staging-smoke/pull/N' \
+  pnpm --filter @coppergate/worker exec node --import tsx scripts/accept-task-review.mjs
+```
 
 **Manual path:**
 

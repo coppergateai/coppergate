@@ -39,6 +39,7 @@ import {
 import type { GithubDeliveryClient } from "@coppergate/github";
 import { LocalSandboxManager, type SandboxHandle } from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
+import { buildDeliveryFiles } from "./delivery-files.js";
 import {
   resolveDeliveryMode,
   resolveGithubDelivery,
@@ -167,6 +168,9 @@ export async function executeClaimedRun(
   const sandboxManager =
     sandboxMode === "local" ? new LocalSandboxManager() : null;
   let sandbox: SandboxHandle | null = null;
+  /** Captured before sandbox destroy so delivery can use real file bodies. */
+  let deliveryBundle: Awaited<ReturnType<typeof buildDeliveryFiles>> | null =
+    null;
 
   try {
     if (sandboxManager) {
@@ -254,6 +258,19 @@ export async function executeClaimedRun(
           completion = event.payload;
           actualCost = event.payload.actualCostMicros || actualCost;
         }
+      }
+
+      if (completion && !sawCancel) {
+        deliveryBundle = await buildDeliveryFiles({
+          workdir: sandbox?.workdir,
+          filesChanged: completion.filesChanged,
+          runId: run.id,
+        });
+        log.info("delivery files prepared", {
+          runId: run.id,
+          count: deliveryBundle.files.length,
+          fromSandbox: deliveryBundle.fromSandbox,
+        });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -404,6 +421,13 @@ export async function executeClaimedRun(
     task.githubIssueNumber != null
       ? `\n\nCloses #${task.githubIssueNumber}`
       : "";
+  const prepared =
+    deliveryBundle ??
+    (await buildDeliveryFiles({
+      workdir: null,
+      filesChanged: completion.filesChanged,
+      runId: run.id,
+    }));
   const delivery = await github.deliverPullRequest({
     repo,
     branchName: completion.branchName,
@@ -411,13 +435,7 @@ export async function executeClaimedRun(
     commitMessage: `Coppergate: ${task.title}`,
     prTitle: `Coppergate: ${task.title}`,
     prBody: `Task \`${task.id}\` · run \`${run.id}\` · repo \`${repo.owner}/${repo.repo}\`${issueLine}`,
-    files: (completion.filesChanged.length
-      ? completion.filesChanged
-      : ["README.md"]
-    ).map((path) => ({
-      path,
-      content: `// coppergate run ${run.id}\n`,
-    })),
+    files: prepared.files,
     idempotencyKey: `task:${task.id}:run:${run.id}`,
   });
 
@@ -456,9 +474,7 @@ export async function executeClaimedRun(
     },
   });
 
-  const filesChanged = completion.filesChanged.length
-    ? completion.filesChanged
-    : ["README.md"];
+  const filesChanged = prepared.files.map((f) => f.path);
   await persistDeliveryArtifacts(db, {
     workspaceId: run.workspaceId,
     projectId: run.projectId,

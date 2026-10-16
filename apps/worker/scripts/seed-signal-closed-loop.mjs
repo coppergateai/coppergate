@@ -26,6 +26,7 @@ import {
   ensureArenaForProject,
   ensureDefaultAutoArmRule,
   enqueueAgentRun,
+  githubInstallations,
   ingestSignal,
   insertTestUser,
   listRunsForTask,
@@ -124,12 +125,12 @@ async function waitForCoppergateInstall(jwt, timeoutMs = 10 * 60 * 1000) {
     const hit = installs.find((i) => i.account?.login === "coppergateai");
     if (hit) return hit;
     console.log(
-      "Waiting for coppergatelocal install on coppergateai (select coppergate-staging-smoke)…",
+      "Waiting for coppergateai install on coppergateai (select coppergate-staging-smoke)…",
     );
     await new Promise((r) => setTimeout(r, 8_000));
   }
   throw new Error(
-    "Timed out. Install: https://github.com/apps/coppergatelocal/installations/new",
+    "Timed out. Install: https://github.com/apps/coppergateai/installations/new",
   );
 }
 
@@ -215,83 +216,120 @@ if (forcedInstallId && forcedRepoId) {
 const db = createDb(databaseUrl, { max: 2 });
 const stamp = Date.now();
 try {
-  const user = await insertTestUser(db, {
-    login: `sig-seed-${stamp}`,
-    githubUserId: `gh-sig-seed-${stamp}`,
-  });
-  const actor = user.id;
-  const { workspace } = await createWorkspaceWithOwner(db, {
-    name: `Signal closed loop ${stamp}`,
-    ownerUserId: actor,
-  });
-  const workspaceId = workspace.id;
+  // Reuse workspace if this GitHub App install is already bound (unique constraint).
+  const [existingInstall] = await db
+    .select()
+    .from(githubInstallations)
+    .where(eq(githubInstallations.githubInstallationId, String(installId)))
+    .limit(1);
 
-  const installation = await upsertGithubInstallation(db, {
-    workspaceId,
-    githubInstallationId: String(installId),
-    accountLogin: target.owner.login || "coppergateai",
-    status: "active",
-  });
-  const conn = await connectRepository(db, {
-    workspaceId,
-    installationId: installation.id,
-    githubRepoId: String(target.id),
-    owner: target.owner.login,
-    name: target.name,
-    defaultBranch: target.default_branch || "main",
-    baseRepoFullName: target.full_name,
-  });
+  let workspaceId;
+  let projectId;
+  let actor;
 
-  const { project } = await createProjectWithRepo(db, {
-    workspaceId,
-    name: "Signal staging smoke",
-    mode: "existing_repo",
-    repositoryConnectionId: conn.id,
-  });
-  const projectId = project.id;
+  if (existingInstall) {
+    workspaceId = existingInstall.workspaceId;
+    const [proj] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.workspaceId, workspaceId))
+      .limit(1);
+    if (!proj) {
+      throw new Error(
+        `Installation ${installId} bound to workspace ${workspaceId} but no project found`,
+      );
+    }
+    projectId = proj.id;
+    actor = process.env.ACTOR?.trim() || "operator:signal-seed";
+    console.log("reusing workspace/project", { workspaceId, projectId });
+    await ensureArenaForProject(db, {
+      workspaceId,
+      projectId,
+      actor,
+      minHuman: false,
+      defaultContenderN: 2,
+      contenderCount: 2,
+      contenderBudgetMicros: 200_000,
+    });
+  } else {
+    const user = await insertTestUser(db, {
+      login: `sig-seed-${stamp}`,
+      githubUserId: `gh-sig-seed-${stamp}`,
+    });
+    actor = user.id;
+    const { workspace } = await createWorkspaceWithOwner(db, {
+      name: `Signal closed loop ${stamp}`,
+      ownerUserId: actor,
+    });
+    workspaceId = workspace.id;
 
-  await setProjectBudget(db, {
-    workspaceId,
-    projectId,
-    capMicros: 10_000_000,
-    actor,
-  });
-  await db
-    .update(projects)
-    .set({ autonomyLevel: "L1" })
-    .where(eq(projects.id, projectId));
+    const installation = await upsertGithubInstallation(db, {
+      workspaceId,
+      githubInstallationId: String(installId),
+      accountLogin: target.owner.login || "coppergateai",
+      status: "active",
+    });
+    const conn = await connectRepository(db, {
+      workspaceId,
+      installationId: installation.id,
+      githubRepoId: String(target.id),
+      owner: target.owner.login,
+      name: target.name,
+      defaultBranch: target.default_branch || "main",
+      baseRepoFullName: target.full_name,
+    });
 
-  const draft = await createBriefDraft(db, {
-    workspaceId,
-    projectId,
-    actor,
-    rawIdea: "Keep quality / CI green via arena",
-    content: {
-      title: "Signal closed loop",
-      targetUser: "Operator",
-      problem: "External signals must become reviewable PRs",
-      scope: "Signal arm → sandbox agent → PR",
-      nonGoals: "L3 deploy",
-      acceptanceCriteria: ["Signal-armed PR opens on smoke repo"],
-      clarifyingAnswers: [],
-    },
-  });
-  await approveBrief(db, {
-    workspaceId,
-    projectId,
-    briefId: draft.id,
-    actor,
-  });
+    const { project } = await createProjectWithRepo(db, {
+      workspaceId,
+      name: "Signal staging smoke",
+      mode: "existing_repo",
+      repositoryConnectionId: conn.id,
+    });
+    projectId = project.id;
 
-  await ensureArenaForProject(db, {
-    workspaceId,
-    projectId,
-    actor,
-    minHuman: false,
-    defaultContenderN: 2,
-    contenderCount: 2,
-    contenderBudgetMicros: 200_000,
-  });
+    await setProjectBudget(db, {
+      workspaceId,
+      projectId,
+      capMicros: 10_000_000,
+      actor,
+    });
+    await db
+      .update(projects)
+      .set({ autonomyLevel: "L1" })
+      .where(eq(projects.id, projectId));
+
+    const draft = await createBriefDraft(db, {
+      workspaceId,
+      projectId,
+      actor,
+      rawIdea: "Keep quality / CI green via arena",
+      content: {
+        title: "Signal closed loop",
+        targetUser: "Operator",
+        problem: "External signals must become reviewable PRs",
+        scope: "Signal arm → sandbox agent → PR",
+        nonGoals: "L3 deploy",
+        acceptanceCriteria: ["Signal-armed PR opens on smoke repo"],
+        clarifyingAnswers: [],
+      },
+    });
+    await approveBrief(db, {
+      workspaceId,
+      projectId,
+      briefId: draft.id,
+      actor,
+    });
+
+    await ensureArenaForProject(db, {
+      workspaceId,
+      projectId,
+      actor,
+      minHuman: false,
+      defaultContenderN: 2,
+      contenderCount: 2,
+      contenderBudgetMicros: 200_000,
+    });
+  }
 
   await ensureDefaultAutoArmRule(db, {
     workspaceId,

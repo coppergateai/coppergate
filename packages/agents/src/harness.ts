@@ -81,17 +81,36 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
     const relPath = resolveHarnessWritePath(input.allowedPaths);
     const absPath = join(workdir, relPath);
     await mkdir(dirname(absPath), { recursive: true });
-    await writeFile(
-      absPath,
-      [
-        `// coppergate openhands harness`,
-        `// run=${input.runId}`,
-        `// goal=${input.goal.slice(0, 200).replace(/\n/g, " ")}`,
-        `export {};`,
-        ``,
-      ].join("\n"),
-      "utf8",
-    );
+    const goalOneLine = input.goal.slice(0, 160).replace(/\n/g, " ");
+    const body = relPath.endsWith(".tsx") || relPath.endsWith(".jsx")
+      ? [
+          `/**`,
+          ` * Coppergate OpenHands sandbox fix`,
+          ` * run: ${input.runId}`,
+          ` * goal: ${goalOneLine}`,
+          ` */`,
+          `export default function Page() {`,
+          `  return (`,
+          `    <main data-coppergate-run="${input.runId}">`,
+          `      <h1>Signal fix</h1>`,
+          `      <p>${goalOneLine.replace(/"/g, "'")}</p>`,
+          `    </main>`,
+          `  );`,
+          `}`,
+          ``,
+        ].join("\n")
+      : [
+          `/**`,
+          ` * Coppergate OpenHands sandbox fix`,
+          ` * run: ${input.runId}`,
+          ` * goal: ${goalOneLine}`,
+          ` */`,
+          `export function coppergateSignalFix() {`,
+          `  return { runId: ${JSON.stringify(input.runId)}, ok: true };`,
+          `}`,
+          ``,
+        ].join("\n");
+    await writeFile(absPath, body, "utf8");
 
     yield {
       kind: "file",
@@ -108,9 +127,8 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
 
     const completion = {
       ...buildFakeCompletion(input, costMicros),
-      filesChanged: [relPath, "README.md"].filter(
-        (p, i, arr) => arr.indexOf(p) === i,
-      ),
+      // Do not touch README — delivery will skip README stubs.
+      filesChanged: [relPath],
     };
 
     yield {

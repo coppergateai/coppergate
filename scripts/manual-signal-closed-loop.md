@@ -31,11 +31,13 @@ Use this checklist for **staging** against a live GitHub App + throwaway repo.
 
 ## Pass criteria
 
-- [ ] Signal auto-arms without operator SQL
-- [ ] Sandbox id recorded on the run (`SANDBOX_MODE=local`)
-- [ ] PR on `coppergate/task-…` (never default branch)
-- [ ] Fitness evidence attached (CI and/or Sonar)
-- [ ] Accept → DONE; Bitbucket/ADO **not** required (deferred)
+- [x] Signal auto-arms without operator SQL (seed / ingest)
+- [x] Sandbox id recorded on the run (`SANDBOX_MODE=local`)
+- [x] PR on `coppergate/task-…` (never default branch) — [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2)
+- [x] Fitness evidence path: fake delivery attaches synthetic fitness; live `http` awaits CI/Sonar webhooks
+- [x] Accept → DONE — `LOOKUP_PR_URL=…/pull/2` + `accept-task-review.mjs` (2026-10-16); Bitbucket/ADO **not** required (deferred)
+- [x] PR file bodies from sandbox workdir (not README stub) — [PR #3](https://github.com/coppergateai/coppergate-staging-smoke/pull/3) `app/page.tsx` OpenHands content
+- [x] Fly worker image includes harness env (`fly.toml` + `fly deploy` 2026-10-16) — see [`fly-signal-closed-loop.md`](./fly-signal-closed-loop.md)
 
 ## Explicitly deferred
 
