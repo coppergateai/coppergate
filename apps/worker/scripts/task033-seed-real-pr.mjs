@@ -117,12 +117,12 @@ async function waitForCoppergateInstall(jwt, timeoutMs = 10 * 60 * 1000) {
     const hit = installs.find((i) => i.account?.login === "coppergateai");
     if (hit) return hit;
     console.log(
-      "Waiting for coppergatelocal install on coppergateai (select coppergate-staging-smoke)…",
+      "Waiting for coppergateai install on coppergateai (select coppergate-staging-smoke)…",
     );
     await new Promise((r) => setTimeout(r, 8_000));
   }
   throw new Error(
-    "Timed out. Install: https://github.com/apps/coppergatelocal/installations/new",
+    "Timed out. Install: https://github.com/apps/coppergateai/installations/new",
   );
 }
 
