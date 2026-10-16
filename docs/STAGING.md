@@ -79,12 +79,21 @@ Staging (live GitHub App on `coppergate-staging-smoke`):
 **Fast path (seed script):**
 
 ```bash
+# Remote Fly DB (preferred for hosted worker):
 DATABASE_URL='postgres://…@coppergate-db.fly.dev:5432/…?sslmode=require' \
   SIGNAL_PROVIDER=sonar \
-  node --import tsx apps/worker/scripts/seed-signal-closed-loop.mjs
+  pnpm --filter @coppergate/worker exec node --import tsx scripts/seed-signal-closed-loop.mjs
+
+# Local DB + local worker http delivery (App install must be real):
+STAGING_ALLOW_LOCAL=1 SIGNAL_PROVIDER=sonar \
+  GITHUB_INSTALLATION_ID=… GITHUB_REPO_ID=… \
+  GITHUB_REPO_FULL_NAME=coppergateai/coppergate-staging-smoke \
+  pnpm --filter @coppergate/worker exec node --import tsx scripts/seed-signal-closed-loop.mjs
 ```
 
-(`SIGNAL_PROVIDER=ci_failure` for the CI reverse vertical.) Worker must be on Fly with `GITHUB_DELIVERY_MODE=http`.
+(`SIGNAL_PROVIDER=ci_failure` for the CI reverse vertical.) Worker needs `GITHUB_DELIVERY_MODE=http`.
+
+**Proven:** [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) — Sonar signal seed → OpenHands sandbox → live PR (2026-10-16).
 
 **Manual path:**
 

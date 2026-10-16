@@ -136,8 +136,14 @@ async function waitForCoppergateInstall(jwt, timeoutMs = 10 * 60 * 1000) {
 loadDotEnv();
 
 const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl || /localhost|127\.0\.0\.1/.test(databaseUrl)) {
-  console.error("DATABASE_URL must be the shared remote staging DB");
+const allowLocal = process.env.STAGING_ALLOW_LOCAL === "1";
+if (
+  !databaseUrl ||
+  (!allowLocal && /localhost|127\.0\.0\.1/.test(databaseUrl))
+) {
+  console.error(
+    "DATABASE_URL must be the shared remote staging DB (or set STAGING_ALLOW_LOCAL=1 for local worker + http delivery)",
+  );
   process.exit(1);
 }
 
@@ -149,28 +155,62 @@ if (provider !== "sonar" && provider !== "ci_failure") {
 
 const appId = process.env.GITHUB_APP_ID;
 const slug = process.env.GITHUB_APP_SLUG;
-const pem = process.env.GITHUB_APP_PRIVATE_KEY;
-if (!appId || !slug || !pem) {
-  console.error("GitHub App env missing");
-  process.exit(1);
-}
+const pem = (process.env.GITHUB_APP_PRIVATE_KEY ?? "").replace(/\\n/g, "\n");
+const forcedInstallId = process.env.GITHUB_INSTALLATION_ID?.trim();
+const forcedRepoId = process.env.GITHUB_REPO_ID?.trim();
+const forcedRepoFull =
+  process.env.GITHUB_REPO_FULL_NAME?.trim() || "coppergateai/coppergate-staging-smoke";
 
-const jwt = appJwt(appId, pem);
-const install = await waitForCoppergateInstall(jwt);
-console.log("installation", install.id, install.account.login);
+let installId;
+let target;
 
-const access = await gh(jwt, `/app/installations/${install.id}/access_tokens`, {
-  method: "POST",
-  body: "{}",
-});
-const repos = await gh(access.token, "/installation/repositories");
-const target =
-  repos.repositories.find((r) => r.name === "coppergate-staging-smoke") ||
-  repos.repositories[0];
-if (!target) {
-  throw new Error("No repos on coppergateai installation");
+if (forcedInstallId && forcedRepoId) {
+  // Bypass App JWT when installation + repo are provided (local seed / CI).
+  installId = forcedInstallId;
+  const [owner, name] = forcedRepoFull.split("/");
+  target = {
+    id: Number(forcedRepoId),
+    name,
+    full_name: forcedRepoFull,
+    default_branch: process.env.GITHUB_REPO_DEFAULT_BRANCH || "main",
+    owner: { login: owner },
+  };
+  console.log(
+    "using forced installation/repo",
+    installId,
+    target.full_name,
+    "id",
+    target.id,
+  );
+} else {
+  if (!appId || !slug || !pem) {
+    console.error(
+      "GitHub App env missing (or set GITHUB_INSTALLATION_ID + GITHUB_REPO_ID)",
+    );
+    process.exit(1);
+  }
+  const jwt = appJwt(appId, pem);
+  const install = await waitForCoppergateInstall(jwt);
+  installId = String(install.id);
+  console.log("installation", install.id, install.account.login);
+
+  const access = await gh(
+    jwt,
+    `/app/installations/${install.id}/access_tokens`,
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
+  const repos = await gh(access.token, "/installation/repositories");
+  target =
+    repos.repositories.find((r) => r.name === "coppergate-staging-smoke") ||
+    repos.repositories[0];
+  if (!target) {
+    throw new Error("No repos on coppergateai installation");
+  }
+  console.log("target repo", target.full_name, "id", target.id);
 }
-console.log("target repo", target.full_name, "id", target.id);
 
 const db = createDb(databaseUrl, { max: 2 });
 const stamp = Date.now();
@@ -188,8 +228,8 @@ try {
 
   const installation = await upsertGithubInstallation(db, {
     workspaceId,
-    githubInstallationId: String(install.id),
-    accountLogin: "coppergateai",
+    githubInstallationId: String(installId),
+    accountLogin: target.owner.login || "coppergateai",
     status: "active",
   });
   const conn = await connectRepository(db, {

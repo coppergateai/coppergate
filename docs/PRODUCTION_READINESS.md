@@ -5,7 +5,7 @@ Use with `PRODUCTION_SIGNAL_BACKLOG.md` Phase X. Do **not** claim “production 
 ## Adapters & fitness
 
 - [x] Closed-loop unit/integration: Sonar + CI-fail → arena → PR → fitness (`apps/worker/src/e2e-signal-closed-loop.test.ts`)
-- [ ] Staging E2E: Sonar / CI-fail → arena → **live** PR on staging smoke repo ([`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-closed-loop.md))
+- [x] Staging E2E: Sonar → arena → **live** PR on smoke repo — [PR #2](https://github.com/coppergateai/coppergate-staging-smoke/pull/2) (2026-10-16; seed + local worker `GITHUB_DELIVERY_MODE=http`)
 - [ ] Fitness ingest: coverage, e2e, perf, preview, visual, load (under load)
 - [ ] Provider storm shed + workspace ingest quotas verified under load
 
