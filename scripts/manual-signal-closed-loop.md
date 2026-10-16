@@ -15,11 +15,18 @@ Use this checklist for **staging** against a live GitHub App + throwaway repo.
 ## Steps
 
 1. `STAGING_URL=https://www.coppergate.ai node scripts/staging-smoke.mjs`
-2. As workspace owner, `POST /api/workspaces/:id/signals/ingest` with a high-severity `sonar` or `ci_failure` envelope (see [`docs/SIGNALS.md`](../docs/SIGNALS.md)).
+2. Seed (preferred):
+
+   ```bash
+   DATABASE_URL=… SIGNAL_PROVIDER=sonar \
+     node --import tsx apps/worker/scripts/seed-signal-closed-loop.mjs
+   ```
+
+   Or as workspace owner, `POST /api/workspaces/:id/signals/ingest` with a high-severity `sonar` / `ci_failure` envelope (see [`docs/SIGNALS.md`](../docs/SIGNALS.md)).
 3. Confirm signal status `armed` and a task appears (READY_FOR_APPROVAL or QUEUED).
 4. Approve if needed; confirm worker claims a run (sandbox event + delivery).
 5. Open the PR on the smoke repo; confirm `diff_summary` + `delivery_report` in-product.
-6. Confirm fitness attach: CI check evidence and/or Sonar quality-gate artifact on the run.
+6. Confirm fitness: live CI/Sonar webhook on `http` delivery, or synthetic fitness on `fake` delivery for signal-sourced runs.
 7. **Accept** → task `DONE`.
 
 ## Pass criteria

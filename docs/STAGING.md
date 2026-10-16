@@ -76,6 +76,18 @@ node scripts/signal-closed-loop-smoke.mjs
 
 Staging (live GitHub App on `coppergate-staging-smoke`):
 
+**Fast path (seed script):**
+
+```bash
+DATABASE_URL='postgres://…@coppergate-db.fly.dev:5432/…?sslmode=require' \
+  SIGNAL_PROVIDER=sonar \
+  node --import tsx apps/worker/scripts/seed-signal-closed-loop.mjs
+```
+
+(`SIGNAL_PROVIDER=ci_failure` for the CI reverse vertical.) Worker must be on Fly with `GITHUB_DELIVERY_MODE=http`.
+
+**Manual path:**
+
 1. Workspace has funded arena (`ensureArena` / Settings → Arena) + approved brief.
 2. Owner upserts auto-arm for `sonar` or `ci_failure` (`POST /api/workspaces/:id/signals`).
 3. Ingest a high-severity envelope (`POST …/signals/ingest`) or fire a real Sonar/CI webhook.

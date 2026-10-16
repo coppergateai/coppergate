@@ -89,6 +89,26 @@ export async function listSignalEvents(
     .limit(limit);
 }
 
+/** Lookup the signal that armed a task (if any). */
+export async function getSignalEventForTask(
+  db: Database,
+  workspaceId: string,
+  taskId: string,
+): Promise<SignalEvent | null> {
+  const [row] = await db
+    .select()
+    .from(signalEvents)
+    .where(
+      and(
+        eq(signalEvents.workspaceId, workspaceId),
+        eq(signalEvents.taskId, taskId),
+      ),
+    )
+    .orderBy(desc(signalEvents.receivedAt))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getSignalEvent(
   db: Database,
   workspaceId: string,
