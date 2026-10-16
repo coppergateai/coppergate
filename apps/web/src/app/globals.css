@@ -1,8 +1,11 @@
-:root {
+:root,
+html[data-theme="dark"] {
+  color-scheme: dark;
   --ink: #090a0c;
   --ink-soft: #101114;
   --surface: #121316;
   --surface-elevated: #15171b;
+  --surface-hover: #1a1c21;
   --paper: #f5f5f3;
   --mute: #a1a1aa;
   --mute-strong: #e4e4e7;
@@ -14,6 +17,30 @@
   --danger: #d46a6a;
   --line: #26282d;
   --line-soft: rgba(255, 255, 255, 0.06);
+  --overlay: rgba(255, 255, 255, 0.04);
+  --overlay-strong: rgba(255, 255, 255, 0.06);
+  --overlay-muted: rgba(255, 255, 255, 0.02);
+  --overlay-faint: rgba(255, 255, 255, 0.012);
+  --panel-inset: rgba(0, 0, 0, 0.22);
+  --scrim: rgba(9, 10, 12, 0.55);
+  --scrim-strong: rgba(9, 10, 12, 0.9);
+  --announce-bg: rgba(16, 17, 20, 0.92);
+  --caps-bg: rgba(16, 17, 20, 0.55);
+  --atm-top: #0c0d10;
+  --atm-bottom: #07080a;
+  --atm-glow-soft: rgba(255, 255, 255, 0.03);
+  --grid-line: rgba(255, 255, 255, 0.03);
+  --header-shadow: 0 10px 36px rgba(0, 0, 0, 0.35);
+  --board-bg: rgba(12, 13, 16, 0.72);
+  --micro-cta-bg: rgba(18, 19, 22, 0.96);
+  --on-copper: #0a0a0a;
+  --marquee-fade: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 6%,
+    #000 90%,
+    transparent 100%
+  );
   --font: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --max: 1440px;
   --gutter: clamp(1.25rem, 4vw, 2.5rem);
@@ -21,6 +48,52 @@
   --radius: 12px;
   --radius-sm: 8px;
   --shadow-elevated: 0 24px 64px rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  /* Cool neutrals — avoid warm cream / parchment washes */
+  --ink: #ffffff;
+  --ink-soft: #f4f4f5;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-hover: #f4f4f5;
+  --paper: #09090b;
+  --mute: #3f3f46;
+  --mute-strong: #18181b;
+  --mute-soft: #52525b;
+  --copper: #9a652e;
+  --copper-hot: #a86f35;
+  --copper-dim: rgba(154, 101, 46, 0.05);
+  --success: #1f7a45;
+  --danger: #b53d3d;
+  --line: #e4e4e7;
+  --line-soft: rgba(24, 24, 27, 0.08);
+  --overlay: rgba(24, 24, 27, 0.035);
+  --overlay-strong: rgba(24, 24, 27, 0.055);
+  --overlay-muted: rgba(24, 24, 27, 0.025);
+  --overlay-faint: rgba(24, 24, 27, 0.015);
+  --panel-inset: rgba(24, 24, 27, 0.03);
+  --scrim: rgba(255, 255, 255, 0.82);
+  --scrim-strong: rgba(255, 255, 255, 0.97);
+  --announce-bg: rgba(255, 255, 255, 0.96);
+  --caps-bg: #f4f4f5;
+  --atm-top: #ffffff;
+  --atm-bottom: #f4f4f5;
+  --atm-glow-soft: rgba(24, 24, 27, 0.02);
+  --grid-line: rgba(24, 24, 27, 0.045);
+  --header-shadow: 0 10px 28px rgba(24, 24, 27, 0.05);
+  --shadow-elevated: 0 16px 40px rgba(24, 24, 27, 0.06);
+  --board-bg: #ffffff;
+  --micro-cta-bg: #ffffff;
+  --on-copper: #09090b;
+  --marquee-fade: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 12%,
+    #000 84%,
+    transparent 100%
+  );
 }
 
 *,

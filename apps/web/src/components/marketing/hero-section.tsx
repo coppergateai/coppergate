@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { HeroArenaStory } from "./hero-arena-story";
 import { IconArrow } from "./icons";
-import { ProductPreview } from "./product-preview";
 import styles from "./marketing.module.css";
 
 type Props = {
@@ -42,7 +42,7 @@ export function HeroSection({ signedIn }: Props) {
 
         <div className={`${styles.heroVisual} cg-rise cg-rise-delay-2`}>
           <div className={styles.heroGlow} aria-hidden="true" />
-          <ProductPreview compact />
+          <HeroArenaStory signedIn={signedIn} />
         </div>
       </div>
     </section>
