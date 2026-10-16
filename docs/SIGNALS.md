@@ -57,6 +57,21 @@ GitHub `check_run` failures that do **not** attach to an existing Coppergate run
 
 Sonar webhooks with `headSha`/`revision` + quality gate status also attach a validation artifact (`sonar-quality-gate-v1`) used by the rules critic (TASK069).
 
+## Closed-loop proof (Sonar ∥ CI-fail)
+
+Vertical under test (private beta focus):
+
+```text
+signal ingest → auto-arm rule → Task → approve → worker sandbox → agent → PR → fitness → REVIEW_REQUIRED
+```
+
+- Local/CI: `apps/worker/src/e2e-signal-closed-loop.test.ts` / `node scripts/signal-closed-loop-smoke.mjs`
+- Staging health: `STAGING_URL=… node scripts/staging-smoke.mjs`
+- Staging checklist: [`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-closed-loop.md)
+- Manual signal seed: `POST /api/workspaces/:id/signals/ingest` with a `sonar` or `ci_failure` envelope after `ensureDefaultAutoArmRule`
+
+Bitbucket/ADO appear as CI envelope providers only; **live PR delivery for those SCMs is deferred**.
+
 ## Rate limit
 
 ~120 ingests / workspace / minute → HTTP 429.

@@ -11,8 +11,9 @@ Describe a scoped change → approve a task → get a reviewable PR with evidenc
 - **Template / fixture:** `nextjs_ts` (`coppergate-examples/nextjs_ts`) for `new_product` projects
 - **Existing repos:** stack is detected on bind from root files + SCM Languages API (`nextjs_ts`, `node`, `go`, `rust`, `python`, …, or `unknown`). Workspace owners can **Re-detect stacks** to backfill.
 - **Auth:** GitHub OAuth (user) + GitHub App (repo); GitLab OAuth + project connect also supported
-- **Agent:** FakeCodingAgent by default; optional OpenAI-compatible provider via env. Coding agent path is primarily `nextjs_ts`; other stacks are best-effort (UI soft warning).
-- **Delivery:** Branch + PR only (never default branch); FakeGithubDelivery in local/dev without App credentials
+- **Agent:** FakeCodingAgent by default; optional OpenAI-compatible provider via env; optional `CONTENDER_HARNESS=openhands` (sandbox-backed). Coding agent path is primarily `nextjs_ts`; other stacks are best-effort (UI soft warning).
+- **Sandbox:** Worker creates a `LocalSandboxManager` workdir per run (`SANDBOX_MODE=local` default).
+- **Delivery:** Branch + PR/MR only (never default branch); live GitHub App + GitLab. Bitbucket/ADO deferred. FakeGithubDelivery in local/dev without App credentials
 
 ## Explicit non-goals (this pilot)
 

@@ -10,18 +10,24 @@ Product monorepo. Planning / ADRs: [`coppergate-architecture`](https://github.co
 
 ```text
 apps/
-  web/                 # Next.js UI + BFF (auth, workspaces, /health)
-  worker/              # Job poller stub
+  web/                 # Next.js UI + BFF (auth, workspaces, signals, arena)
+  worker/              # Job poller — claim → sandbox → agent → PR delivery
 packages/
   config/              # Zod env schema (fail-fast)
-  telemetry/           # Structured logs + OTel stubs
+  telemetry/           # Structured logs + funnel + SIGNAL_SLOS
   errors/              # API error envelope
-  db/                  # Drizzle schema + migrations
-  auth/                # GitHub OAuth + session helpers
+  db/                  # Drizzle schema + domain (tasks, arena, signals)
+  auth/                # GitHub/GitLab OAuth + session (+ SSO skeleton)
   github/              # GitHub App JWT, install tokens, AES-GCM seal
+  gitlab/              # GitLab OAuth + MR delivery
+  scm/                 # Shared SCM helpers; Bitbucket/ADO HTTP clients (deferred live path)
+  signals/             # Signal Adapter contract + vendor normalizers
+  agents/              # FakeCodingAgent, OpenAI-compatible, ContenderHarness
+  sandbox/             # LocalSandboxManager (+ Docker/gVisor policy)
+  llm/                 # Brief/plan generation (LLM when configured, else deterministic)
   eslint-config/
   typescript-config/
-  coppergate/          # npm name reserve (placeholder)
+  coppergate/          # npm name reserve (placeholder SDK)
 ```
 
 ## Prerequisites
@@ -52,6 +58,14 @@ pnpm db:migrate:down   # rollback baseline
 pnpm --filter @coppergate/worker dev
 ```
 
+Worker env notes:
+
+| Variable | Default | Notes |
+|---|---|---|
+| `SANDBOX_MODE` | `local` | Set `off` to skip LocalSandboxManager |
+| `CONTENDER_HARNESS` | _(unset)_ | `openhands` for sandbox-backed BYO harness |
+| `GITHUB_DELIVERY_MODE` | `fake` | `http` for real GitHub/GitLab PRs/MRs |
+
 ## Scripts
 
 | Command | Description |
@@ -62,6 +76,12 @@ pnpm --filter @coppergate/worker dev
 | `pnpm build` | Build all packages/apps |
 | `pnpm db:migrate` | Apply Drizzle migrations |
 | `pnpm db:migrate:down` | Roll back baseline migration |
+
+Closed-loop signal proof (needs `DATABASE_URL`):
+
+```bash
+pnpm --filter @coppergate/worker test -- e2e-signal-closed-loop
+```
 
 ## Discovery landing
 
@@ -91,8 +111,9 @@ License: MIT. Hosted SaaS remains the commercial offering — see architecture [
 
 ## Status
 
-**TASK001–032** complete (MVP). Phase 2 Slice I in flight: TASK033 staging (smoke pending secrets); **TASK034–036** done. See architecture `MVP_BACKLOG.md`, `docs/STAGING.md`, `/docs`.
+Private beta: MVP + Survivor arena + Signal foundation shipped. Live SCM delivery is **GitHub App + GitLab**; Bitbucket/Azure DevOps HTTP clients exist but the worker install/auth path is **deferred** until the GitHub closed loop is green on staging. Do not claim “production ready” until Phase X go/no-go (`docs/PRODUCTION_READINESS.md`).
 
+See architecture `MVP_BACKLOG.md`, `PRODUCTION_SIGNAL_BACKLOG.md`, `/docs`, [`docs/SIGNALS.md`](./docs/SIGNALS.md), [`docs/PRIVATE_BETA.md`](./docs/PRIVATE_BETA.md).
 
 ## Related repos
 

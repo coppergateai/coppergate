@@ -536,6 +536,34 @@ export async function getAgentRun(
   return row;
 }
 
+/** Attach sandbox id to a claimed run (worker ↔ LocalSandboxManager). */
+export async function attachSandboxToRun(
+  db: Database,
+  input: { runId: string; workerId: string; sandboxId: string },
+): Promise<AgentRun> {
+  const [updated] = await db
+    .update(agentRuns)
+    .set({
+      sandboxId: input.sandboxId,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(agentRuns.id, input.runId),
+        eq(agentRuns.leaseOwner, input.workerId),
+        sql`${agentRuns.status} in ('RUNNING', 'VALIDATING')`,
+      ),
+    )
+    .returning();
+  if (!updated) {
+    throw new RunError(
+      "not_owner",
+      "Cannot attach sandbox — not owner or not RUNNING/VALIDATING",
+    );
+  }
+  return updated;
+}
+
 export async function getTaskById(
   db: Database,
   taskId: string,

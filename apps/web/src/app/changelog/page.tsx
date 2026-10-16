@@ -18,7 +18,7 @@ const entries = [
       "Inbound adapters: Sonar, Jira/Linear, Sentry/PagerDuty, CI reverse path, and more",
       "Fitness expansion: coverage, e2e, perf, visual regress, preview smoke",
       "Notify: Slack / Teams / Discord; bounded role spawn (fixer, security, …)",
-      "SCM delivery paths for Bitbucket and Azure DevOps alongside GitHub/GitLab",
+      "GitHub/GitLab live delivery; Bitbucket/Azure DevOps clients deferred pending closed-loop staging",
     ],
   },
   {

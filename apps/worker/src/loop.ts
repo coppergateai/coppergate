@@ -1,4 +1,9 @@
-import { createCodingAgent } from "@coppergate/agents";
+import {
+  createCodingAgent,
+  createContenderHarness,
+  harnessAsCodingAgent,
+  type ContenderHarnessKind,
+} from "@coppergate/agents";
 import {
   claimNextRun,
   createDb,
@@ -12,8 +17,32 @@ import { openSecret, parseEncryptionKey } from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
 import { executeClaimedRun } from "./execute.js";
 
+function resolveHarnessKind(): ContenderHarnessKind | null {
+  const raw = (process.env.CONTENDER_HARNESS ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  const allowed: ContenderHarnessKind[] = [
+    "native_fake",
+    "native_openai",
+    "openhands",
+    "aider",
+    "cursor_cloud",
+    "codex",
+  ];
+  return (allowed as string[]).includes(raw)
+    ? (raw as ContenderHarnessKind)
+    : null;
+}
+
 function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
   return (async () => {
+    const harnessKind = resolveHarnessKind();
+    if (harnessKind === "openhands" || harnessKind === "aider") {
+      log.info("using ContenderHarness", { harnessKind, workspaceId });
+      return harnessAsCodingAgent(
+        createContenderHarness({ kind: harnessKind }),
+      );
+    }
+
     try {
       const byok = await getActiveLlmByok(db, workspaceId);
       const keyHex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
@@ -24,6 +53,18 @@ function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
         );
         await touchLlmByokUsed(db, workspaceId);
         log.info("using workspace BYOK for coding agent", { workspaceId });
+        if (harnessKind === "native_openai") {
+          return harnessAsCodingAgent(
+            createContenderHarness({
+              kind: "native_openai",
+              openai: {
+                apiKey,
+                baseUrl: byok.baseUrl ?? undefined,
+                model: byok.model ?? undefined,
+              },
+            }),
+          );
+        }
         return createCodingAgent({
           apiKey,
           baseUrl: byok.baseUrl ?? undefined,
@@ -34,6 +75,11 @@ function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
       log.warn("BYOK resolve failed; falling back", {
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+    if (harnessKind === "native_fake") {
+      return harnessAsCodingAgent(
+        createContenderHarness({ kind: "native_fake" }),
+      );
     }
     return createCodingAgent();
   })();

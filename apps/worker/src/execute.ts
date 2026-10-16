@@ -12,6 +12,7 @@ import {
   appendUsageEvent,
   applyTaskTransition,
   assertSufficientBudget,
+  attachSandboxToRun,
   buildDeliveryReport,
   buildDiffSummary,
   createArtifact,
@@ -33,8 +34,14 @@ import {
   type Task,
 } from "@coppergate/db";
 import type { GithubDeliveryClient } from "@coppergate/github";
+import { LocalSandboxManager, type SandboxHandle } from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
 import { resolveGithubDelivery } from "./github-delivery.js";
+
+function resolveSandboxMode(): "local" | "off" {
+  const raw = (process.env.SANDBOX_MODE ?? "local").trim().toLowerCase();
+  return raw === "off" || raw === "0" || raw === "false" ? "off" : "local";
+}
 
 async function maybeResolveTournamentAfterRun(
   db: Database,
@@ -150,74 +157,133 @@ export async function executeClaimedRun(
     }
   }
 
-  try {
-    for await (const event of agent.run({
-      runId: run.id,
-      taskId: task.id,
-      workspaceId: run.workspaceId,
-      projectId: run.projectId,
-      goal: task.goal,
-      scope: task.scope,
-      allowedPaths: parseJsonArray(task.allowedPaths),
-      acceptanceCriteria: parseJsonArray(task.acceptanceCriteria),
-      baseSha: run.baseSha,
-      toolAllowlist: parseJsonArray(run.toolAllowlist),
-      spendCapMicros: run.spendCapMicros,
-      strategy,
-      architectureContext: strategyContext,
-      isCancelRequested: () => isRunCancelRequested(db, run.id),
-    })) {
-      await renewRunLease(db, run.id, workerId, leaseMs);
+  const sandboxMode = resolveSandboxMode();
+  const sandboxManager =
+    sandboxMode === "local" ? new LocalSandboxManager() : null;
+  let sandbox: SandboxHandle | null = null;
 
+  try {
+    if (sandboxManager) {
+      try {
+        sandbox = await sandboxManager.create({
+          runId: run.id,
+          workspaceId: run.workspaceId,
+          repoUrl: `coppergate://project/${run.projectId}`,
+          baseSha: run.baseSha || "unknown",
+          branchName: run.branchName ?? undefined,
+        });
+        await attachSandboxToRun(db, {
+          runId: run.id,
+          workerId,
+          sandboxId: sandbox.id,
+        });
+        await appendRunEvent(db, {
+          runId: run.id,
+          workspaceId: run.workspaceId,
+          kind: "progress",
+          payload: {
+            message: "Sandbox ready",
+            sandboxId: sandbox.id,
+            runtime: sandbox.runtime,
+          },
+        });
+        log.info("sandbox created", {
+          runId: run.id,
+          sandboxId: sandbox.id,
+          runtime: sandbox.runtime,
+        });
+      } catch (err) {
+        log.warn("sandbox create failed; continuing without sandbox", {
+          runId: run.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        sandbox = null;
+      }
+    }
+
+    try {
+      for await (const event of agent.run({
+        runId: run.id,
+        taskId: task.id,
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        goal: task.goal,
+        scope: task.scope,
+        allowedPaths: parseJsonArray(task.allowedPaths),
+        acceptanceCriteria: parseJsonArray(task.acceptanceCriteria),
+        baseSha: run.baseSha,
+        toolAllowlist: parseJsonArray(run.toolAllowlist),
+        spendCapMicros: run.spendCapMicros,
+        strategy,
+        architectureContext: strategyContext,
+        sandboxWorkdir: sandbox?.workdir,
+        sandboxId: sandbox?.id,
+        isCancelRequested: () => isRunCancelRequested(db, run.id),
+      })) {
+        await renewRunLease(db, run.id, workerId, leaseMs);
+
+        await appendRunEvent(db, {
+          runId: run.id,
+          workspaceId: run.workspaceId,
+          kind: event.kind,
+          payload: {
+            message: event.message,
+            ...(event.payload ?? {}),
+          },
+        });
+
+        if (event.kind === "cost" && event.payload?.costMicros != null) {
+          actualCost = Number(event.payload.costMicros) || actualCost;
+        }
+
+        if (event.kind === "error" && event.payload?.code === "cancelled") {
+          sawCancel = true;
+          break;
+        }
+
+        if (
+          event.kind === "completion" &&
+          isFakeCompletionPayload(event.payload)
+        ) {
+          completion = event.payload;
+          actualCost = event.payload.actualCostMicros || actualCost;
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       await appendRunEvent(db, {
         runId: run.id,
         workspaceId: run.workspaceId,
-        kind: event.kind,
-        payload: {
-          message: event.message,
-          ...(event.payload ?? {}),
-        },
+        kind: "error",
+        payload: { message },
       });
-
-      if (event.kind === "cost" && event.payload?.costMicros != null) {
-        actualCost = Number(event.payload.costMicros) || actualCost;
-      }
-
-      if (event.kind === "error" && event.payload?.code === "cancelled") {
-        sawCancel = true;
-        break;
-      }
-
-      if (event.kind === "completion" && isFakeCompletionPayload(event.payload)) {
-        completion = event.payload;
-        actualCost = event.payload.actualCostMicros || actualCost;
-      }
+      await markRunFailed(db, {
+        runId: run.id,
+        workerId,
+        errorCode: "agent_error",
+        errorMessage: message.slice(0, 500),
+      });
+      await safeTaskTransition(db, task, "FAILED", workerId, log);
+      void notifyWorkspace(db, {
+        event: "run_failed",
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        taskId: task.id,
+        runId: run.id,
+        message: `Run failed: ${message.slice(0, 200)}`,
+      }).catch(() => undefined);
+      await maybeResolveTournamentAfterRun(db, run, workerId, log);
+      return "failed";
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    await appendRunEvent(db, {
-      runId: run.id,
-      workspaceId: run.workspaceId,
-      kind: "error",
-      payload: { message },
-    });
-    await markRunFailed(db, {
-      runId: run.id,
-      workerId,
-      errorCode: "agent_error",
-      errorMessage: message.slice(0, 500),
-    });
-    await safeTaskTransition(db, task, "FAILED", workerId, log);
-    void notifyWorkspace(db, {
-      event: "run_failed",
-      workspaceId: run.workspaceId,
-      projectId: run.projectId,
-      taskId: task.id,
-      runId: run.id,
-      message: `Run failed: ${message.slice(0, 200)}`,
-    }).catch(() => undefined);
-    await maybeResolveTournamentAfterRun(db, run, workerId, log);
-    return "failed";
+  } finally {
+    if (sandbox && sandboxManager) {
+      await sandboxManager.destroy(sandbox).catch((err: unknown) => {
+        log.warn("sandbox destroy failed", {
+          sandboxId: sandbox!.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
   }
 
   if (sawCancel || !completion) {

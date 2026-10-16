@@ -1,6 +1,6 @@
 import { createBriefDraft, getProjectForWorkspace } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
-import { generateBriefDraft } from "@coppergate/llm";
+import { generateBriefDraftAsync } from "@coppergate/llm";
 import { requireUser } from "@/lib/auth";
 import { mapBriefError, serializeBrief } from "@/lib/brief";
 import { requireCsrf } from "@/lib/csrf";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Generate a new draft brief revision (LLM stub). */
+/** Generate a new draft brief revision (LLM when configured, else deterministic). */
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
@@ -60,7 +60,7 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError("not_found", "Project not found");
     }
 
-    const content = generateBriefDraft({
+    const content = await generateBriefDraftAsync({
       idea: body.idea,
       projectName: project.project.name,
       answers,

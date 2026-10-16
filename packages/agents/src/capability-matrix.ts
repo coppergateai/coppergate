@@ -25,8 +25,9 @@ export const HARNESS_CAPABILITY_MATRIX: HarnessCapability[] = [
   {
     id: "openhands",
     displayName: "OpenHands",
-    status: "stub",
-    notes: "Falls back to FakeCodingAgent until sandbox adapter lands.",
+    status: "live",
+    notes:
+      "Sandbox-backed MVP: writes scoped fix into worker LocalSandbox workdir; Fake fallback if no workdir.",
   },
   {
     id: "cursor_cloud",

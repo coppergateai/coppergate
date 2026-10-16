@@ -44,7 +44,8 @@ export default function SupportedStackPage() {
             </li>
             <li>
               <strong>Delivery:</strong> branch + PR/MR only (never default
-              branch). GitHub, GitLab, Bitbucket, and Azure DevOps clients
+              branch). Live: GitHub App + GitLab. Bitbucket/Azure DevOps
+              clients exist but are deferred.
             </li>
             <li>
               <strong>Signals:</strong> Sonar, Jira/Linear/Azure Boards, Sentry/
@@ -57,7 +58,7 @@ export default function SupportedStackPage() {
             </li>
             <li>
               <strong>Agent:</strong> FakeCodingAgent by default; OpenAI-
-              compatible + ContenderHarness BYO stubs
+              compatible; OpenHands ContenderHarness (sandbox-backed MVP)
             </li>
           </ul>
           <p>

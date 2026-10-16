@@ -105,6 +105,9 @@ importers:
       '@coppergate/gitlab':
         specifier: workspace:*
         version: link:../../packages/gitlab
+      '@coppergate/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@coppergate/scm':
         specifier: workspace:*
         version: link:../../packages/scm

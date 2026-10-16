@@ -63,6 +63,27 @@ OAuth App (identity login) callback is already `https://www.coppergate.ai/api/au
 4. Deploy worker: `fly deploy` from repo root (`GITHUB_DELIVERY_MODE=http`).
 5. Smoke: `STAGING_URL=https://www.coppergate.ai node scripts/staging-smoke.mjs`
 6. Real PR seed (or UI path): `apps/worker/scripts/task033-seed-real-pr.mjs` / [`scripts/manual-real-pr-path.md`](../scripts/manual-real-pr-path.md)
+7. Signal closed loop (Sonar ∥ CI-fail): see **Signal → Arena → PR** below; local proof via `node scripts/signal-closed-loop-smoke.mjs`
+
+## Signal → Arena → PR (closed loop)
+
+Local/CI (no staging secrets):
+
+```bash
+DATABASE_URL=… pnpm db:migrate
+node scripts/signal-closed-loop-smoke.mjs
+```
+
+Staging (live GitHub App on `coppergate-staging-smoke`):
+
+1. Workspace has funded arena (`ensureArena` / Settings → Arena) + approved brief.
+2. Owner upserts auto-arm for `sonar` or `ci_failure` (`POST /api/workspaces/:id/signals`).
+3. Ingest a high-severity envelope (`POST …/signals/ingest`) or fire a real Sonar/CI webhook.
+4. Approve task if `min_human` is off; worker claims with `SANDBOX_MODE=local` (optional `CONTENDER_HARNESS=openhands`).
+5. Confirm PR on non-default branch + fitness evidence (CI check or Sonar gate artifact).
+6. Accept → `DONE`.
+
+Checklist: [`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-closed-loop.md).
 
 ## Pass criteria (TASK033)
 
