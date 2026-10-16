@@ -10,6 +10,8 @@ primary_region = "iad"
 [env]
   NODE_ENV = "production"
   GITHUB_DELIVERY_MODE = "http"
+  SANDBOX_MODE = "local"
+  CONTENDER_HARNESS = "openhands"
   APP_URL = "https://www.coppergate.ai"
 
 [processes]

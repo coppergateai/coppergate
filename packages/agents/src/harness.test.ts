@@ -81,6 +81,7 @@ describe("ContenderHarness", () => {
     assert.equal(sawSandbox, true);
     assert.equal(completion, true);
     const body = await readFile(join(workdir, "app/page.tsx"), "utf8");
-    assert.match(body, /openhands harness/);
+    assert.match(body, /Signal fix|coppergateSignalFix|data-coppergate-run/);
+    assert.doesNotMatch(body, /README/);
   });
 });
