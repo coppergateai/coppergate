@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { GeistSans } from "geist/font/sans";
+import Script from "next/script";
 import { DeferredGoogleAnalytics } from "@/components/deferred-google-analytics";
 import { GA_MEASUREMENT_ID } from "@/lib/ga";
 import "./globals.css";
@@ -9,8 +10,13 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#090a0c",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#090a0c" },
+  ],
 };
+
+const themeInitScript = `(function(){try{var t=localStorage.getItem("cg-theme");if(t!=="light"&&t!=="dark")t="dark";document.documentElement.setAttribute("data-theme",t);document.documentElement.style.colorScheme=t;}catch(e){document.documentElement.setAttribute("data-theme","dark");document.documentElement.style.colorScheme="dark";}})();`;
 
 const siteUrl =
   process.env.APP_URL?.replace(/\/$/, "") || "https://www.coppergate.ai";
@@ -77,8 +83,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={GeistSans.variable}>
+    <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
       <body>
+        <Script
+          id="cg-theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
         {children}
         {GA_MEASUREMENT_ID ? (
           <DeferredGoogleAnalytics gaId={GA_MEASUREMENT_ID} />

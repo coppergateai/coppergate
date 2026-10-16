@@ -12,8 +12,16 @@ export function MarketingFooter() {
             <Link className={styles.brandLink} href="/" aria-label="Coppergate home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                className={styles.footerLogo}
+                className={`${styles.footerLogo} ${styles.brandImgOnDark}`}
                 src="/logo-lockup-white.svg"
+                alt="Coppergate"
+                width={132}
+                height={28}
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className={`${styles.footerLogo} ${styles.brandImgOnLight}`}
+                src="/logo-lockup-black.svg"
                 alt="Coppergate"
                 width={132}
                 height={28}

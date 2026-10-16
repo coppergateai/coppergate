@@ -6,6 +6,7 @@ export { FaqBlock } from "./faq-block";
 export { FeatureShowcase } from "./feature-showcase";
 export { FinalCta } from "./final-cta";
 export { FitnessSection } from "./fitness-section";
+export { HeroArenaStory } from "./hero-arena-story";
 export { HeroSection } from "./hero-section";
 export { MarketingFooter } from "./marketing-footer";
 export { MarketingHeader } from "./marketing-header";

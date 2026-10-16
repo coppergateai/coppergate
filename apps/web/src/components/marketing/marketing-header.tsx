@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import { LogoutButton } from "@/app/logout-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { track } from "@/lib/ga";
 import { IconArrow, IconGithub } from "./icons";
 import styles from "./marketing.module.css";
@@ -62,8 +63,16 @@ export function MarketingHeader({ signedIn }: Props) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            className={styles.brandImg}
+            className={`${styles.brandImg} ${styles.brandImgOnDark}`}
             src="/logo-lockup-white.svg"
+            alt="Coppergate"
+            width={148}
+            height={32}
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className={`${styles.brandImg} ${styles.brandImgOnLight}`}
+            src="/logo-lockup-black.svg"
             alt="Coppergate"
             width={148}
             height={32}
@@ -79,6 +88,7 @@ export function MarketingHeader({ signedIn }: Props) {
         </nav>
 
         <div className={styles.navActions}>
+          <ThemeToggle />
           <a
             className={styles.githubLink}
             href="https://github.com/coppergateai/coppergate"
@@ -139,6 +149,10 @@ export function MarketingHeader({ signedIn }: Props) {
                 {link.label}
               </Link>
             ))}
+            <div className={styles.drawerThemeRow}>
+              <span>Theme</span>
+              <ThemeToggle />
+            </div>
             <a
               href="https://github.com/coppergateai/coppergate"
               target="_blank"
