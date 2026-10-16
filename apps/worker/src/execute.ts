@@ -17,7 +17,10 @@ import {
   buildDiffSummary,
   createArtifact,
   getContenderById,
+  getSignalEventForTask,
   getTaskById,
+  ingestCiEvidence,
+  ingestSonarFitness,
   isRunCancelRequested,
   markRunAwaitingReview,
   markRunFailed,
@@ -36,7 +39,10 @@ import {
 import type { GithubDeliveryClient } from "@coppergate/github";
 import { LocalSandboxManager, type SandboxHandle } from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
-import { resolveGithubDelivery } from "./github-delivery.js";
+import {
+  resolveDeliveryMode,
+  resolveGithubDelivery,
+} from "./github-delivery.js";
 
 function resolveSandboxMode(): "local" | "off" {
   const raw = (process.env.SANDBOX_MODE ?? "local").trim().toLowerCase();
@@ -373,8 +379,11 @@ export async function executeClaimedRun(
   let github: GithubDeliveryClient;
   let repo = { owner: "example", repo: "repo", defaultBranch: "main" };
   let baseSha = run.baseSha;
+  let deliveryMode = resolveDeliveryMode();
   if (input.github) {
     github = input.github;
+    // Injected clients (tests) are treated as fake for synthetic fitness attach.
+    deliveryMode = "fake";
   } else {
     const resolved = await resolveGithubDelivery(db, {
       workspaceId: run.workspaceId,
@@ -384,6 +393,7 @@ export async function executeClaimedRun(
     github = resolved.client;
     repo = resolved.repo;
     baseSha = resolved.baseSha;
+    deliveryMode = resolved.mode;
     log.info("github delivery resolved", {
       mode: resolved.mode,
       repo: `${repo.owner}/${repo.repo}`,
@@ -535,6 +545,38 @@ export async function executeClaimedRun(
 
   await setTaskPrUrl(db, task.id, delivery.prUrl);
 
+  // Fake-delivery closed loop: attach synthetic fitness for signal-sourced runs.
+  // Live http mode waits for real CI / Sonar webhooks.
+  if (deliveryMode === "fake") {
+    await attachSyntheticSignalFitness(db, {
+      workspaceId: run.workspaceId,
+      taskId: task.id,
+      runId: run.id,
+      headSha: delivery.headSha,
+      repoFullName: `${repo.owner}/${repo.repo}`,
+      log,
+    });
+  } else {
+    const signal = await getSignalEventForTask(
+      db,
+      run.workspaceId,
+      task.id,
+    ).catch(() => null);
+    if (signal) {
+      await appendRunEvent(db, {
+        runId: run.id,
+        workspaceId: run.workspaceId,
+        kind: "evidence",
+        payload: {
+          message: `Awaiting live fitness from ${signal.provider}`,
+          signalId: signal.id,
+          provider: signal.provider,
+          fitness: "pending",
+        },
+      }).catch(() => undefined);
+    }
+  }
+
   log.info("run awaiting review (not DONE)", {
     runId: run.id,
     taskId: task.id,
@@ -544,6 +586,70 @@ export async function executeClaimedRun(
   await maybeResolveTournamentAfterRun(db, run, workerId, log);
 
   return "review_required";
+}
+
+async function attachSyntheticSignalFitness(
+  db: Database,
+  input: {
+    workspaceId: string;
+    taskId: string;
+    runId: string;
+    headSha: string;
+    repoFullName: string;
+    log: Logger;
+  },
+): Promise<void> {
+  const signal = await getSignalEventForTask(
+    db,
+    input.workspaceId,
+    input.taskId,
+  ).catch(() => null);
+  if (!signal) return;
+
+  try {
+    if (signal.provider === "sonar") {
+      const result = await ingestSonarFitness(db, {
+        runId: input.runId,
+        workspaceId: input.workspaceId,
+        headSha: input.headSha,
+        gateStatus: "OK",
+        projectKey: signal.repoHint ?? input.repoFullName,
+        detailsUrl: null,
+      });
+      input.log.info("synthetic sonar fitness attached", {
+        runId: input.runId,
+        attached: result.attached,
+      });
+      return;
+    }
+    if (
+      signal.provider === "ci_failure" ||
+      signal.provider === "circleci" ||
+      signal.provider === "buildkite" ||
+      signal.provider === "jenkins"
+    ) {
+      const result = await ingestCiEvidence(db, {
+        headSha: input.headSha,
+        name: "coppergate-fake-ci",
+        status: "completed",
+        conclusion: "success",
+        passed: true,
+        blocksAccept: false,
+        checkRunId: null,
+        detailsUrl: null,
+        repoFullName: input.repoFullName,
+      });
+      input.log.info("synthetic CI fitness attached", {
+        runId: input.runId,
+        attached: result.attached,
+      });
+    }
+  } catch (err) {
+    input.log.warn("synthetic signal fitness skipped", {
+      runId: input.runId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 async function safeTaskTransition(

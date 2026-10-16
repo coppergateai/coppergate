@@ -396,6 +396,7 @@ export {
   ensureDefaultAutoArmRule,
   findWorkspacesForRepo,
   getSignalEvent,
+  getSignalEventForTask,
   ingestSignal,
   listAutoArmRules,
   listSignalEvents,
