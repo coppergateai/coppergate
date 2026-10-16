@@ -1,4 +1,5 @@
 import {
+  countAcceptedPrsForWorkspace,
   decideTaskReview,
   getInstallationForWorkspace,
   getProjectForWorkspace,
@@ -83,6 +84,20 @@ export async function POST(request: Request, context: RouteContext) {
         userId: user.id,
         meta: { status: result.task.status },
       });
+      const acceptedCount = await countAcceptedPrsForWorkspace(
+        db,
+        body.workspaceId,
+      );
+      if (acceptedCount >= 2) {
+        trackFunnel({
+          stage: "second_pr_accepted",
+          workspaceId: body.workspaceId,
+          projectId: result.task.projectId,
+          taskId,
+          userId: user.id,
+          meta: { acceptedCount },
+        });
+      }
 
       // TASK043 — optional L2 merge when project.mergeEnabled + autonomy L2.
       try {

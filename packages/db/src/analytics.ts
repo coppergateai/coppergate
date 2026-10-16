@@ -236,6 +236,24 @@ export async function getWorkspaceCostExplorer(
   };
 }
 
+/** Count accepted/done tasks with a PR URL for one workspace (GTM second-PR). */
+export async function countAcceptedPrsForWorkspace(
+  db: Database,
+  workspaceId: string,
+): Promise<number> {
+  const rows = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.workspaceId, workspaceId),
+        inArray(tasks.status, ["ACCEPTED", "DONE"]),
+        sql`${tasks.prUrl} is not null`,
+      ),
+    );
+  return rows.length;
+}
+
 /** TASK047 — lightweight retention snapshot for operators. */
 export async function getRetentionSnapshot(
   db: Database,

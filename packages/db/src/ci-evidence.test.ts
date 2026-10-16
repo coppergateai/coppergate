@@ -2,10 +2,12 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import {
+  appendRunEvent,
   closeDb,
   createDb,
   createWorkspaceWithOwner,
   enqueueAgentRun,
+  getRunCiFitness,
   ingestCiEvidence,
   insertTestUser,
   listRunEvents,
@@ -27,6 +29,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
   let workspaceId = "";
   let projectId = "";
   let runId = "";
+  let actor = "";
   const headSha = "ciheadsha001";
 
   before(async () => {
@@ -35,6 +38,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
       login: `ci-${stamp}`,
       githubUserId: `gh-ci-${stamp}`,
     });
+    actor = user.id;
     workspaceId = (
       await createWorkspaceWithOwner(db, {
         name: "CI WS",
@@ -180,5 +184,157 @@ describe("CI evidence ingestion", { skip: !url }, () => {
       .where(eq(agentRuns.id, runId))
       .limit(1);
     assert.equal(run?.errorCode, "ci_failed");
+  });
+
+  it("later green check for same name clears blocker", async () => {
+    const stamp = Date.now();
+    const sha = `clearedsha${stamp}`;
+    const plan = await generateProjectPlan(db, {
+      workspaceId,
+      projectId,
+      actor,
+      milestones: [
+        {
+          title: "M-clear",
+          description: "",
+          tasks: [
+            {
+              key: `clear-${stamp}`,
+              title: "Clear CI",
+              goal: "g",
+              scope: "s",
+              allowedPaths: [],
+              acceptanceCriteria: ["ok"],
+              estimateMicros: 1000,
+              estimateComplexity: "S",
+              dependsOn: [],
+              priority: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const taskId = plan.milestones[0]!.tasks[0]!.task.id;
+    const { run } = await enqueueAgentRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      idempotencyKey: `ci-clear-${stamp}`,
+    });
+    await db
+      .update(agentRuns)
+      .set({
+        headSha: sha,
+        status: "REVIEW_REQUIRED",
+        updatedAt: new Date(),
+      })
+      .where(eq(agentRuns.id, run.id));
+
+    await ingestCiEvidence(db, {
+      headSha: sha,
+      name: "lint",
+      status: "completed",
+      conclusion: "failure",
+      passed: false,
+      blocksAccept: true,
+      checkRunId: 10,
+      detailsUrl: null,
+      repoFullName: "org-ci/app",
+    });
+    assert.equal(await runHasBlockingCi(db, run.id), true);
+
+    await ingestCiEvidence(db, {
+      headSha: sha,
+      name: "lint",
+      status: "completed",
+      conclusion: "success",
+      passed: true,
+      blocksAccept: false,
+      checkRunId: 11,
+      detailsUrl: null,
+      repoFullName: "org-ci/app",
+    });
+    const fitness = await getRunCiFitness(db, run.id);
+    assert.equal(fitness.blocking, false);
+    assert.equal(fitness.passed, true);
+    const [row] = await db
+      .select()
+      .from(agentRuns)
+      .where(eq(agentRuns.id, run.id))
+      .limit(1);
+    assert.equal(row?.errorCode, null);
+  });
+
+  it("fitness pending without green CI is not accept-ready", async () => {
+    const stamp = Date.now();
+    const pendingSha = `pendingsha${stamp}`;
+    const plan = await generateProjectPlan(db, {
+      workspaceId,
+      projectId,
+      actor,
+      milestones: [
+        {
+          title: "M-pending",
+          description: "",
+          tasks: [
+            {
+              key: `pend-${stamp}`,
+              title: "Pending CI",
+              goal: "g",
+              scope: "s",
+              allowedPaths: [],
+              acceptanceCriteria: ["ok"],
+              estimateMicros: 1000,
+              estimateComplexity: "S",
+              dependsOn: [],
+              priority: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const taskId = plan.milestones[0]!.tasks[0]!.task.id;
+    const { run } = await enqueueAgentRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      idempotencyKey: `ci-pend-${stamp}`,
+    });
+    await db
+      .update(agentRuns)
+      .set({
+        headSha: pendingSha,
+        status: "REVIEW_REQUIRED",
+        updatedAt: new Date(),
+      })
+      .where(eq(agentRuns.id, run.id));
+
+    await appendRunEvent(db, {
+      runId: run.id,
+      workspaceId,
+      kind: "evidence",
+      payload: {
+        message: "Awaiting live CI evidence (github_check_run)",
+        fitness: "pending",
+      },
+    });
+    const fitness = await getRunCiFitness(db, run.id);
+    assert.equal(fitness.awaitingLive, true);
+    assert.equal(fitness.acceptReady, false);
+
+    await ingestCiEvidence(db, {
+      headSha: pendingSha,
+      name: "ci",
+      status: "completed",
+      conclusion: "success",
+      passed: true,
+      blocksAccept: false,
+      checkRunId: 99,
+      detailsUrl: null,
+      repoFullName: "org-ci/app",
+    });
+    const ready = await getRunCiFitness(db, run.id);
+    assert.equal(ready.passed, true);
+    assert.equal(ready.acceptReady, true);
   });
 });

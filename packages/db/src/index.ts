@@ -30,6 +30,7 @@ export {
   users,
   waitlistSignups,
   pilotInvites,
+  workspaceSubscriptions,
   workspaces,
   type AgentRun,
   type AgentRunEvent,
@@ -81,8 +82,12 @@ export {
   type User,
   type WaitlistSignup,
   type PilotInvite,
+  type PilotInviteKind,
   type Workspace,
   type WorkspaceStatus,
+  type WorkspaceSubscription,
+  type BillingPlan,
+  type SubscriptionStatus,
 } from "./schema.js";
 export {
   ArenaError,
@@ -328,9 +333,14 @@ export {
   redactValue,
 } from "./redact.js";
 export {
+  getRunCiFitness,
   ingestCiEvidence,
+  listRunCiChecks,
+  runCiAcceptReady,
   runHasBlockingCi,
   type CiEvidenceInput,
+  type RunCiCheckSummary,
+  type RunCiFitness,
 } from "./ci-evidence.js";
 export {
   buildDeliveryReport,
@@ -363,6 +373,7 @@ export {
   revokeDeliveryShareToken,
 } from "./share-reports.js";
 export {
+  countAcceptedPrsForWorkspace,
   getProjectCostExplorer,
   getRetentionSnapshot,
   getWorkspaceCostAnalytics,
@@ -453,3 +464,20 @@ export {
   type EmailProvider,
   type EmailTemplate,
 } from "./email.js";
+export {
+  BillingError,
+  countActiveHostedSubscriptions,
+  effectivePlan,
+  findSubscriptionByStripeCustomer,
+  getWorkspaceSubscription,
+  normalizeBillingPlan,
+  normalizeSubscriptionStatus,
+  upsertWorkspaceSubscription,
+  type UpsertSubscriptionInput,
+} from "./billing.js";
+export {
+  countPaidPilotInvites,
+  getPilotGoNoGoSnapshot,
+  listPayingWorkspaceIds,
+  type PilotGoNoGoSnapshot,
+} from "./pilots.js";

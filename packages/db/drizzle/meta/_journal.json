@@ -162,6 +162,13 @@
       "when": 1728568600000,
       "tag": "0022_agent_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1728568700000,
+      "tag": "0023_billing",
+      "breakpoints": true
     }
   ]
 }

@@ -105,6 +105,10 @@ export default async function ProjectDetailPage({
   const usage = await getProjectSpendSummary(db, workspaceId, projectId);
   const hasBudget = usage.capMicros > 0 && usage.budgetStatus === "active";
   const hasPlan = !!plan && plan.milestones.some((m) => m.tasks.length > 0);
+  const hasIssueTask =
+    plan?.milestones.some(({ tasks }) =>
+      tasks.some(({ task }) => task.githubIssueNumber != null),
+    ) ?? false;
   const hasQueuedOrBeyond =
     plan?.milestones.some(({ tasks }) =>
       tasks.some(
@@ -112,6 +116,16 @@ export default async function ProjectDetailPage({
           task.status !== "DRAFT" && task.status !== "READY_FOR_APPROVAL",
       ),
     ) ?? false;
+  const hasAcceptedPr =
+    plan?.milestones.some(({ tasks }) =>
+      tasks.some(
+        ({ task }) =>
+          (task.status === "ACCEPTED" || task.status === "DONE") &&
+          !!task.prUrl,
+      ),
+    ) ?? false;
+  /** Wedge (D14): issue path OR classic brief+plan both unlock first PR. */
+  const wedgeReady = hasIssueTask || (hasApprovedBrief && hasPlan);
 
   const boardTasks =
     plan?.milestones.flatMap(({ milestone, tasks }) =>
@@ -126,7 +140,7 @@ export default async function ProjectDetailPage({
     ) ?? [];
 
   const showGuide =
-    !hasApprovedBrief || !hasPlan || !hasBudget || !hasQueuedOrBeyond;
+    !hasBudget || !wedgeReady || !hasQueuedOrBeyond || !hasAcceptedPr;
 
   const isOwner = access.role === "owner";
   const basePath = `/workspaces/${workspaceId}/projects/${projectId}`;
@@ -184,41 +198,45 @@ export default async function ProjectDetailPage({
                       id: "budget",
                       title: "Set an active spend cap",
                       detail:
-                        "Pause blocks the worker from claiming new runs.",
-                      href: hasBudget ? undefined : `${basePath}?tab=overview#budget`,
+                        "Hard cap is selection pressure — pause blocks new runs.",
+                      href: hasBudget
+                        ? undefined
+                        : `${basePath}?tab=overview#budget`,
                       ctaLabel: "Go to budget",
                       done: hasBudget,
                     },
                     {
-                      id: "brief",
-                      title: "Generate and approve a brief",
-                      detail: "Keep scope tiny for the first delivery.",
-                      href: hasApprovedBrief
+                      id: "issue",
+                      title: "Import a GitHub issue",
+                      detail:
+                        "Primary wedge: one small open issue → draft task (PR will Closes #N). Brief/plan remains available for new-product demos.",
+                      href: hasIssueTask
                         ? undefined
-                        : `${basePath}?tab=overview#brief`,
-                      ctaLabel: "Go to brief",
-                      done: hasApprovedBrief,
-                    },
-                    {
-                      id: "plan",
-                      title: "Generate a plan",
-                      detail: "One small task is enough for the smoke path.",
-                      href: hasPlan
-                        ? undefined
-                        : `${basePath}?tab=delivery#plan`,
-                      ctaLabel: "Go to plan",
-                      done: hasPlan,
+                        : `${basePath}?tab=overview#issues`,
+                      ctaLabel: "Open issues",
+                      done: hasIssueTask || (hasApprovedBrief && hasPlan),
                     },
                     {
                       id: "task",
-                      title: "Submit + approve a task",
+                      title: "Approve / queue the task",
                       detail:
-                        "Requires autonomy ≥ L1 and a running worker.",
+                        "Autonomy ≥ L1 + worker. min_human arenas auto-queue after arm.",
                       href: hasQueuedOrBeyond
                         ? undefined
                         : `${basePath}?tab=delivery`,
                       ctaLabel: "Open delivery",
                       done: hasQueuedOrBeyond,
+                    },
+                    {
+                      id: "review",
+                      title: "Review the survivor PR",
+                      detail:
+                        "Checks, cost, and diff evidence — then accept or retry. See /docs/recovery if it fails.",
+                      href: hasAcceptedPr
+                        ? undefined
+                        : `${basePath}?tab=delivery`,
+                      ctaLabel: "Open delivery",
+                      done: hasAcceptedPr,
                     },
                   ]}
                 />

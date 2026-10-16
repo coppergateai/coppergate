@@ -12,6 +12,16 @@ export const metadata: Metadata = {
 
 const entries = [
   {
+    date: "2026-10-16",
+    title: "Commercial wedge + hosted billing",
+    items: [
+      "D14 lock: GitHub issue → verified PR is the paid-pilot KPI",
+      "Stripe Checkout / portal for Hosted Starter & Pro (Settings → Billing)",
+      "Onboarding and recovery docs oriented to one-session first PR",
+      "Wedge depth: Sentry + CI-fail auto-arm; expand-on-pull for the rest",
+    ],
+  },
+  {
     date: "2026-10-15",
     title: "Signal → Arena production adapters",
     items: [

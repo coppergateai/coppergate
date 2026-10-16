@@ -125,28 +125,18 @@ export function GithubPanel({ workspaceId, canManage, initialQuery }: Props) {
               onClick={() => {
                 setBusy(true);
                 setError(null);
-                void fetch("/api/integrations/github/install", {
-                  method: "POST",
-                  credentials: "same-origin",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ workspaceId }),
-                })
-                  .then(async (res) => {
-                    const body = (await res.json()) as {
-                      url?: string;
-                      error?: { message: string };
-                    };
-                    if (!res.ok || !body.url) {
-                      throw new Error(body.error?.message ?? "Install failed");
-                    }
-                    window.location.href = body.url;
-                  })
-                  .catch((err: unknown) => {
-                    setError(
-                      err instanceof Error ? err.message : "Install failed",
-                    );
-                    setBusy(false);
-                  });
+                // Top-level form POST → 303 to GitHub (Set-Cookie on navigation).
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "/api/integrations/github/install";
+                form.style.display = "none";
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = "workspaceId";
+                input.value = workspaceId;
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
               }}
             >
               {installation ? "Reconfigure on GitHub" : "Install GitHub App"}

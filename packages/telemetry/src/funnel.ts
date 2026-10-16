@@ -1,17 +1,21 @@
 import type { Logger } from "./logger.js";
 
 /**
- * PRODUCT §13 funnel stages — north-star components for private beta.
- * Landing visit → GitHub connected → brief approved → first task started →
- * first PR opened → first PR accepted.
+ * PRODUCT §13 + GTM Phase 0 funnel stages.
+ * Landing → connect → brief|issue → task → PR → accept → second PR / paid.
  */
 export type FunnelStage =
   | "landing_visit"
   | "github_connected"
   | "brief_approved"
+  | "issue_imported"
   | "task_started"
   | "pr_opened"
-  | "pr_accepted";
+  | "pr_accepted"
+  | "second_pr_accepted"
+  | "invite_redeemed"
+  | "paid_pilot_started"
+  | "checkout_completed";
 
 export type FunnelEventInput = {
   stage: FunnelStage;
@@ -45,7 +49,12 @@ export const FUNNEL_STAGES: readonly FunnelStage[] = [
   "landing_visit",
   "github_connected",
   "brief_approved",
+  "issue_imported",
   "task_started",
   "pr_opened",
   "pr_accepted",
+  "second_pr_accepted",
+  "invite_redeemed",
+  "paid_pilot_started",
+  "checkout_completed",
 ] as const;

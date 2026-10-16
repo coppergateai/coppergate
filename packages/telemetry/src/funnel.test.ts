@@ -25,14 +25,19 @@ describe("funnel instrumentation", () => {
     assert.equal(entry.msg, "funnel");
   });
 
-  it("covers PRODUCT §13 stages", () => {
+  it("covers PRODUCT §13 + GTM paid stages", () => {
     assert.deepEqual([...FUNNEL_STAGES], [
       "landing_visit",
       "github_connected",
       "brief_approved",
+      "issue_imported",
       "task_started",
       "pr_opened",
       "pr_accepted",
+      "second_pr_accepted",
+      "invite_redeemed",
+      "paid_pilot_started",
+      "checkout_completed",
     ]);
   });
 });

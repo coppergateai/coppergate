@@ -117,8 +117,9 @@ export function SignalsPanel({ workspaceId, isOwner, projects }: Props) {
         Signals
       </h2>
       <p className={styles.sectionLede}>
-        Point Sonar, Jira, Sentry, CI, and other adapters at your workspace
-        webhook. Events verify, dedupe, then auto-arm a bounded arena.
+        Wedge depth (D14): prioritize <strong>Sentry</strong> and{" "}
+        <strong>ci_failure</strong> webhooks (plus GitHub issue import on the
+        project). Other adapters expand only on customer pull — see docs/EXPAND_PULL.md.
       </p>
 
       <div className={styles.splitGrid}>
@@ -135,7 +136,7 @@ export function SignalsPanel({ workspaceId, isOwner, projects }: Props) {
             </button>
           </div>
           <p className={styles.muted}>
-            Providers: sonar, jira, linear, sentry, ci_failure, fake, …
+            Depth first: sentry, ci_failure (also: sonar, jira, linear, fake, …)
           </p>
         </div>
 
@@ -242,6 +243,50 @@ export function SignalsPanel({ workspaceId, isOwner, projects }: Props) {
             }}
           >
             Ensure auto-arm rule
+          </button>
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            disabled={pending || !isOwner}
+            onClick={() => {
+              setPending(true);
+              setError(null);
+              const providers = ["sentry", "ci_failure"] as const;
+              void (async () => {
+                for (const provider of providers) {
+                  const res = await fetch(
+                    `/api/workspaces/${workspaceId}/signals`,
+                    {
+                      method: "POST",
+                      credentials: "same-origin",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        provider,
+                        minSeverity: "high",
+                        enabled: true,
+                        armArena: true,
+                        profileKeys: ["fixer"],
+                      }),
+                    },
+                  );
+                  const body = (await res.json()) as {
+                    error?: { message?: string };
+                  };
+                  if (!res.ok) {
+                    throw new Error(
+                      body.error?.message ?? `Rule failed for ${provider}`,
+                    );
+                  }
+                }
+                load();
+              })()
+                .catch((err: unknown) =>
+                  setError(err instanceof Error ? err.message : String(err)),
+                )
+                .finally(() => setPending(false));
+            }}
+          >
+            Enable wedge auto-arm (Sentry + CI-fail)
           </button>
         </div>
       </div>

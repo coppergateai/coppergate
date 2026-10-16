@@ -57,7 +57,17 @@ GitHub `check_run` failures that do **not** attach to an existing Coppergate run
 
 Sonar webhooks with `headSha`/`revision` + quality gate status also attach a validation artifact (`sonar-quality-gate-v1`) used by the rules critic (TASK069).
 
-## Closed-loop proof (Sonar ∥ CI-fail)
+## Wedge depth (D14) — deepen these, not ten half-adapters
+
+| Loop | Status | Operator focus |
+|---|---|---|
+| **GitHub issue → task → PR** | Primary commercial wedge | Project **Issues** panel; PR body `Closes #N` |
+| **CI-fail → fix arena → PR** | Secondary depth | Default auto-arm for `ci_failure`; GitHub check_run reverse path |
+| **Sentry → fix arena → PR** | Secondary depth | Webhook `sentry` + auto-arm ≥`high`; outbound comment when configured |
+
+Jira/Linear/Sonar/… remain available but are **expand-on-pull** — see [EXPAND_PULL.md](./EXPAND_PULL.md).
+
+## Closed-loop proof (Issue ∥ Sentry ∥ CI-fail)
 
 Vertical under test (private beta focus):
 
@@ -65,10 +75,13 @@ Vertical under test (private beta focus):
 signal ingest → auto-arm rule → Task → approve → worker sandbox → agent → PR → fitness → REVIEW_REQUIRED
 ```
 
+Issue path (no webhook): import via `POST /api/projects/:id/issues` → same task/PR loop.
+
 - Local/CI: `apps/worker/src/e2e-signal-closed-loop.test.ts` / `node scripts/signal-closed-loop-smoke.mjs`
+- Sentry depth: `apps/worker/src/e2e-sentry-wedge.test.ts`
 - Staging health: `STAGING_URL=… node scripts/staging-smoke.mjs`
 - Staging checklist: [`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-closed-loop.md)
-- Manual signal seed: `POST /api/workspaces/:id/signals/ingest` with a `sonar` or `ci_failure` envelope after `ensureDefaultAutoArmRule`
+- Manual signal seed: `POST /api/workspaces/:id/signals/ingest` with a `sentry` or `ci_failure` envelope after `ensureDefaultAutoArmRule`
 
 Bitbucket/ADO appear as CI envelope providers only; **live PR delivery for those SCMs is deferred**.
 

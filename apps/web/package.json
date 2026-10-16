@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@coppergate/auth": "workspace:*",
+    "@coppergate/billing": "workspace:*",
     "@coppergate/config": "workspace:*",
     "@coppergate/db": "workspace:*",
     "@coppergate/errors": "workspace:*",

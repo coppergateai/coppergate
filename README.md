@@ -16,7 +16,8 @@ packages/
   config/              # Zod env schema (fail-fast)
   telemetry/           # Structured logs + funnel + SIGNAL_SLOS
   errors/              # API error envelope
-  db/                  # Drizzle schema + domain (tasks, arena, signals)
+  db/                  # Drizzle schema + domain (tasks, arena, signals, billing)
+  billing/             # Stripe Checkout + portal + webhook sync
   auth/                # GitHub/GitLab OAuth + session (+ SSO skeleton)
   github/              # GitHub App JWT, install tokens, AES-GCM seal
   gitlab/              # GitLab OAuth + MR delivery
@@ -29,6 +30,22 @@ packages/
   typescript-config/
   coppergate/          # npm name reserve (placeholder SDK)
 ```
+
+## GTM / paid pilots
+
+Commercial wedge (**D14**): GitHub **issue → verified PR**. Playbooks:
+
+- [`docs/GTM.md`](./docs/GTM.md) — path to $1M ARR
+- [`docs/WEDGE.md`](./docs/WEDGE.md) · [`docs/PILOT_OUTREACH.md`](./docs/PILOT_OUTREACH.md)
+- [`docs/EXPAND_PULL.md`](./docs/EXPAND_PULL.md) · [`docs/LAUNCH_KIT.md`](./docs/LAUNCH_KIT.md)
+
+```bash
+DATABASE_URL=… pnpm exec tsx scripts/list-waitlist.mjs
+DATABASE_URL=… pnpm exec tsx scripts/create-pilot-invite.mjs PAID-DEMO 1 paid_pilot
+DATABASE_URL=… pnpm exec tsx scripts/pilot-go-no-go.mjs
+```
+
+Hosted billing: set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` — owners upgrade under **Settings → Billing**.
 
 ## Prerequisites
 

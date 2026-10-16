@@ -10,6 +10,7 @@ import {
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AnalyticsPanel } from "./analytics-panel";
+import { BillingPanel } from "./billing-panel";
 import { ByokPanel } from "./byok-panel";
 import { CostExplorerPanel } from "./cost-explorer";
 import { DangerZone } from "./danger-zone";
@@ -51,6 +52,8 @@ export default async function WorkspaceSettingsPage({
   const githubFlag = typeof query.github === "string" ? query.github : undefined;
   const gitlabFlag = typeof query.gitlab === "string" ? query.gitlab : undefined;
   const tabParam = typeof query.tab === "string" ? query.tab : undefined;
+  const checkoutFlag =
+    typeof query.checkout === "string" ? query.checkout : undefined;
   const initialQuery = [
     githubFlag ? `github=${githubFlag}` : null,
     gitlabFlag ? `gitlab=${gitlabFlag}` : null,
@@ -180,6 +183,13 @@ export default async function WorkspaceSettingsPage({
           panels={{
             connections,
             general,
+            billing: (
+              <BillingPanel
+                workspaceId={workspace.id}
+                isOwner={role === "owner"}
+                checkoutFlag={checkoutFlag}
+              />
+            ),
             signals,
             llm: (
               <ByokPanel

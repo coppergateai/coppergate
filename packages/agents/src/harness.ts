@@ -122,7 +122,12 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
     yield {
       kind: "cost",
       message: "OpenHands sandbox harness estimate",
-      payload: { costMicros, harness: this.kind },
+      payload: {
+        costMicros,
+        harness: this.kind,
+        provider: "openhands",
+        model: "openhands-sandbox-v1",
+      },
     };
 
     const completion = {
@@ -191,10 +196,12 @@ export function createContenderHarness(
 /** Adapt harness → CodingAgent for existing worker paths. */
 export function harnessAsCodingAgent(harness: ContenderHarness): CodingAgent {
   return {
+    kind: harness.kind,
+    capability: harness.capability,
     run(input) {
       return harness.run(input);
     },
-  };
+  } as CodingAgent & { kind: ContenderHarnessKind; capability: string };
 }
 
 function resolveHarnessWritePath(allowedPaths: string[]): string {

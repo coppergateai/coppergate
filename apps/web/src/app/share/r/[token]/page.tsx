@@ -13,7 +13,8 @@ export default async function PublicSharePage({ params }: PageProps) {
         <p className={styles.pageEyebrow}>Shared delivery</p>
         <h1 className={styles.pageTitle}>Redacted report</h1>
         <p className={styles.pageLede}>
-          Public share link — secrets and source contents are redacted.
+          Public share link — secrets and source contents are redacted. Agents
+          competed; this is the survivor evidence.
         </p>
         <pre
           style={{
@@ -29,6 +30,13 @@ export default async function PublicSharePage({ params }: PageProps) {
         >
           {JSON.stringify(report, null, 2)}
         </pre>
+        <p className={styles.pageLede} style={{ marginTop: "1.5rem" }}>
+          Built with{" "}
+          <a href="https://www.coppergate.ai">Coppergate</a> — selection over
+          supervision.{" "}
+          <a href="https://www.coppergate.ai/#early-access">Request early access</a>
+          .
+        </p>
       </main>
     );
   } catch (err) {

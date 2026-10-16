@@ -17,6 +17,11 @@ export const SETTINGS_TABS = [
     blurb: "Workspace & budgets",
   },
   {
+    id: "billing",
+    label: "Billing",
+    blurb: "Hosted Starter & Pro",
+  },
+  {
     id: "signals",
     label: "Signals",
     blurb: "Adapters & notify",

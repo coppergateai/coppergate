@@ -21,8 +21,13 @@ const items = [
   },
   {
     href: "/docs/pricing",
-    title: "Pricing intent",
-    detail: "Arena budgets, cost per survivor PR, paid pilots",
+    title: "Pricing",
+    detail: "Community + Hosted Starter/Pro, usage, paid pilots",
+  },
+  {
+    href: "/docs/recovery",
+    title: "Self-serve recovery",
+    detail: "Cancel, retry, stale leases, kill-switch — no operator required",
   },
   {
     href: "/security",
@@ -39,8 +44,8 @@ export default function DocsIndexPage() {
         <h1 className={styles.pageTitle}>Documentation</h1>
         <p className={styles.pageLede}>
           Guides for design partners. North star is the Survivor arena;
-          today&apos;s wedge is GitHub-native fitness (branch/PR + CI) with spend
-          caps and a kill-switch.
+          commercial wedge is <strong>GitHub issue → verified PR</strong> with
+          spend caps and a kill-switch.
         </p>
 
         <ul className={styles.docsList}>

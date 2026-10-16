@@ -1,8 +1,10 @@
 import {
   createCodingAgent,
   createContenderHarness,
+  FakeCodingAgent,
   harnessAsCodingAgent,
   type ContenderHarnessKind,
+  type CodingAgent,
 } from "@coppergate/agents";
 import {
   claimNextRun,
@@ -17,9 +19,13 @@ import { openSecret, parseEncryptionKey } from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
 import { executeClaimedRun } from "./execute.js";
 
-function resolveHarnessKind(): ContenderHarnessKind | null {
+function resolveDeliveryModeHint(): "http" | "fake" {
+  const raw = (process.env.GITHUB_DELIVERY_MODE ?? "fake").trim().toLowerCase();
+  return raw === "http" ? "http" : "fake";
+}
+
+function parseHarnessEnv(): ContenderHarnessKind | null {
   const raw = (process.env.CONTENDER_HARNESS ?? "").trim().toLowerCase();
-  if (!raw) return null;
   const allowed: ContenderHarnessKind[] = [
     "native_fake",
     "native_openai",
@@ -28,60 +34,101 @@ function resolveHarnessKind(): ContenderHarnessKind | null {
     "cursor_cloud",
     "codex",
   ];
-  return (allowed as string[]).includes(raw)
+  return raw && (allowed as string[]).includes(raw)
     ? (raw as ContenderHarnessKind)
     : null;
 }
 
+/**
+ * Pilot default: BYOK/OpenAI when present; else OpenHands on http delivery.
+ * Fake only for GITHUB_DELIVERY_MODE=fake / CI / explicit native_fake.
+ */
+function resolveHarnessKind(): ContenderHarnessKind | null {
+  const explicit = parseHarnessEnv();
+  if (explicit) return explicit;
+  if (resolveDeliveryModeHint() === "http") return "openhands";
+  return null;
+}
+
 function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
-  return (async () => {
-    const harnessKind = resolveHarnessKind();
-    if (harnessKind === "openhands" || harnessKind === "aider") {
-      log.info("using ContenderHarness", { harnessKind, workspaceId });
+  return (async (): Promise<CodingAgent> => {
+    const explicit = parseHarnessEnv();
+    const delivery = resolveDeliveryModeHint();
+    const forceFakePath =
+      explicit === "native_fake" ||
+      delivery === "fake" ||
+      process.env.NODE_ENV === "test" ||
+      process.env.CI === "true";
+
+    if (explicit === "openhands" || explicit === "aider") {
+      log.info("using ContenderHarness", {
+        harnessKind: explicit,
+        workspaceId,
+      });
       return harnessAsCodingAgent(
-        createContenderHarness({ kind: harnessKind }),
+        createContenderHarness({ kind: explicit }),
       );
     }
 
-    try {
-      const byok = await getActiveLlmByok(db, workspaceId);
-      const keyHex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
-      if (byok?.encryptedPayload && keyHex) {
-        const apiKey = openSecret(
-          byok.encryptedPayload,
-          parseEncryptionKey(keyHex),
-        );
-        await touchLlmByokUsed(db, workspaceId);
-        log.info("using workspace BYOK for coding agent", { workspaceId });
-        if (harnessKind === "native_openai") {
-          return harnessAsCodingAgent(
-            createContenderHarness({
-              kind: "native_openai",
-              openai: {
-                apiKey,
-                baseUrl: byok.baseUrl ?? undefined,
-                model: byok.model ?? undefined,
-              },
-            }),
+    // Prefer BYOK / env OpenAI before OpenHands default (plan Sprint 3).
+    if (!forceFakePath || explicit === "native_openai") {
+      try {
+        const byok = await getActiveLlmByok(db, workspaceId);
+        const keyHex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
+        if (byok?.encryptedPayload && keyHex) {
+          const apiKey = openSecret(
+            byok.encryptedPayload,
+            parseEncryptionKey(keyHex),
           );
+          await touchLlmByokUsed(db, workspaceId);
+          log.info("using workspace BYOK for coding agent", { workspaceId });
+          if (explicit === "native_openai") {
+            return harnessAsCodingAgent(
+              createContenderHarness({
+                kind: "native_openai",
+                openai: {
+                  apiKey,
+                  baseUrl: byok.baseUrl ?? undefined,
+                  model: byok.model ?? undefined,
+                },
+              }),
+            );
+          }
+          return createCodingAgent({
+            apiKey,
+            baseUrl: byok.baseUrl ?? undefined,
+            model: byok.model ?? undefined,
+          });
         }
-        return createCodingAgent({
-          apiKey,
-          baseUrl: byok.baseUrl ?? undefined,
-          model: byok.model ?? undefined,
+      } catch (err) {
+        log.warn("BYOK resolve failed; falling back", {
+          error: err instanceof Error ? err.message : String(err),
         });
       }
-    } catch (err) {
-      log.warn("BYOK resolve failed; falling back", {
-        error: err instanceof Error ? err.message : String(err),
-      });
+
+      const envAgent = createCodingAgent();
+      // createCodingAgent returns Fake when no key — only keep it if real provider.
+      if (!(envAgent instanceof FakeCodingAgent)) {
+        log.info("using OpenAI-compatible agent from env", { workspaceId });
+        return envAgent;
+      }
     }
-    if (harnessKind === "native_fake") {
+
+    if (explicit === "native_fake") {
       return harnessAsCodingAgent(
         createContenderHarness({ kind: "native_fake" }),
       );
     }
-    return createCodingAgent();
+
+    if (forceFakePath) {
+      log.info("using FakeCodingAgent (fake delivery / CI)", { workspaceId });
+      return createCodingAgent({ forceFake: true });
+    }
+
+    // Live http default without BYOK: OpenHands sandbox harness.
+    const kind = resolveHarnessKind() ?? "openhands";
+    log.info("using ContenderHarness", { harnessKind: kind, workspaceId });
+    return harnessAsCodingAgent(createContenderHarness({ kind }));
   })();
 }
 
@@ -105,7 +152,13 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
   let lastPurgeAt = 0;
   let consecutiveErrors = 0;
 
-  log.info("worker loop started", { workerId, pollMs, leaseMs });
+  log.info("worker loop started", {
+    workerId,
+    pollMs,
+    leaseMs,
+    deliveryMode: resolveDeliveryModeHint(),
+    contenderHarness: resolveHarnessKind(),
+  });
 
   try {
     while (!(options.shouldStop?.() ?? false)) {
