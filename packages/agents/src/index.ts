@@ -36,6 +36,7 @@ export {
   NativeFakeHarness,
   NativeOpenAiHarness,
   OpenHandsHarnessStub,
+  OpenHandsSandboxHarness,
   createContenderHarness,
   harnessAsCodingAgent,
   type ContenderHarness,

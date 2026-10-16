@@ -18,6 +18,10 @@ export type AgentRunInput = {
   architectureContext?: string;
   /** Contender strategy — blitz | fortress | balanced. */
   strategy?: string;
+  /** Absolute sandbox workdir when worker created a LocalSandboxManager clone. */
+  sandboxWorkdir?: string;
+  /** Sandbox id for evidence / audit (optional). */
+  sandboxId?: string;
   /** Cooperative cancel check between events. */
   isCancelRequested?: () => boolean | Promise<boolean>;
 };

@@ -23,3 +23,9 @@ export {
   type TelemetryInitOptions,
   type TracerLike,
 } from "./otel.js";
+export {
+  SIGNAL_SLOS,
+  evaluateSloBurn,
+  type SloBurnInput,
+  type SloBurnResult,
+} from "./slos.js";

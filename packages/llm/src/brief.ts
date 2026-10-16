@@ -1,7 +1,14 @@
 /**
- * Deterministic brief stub — real LLM provider lands later (BYOK / hosted).
+ * Brief generation — deterministic stub with optional OpenAI-compatible LLM.
  * Caps clarifying questions at 3 per PRODUCT FR-02.
  */
+
+import {
+  chatCompletionJson,
+  parseJsonObject,
+  resolveLlmChatConfig,
+  type LlmChatConfig,
+} from "./openai-chat.js";
 
 export type ClarifyingQuestion = {
   id: string;
@@ -24,6 +31,8 @@ export type BriefDraftContent = {
   clarifyingAnswers: ClarifyingAnswer[];
   /** true when answers are still needed before a complete draft */
   needsAnswers: boolean;
+  /** Which generator produced the draft. */
+  source?: "deterministic" | "llm";
 };
 
 const MAX_QUESTIONS = 3;
@@ -61,7 +70,7 @@ function answerMap(
 }
 
 /**
- * Produce a draft brief. If fewer than 2 answers are provided, returns a
+ * Deterministic draft brief. If fewer than 2 answers are provided, returns a
  * skeleton with clarifying questions (needsAnswers=true).
  */
 export function generateBriefDraft(input: {
@@ -94,6 +103,7 @@ export function generateBriefDraft(input: {
       acceptanceCriteria: [],
       clarifyingAnswers,
       needsAnswers: true,
+      source: "deterministic",
     };
   }
 
@@ -124,5 +134,81 @@ export function generateBriefDraft(input: {
     ],
     clarifyingAnswers,
     needsAnswers: false,
+    source: "deterministic",
   };
+}
+
+/**
+ * Prefer OpenAI-compatible LLM when configured; fall back to deterministic stub.
+ */
+export async function generateBriefDraftAsync(
+  input: {
+    idea: string;
+    projectName?: string;
+    answers?: Array<{ id: string; answer: string }>;
+  },
+  llm?: Partial<LlmChatConfig>,
+): Promise<BriefDraftContent> {
+  const fallback = generateBriefDraft(input);
+  if (fallback.needsAnswers) return fallback;
+
+  const config = resolveLlmChatConfig(llm);
+  if (!config) return fallback;
+
+  try {
+    const result = await chatCompletionJson(config, {
+      system:
+        "You are Coppergate's product strategist. Return strict JSON with keys: title, targetUser, problem, scope, nonGoals, acceptanceCriteria (string array, 2-5 items). Keep scope to Next.js+TypeScript MVP. No markdown.",
+      user: JSON.stringify({
+        idea: input.idea.trim(),
+        projectName: input.projectName ?? null,
+        answers: input.answers ?? [],
+      }),
+    });
+    const parsed = parseJsonObject(result.content);
+    if (!parsed) return fallback;
+
+    const title =
+      typeof parsed.title === "string" && parsed.title.trim()
+        ? parsed.title.trim().slice(0, 120)
+        : fallback.title;
+    const targetUser =
+      typeof parsed.targetUser === "string" && parsed.targetUser.trim()
+        ? parsed.targetUser.trim()
+        : fallback.targetUser;
+    const problem =
+      typeof parsed.problem === "string" && parsed.problem.trim()
+        ? parsed.problem.trim()
+        : fallback.problem;
+    const scope =
+      typeof parsed.scope === "string" && parsed.scope.trim()
+        ? parsed.scope.trim()
+        : fallback.scope;
+    const nonGoals =
+      typeof parsed.nonGoals === "string" && parsed.nonGoals.trim()
+        ? parsed.nonGoals.trim()
+        : fallback.nonGoals;
+    const acceptanceCriteria = Array.isArray(parsed.acceptanceCriteria)
+      ? parsed.acceptanceCriteria
+          .filter((c): c is string => typeof c === "string" && !!c.trim())
+          .map((c) => c.trim())
+          .slice(0, 5)
+      : fallback.acceptanceCriteria;
+
+    if (acceptanceCriteria.length < 1) return fallback;
+
+    return {
+      title,
+      targetUser,
+      problem,
+      scope,
+      nonGoals,
+      acceptanceCriteria,
+      clarifyingAnswers: fallback.clarifyingAnswers,
+      needsAnswers: false,
+      source: "llm",
+    };
+  } catch {
+    return fallback;
+  }
 }

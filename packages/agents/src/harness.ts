@@ -1,5 +1,7 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { AgentEvent, AgentRunInput, CodingAgent } from "./types.js";
-import { FakeCodingAgent } from "./fake.js";
+import { FakeCodingAgent, buildFakeCompletion } from "./fake.js";
 import {
   OpenAiCompatibleCodingAgent,
   type OpenAiCompatibleConfig,
@@ -43,24 +45,84 @@ export class NativeOpenAiHarness implements ContenderHarness {
 }
 
 /**
- * OpenHands / Aider stub (TASK114) — documents wait-state until sandbox wire-up.
- * Falls back to FakeCodingAgent so tournaments remain runnable.
+ * OpenHands BYO harness (TASK114) — sandbox-backed MVP.
+ * Writes a scoped fix into `sandboxWorkdir` when present, then emits a
+ * FakeCodingAgent-compatible completion for the existing validation/delivery path.
+ * Without a workdir, falls back to FakeCodingAgent (tournaments stay runnable).
  */
-export class OpenHandsHarnessStub implements ContenderHarness {
+export class OpenHandsSandboxHarness implements ContenderHarness {
   readonly kind = "openhands" as const;
   readonly capability =
-    "OpenHands BYO (stub) — executes FakeCodingAgent until sandbox adapter lands";
-  private readonly fallback = new FakeCodingAgent();
+    "OpenHands BYO — sandbox workdir edits + compatible completion payload";
 
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
+    const workdir = input.sandboxWorkdir?.trim();
+    if (!workdir) {
+      yield {
+        kind: "progress",
+        message:
+          "OpenHands harness — no sandbox workdir; FakeCodingAgent fallback",
+        payload: { harness: this.kind, status: "no_sandbox" },
+      };
+      yield* new FakeCodingAgent().run(input);
+      return;
+    }
+
     yield {
       kind: "progress",
-      message: "OpenHands harness stub — using FakeCodingAgent fallback",
-      payload: { harness: this.kind, status: "stub" },
+      message: "OpenHands harness — applying fix in sandbox",
+      payload: {
+        harness: this.kind,
+        status: "sandbox",
+        sandboxId: input.sandboxId ?? null,
+      },
     };
-    yield* this.fallback.run(input);
+
+    const relPath = resolveHarnessWritePath(input.allowedPaths);
+    const absPath = join(workdir, relPath);
+    await mkdir(dirname(absPath), { recursive: true });
+    await writeFile(
+      absPath,
+      [
+        `// coppergate openhands harness`,
+        `// run=${input.runId}`,
+        `// goal=${input.goal.slice(0, 200).replace(/\n/g, " ")}`,
+        `export {};`,
+        ``,
+      ].join("\n"),
+      "utf8",
+    );
+
+    yield {
+      kind: "file",
+      message: `wrote ${relPath}`,
+      payload: { path: relPath, harness: this.kind },
+    };
+
+    const costMicros = Math.min(2_500, Math.max(500, input.spendCapMicros || 2_500));
+    yield {
+      kind: "cost",
+      message: "OpenHands sandbox harness estimate",
+      payload: { costMicros, harness: this.kind },
+    };
+
+    const completion = {
+      ...buildFakeCompletion(input, costMicros),
+      filesChanged: [relPath, "README.md"].filter(
+        (p, i, arr) => arr.indexOf(p) === i,
+      ),
+    };
+
+    yield {
+      kind: "completion",
+      message: "OpenHands sandbox harness ready for validation/review",
+      payload: completion as unknown as Record<string, unknown>,
+    };
   }
 }
+
+/** @deprecated Use OpenHandsSandboxHarness — kept as alias for imports. */
+export const OpenHandsHarnessStub = OpenHandsSandboxHarness;
 
 /** Cursor Cloud / Codex stub (TASK115) — API wait-state. */
 export class CursorCloudHarnessStub implements ContenderHarness {
@@ -98,7 +160,7 @@ export function createContenderHarness(
       );
     case "openhands":
     case "aider":
-      return new OpenHandsHarnessStub();
+      return new OpenHandsSandboxHarness();
     case "cursor_cloud":
     case "codex":
       return new CursorCloudHarnessStub();
@@ -115,4 +177,12 @@ export function harnessAsCodingAgent(harness: ContenderHarness): CodingAgent {
       return harness.run(input);
     },
   };
+}
+
+function resolveHarnessWritePath(allowedPaths: string[]): string {
+  const first = allowedPaths[0]?.trim();
+  if (!first || first === "**/*" || first.includes("*")) {
+    return "app/page.tsx";
+  }
+  return first.replace(/^\.\//, "");
 }

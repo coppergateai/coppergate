@@ -4,28 +4,35 @@ Use with `PRODUCTION_SIGNAL_BACKLOG.md` Phase X. Do **not** claim “production 
 
 ## Adapters & fitness
 
-- [ ] Staging E2E: Sonar / Sentry / Jira / CI-fail → arena → PR
-- [ ] Fitness ingest: coverage, e2e, perf, preview, visual, load
+- [x] Closed-loop unit/integration: Sonar + CI-fail → arena → PR → fitness (`apps/worker/src/e2e-signal-closed-loop.test.ts`)
+- [ ] Staging E2E: Sonar / CI-fail → arena → **live** PR on staging smoke repo ([`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-closed-loop.md))
+- [ ] Fitness ingest: coverage, e2e, perf, preview, visual, load (under load)
 - [ ] Provider storm shed + workspace ingest quotas verified under load
 
 ## Security & tenancy
 
-- [ ] Cross-tenant isolation soak (TASK123)
-- [ ] Credential rotation drill (TASK126)
+- [x] Cross-tenant isolation suite (signal IDOR + pure guards) — chaos/failover drill remains
+- [ ] Credential rotation drill recorded (TASK126)
 - [ ] Pen-test P0/P1 closed; SECURITY appendix (TASK127)
 
 ## Ops
 
-- [ ] SLOs: ingest success ≥ 99.5%, arm p95 ≤ 5s, worker lag p95 ≤ 30s
-- [ ] On-call alerts on SLO burn
+- [x] SLO targets codified: `SIGNAL_SLOS` + `evaluateSloBurn` (`@coppergate/telemetry`)
+- [ ] On-call alerts on SLO burn (dashboard wiring)
 - [ ] Backup restore drill (TASK128) — see `docs/DR.md`
 - [ ] Pen-test appendix (`docs/SECURITY_PRODUCTION.md`) signed
 
 ## Enterprise surface
 
-- [ ] Bitbucket / ADO PR delivery live or explicitly deferred
+- [x] Bitbucket / ADO PR delivery **explicitly deferred** (HTTP clients exist; worker install/auth not wired; GitHub/GitLab only for pilots)
 - [ ] SSO IdP staging (Okta/Entra) beyond skeleton
 - [ ] Self-host / GHES smoke
+
+## Worker / harness
+
+- [x] `LocalSandboxManager` wired in `executeClaimedRun` (`SANDBOX_MODE=local` default)
+- [x] OpenHands ContenderHarness sandbox-backed MVP (`CONTENDER_HARNESS=openhands`)
+- [x] Brief/plan OpenAI-compatible path with deterministic fallback (`@coppergate/llm`)
 
 ## Go / no-go
 

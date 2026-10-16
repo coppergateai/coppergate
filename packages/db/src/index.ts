@@ -309,6 +309,7 @@ export {
   releaseRunClaim,
   renewRunLease,
   requestCancelRun,
+  attachSandboxToRun,
   setTaskPrUrl,
 } from "./runs.js";
 export {

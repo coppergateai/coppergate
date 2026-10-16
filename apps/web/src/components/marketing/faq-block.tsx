@@ -34,7 +34,7 @@ const faqs = [
   },
   {
     q: "What SCM access do you need?",
-    a: "Sign-in uses GitHub or GitLab OAuth for identity. Delivery is PR/MR based via GitHub App or GitLab (Bitbucket and Azure DevOps delivery paths exist). You choose which orgs and repos to connect and can revoke anytime.",
+    a: "Sign-in uses GitHub or GitLab OAuth for identity. Live delivery is PR/MR via GitHub App or GitLab. Bitbucket and Azure DevOps clients exist but are deferred until the GitHub closed loop is production-ready. You choose which orgs and repos to connect and can revoke anytime.",
   },
   {
     q: "Is Coppergate generally available?",

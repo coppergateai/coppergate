@@ -5,7 +5,7 @@ import {
   parseJsonArray,
 } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
-import { generatePlanDraft } from "@coppergate/llm";
+import { generatePlanDraftAsync } from "@coppergate/llm";
 import { requireUser } from "@/lib/auth";
 import { mapBriefError } from "@/lib/brief";
 import { requireCsrf } from "@/lib/csrf";
@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Generate draft milestones/tasks from the approved brief (LLM stub). */
+/** Generate draft milestones/tasks from the approved brief (LLM when configured). */
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
@@ -51,7 +51,7 @@ export async function POST(request: Request, context: RouteContext) {
       projectId,
     ).catch(mapBriefError);
 
-    const draft = generatePlanDraft({
+    const draft = await generatePlanDraftAsync({
       title: brief.title,
       targetUser: brief.targetUser,
       problem: brief.problem,

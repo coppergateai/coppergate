@@ -28,7 +28,10 @@ Store dumps encrypted at rest; retain ≥ 14 days for private beta.
 2. `pg_restore --clean --if-exists -d "$RESTORE_URL" coppergate-….dump`
 3. Point a staging web/worker at `RESTORE_URL`.
 4. Smoke: login → list workspaces → open one signal → kill-switch still works.
-5. Record drill date in `PRODUCTION_READINESS.md`.
+5. Closed-loop regression (optional): `DATABASE_URL=$RESTORE_URL node scripts/signal-closed-loop-smoke.mjs`
+6. Record drill date in `PRODUCTION_READINESS.md`.
+
+SLO burn helper for on-call triage: `evaluateSloBurn` / `SIGNAL_SLOS` in `@coppergate/telemetry`.
 
 ## Failover notes
 
