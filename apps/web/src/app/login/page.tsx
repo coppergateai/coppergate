@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { isGitlabConfigured } from "@/lib/gitlab";
 import { env } from "@/lib/env";
+import { BrandMark } from "@/components/app/ui";
 import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
 
@@ -28,14 +29,7 @@ export default async function LoginPage() {
     <SiteChrome>
       <main className={styles.authMain}>
         <div className={styles.authCard}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            className={styles.authMark}
-            src="/logo-white.svg"
-            alt=""
-            width={72}
-            height={68}
-          />
+          <BrandMark className={styles.authMark} size={72} />
           <h1 className={styles.authTitle}>Sign in to Coppergate</h1>
           <p className={styles.authLede}>
             Continue with GitHub or GitLab to open your workspaces. We only

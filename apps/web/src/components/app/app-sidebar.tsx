@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { LogoutButton } from "@/app/logout-button";
+import { BrandMark } from "./ui";
 import { useWorkspaceNav } from "./workspace-nav-context";
 import styles from "./app.module.css";
 
@@ -66,14 +67,7 @@ export function AppSidebar({
       aria-label="Workspace navigation"
     >
       <Link href="/workspaces" className={styles.brand} onClick={onClose}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className={styles.brandMark}
-          src="/logo-white.svg"
-          alt=""
-          width={22}
-          height={22}
-        />
+        <BrandMark className={styles.brandMark} size={22} />
         <span className={styles.brandName}>Coppergate</span>
       </Link>
 
