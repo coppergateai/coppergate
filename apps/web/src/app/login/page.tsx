@@ -29,7 +29,7 @@ export default async function LoginPage() {
     <SiteChrome>
       <main className={styles.authMain}>
         <div className={styles.authCard}>
-          <BrandMark className={styles.authMark} size={72} />
+          <BrandMark className={styles.authMark} size={52} />
           <h1 className={styles.authTitle}>Sign in to Coppergate</h1>
           <p className={styles.authLede}>
             Continue with GitHub or GitLab to open your workspaces. We only

@@ -51,6 +51,8 @@ html[data-theme="dark"] {
     transparent 100%
   );
   --font: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space), var(--font-geist-sans), ui-sans-serif,
+    system-ui, sans-serif;
   --max: 1440px;
   --gutter: clamp(1.25rem, 4vw, 2.5rem);
   --section-y: clamp(4rem, 9vw, 6.5rem);

@@ -1,55 +1,135 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  applyTheme,
+  resolveInitialTheme,
+  storeTheme,
+  type Theme,
+} from "@/lib/theme";
 import { useWorkspaceNav } from "./workspace-nav-context";
 import styles from "./command-palette.module.css";
 
-type Item = { id: string; label: string; href: string; group: string };
+type Item = {
+  id: string;
+  label: string;
+  href?: string;
+  group: string;
+  action?: () => void;
+};
 
-export function CommandPalette() {
+type Props = {
+  workspaces?: Array<{ id: string; name: string }>;
+};
+
+export function CommandPalette({ workspaces = [] }: Props) {
   const nav = useWorkspaceNav();
   const router = useRouter();
+  const pathname = usePathname() || "/workspaces";
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
 
+  const workspaceId =
+    nav?.workspaceId ??
+    pathname.match(/^\/workspaces\/([^/]+)/)?.[1] ??
+    null;
+
   const items = useMemo(() => {
-    if (!nav) return [] as Item[];
     const base: Item[] = [
       {
-        id: "projects",
-        label: "Projects",
-        href: `/workspaces/${nav.workspaceId}/projects`,
-        group: "Workspace",
+        id: "workspaces",
+        label: "All workspaces",
+        href: "/workspaces",
+        group: "Navigate",
       },
       {
-        id: "inbox",
-        label: "Inbox",
-        href: `/workspaces/${nav.workspaceId}/inbox`,
-        group: "Workspace",
+        id: "profile",
+        label: "Profile",
+        href: "/profile",
+        group: "Navigate",
       },
       {
-        id: "activity",
-        label: "Activity",
-        href: `/workspaces/${nav.workspaceId}/activity`,
-        group: "Workspace",
+        id: "docs",
+        label: "Documentation",
+        href: "/docs",
+        group: "Navigate",
       },
       {
-        id: "settings",
-        label: "Settings",
-        href: `/workspaces/${nav.workspaceId}/settings`,
-        group: "Workspace",
+        id: "create-ws",
+        label: "Create workspace",
+        href: "/workspaces#create-workspace",
+        group: "Actions",
+      },
+      {
+        id: "theme",
+        label: "Toggle theme",
+        group: "Actions",
+        action: () => {
+          const current = resolveInitialTheme();
+          const next: Theme = current === "dark" ? "light" : "dark";
+          applyTheme(next);
+          storeTheme(next);
+        },
       },
     ];
-    for (const p of nav.projects) {
+
+    if (workspaceId) {
+      base.push(
+        {
+          id: "projects",
+          label: "Projects",
+          href: `/workspaces/${workspaceId}/projects`,
+          group: "Workspace",
+        },
+        {
+          id: "inbox",
+          label: "Inbox",
+          href: `/workspaces/${workspaceId}/inbox`,
+          group: "Workspace",
+        },
+        {
+          id: "activity",
+          label: "Activity",
+          href: `/workspaces/${workspaceId}/activity`,
+          group: "Workspace",
+        },
+        {
+          id: "settings",
+          label: "Settings",
+          href: `/workspaces/${workspaceId}/settings`,
+          group: "Workspace",
+        },
+        {
+          id: "create-project",
+          label: "Create project",
+          href: `/workspaces/${workspaceId}/projects#create-project`,
+          group: "Actions",
+        },
+      );
+    }
+
+    if (nav) {
+      for (const p of nav.projects) {
+        base.push({
+          id: `p-${p.id}`,
+          label: p.name,
+          href: `/workspaces/${nav.workspaceId}/projects/${p.id}`,
+          group: "Projects",
+        });
+      }
+    }
+
+    for (const ws of workspaces) {
       base.push({
-        id: `p-${p.id}`,
-        label: p.name,
-        href: `/workspaces/${nav.workspaceId}/projects/${p.id}`,
-        group: "Projects",
+        id: `ws-${ws.id}`,
+        label: ws.name,
+        href: `/workspaces/${ws.id}/projects`,
+        group: "Workspaces",
       });
     }
+
     const query = q.trim().toLowerCase();
     if (!query) return base;
     return base.filter(
@@ -57,9 +137,14 @@ export function CommandPalette() {
         i.label.toLowerCase().includes(query) ||
         i.group.toLowerCase().includes(query),
     );
-  }, [nav, q]);
+  }, [nav, q, workspaceId, workspaces]);
 
   useEffect(() => {
+    function openPalette() {
+      setOpen(true);
+      setQ("");
+      setActive(0);
+    }
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -69,19 +154,30 @@ export function CommandPalette() {
       }
       if (e.key === "Escape") setOpen(false);
     }
+    function onOpenEvent() {
+      openPalette();
+    }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("cg:open-command-palette", onOpenEvent);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("cg:open-command-palette", onOpenEvent);
+    };
   }, []);
 
   useEffect(() => {
     setActive(0);
   }, [q]);
 
-  if (!nav || !open) return null;
+  if (!open) return null;
 
-  function go(href: string) {
+  function go(item: Item) {
     setOpen(false);
-    router.push(href);
+    if (item.action) {
+      item.action();
+      return;
+    }
+    if (item.href) router.push(item.href);
   }
 
   return (
@@ -96,7 +192,7 @@ export function CommandPalette() {
         <input
           className={styles.input}
           autoFocus
-          placeholder="Jump to project, inbox, settings…"
+          placeholder="Jump, create, toggle theme…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => {
@@ -108,7 +204,7 @@ export function CommandPalette() {
               setActive((i) => Math.max(0, i - 1));
             } else if (e.key === "Enter" && items[active]) {
               e.preventDefault();
-              go(items[active]!.href);
+              go(items[active]!);
             }
           }}
         />
@@ -126,7 +222,7 @@ export function CommandPalette() {
                       : styles.item
                   }
                   onMouseEnter={() => setActive(i)}
-                  onClick={() => go(item.href)}
+                  onClick={() => go(item)}
                 >
                   <span className={styles.itemGroup}>{item.group}</span>
                   <span className={styles.itemLabel}>{item.label}</span>

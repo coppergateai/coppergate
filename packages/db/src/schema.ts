@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -173,6 +174,10 @@ export const projects = pgTable(
       .default(0),
     /** L2 merge opt-in after accept + green CI (TASK043). Default OFF. */
     mergeEnabled: boolean("merge_enabled").notNull().default(false),
+    /**
+     * JSON MultiRepoPolicy override (TASK121). Null = platform defaults (off).
+     */
+    multiRepoPolicy: text("multi_repo_policy"),
     /** Pointer to approved brief revision — TASK008 */
     currentBriefId: uuid("current_brief_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -736,9 +741,11 @@ export const repositoryConnections = pgTable(
     installationStatus: text("installation_status").notNull().default("active"),
     /** JSON string for compatibility checks */
     compatibility: text("compatibility"),
-    projectId: uuid("project_id")
-      .unique()
-      .references(() => projects.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    /** primary | secondary — exactly one primary per project when bound. */
+    repoRole: text("repo_role").notNull().default("primary"),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -753,6 +760,11 @@ export const repositoryConnections = pgTable(
       t.githubRepoId,
     ),
     index("repository_connections_workspace_id_idx").on(t.workspaceId),
+    index("repository_connections_project_id_idx").on(t.projectId),
+    /** At most one primary repo per project. */
+    uniqueIndex("repository_connections_project_primary_uidx")
+      .on(t.projectId)
+      .where(sql`${t.projectId} IS NOT NULL AND ${t.repoRole} = 'primary'`),
   ],
 );
 

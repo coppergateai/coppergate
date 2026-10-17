@@ -1,6 +1,5 @@
 import {
   ArenaPreviewSection,
-  CapabilityStrip,
   EvidenceSection,
   FaqBlock,
   FinalCta,
@@ -23,7 +22,6 @@ export default async function HomePage() {
       <LandingFunnelBeacon />
       <JsonLd />
       <HeroSection signedIn={Boolean(user)} />
-      <CapabilityStrip />
       <ArenaPreviewSection />
       <SurvivorWorkflow />
       <EvidenceSection />

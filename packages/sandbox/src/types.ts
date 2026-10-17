@@ -11,6 +11,8 @@ export type SandboxLimits = {
   wallClockMs: number;
 };
 
+export type SandboxCloneMode = "sim" | "git";
+
 export type CreateSandboxInput = {
   runId: string;
   workspaceId: string;
@@ -21,6 +23,13 @@ export type CreateSandboxInput = {
   /** Optional branch name for working tree metadata. */
   branchName?: string;
   limits?: Partial<SandboxLimits>;
+  /**
+   * sim = minimal fixture tree (CI/demo).
+   * git = shallow clone + checkout baseSha (requires authToken for private repos).
+   */
+  cloneMode?: SandboxCloneMode;
+  /** Installation / PAT token for private git clone (never logged). */
+  authToken?: string | null;
 };
 
 export type SandboxHandle = {
@@ -33,6 +42,8 @@ export type SandboxHandle = {
   createdAt: Date;
   /** Implementation kind. */
   runtime: "local" | "docker-gvisor";
+  /** How the tree was materialized. */
+  cloneMode?: SandboxCloneMode;
 };
 
 export type ExecResult = {

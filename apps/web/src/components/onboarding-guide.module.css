@@ -5,7 +5,7 @@
   background:
     radial-gradient(
       80% 60% at 100% 0%,
-      rgba(200, 137, 73, 0.08),
+      var(--copper-fill-soft),
       transparent 55%
     ),
     var(--surface);
@@ -16,6 +16,10 @@
   margin: 0;
 }
 
+.collapsed .head {
+  border-bottom: 0;
+}
+
 .head {
   display: flex;
   flex-wrap: wrap;
@@ -24,6 +28,31 @@
   gap: 0.75rem 1.25rem;
   padding: 1.1rem 1.15rem 0.95rem;
   border-bottom: 1px solid var(--line);
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.collapseBtn {
+  height: 1.75rem;
+  padding: 0 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mute);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collapseBtn:hover {
+  border-color: var(--copper-border);
+  color: var(--paper);
 }
 
 .headCopy {
@@ -85,10 +114,10 @@
 }
 
 .stepDotActive {
-  border-color: rgba(200, 137, 73, 0.65);
-  background: rgba(200, 137, 73, 0.14);
+  border-color: var(--copper-border-strong);
+  background: var(--copper-fill);
   color: var(--copper-hot);
-  box-shadow: 0 0 0 3px rgba(200, 137, 73, 0.12);
+  box-shadow: 0 0 0 3px var(--copper-fill);
 }
 
 .stepRail {
@@ -157,12 +186,12 @@
   gap: 0.4rem;
   min-height: 2.35rem;
   padding: 0.45rem 0.95rem;
-  border: 1px solid rgba(200, 137, 73, 0.55);
+  border: 1px solid var(--copper-border);
   border-radius: 8px;
   background: linear-gradient(
     180deg,
-    rgba(200, 137, 73, 0.22),
-    rgba(200, 137, 73, 0.1)
+    var(--copper-fill-strong),
+    var(--copper-fill)
   );
   color: var(--paper);
   font-size: 0.88rem;
@@ -175,11 +204,11 @@
 }
 
 .cta:hover {
-  border-color: rgba(200, 137, 73, 0.85);
+  border-color: var(--copper-border-strong);
   background: linear-gradient(
     180deg,
-    rgba(200, 137, 73, 0.32),
-    rgba(200, 137, 73, 0.14)
+    var(--copper-fill-strong),
+    var(--copper-fill)
   );
   transform: translateY(-1px);
 }

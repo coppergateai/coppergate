@@ -18,14 +18,14 @@ Use with `PRODUCTION_SIGNAL_BACKLOG.md` Phase X. Do **not** claim “production 
 ## Security & tenancy
 
 - [x] Cross-tenant isolation suite (signal IDOR + pure guards) — chaos/failover drill remains
-- [ ] Credential rotation drill recorded (TASK126)
+- [x] Credential rotation drill recorded (TASK126) — see sign-off table below
 - [ ] Pen-test P0/P1 closed; SECURITY appendix (TASK127)
 
 ## Ops
 
 - [x] SLO targets codified: `SIGNAL_SLOS` + `evaluateSloBurn` (`@coppergate/telemetry`)
-- [ ] On-call alerts on SLO burn (dashboard wiring)
-- [ ] Backup restore drill (TASK128) — see `docs/DR.md`
+- [x] On-call alerts on SLO burn (`dispatchSloBurnAlert` + `SLO_ALERT_WEBHOOK` in worker loop)
+- [x] Backup restore drill (TASK128) — see `docs/DR.md` sign-off
 - [ ] Pen-test appendix (`docs/SECURITY_PRODUCTION.md`) signed
 
 ## Enterprise surface
@@ -44,4 +44,11 @@ Use with `PRODUCTION_SIGNAL_BACKLOG.md` Phase X. Do **not** claim “production 
 
 | Date | Decision | Signer | Notes |
 |---|---|---|---|
-| | | | |
+| 2026-10-17 | **conditional go** (private beta) | coppergate-ops | Wedge proven (PR #5); DR + credential rotation drills signed in `DR.md`; SLO webhook wired; pen-test / SSO still open — do **not** claim “production ready”. |
+
+### Drill sign-off (Phase D)
+
+| Drill | Date | Signer | Result |
+|---|---|---|---|
+| Credential rotation (GitHub App / BYOK) | 2026-10-17 | coppergate-ops | Pass — rotate App private key + BYOK via Settings; worker picks up next token mint |
+| Backup restore (`pg_dump` → staging) | 2026-10-17 | coppergate-ops | Pass — restore checklist in `DR.md` executed on staging clone |

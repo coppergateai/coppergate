@@ -9,6 +9,7 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/app/ui";
 import type { SerializedApproval } from "@/lib/approval";
 import styles from "./inbox.module.css";
 
@@ -89,6 +90,7 @@ export function InboxShell({
   initialSelectedId,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [tab, setTab] = useState<InboxTab>(initialTab);
   const [selectedId, setSelectedId] = useState<string | null>(
     initialSelectedId,
@@ -96,25 +98,35 @@ export function InboxShell({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState(false);
+  const [optimisticGone, setOptimisticGone] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [, startTransition] = useTransition();
+
+  const livePending = useMemo(
+    () => pending.filter((a) => !optimisticGone.has(a.id)),
+    [pending, optimisticGone],
+  );
 
   const rows = useMemo(() => {
     if (tab === "recent") return recent;
-    if (tab === "brief") return pending.filter((a) => a.targetType === "brief");
-    if (tab === "task") return pending.filter((a) => a.targetType === "task");
-    return pending;
-  }, [tab, pending, recent]);
+    if (tab === "brief")
+      return livePending.filter((a) => a.targetType === "brief");
+    if (tab === "task")
+      return livePending.filter((a) => a.targetType === "task");
+    return livePending;
+  }, [tab, livePending, recent]);
 
   const selected = useMemo(() => {
     if (selectedId) {
       const hit =
         rows.find((a) => a.id === selectedId) ??
-        pending.find((a) => a.id === selectedId) ??
+        livePending.find((a) => a.id === selectedId) ??
         recent.find((a) => a.id === selectedId);
       if (hit) return hit;
     }
     return rows[0] ?? null;
-  }, [selectedId, rows, pending, recent]);
+  }, [selectedId, rows, livePending, recent]);
 
   const syncUrl = useCallback(
     (nextTab: InboxTab, nextId: string | null) => {
@@ -138,13 +150,17 @@ export function InboxShell({
       next === "recent"
         ? recent
         : next === "brief"
-          ? pending.filter((a) => a.targetType === "brief")
+          ? livePending.filter((a) => a.targetType === "brief")
           : next === "task"
-            ? pending.filter((a) => a.targetType === "task")
-            : pending;
+            ? livePending.filter((a) => a.targetType === "task")
+            : livePending;
     const nextId = list[0]?.id ?? null;
     setSelectedId(nextId);
     syncUrl(next, nextId);
+  }
+
+  function markGone(id: string) {
+    setOptimisticGone((prev) => new Set(prev).add(id));
   }
 
   function selectRow(id: string) {
@@ -188,11 +204,18 @@ export function InboxShell({
       if (!res.ok) {
         throw new Error(body?.error?.message ?? `Approve failed (${res.status})`);
       }
+      const goneId = selected.id;
+      markGone(goneId);
+      toast.push("Approved", "success");
       startTransition(() => {
         router.refresh();
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Approve failed");
+      toast.push(
+        err instanceof Error ? err.message : "Approve failed",
+        "error",
+      );
     } finally {
       setPendingAction(false);
     }
@@ -223,12 +246,21 @@ export function InboxShell({
       if (!res.ok) {
         throw new Error(body?.error?.message ?? `Resolve failed (${res.status})`);
       }
+      markGone(selected.id);
       setNote("");
+      toast.push(
+        decision === "rejected" ? "Rejected" : "Changes requested",
+        "success",
+      );
       startTransition(() => {
         router.refresh();
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Resolve failed");
+      toast.push(
+        err instanceof Error ? err.message : "Resolve failed",
+        "error",
+      );
     } finally {
       setPendingAction(false);
     }
@@ -274,9 +306,9 @@ export function InboxShell({
   });
 
   const counts = {
-    pending: pending.length,
-    brief: pending.filter((a) => a.targetType === "brief").length,
-    task: pending.filter((a) => a.targetType === "task").length,
+    pending: livePending.length,
+    brief: livePending.filter((a) => a.targetType === "brief").length,
+    task: livePending.filter((a) => a.targetType === "task").length,
     recent: recent.length,
   };
 

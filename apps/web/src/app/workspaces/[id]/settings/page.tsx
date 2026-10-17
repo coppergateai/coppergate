@@ -171,7 +171,13 @@ export default async function WorkspaceSettingsPage({
 
   return (
     <main className={styles.main}>
-      <Suspense fallback={null}>
+      <Suspense
+        fallback={
+          <div style={{ padding: "1.25rem 1.15rem" }} aria-busy="true">
+            <p className={styles.note}>Loading settings…</p>
+          </div>
+        }
+      >
         <SettingsShell
           workspaceName={workspace.name}
           workspaceSlug={workspace.slug}

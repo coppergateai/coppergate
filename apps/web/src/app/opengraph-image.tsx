@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Coppergate — From idea to reviewed PR";
+export const alt = "Coppergate — Agents compete. Survivors ship.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -16,8 +16,8 @@ export default function OpenGraphImage() {
           justifyContent: "space-between",
           padding: "64px 72px",
           background:
-            "linear-gradient(180deg, #0c0c0c 0%, #070707 45%, #050505 100%)",
-          color: "#ffffff",
+            "linear-gradient(180deg, #0c0d10 0%, #090a0c 45%, #07080a 100%)",
+          color: "#f5f5f3",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -32,7 +32,7 @@ export default function OpenGraphImage() {
             width="48"
             height="46"
             viewBox="0 0 800 760"
-            fill="#b87333"
+            fill="#c88949"
           >
             <path
               fillRule="evenodd"
@@ -60,19 +60,19 @@ export default function OpenGraphImage() {
               maxWidth: 900,
             }}
           >
-            From idea to reviewed PR.
+            Agents compete. Survivors ship.
           </div>
           <div
             style={{
               fontSize: 28,
-              color: "#a3a3a3",
+              color: "#a1a1aa",
               letterSpacing: "-0.01em",
               maxWidth: 820,
               lineHeight: 1.35,
             }}
           >
-            Plans, codes, and opens pull requests with evidence — you open the
-            gate for what ships.
+            Contenders race the same task. CI and cost decide. You hold the
+            kill-switch.
           </div>
         </div>
 
@@ -86,7 +86,7 @@ export default function OpenGraphImage() {
           }}
         >
           <span>Private beta · GitHub-native</span>
-          <span style={{ color: "#b87333" }}>coppergate.ai</span>
+          <span style={{ color: "#c88949" }}>coppergate.ai</span>
         </div>
       </div>
     ),

@@ -12,6 +12,7 @@ import {
 import type {
   CreateSandboxInput,
   ExecResult,
+  SandboxCloneMode,
   SandboxHandle,
   SandboxManager,
 } from "./types.js";
@@ -19,8 +20,9 @@ import type {
 type ActiveSandbox = SandboxHandle & { destroyed: boolean };
 
 /**
- * Filesystem sandbox for CI/local demos (no Docker required).
- * Still enforces egress + lifecycle policy used by gVisor path.
+ * Filesystem sandbox for CI/local/staging.
+ * - cloneMode=sim: minimal fixture tree (no network).
+ * - cloneMode=git: shallow clone + checkout baseSha (real repo tree).
  */
 export class LocalSandboxManager implements SandboxManager {
   private readonly active = new Map<string, ActiveSandbox>();
@@ -39,6 +41,7 @@ export class LocalSandboxManager implements SandboxManager {
       throw new SandboxPolicyError("invalid", "runId and workspaceId required");
     }
 
+    const cloneMode: SandboxCloneMode = input.cloneMode ?? "sim";
     const root = this.options?.rootDir ?? tmpdir();
     const workdir = await mkdtemp(join(root, "cg-sandbox-"));
     const id = `local_${createHash("sha256")
@@ -46,18 +49,12 @@ export class LocalSandboxManager implements SandboxManager {
       .digest("hex")
       .slice(0, 16)}`;
 
-    // Simulate clone-at-SHA: materialize a minimal tree pinned to baseSha.
-    await mkdir(join(workdir, ".git"), { recursive: true });
-    await writeFile(
-      join(workdir, ".git", "HEAD"),
-      `ref: refs/heads/${input.branchName ?? "coppergate-work"}\n`,
-      "utf8",
-    );
-    await writeFile(
-      join(workdir, "README.md"),
-      `# Sandbox clone\n\nbaseSha=${input.baseSha}\nrepo=${input.repoUrl}\n`,
-      "utf8",
-    );
+    if (cloneMode === "git") {
+      await this.gitCloneCheckout(workdir, input);
+    } else {
+      await this.materializeSimTree(workdir, input);
+    }
+
     await writeFile(
       join(workdir, ".coppergate-sandbox.json"),
       JSON.stringify(
@@ -66,7 +63,8 @@ export class LocalSandboxManager implements SandboxManager {
           runId: input.runId,
           workspaceId: input.workspaceId,
           baseSha: input.baseSha,
-          repoUrl: input.repoUrl,
+          repoUrl: redactRepoUrl(input.repoUrl),
+          cloneMode,
           limits: { ...DEFAULT_LIMITS, ...input.limits },
           runtime: "local",
         },
@@ -84,10 +82,89 @@ export class LocalSandboxManager implements SandboxManager {
       baseSha: input.baseSha,
       createdAt: new Date(),
       runtime: "local",
+      cloneMode,
       destroyed: false,
     };
     this.active.set(id, handle);
     return { ...handle };
+  }
+
+  private async materializeSimTree(
+    workdir: string,
+    input: CreateSandboxInput,
+  ): Promise<void> {
+    await mkdir(join(workdir, ".git"), { recursive: true });
+    await writeFile(
+      join(workdir, ".git", "HEAD"),
+      `ref: refs/heads/${input.branchName ?? "coppergate-work"}\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(workdir, "README.md"),
+      `# Sandbox clone\n\nbaseSha=${input.baseSha}\nrepo=${redactRepoUrl(input.repoUrl)}\n`,
+      "utf8",
+    );
+  }
+
+  private async gitCloneCheckout(
+    workdir: string,
+    input: CreateSandboxInput,
+  ): Promise<void> {
+    const url = authenticatedCloneUrl(input.repoUrl, input.authToken);
+    const clone = await runCommand(
+      [
+        "git",
+        "clone",
+        "--depth",
+        "50",
+        "--no-tags",
+        url,
+        workdir,
+      ],
+      process.cwd(),
+      Math.min(DEFAULT_LIMITS.wallClockMs, 120_000),
+    );
+    if (clone.exitCode !== 0) {
+      throw new SandboxPolicyError(
+        "invalid",
+        `git clone failed: ${clone.stderr.slice(0, 400)}`,
+      );
+    }
+
+    const sha = input.baseSha.trim();
+    if (sha && sha !== "unknown" && !/^0+$/.test(sha)) {
+      const fetch = await runCommand(
+        ["git", "fetch", "--depth", "1", "origin", sha],
+        workdir,
+        60_000,
+      );
+      if (fetch.exitCode === 0) {
+        const co = await runCommand(
+          ["git", "checkout", "--force", sha],
+          workdir,
+          30_000,
+        );
+        if (co.exitCode !== 0) {
+          throw new SandboxPolicyError(
+            "invalid",
+            `git checkout ${sha} failed: ${co.stderr.slice(0, 300)}`,
+          );
+        }
+      } else {
+        // Fall back to default HEAD if SHA not fetchable (shallow).
+        const co = await runCommand(
+          ["git", "checkout", "--force", "HEAD"],
+          workdir,
+          30_000,
+        );
+        if (co.exitCode !== 0) {
+          throw new SandboxPolicyError(
+            "invalid",
+            `git checkout HEAD failed: ${co.stderr.slice(0, 300)}`,
+          );
+        }
+      }
+    }
   }
 
   async exec(
@@ -100,7 +177,6 @@ export class LocalSandboxManager implements SandboxManager {
       throw new SandboxPolicyError("invalid", "command required");
     }
 
-    // Policy probe: refuse commands that target metadata / disallowed URLs.
     for (const arg of command) {
       if (arg.includes(METADATA_IPV4) || /169\.254\.\d+\.\d+/.test(arg)) {
         throw new SandboxPolicyError(
@@ -114,17 +190,13 @@ export class LocalSandboxManager implements SandboxManager {
       }
     }
 
-    const timeoutMs =
-      options?.timeoutMs ??
-      DEFAULT_LIMITS.wallClockMs;
-
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_LIMITS.wallClockMs;
     return runCommand(command, active.workdir, timeoutMs);
   }
 
   async destroy(sandbox: SandboxHandle): Promise<void> {
     const active = this.active.get(sandbox.id);
     if (!active || active.destroyed) {
-      // Idempotent destroy
       await rm(sandbox.workdir, { recursive: true, force: true }).catch(
         () => undefined,
       );
@@ -135,7 +207,6 @@ export class LocalSandboxManager implements SandboxManager {
     await rm(active.workdir, { recursive: true, force: true });
   }
 
-  /** Test helper: whether workdir still exists. */
   async isDestroyed(sandbox: SandboxHandle): Promise<boolean> {
     const active = this.active.get(sandbox.id);
     if (active && !active.destroyed) return false;
@@ -156,6 +227,31 @@ export class LocalSandboxManager implements SandboxManager {
   }
 }
 
+function redactRepoUrl(url: string): string {
+  return url.replace(/https:\/\/[^@]+@/i, "https://***@");
+}
+
+function authenticatedCloneUrl(
+  repoUrl: string,
+  token: string | null | undefined,
+): string {
+  const trimmed = repoUrl.trim();
+  if (!token?.trim()) return trimmed;
+  if (trimmed.startsWith("https://github.com/")) {
+    return trimmed.replace(
+      "https://github.com/",
+      `https://x-access-token:${encodeURIComponent(token)}@github.com/`,
+    );
+  }
+  if (trimmed.startsWith("https://")) {
+    return trimmed.replace(
+      "https://",
+      `https://oauth2:${encodeURIComponent(token)}@`,
+    );
+  }
+  return trimmed;
+}
+
 function runCommand(
   command: string[],
   cwd: string,
@@ -168,6 +264,7 @@ function runCommand(
       env: {
         PATH: process.env.PATH,
         HOME: cwd,
+        GIT_TERMINAL_PROMPT: "0",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

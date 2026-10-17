@@ -12,10 +12,10 @@ type Props = {
 
 const toneClass: Record<Tone, string> = {
   neutral: "",
-  info: styles.bannerInfo,
-  success: styles.bannerSuccess,
-  warn: styles.bannerWarn,
-  danger: styles.bannerDanger,
+  info: styles.bannerInfo ?? "",
+  success: styles.bannerSuccess ?? "",
+  warn: styles.bannerWarn ?? "",
+  danger: styles.bannerDanger ?? "",
 };
 
 export function Banner({

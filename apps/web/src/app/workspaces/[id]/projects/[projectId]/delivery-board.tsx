@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { EmptyState } from "@/components/app/ui";
 import styles from "./project-detail.module.css";
 
 export type BoardTask = {
@@ -68,7 +69,18 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
       </p>
 
       {tasks.length === 0 ? (
-        <p className={styles.muted}>Generate a plan to populate the board.</p>
+        <EmptyState
+          title="No tasks on the board yet"
+          body="Generate a plan from an approved brief, or import a GitHub issue from Overview to queue the first delivery."
+          action={
+            <Link
+              href={`#plan`}
+              className={styles.linkCta}
+            >
+              Go to plan
+            </Link>
+          }
+        />
       ) : (
         <div className={styles.boardGrid}>
           {COLUMNS.map((col) => {

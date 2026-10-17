@@ -642,3 +642,22 @@ export async function countClaimableRuns(db: Database): Promise<number> {
     );
   return Number(row?.n ?? 0);
 }
+
+/** Inflight runs for plan concurrency enforcement. */
+export async function countInflightRunsForWorkspace(
+  db: Database,
+  workspaceId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({
+      n: sql<number>`count(*)::int`,
+    })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.workspaceId, workspaceId),
+        sql`${agentRuns.status} in ('RUNNING', 'VALIDATING')`,
+      ),
+    );
+  return Number(row?.n ?? 0);
+}

@@ -66,7 +66,7 @@
 
 .item:hover,
 .itemActive {
-  background: rgba(200, 137, 73, 0.12);
+  background: var(--copper-fill);
 }
 
 .itemGroup {

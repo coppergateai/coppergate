@@ -24,10 +24,10 @@
   background:
     radial-gradient(
       70% 120% at 0% 0%,
-      rgba(200, 137, 73, 0.07),
+      var(--copper-fill-soft),
       transparent 55%
     ),
-    rgba(16, 17, 20, 0.96);
+    var(--page-bar-bg);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
@@ -59,12 +59,36 @@
 .tabNav {
   display: flex;
   flex-wrap: nowrap;
-  gap: 0.25rem;
+  align-items: flex-end;
+  gap: 0.85rem 1.15rem;
   overflow-x: auto;
-  padding: 0.55rem 1.15rem;
+  padding: 0.55rem 1.15rem 0.65rem;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-muted);
   scrollbar-width: thin;
+}
+
+.tabGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.tabGroupLabel {
+  margin: 0;
+  padding-left: 0.35rem;
+  color: var(--mute-soft);
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tabGroupRow {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
 }
 
 .tabBtn {
@@ -92,8 +116,8 @@
 }
 
 .tabBtnActive {
-  border-color: rgba(200, 137, 73, 0.45);
-  background: rgba(200, 137, 73, 0.14);
+  border-color: var(--copper-border);
+  background: var(--copper-fill);
   color: var(--paper);
 }
 
@@ -143,7 +167,7 @@
   background:
     radial-gradient(
       80% 80% at 100% 0%,
-      rgba(200, 137, 73, 0.06),
+      var(--copper-fill-soft),
       transparent 55%
     ),
     rgba(255, 255, 255, 0.025);
@@ -351,8 +375,8 @@
 }
 
 .toggle:checked {
-  background: rgba(200, 137, 73, 0.45);
-  border-color: rgba(200, 137, 73, 0.7);
+  background: var(--copper-border);
+  border-color: var(--copper-border-strong);
 }
 
 .toggle:checked::after {
@@ -360,7 +384,7 @@
 }
 
 .toggle:focus-visible {
-  outline: 2px solid rgba(200, 137, 73, 0.55);
+  outline: 2px solid var(--copper-border);
   outline-offset: 2px;
 }
 
@@ -386,7 +410,7 @@
   background:
     radial-gradient(
       90% 70% at 100% 0%,
-      rgba(200, 137, 73, 0.05),
+      var(--copper-fill-soft),
       transparent 55%
     ),
     rgba(255, 255, 255, 0.02);
@@ -477,7 +501,7 @@
 }
 
 .copyBtn:hover {
-  border-color: rgba(200, 137, 73, 0.45);
+  border-color: var(--copper-border);
 }
 
 .field {
@@ -531,12 +555,12 @@
   justify-self: start;
   min-height: 2.25rem;
   padding: 0.45rem 0.95rem;
-  border: 1px solid rgba(200, 137, 73, 0.55);
+  border: 1px solid var(--copper-border);
   border-radius: 8px;
   background: linear-gradient(
     180deg,
-    rgba(200, 137, 73, 0.22),
-    rgba(200, 137, 73, 0.1)
+    var(--copper-fill-strong),
+    var(--copper-fill)
   );
   color: var(--paper);
   font: inherit;
@@ -552,11 +576,11 @@
 }
 
 .submit:hover:not(:disabled) {
-  border-color: rgba(200, 137, 73, 0.85);
+  border-color: var(--copper-border-strong);
   background: linear-gradient(
     180deg,
-    rgba(200, 137, 73, 0.32),
-    rgba(200, 137, 73, 0.14)
+    var(--copper-fill-strong),
+    var(--copper-fill)
   );
   transform: translateY(-1px);
 }
@@ -609,12 +633,12 @@
 .primaryBtn {
   min-height: 2.25rem;
   padding: 0.45rem 0.95rem;
-  border: 1px solid rgba(200, 137, 73, 0.55);
+  border: 1px solid var(--copper-border);
   border-radius: 8px;
   background: linear-gradient(
     180deg,
-    rgba(200, 137, 73, 0.22),
-    rgba(200, 137, 73, 0.1)
+    var(--copper-fill-strong),
+    var(--copper-fill)
   );
   color: var(--paper);
   font: inherit;
@@ -628,11 +652,11 @@
 }
 
 .primaryBtn:hover:not(:disabled) {
-  border-color: rgba(200, 137, 73, 0.85);
+  border-color: var(--copper-border-strong);
   background: linear-gradient(
     180deg,
-    rgba(200, 137, 73, 0.32),
-    rgba(200, 137, 73, 0.14)
+    var(--copper-fill-strong),
+    var(--copper-fill)
   );
 }
 
@@ -782,6 +806,22 @@
   font-size: 0.85rem;
 }
 
+.skeletonLine {
+  display: block;
+  height: 0.85rem;
+  width: 72%;
+  margin-bottom: 0.55rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--overlay) 0%,
+    var(--overlay-strong) 45%,
+    var(--overlay) 90%
+  );
+  background-size: 200% 100%;
+  animation: cg-shimmer 1.4s ease-in-out infinite;
+}
+
 .list {
   list-style: none;
   padding: 0;
@@ -886,8 +926,8 @@
 }
 
 .billingBannerSync {
-  border: 1px solid rgba(200, 137, 73, 0.35);
-  background: rgba(200, 137, 73, 0.1);
+  border: 1px solid var(--copper-border);
+  background: var(--copper-fill);
   color: var(--mute-strong);
 }
 
@@ -929,7 +969,7 @@
   background:
     radial-gradient(
       90% 70% at 0% 0%,
-      rgba(200, 137, 73, 0.07),
+      var(--copper-fill-soft),
       transparent 55%
     ),
     rgba(255, 255, 255, 0.02);
@@ -940,18 +980,18 @@
 }
 
 .billingPlanCard:hover {
-  border-color: rgba(200, 137, 73, 0.35);
+  border-color: var(--copper-border);
 }
 
 .billingPlanCardCurrent {
-  border-color: rgba(200, 137, 73, 0.55);
+  border-color: var(--copper-border);
   background:
     radial-gradient(
       90% 70% at 0% 0%,
-      rgba(200, 137, 73, 0.14),
+      var(--copper-fill),
       transparent 55%
     ),
-    rgba(200, 137, 73, 0.05);
+    var(--copper-fill-soft);
 }
 
 .billingPlanHead {
@@ -973,7 +1013,7 @@
   display: inline-block;
   margin-top: 0.35rem;
   padding: 0.15rem 0.45rem;
-  border: 1px solid rgba(200, 137, 73, 0.45);
+  border: 1px solid var(--copper-border);
   border-radius: 4px;
   color: var(--copper-hot, #e8a86a);
   font-size: 0.65rem;

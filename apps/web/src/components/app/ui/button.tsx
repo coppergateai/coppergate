@@ -11,10 +11,10 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variantClass: Record<Variant, string> = {
-  primary: styles.btnPrimary,
-  secondary: styles.btnSecondary,
-  ghost: styles.btnGhost,
-  danger: styles.btnDanger,
+  primary: styles.btnPrimary ?? "",
+  secondary: styles.btnSecondary ?? "",
+  ghost: styles.btnGhost ?? "",
+  danger: styles.btnDanger ?? "",
 };
 
 export function Button({

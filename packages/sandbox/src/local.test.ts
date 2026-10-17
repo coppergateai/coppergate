@@ -17,6 +17,7 @@ describe("LocalSandboxManager", () => {
 
     assert.equal(sandbox.baseSha, "deadbeefcafebabe");
     assert.equal(sandbox.runtime, "local");
+    assert.equal(sandbox.cloneMode, "sim");
     await access(sandbox.workdir);
 
     const cat = await mgr.exec(sandbox, ["cat", ".coppergate-sandbox.json"]);

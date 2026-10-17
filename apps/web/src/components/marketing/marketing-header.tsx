@@ -119,9 +119,9 @@ export function MarketingHeader({ signedIn }: Props) {
               <Link
                 className={styles.btnPrimary}
                 href="/login"
-                onClick={() => track("cta_open_workspaces", { location: "nav" })}
+                onClick={() => track("cta_request_access", { location: "nav" })}
               >
-                Open workspaces
+                Request access
                 <IconArrow />
               </Link>
             </>
@@ -178,7 +178,7 @@ export function MarketingHeader({ signedIn }: Props) {
                   Sign in
                 </Link>
                 <Link className={styles.drawerCta} href="/login" onClick={closeMenu}>
-                  Open workspaces
+                  Request access
                 </Link>
               </>
             )}

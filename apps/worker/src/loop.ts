@@ -16,7 +16,11 @@ import {
   type Database,
 } from "@coppergate/db";
 import { openSecret, parseEncryptionKey } from "@coppergate/github";
-import type { Logger } from "@coppergate/telemetry";
+import {
+  SIGNAL_SLOS,
+  dispatchSloBurnAlert,
+  type Logger,
+} from "@coppergate/telemetry";
 import { executeClaimedRun } from "./execute.js";
 
 function resolveDeliveryModeHint(): "http" | "fake" {
@@ -150,7 +154,11 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
   const db = createDb(options.databaseUrl, { max: 2 });
   const { workerId, log } = options;
   let lastPurgeAt = 0;
+  let lastSloCheckAt = 0;
   let consecutiveErrors = 0;
+  let processedWindow = 0;
+  let terminalFailWindow = 0;
+  let lagSamplesMs: number[] = [];
 
   log.info("worker loop started", {
     workerId,
@@ -179,6 +187,34 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           }
         }
 
+        // SLO burn → Slack/webhook (Phase D) — every 2 minutes when samples exist.
+        if (Date.now() - lastSloCheckAt > 2 * 60_000 && lagSamplesMs.length > 0) {
+          lastSloCheckAt = Date.now();
+          const sorted = [...lagSamplesMs].sort((a, b) => a - b);
+          const p95 =
+            sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ??
+            sorted[sorted.length - 1]!;
+          const failRate =
+            processedWindow > 0 ? 1 - terminalFailWindow / processedWindow : 1;
+          await dispatchSloBurnAlert({
+            metrics: {
+              workerLagP95Ms: p95,
+              // Map terminal failure rate into ingestSuccessRate slot for burn.
+              ingestSuccessRate: failRate,
+            },
+            log,
+          });
+          if (p95 > SIGNAL_SLOS.workerLagP95Ms) {
+            log.warn("worker lag p95 above SLO", {
+              p95,
+              target: SIGNAL_SLOS.workerLagP95Ms,
+            });
+          }
+          lagSamplesMs = [];
+          processedWindow = 0;
+          terminalFailWindow = 0;
+        }
+
         const run = await claimNextRun(db, workerId, leaseMs);
         if (!run) {
           consecutiveErrors = 0;
@@ -192,6 +228,7 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           attempt: run.attempt,
         });
 
+        const started = Date.now();
         const agent = await resolveWorkerAgent(db, run.workspaceId, log);
         const outcome = await executeClaimedRun(db, {
           run,
@@ -200,12 +237,16 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           leaseMs,
           agent,
         });
+        lagSamplesMs.push(Date.now() - started);
+        if (lagSamplesMs.length > 64) lagSamplesMs = lagSamplesMs.slice(-64);
+        processedWindow += 1;
 
         consecutiveErrors = 0;
         log.info("run processed", { runId: run.id, outcome });
 
         // Poison visibility: terminal failures surface for ops dashboards.
         if (outcome === "failed" || outcome === "validation_failed") {
+          terminalFailWindow += 1;
           log.warn("run terminal failure (dead-letter visibility)", {
             runId: run.id,
             taskId: run.taskId,

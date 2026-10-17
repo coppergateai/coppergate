@@ -1,6 +1,6 @@
 import Link from "next/link";
 import styles from "@/components/marketing/marketing.module.css";
-import { SiteChrome } from "../../site-chrome";
+import { DocsShell } from "@/components/docs/docs-shell";
 
 export const metadata = {
   title: "Supported stack · Coppergate Docs",
@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function SupportedStackPage() {
   return (
-    <SiteChrome>
+    <DocsShell>
       <main className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
@@ -68,6 +68,6 @@ export default function SupportedStackPage() {
           </p>
         </div>
       </main>
-    </SiteChrome>
+    </DocsShell>
   );
 }

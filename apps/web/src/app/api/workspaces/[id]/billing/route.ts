@@ -3,10 +3,13 @@ import {
   createBillingPortalSession,
   createCheckoutSession,
   HOSTED_PLANS,
+  limitsForPlan,
+  reportUsageSummaryToStripe,
   type HostedPlanId,
 } from "@coppergate/billing";
 import {
   effectivePlan,
+  getWorkspaceMonthToDateUsage,
   getWorkspaceSubscription,
 } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
@@ -33,11 +36,31 @@ export async function GET(request: Request, context: RouteContext) {
 
     const cfg = getStripeBillingConfig();
     const sub = await getWorkspaceSubscription(db, workspaceId);
+    const plan = effectivePlan(sub);
+    const usage = await getWorkspaceMonthToDateUsage(db, workspaceId);
+
+    if (
+      cfg &&
+      sub?.stripeCustomerId &&
+      (plan === "starter" || plan === "pro" || plan === "team")
+    ) {
+      const stripe = createStripeClient(cfg.secretKey);
+      void reportUsageSummaryToStripe({
+        stripe,
+        customerId: sub.stripeCustomerId,
+        workspaceId,
+        periodLabel: usage.periodLabel,
+        spentMicros: usage.spentMicros,
+        eventCount: usage.eventCount,
+      }).catch(() => undefined);
+    }
 
     return jsonOk(
       {
         configured: !!cfg,
-        plan: effectivePlan(sub),
+        plan,
+        limits: limitsForPlan(plan),
+        usage,
         subscription: sub
           ? {
               plan: sub.plan,
@@ -45,6 +68,8 @@ export async function GET(request: Request, context: RouteContext) {
               currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
               cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
               hasCustomer: !!sub.stripeCustomerId,
+              paymentFailed:
+                sub.status === "past_due" || sub.status === "unpaid",
             }
           : null,
         plans: HOSTED_PLANS,

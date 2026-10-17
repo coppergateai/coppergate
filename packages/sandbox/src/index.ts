@@ -1,6 +1,7 @@
 export type {
   CreateSandboxInput,
   ExecResult,
+  SandboxCloneMode,
   SandboxHandle,
   SandboxLimits,
   SandboxManager,

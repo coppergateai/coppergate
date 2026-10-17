@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/app";
 import { TournamentPanel } from "./tournament-panel";
+import styles from "./task-detail.module.css";
 
 type Run = {
   id: string;
@@ -97,6 +99,7 @@ export function TaskDetailPanel({
   isOwner,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [task, setTask] = useState(initialTask);
   const [runs, setRuns] = useState<Run[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -214,16 +217,87 @@ export function TaskDetailPanel({
           attemptCount: data.task!.attemptCount ?? t.attemptCount,
         }));
       }
+      toast.push("Updated", "success");
       await refreshRuns();
       await refreshEvents();
       await refreshArtifacts();
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      const message = err instanceof Error ? err.message : "Action failed";
+      setError(message);
+      toast.push(message, "error");
     } finally {
       setPending(false);
     }
   }
+
+  const agentMeta = (() => {
+    for (const e of [...events].reverse()) {
+      const p = e.payload;
+      const provider =
+        typeof p.provider === "string"
+          ? p.provider
+          : typeof p.harness === "string"
+            ? p.harness
+            : null;
+      const model = typeof p.model === "string" ? p.model : null;
+      const sandboxMode =
+        typeof p.sandboxMode === "string" ? p.sandboxMode : null;
+      if (provider || model || sandboxMode) {
+        return { provider, model, sandboxMode };
+      }
+    }
+    return { provider: null, model: null, sandboxMode: null };
+  })();
+
+  const failureHint = (() => {
+    const code = selected?.errorCode ?? null;
+    if (task.status === "FAILED" || code) {
+      if (code === "ci_failed") {
+        return {
+          title: "CI blocked this delivery",
+          body: "Fix failing checks on the PR branch, or retry after a green run. Accept stays closed while CI fails. Recovery: /docs/recovery#ci",
+          href: "/docs/recovery#ci",
+        };
+      }
+      if (code === "budget_paused" || code === "budget_exceeded") {
+        return {
+          title: "Budget paused or exceeded",
+          body: "Raise or unpause the project spend cap in Settings, then Retry. Recovery: /docs/recovery#budget",
+          href: "/docs/recovery#budget",
+        };
+      }
+      if (code === "validation_failed") {
+        return {
+          title: "Validation failed",
+          body: "Lint/test or acceptance checks failed in the sandbox. Tighten scope and Retry. Recovery: /docs/recovery#validation",
+          href: "/docs/recovery#validation",
+        };
+      }
+      if (code === "agent_error" || code === "incomplete") {
+        return {
+          title: "Agent error",
+          body: "The coding agent exited without a reviewable delivery. Check BYOK/OpenHands logs, then Retry. Recovery: /docs/recovery#agent",
+          href: "/docs/recovery#agent",
+        };
+      }
+      if (code === "plan_limit") {
+        return {
+          title: "Plan limit reached",
+          body: "Your plan’s concurrency or fan-out cap blocked enqueue. Upgrade in Settings → Billing, or wait for inflight runs to finish.",
+          href: `/workspaces/${workspaceId}/settings?tab=billing`,
+        };
+      }
+      if (task.status === "FAILED") {
+        return {
+          title: "Run failed",
+          body: "Open the activity log, then Retry. See /docs/recovery for self-serve steps.",
+          href: "/docs/recovery",
+        };
+      }
+    }
+    return null;
+  })();
 
   const costMicros =
     selected?.actualCostMicros ||
@@ -336,43 +410,36 @@ export function TaskDetailPanel({
     : null;
 
   return (
-    <div>
-      <p style={{ margin: "0 0 0.35rem", color: "#A3A3A3", fontSize: "0.875rem" }}>
+    <div className={styles.root}>
+      <p className={styles.meta}>
         {task.status} · attempt {task.attemptCount}/{task.maxAttempts}
         {task.prUrl ? (
           <>
             {" · "}
-            <a href={task.prUrl} style={{ color: "#A3A3A3" }}>
-              PR
-            </a>
+            <a href={task.prUrl}>PR</a>
           </>
         ) : null}
         {" · "}
         {(costMicros / 100).toFixed(2)}¢
+        {agentMeta.provider ? ` · ${agentMeta.provider}` : null}
+        {agentMeta.model ? ` · ${agentMeta.model}` : null}
+        {agentMeta.sandboxMode === "sim"
+          ? " · simulated sandbox"
+          : agentMeta.sandboxMode === "git"
+            ? " · git sandbox"
+            : null}
       </p>
-      <h1
-        style={{
-          margin: "0 0 0.5rem",
-          fontSize: "1.5rem",
-          fontWeight: 600,
-        }}
-      >
-        {task.title}
-      </h1>
-      <p style={{ margin: 0, color: "#E5E5E5", fontSize: "0.9rem" }}>
-        {task.goal}
-      </p>
-      <p style={{ margin: "0.5rem 0 0", color: "#737373", fontSize: "0.85rem" }}>
-        Scope: {task.scope}
-      </p>
+      <h1 className={styles.title}>{task.title}</h1>
+      <p className={styles.goal}>{task.goal}</p>
+      <p className={styles.scope}>Scope: {task.scope}</p>
 
       {isOwner ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "1.25rem" }}>
+        <div className={styles.actions}>
           {task.status === "DRAFT" ? (
             <button
               type="button"
               disabled={pending}
-              style={btn}
+              className={styles.btn}
               onClick={() =>
                 void postAction(`/api/tasks/${taskId}/submit`, { workspaceId })
               }
@@ -384,7 +451,7 @@ export function TaskDetailPanel({
             <button
               type="button"
               disabled={pending}
-              style={btn}
+              className={styles.btn}
               onClick={() =>
                 void postAction(`/api/tasks/${taskId}/approve`, { workspaceId })
               }
@@ -396,7 +463,7 @@ export function TaskDetailPanel({
             <button
               type="button"
               disabled={pending || !selected}
-              style={btnGhost}
+              className={styles.btnGhost}
               onClick={() => {
                 if (!selected) return;
                 void postAction(`/api/runs/${selected.id}/cancel`, {
@@ -411,7 +478,7 @@ export function TaskDetailPanel({
             <button
               type="button"
               disabled={pending}
-              style={btn}
+              className={styles.btn}
               onClick={() =>
                 void postAction(`/api/tasks/${taskId}/retry`, { workspaceId })
               }
@@ -424,11 +491,7 @@ export function TaskDetailPanel({
               <button
                 type="button"
                 disabled={pending || !ciFitness.acceptReady}
-                style={
-                  !ciFitness.acceptReady
-                    ? { ...btn, opacity: 0.45, cursor: "not-allowed" }
-                    : btn
-                }
+                className={styles.btn}
                 title={acceptBlockedReason ?? "Accept delivery"}
                 onClick={() =>
                   void postAction(`/api/tasks/${taskId}/review`, {
@@ -442,7 +505,7 @@ export function TaskDetailPanel({
               <button
                 type="button"
                 disabled={pending}
-                style={btnGhost}
+                className={styles.btnGhost}
                 onClick={() =>
                   void postAction(`/api/tasks/${taskId}/review`, {
                     workspaceId,
@@ -455,7 +518,7 @@ export function TaskDetailPanel({
               <button
                 type="button"
                 disabled={pending}
-                style={btnGhost}
+                className={styles.btnGhost}
                 onClick={() =>
                   void postAction(`/api/tasks/${taskId}/review`, {
                     workspaceId,
@@ -470,37 +533,29 @@ export function TaskDetailPanel({
         </div>
       ) : null}
       {task.status === "REVIEW_REQUIRED" && acceptBlockedReason ? (
-        <p
-          style={{
-            margin: "0.5rem 0 0",
-            color: "#FBBF24",
-            fontSize: "0.8rem",
-          }}
-        >
-          {acceptBlockedReason}
-        </p>
+        <p className={styles.warn}>{acceptBlockedReason}</p>
       ) : null}
 
-      {error ? (
-        <p style={{ marginTop: "0.75rem", color: "#F87171", fontSize: "0.875rem" }}>
-          {error}
-        </p>
+      {error ? <p className={styles.error}>{error}</p> : null}
+
+      {failureHint ? (
+        <section className={styles.recovery}>
+          <h2 className={styles.recoveryTitle}>{failureHint.title}</h2>
+          <p className={styles.recoveryBody}>{failureHint.body}</p>
+          {"href" in failureHint && failureHint.href ? (
+            <p className={styles.sectionLede}>
+              <a href={failureHint.href}>Open recovery steps →</a>
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       <RecoveryCopy taskStatus={task.status} run={selected} />
 
       {diffSummary || deliveryReport || ciFitness.checks.length > 0 || ciFitness.awaitingLive ? (
-        <section style={{ marginTop: "2rem" }}>
-          <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>
-            Delivery for review
-          </h2>
-          <p
-            style={{
-              margin: "0.35rem 0 0.75rem",
-              color: "#A3A3A3",
-              fontSize: "0.8rem",
-            }}
-          >
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Delivery for review</h2>
+          <p className={styles.sectionLede}>
             Cost {(costMicros / 100).toFixed(2)}¢
             {diffSummary ? ` · ${diffSummary.files.length} file(s)` : null}
             {" · CI "}
@@ -514,38 +569,19 @@ export function TaskDetailPanel({
           </p>
           {ciFitness.awaitingLive || ciFitness.checks.length > 0 ? (
             <div style={{ marginBottom: "0.85rem" }}>
-              <p
-                style={{
-                  margin: "0 0 0.35rem",
-                  color: "#E5E5E5",
-                  fontSize: "0.8rem",
-                }}
-              >
+              <p className={styles.subLabel}>
                 CI evidence
                 {ciFitness.awaitingLive && !ciFitness.passed
                   ? " — waiting for GitHub checks"
                   : null}
               </p>
               {ciFitness.checks.length === 0 ? (
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#737373",
-                    fontSize: "0.75rem",
-                  }}
-                >
+                <p className={styles.empty}>
                   No check_run attached yet. Accept stays closed until checks
                   report.
                 </p>
               ) : (
-                <ul
-                  style={{
-                    margin: 0,
-                    paddingLeft: "1.1rem",
-                    color: "#A3A3A3",
-                    fontSize: "0.75rem",
-                  }}
-                >
+                <ul className={styles.list}>
                   {ciFitness.checks.map((c) => (
                     <li key={c.name}>
                       {c.name}: {c.conclusion ?? "unknown"}
@@ -559,7 +595,7 @@ export function TaskDetailPanel({
                           {" · "}
                           <a
                             href={c.detailsUrl}
-                            style={{ color: "#A3A3A3" }}
+                            className={styles.link}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -574,15 +610,9 @@ export function TaskDetailPanel({
             </div>
           ) : null}
           {deliveryReport ? (
-            <p
-              style={{
-                margin: "0.35rem 0 0.75rem",
-                color: "#737373",
-                fontSize: "0.8rem",
-              }}
-            >
+            <p className={styles.sectionLede}>
               PR{" "}
-              <a href={deliveryReport.prUrl} style={{ color: "#A3A3A3" }}>
+              <a href={deliveryReport.prUrl} className={styles.link}>
                 #{deliveryReport.prNumber}
               </a>
               {" · "}
@@ -594,7 +624,7 @@ export function TaskDetailPanel({
                   {" · "}
                   <a
                     href={deliveryReport.previewUrl}
-                    style={{ color: "#A3A3A3" }}
+                    className={styles.link}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -608,23 +638,10 @@ export function TaskDetailPanel({
           ) : null}
           {reviewFindings ? (
             <div style={{ marginBottom: "0.85rem" }}>
-              <p
-                style={{
-                  margin: "0 0 0.35rem",
-                  color: "#E5E5E5",
-                  fontSize: "0.8rem",
-                }}
-              >
+              <p className={styles.subLabel}>
                 Reviewer: {reviewFindings.summary}
               </p>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: "1.1rem",
-                  color: "#A3A3A3",
-                  fontSize: "0.75rem",
-                }}
-              >
+              <ul className={styles.list}>
                 {reviewFindings.findings.map((f) => (
                   <li key={`${f.code}-${f.message}`}>
                     [{f.severity}] {f.message}
@@ -636,17 +653,7 @@ export function TaskDetailPanel({
           {selected && isOwner ? (
             <button
               type="button"
-              style={{
-                marginBottom: "0.75rem",
-                height: "2rem",
-                padding: "0 0.75rem",
-                borderRadius: 999,
-                border: "1px solid #404040",
-                background: "transparent",
-                color: "#E5E5E5",
-                fontSize: "0.8rem",
-                cursor: "pointer",
-              }}
+              className={styles.shareBtn}
               onClick={() => {
                 void fetch(`/api/runs/${selected.id}/share`, {
                   method: "POST",
@@ -676,48 +683,20 @@ export function TaskDetailPanel({
           ) : null}
           {diffSummary ? (
             <>
-              <p
-                style={{
-                  margin: "0 0 0.5rem",
-                  color: "#A3A3A3",
-                  fontSize: "0.8rem",
-                }}
-              >
+              <p className={styles.sectionLede}>
                 Changed files ({diffSummary.files.length}) · head{" "}
                 {diffSummary.headSha.slice(0, 7)}
               </p>
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: 0,
-                  margin: 0,
-                  fontSize: "0.8rem",
-                  color: "#E5E5E5",
-                }}
-              >
+              <ul className={styles.fileList}>
                 {diffSummary.files.map((f) => (
-                  <li
-                    key={f.path}
-                    style={{
-                      padding: "0.35rem 0",
-                      borderBottom: "1px solid #262626",
-                    }}
-                  >
-                    <span style={{ color: "#737373" }}>{f.action}</span>{" "}
+                  <li key={f.path} className={styles.fileItem}>
+                    <span className={styles.fileAction}>{f.action}</span>{" "}
                     {f.path}
                   </li>
                 ))}
               </ul>
               {diffSummary.notes.length > 0 ? (
-                <p
-                  style={{
-                    margin: "0.65rem 0 0",
-                    color: "#737373",
-                    fontSize: "0.75rem",
-                  }}
-                >
-                  {diffSummary.notes.join(" · ")}
-                </p>
+                <p className={styles.empty}>{diffSummary.notes.join(" · ")}</p>
               ) : null}
             </>
           ) : null}
@@ -726,30 +705,30 @@ export function TaskDetailPanel({
 
       <TournamentPanel workspaceId={workspaceId} taskId={taskId} />
 
-      <section style={{ marginTop: "2rem" }}>
-        <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>Runs & cost</h2>
-        <p style={{ margin: "0.35rem 0 0.75rem", color: "#737373", fontSize: "0.8rem" }}>
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Runs & cost</h2>
+        <p className={styles.sectionLede}>
           Selected run cost:{" "}
-          {costMicros ? `${(costMicros / 100).toFixed(2)}¢` : "—"} (no GitHub
-          writes in MVP fake mode)
+          {costMicros ? `${(costMicros / 100).toFixed(2)}¢` : "—"}
+          {agentMeta.provider ? ` · agent ${agentMeta.provider}` : null}
         </p>
         {runs.length === 0 ? (
-          <p style={{ color: "#737373", fontSize: "0.875rem" }}>
-            No runs yet. Approve the task to enqueue a fake agent run (requires
+          <p className={styles.empty}>
+            No runs yet. Approve the task to enqueue a coding run (requires a
             worker).
           </p>
         ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          <ul className={styles.runList}>
             {runs.map((r) => (
               <li key={r.id}>
                 <button
                   type="button"
                   onClick={() => setSelectedRunId(r.id)}
-                  style={{
-                    ...runBtn,
-                    borderColor:
-                      selected?.id === r.id ? "#FFFFFF" : "#404040",
-                  }}
+                  className={
+                    selected?.id === r.id
+                      ? `${styles.runBtn} ${styles.runBtnActive}`
+                      : styles.runBtn
+                  }
                 >
                   Attempt {r.attempt} · {r.status}
                   {r.actualCostMicros
@@ -762,35 +741,22 @@ export function TaskDetailPanel({
         )}
       </section>
 
-      <section style={{ marginTop: "2rem" }}>
-        <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>Activity</h2>
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Activity</h2>
         {events.length === 0 ? (
-          <p style={{ color: "#737373", fontSize: "0.875rem", marginTop: "0.5rem" }}>
+          <p className={styles.empty}>
             {selected?.status === "QUEUED"
               ? "Queued — waiting for worker to claim…"
               : "No events yet."}
           </p>
         ) : (
-          <ol
-            style={{
-              listStyle: "none",
-              padding: 0,
-              margin: "0.75rem 0 0",
-            }}
-          >
+          <ol className={styles.eventList}>
             {events.map((e) => (
-              <li
-                key={e.id}
-                style={{
-                  padding: "0.55rem 0",
-                  borderBottom: "1px solid #262626",
-                  fontSize: "0.8rem",
-                }}
-              >
-                <span style={{ color: "#A3A3A3" }}>
+              <li key={e.id} className={styles.eventItem}>
+                <span className={styles.eventKind}>
                   #{e.seq} {e.kind}
                 </span>
-                <div style={{ marginTop: 2, color: "#E5E5E5" }}>
+                <div className={styles.eventBody}>
                   {typeof e.payload.message === "string"
                     ? e.payload.message
                     : JSON.stringify(e.payload)}
@@ -844,59 +810,14 @@ function RecoveryCopy({
   }
 
   return (
-    <section
-      style={{
-        marginTop: "1.5rem",
-        padding: "0.85rem 0",
-        borderTop: "1px solid #262626",
-      }}
-    >
-      <h2 style={{ fontSize: "0.95rem", fontWeight: 600, margin: 0 }}>
-        {title}
-      </h2>
-      <p
-        style={{
-          margin: "0.4rem 0 0",
-          color: "#A3A3A3",
-          fontSize: "0.8rem",
-          lineHeight: 1.45,
-        }}
-      >
+    <section className={styles.recovery}>
+      <h2 className={styles.recoveryTitle}>{title}</h2>
+      <p className={styles.recoveryBody}>
         {body}{" "}
-        <a href="/docs/recovery" style={{ color: "#D4A574" }}>
+        <a href="/docs/recovery" className={styles.docsLink}>
           Recovery docs →
         </a>
       </p>
     </section>
   );
 }
-
-const btn: CSSProperties = {
-  padding: "0.55rem 0.9rem",
-  background: "#FFFFFF",
-  color: "#0A0A0A",
-  border: "none",
-  borderRadius: 4,
-  fontWeight: 600,
-  cursor: "pointer",
-  fontSize: "0.85rem",
-};
-
-const btnGhost: CSSProperties = {
-  ...btn,
-  background: "transparent",
-  color: "#FFFFFF",
-  border: "1px solid #404040",
-};
-
-const runBtn: CSSProperties = {
-  width: "100%",
-  textAlign: "left",
-  padding: "0.5rem 0",
-  background: "transparent",
-  color: "#E5E5E5",
-  border: "none",
-  borderBottom: "1px solid #404040",
-  cursor: "pointer",
-  fontSize: "0.8rem",
-};

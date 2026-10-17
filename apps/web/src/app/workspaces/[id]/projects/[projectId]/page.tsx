@@ -12,6 +12,7 @@ import {
   serializeAllowedPaths,
   serializeTaskCriteria,
 } from "@coppergate/db";
+import { SkeletonStack } from "@/components/app/ui";
 import { currentUser } from "@/lib/auth";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
@@ -22,12 +23,11 @@ import { MergePanel } from "./merge-panel";
 import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
 import { DeliveryBoard } from "./delivery-board";
+import { MultiRepoPanel } from "./multi-repo-panel";
 import { PlanPanel } from "./plan-panel";
 import { PolicyPresetsPanel } from "./policy-presets";
-import {
-  parseProjectTab,
-  ProjectShell,
-} from "./project-shell";
+import { ProjectShell } from "./project-shell";
+import { parseProjectTab } from "./project-tabs";
 import styles from "./project-detail.module.css";
 
 type PageProps = {
@@ -167,7 +167,7 @@ export default async function ProjectDetailPage({
             : null;
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ProjectPageSkeleton />}>
       <ProjectShell
         workspaceId={workspaceId}
         projectId={projectId}
@@ -265,6 +265,11 @@ export default async function ProjectDetailPage({
               initialBrief={initialBrief}
               isOwner={isOwner}
             />
+            <IssuesPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              isOwner={isOwner}
+            />
           </>
         }
         delivery={
@@ -292,16 +297,16 @@ export default async function ProjectDetailPage({
         }
         more={
           <>
+            <MultiRepoPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              isOwner={isOwner}
+            />
             <PolicyPresetsPanel
               workspaceId={workspaceId}
               projectId={projectId}
               initialAutonomy={row.project.autonomyLevel}
               initialMergeEnabled={row.project.mergeEnabled}
-              isOwner={isOwner}
-            />
-            <IssuesPanel
-              workspaceId={workspaceId}
-              projectId={projectId}
               isOwner={isOwner}
             />
             <MergePanel
@@ -315,5 +320,13 @@ export default async function ProjectDetailPage({
         }
       />
     </Suspense>
+  );
+}
+
+function ProjectPageSkeleton() {
+  return (
+    <main style={{ padding: "1.25rem 1.15rem" }}>
+      <SkeletonStack rows={4} />
+    </main>
   );
 }

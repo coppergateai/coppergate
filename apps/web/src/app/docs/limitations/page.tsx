@@ -1,6 +1,6 @@
 import Link from "next/link";
 import styles from "@/components/marketing/marketing.module.css";
-import { SiteChrome } from "../../site-chrome";
+import { DocsShell } from "@/components/docs/docs-shell";
 
 export const metadata = {
   title: "Limitations · Coppergate Docs",
@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function LimitationsPage() {
   return (
-    <SiteChrome>
+    <DocsShell>
       <main className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
@@ -74,6 +74,6 @@ export default function LimitationsPage() {
           </p>
         </div>
       </main>
-    </SiteChrome>
+    </DocsShell>
   );
 }

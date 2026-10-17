@@ -169,6 +169,13 @@
       "when": 1728568700000,
       "tag": "0023_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1729000000000,
+      "tag": "0024_multi_repo",
+      "breakpoints": true
     }
   ]
 }

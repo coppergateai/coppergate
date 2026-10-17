@@ -22,10 +22,10 @@
   background:
     radial-gradient(
       70% 120% at 0% 0%,
-      rgba(200, 137, 73, 0.07),
+      var(--copper-fill-soft),
       transparent 55%
     ),
-    rgba(16, 17, 20, 0.96);
+    var(--page-bar-bg);
 }
 
 .kicker {
@@ -85,7 +85,7 @@
   background:
     radial-gradient(
       90% 80% at 0% 0%,
-      rgba(200, 137, 73, 0.08),
+      var(--copper-fill-soft),
       transparent 55%
     ),
     rgba(255, 255, 255, 0.025);
@@ -180,7 +180,7 @@
   background:
     radial-gradient(
       90% 70% at 100% 0%,
-      rgba(200, 137, 73, 0.05),
+      var(--copper-fill-soft),
       transparent 55%
     ),
     rgba(255, 255, 255, 0.02);
@@ -250,12 +250,12 @@
   justify-self: start;
   min-height: 2.25rem;
   padding: 0.45rem 0.95rem;
-  border: 1px solid rgba(200, 137, 73, 0.55);
+  border: 1px solid var(--copper-border);
   border-radius: 8px;
   background: linear-gradient(
     180deg,
-    rgba(200, 137, 73, 0.22),
-    rgba(200, 137, 73, 0.1)
+    var(--copper-fill-strong),
+    var(--copper-fill)
   );
   color: var(--paper);
   font: inherit;
@@ -265,7 +265,7 @@
 }
 
 .submit:hover:not(:disabled) {
-  border-color: rgba(200, 137, 73, 0.85);
+  border-color: var(--copper-border-strong);
 }
 
 .submit:disabled {

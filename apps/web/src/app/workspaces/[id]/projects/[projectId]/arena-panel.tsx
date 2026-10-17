@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SkeletonStack } from "@/components/app/ui";
 import styles from "./project-detail.module.css";
 
 type ArenaView = {
@@ -32,6 +33,7 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
   const [contenders, setContenders] = useState<ContenderView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [budgetMicros, setBudgetMicros] = useState("100000");
 
   const load = useCallback(async () => {
@@ -45,11 +47,13 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
     };
     if (!res.ok) {
       setError(data.error?.message ?? "Failed to load arena");
+      setLoading(false);
       return;
     }
     setArena(data.arena ?? null);
     setContenders(data.contenders ?? []);
     setError(null);
+    setLoading(false);
   }, [projectId, workspaceId]);
 
   useEffect(() => {
@@ -85,22 +89,32 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
   return (
     <section
       id="arena"
-      className={styles.section}
+      className={`${styles.section} ${styles.arenaSection}`}
       aria-labelledby="arena-heading"
     >
       <h2 id="arena-heading" className={styles.sectionLabel}>
         Survivor arena
       </h2>
       <p className={styles.sectionLede}>
-        Contenders compete; efficiency payoff decides. Kill-switch freezes the
-        arena.
+        These are this project&apos;s agents. Contenders compete on queued
+        tasks; kill-switch freezes this arena only. By default one primary repo
+        — agents do not auto-sync other projects&apos; repos. When multi-repo is
+        enabled under More → Repositories, secondaries are read context for this
+        arena; writes go to primary unless coordinated PRs are enabled.
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      {!arena ? (
+      {loading ? (
+        <div className={styles.arenaBoard}>
+          <SkeletonStack rows={3} />
+        </div>
+      ) : !arena ? (
         isOwner ? (
-          <div className={styles.panel}>
+          <div className={`${styles.panel} ${styles.arenaBoard}`}>
+            <p className={styles.arenaBoardKicker}>
+              No agents armed for this project yet.
+            </p>
             <div className={styles.btnRow}>
               <label className={styles.field}>
                 Contender budget (µUSD)
@@ -126,12 +140,14 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
             </div>
           </div>
         ) : (
-          <p className={styles.muted}>No arena armed yet.</p>
+          <p className={styles.muted}>
+            No agents armed for this project yet.
+          </p>
         )
       ) : (
-        <div className={styles.panel}>
+        <div className={`${styles.panel} ${styles.arenaBoard}`}>
           <div className={styles.metaRow}>
-            <span>
+            <span className={styles.arenaStatusChip}>
               Status <strong>{arena.status}</strong>
             </span>
             <span>N={arena.defaultContenderN}</span>
@@ -146,16 +162,27 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
             ) : null}
           </div>
 
-          <ul className={styles.arenaList}>
-            {contenders.map((c) => (
-              <li key={c.id} className={styles.arenaItem}>
-                <strong>{c.profileKey}</strong>
-                <span>{c.strategy}</span>
-                <span>{c.status}</span>
-                <span>{c.budgetMicrosRemaining} µUSD</span>
-              </li>
-            ))}
-          </ul>
+          <p className={styles.arenaBoardKicker}>Agents</p>
+          {contenders.length === 0 ? (
+            <p className={styles.muted}>
+              Arena armed — contenders appear when the pool is seeded.
+            </p>
+          ) : (
+            <ul className={styles.arenaList}>
+              {contenders.map((c) => (
+                <li key={c.id} className={styles.arenaItem}>
+                  <div className={styles.arenaItemTop}>
+                    <strong>{c.profileKey}</strong>
+                    <span className={styles.arenaItemStatus}>{c.status}</span>
+                  </div>
+                  <div className={styles.arenaItemMeta}>
+                    <span>{c.strategy} · agent</span>
+                    <span>{c.budgetMicrosRemaining} µUSD</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
 
           {isOwner ? (
             <div className={styles.btnRow}>

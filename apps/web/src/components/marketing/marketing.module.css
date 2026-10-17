@@ -78,6 +78,33 @@
   background: var(--announce-bg);
 }
 
+.announceRight {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.announceDismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--mute-soft);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.announceDismiss:hover {
+  color: var(--paper);
+  background: var(--overlay);
+}
+
 .announceInner {
   width: min(var(--max), 100%);
   margin: 0 auto;
@@ -214,7 +241,7 @@
 
 .themeToggle:hover:not(:disabled) {
   color: var(--paper);
-  border-color: rgba(200, 137, 73, 0.45);
+  border-color: var(--copper-border);
   background: var(--overlay);
 }
 
@@ -292,8 +319,8 @@
   padding: 0 1.05rem;
   border-radius: 999px;
   border: 0;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--copper);
+  color: var(--on-copper);
   font-family: inherit;
   font-size: 0.875rem;
   font-weight: 600;
@@ -305,7 +332,7 @@
 }
 
 .btnPrimary:hover {
-  background: #fff;
+  background: var(--copper-hot);
   transform: translateY(-1px);
 }
 
@@ -335,7 +362,7 @@
 }
 
 .btnSecondary:hover {
-  border-color: rgba(200, 137, 73, 0.45);
+  border-color: var(--copper-border);
   background: var(--surface-elevated);
 }
 
@@ -348,8 +375,8 @@
   padding: 0 1.35rem;
   border-radius: 999px;
   border: 0;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--copper);
+  color: var(--on-copper);
   font-family: inherit;
   font-size: 0.9375rem;
   font-weight: 600;
@@ -361,7 +388,7 @@
 }
 
 .btnHeroPrimary:hover {
-  background: #fff;
+  background: var(--copper-hot);
   transform: translateY(-1px);
 }
 
@@ -433,8 +460,8 @@
   justify-content: center;
   height: 2.6rem;
   border-radius: 999px !important;
-  background: var(--paper) !important;
-  color: var(--ink) !important;
+  background: var(--copper) !important;
+  color: var(--on-copper) !important;
   text-align: center !important;
 }
 
@@ -462,7 +489,7 @@
 /* —— Hero —— */
 .hero {
   position: relative;
-  padding: clamp(2.5rem, 6vw, 4.25rem) 0 clamp(2.75rem, 6vw, 4.5rem);
+  padding: clamp(1.75rem, 4vw, 3rem) 0 clamp(2rem, 5vw, 3.5rem);
 }
 
 .heroInner {
@@ -490,6 +517,7 @@
 
 .headline {
   margin: 0;
+  font-family: var(--font-display);
   font-size: clamp(2.2rem, 4.2vw, 3.35rem);
   font-weight: 650;
   letter-spacing: -0.035em;
@@ -668,8 +696,8 @@
   align-items: center;
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
-  border: 1px solid rgba(200, 137, 73, 0.35);
-  background: rgba(200, 137, 73, 0.1);
+  border: 1px solid var(--copper-border);
+  background: var(--copper-fill);
   color: var(--copper-hot);
   font-size: 0.62rem;
   font-weight: 650;
@@ -743,9 +771,9 @@
 
 .contender:hover,
 .contenderActive {
-  border-color: rgba(200, 137, 73, 0.5);
+  border-color: var(--copper-border);
   background: var(--surface-hover);
-  box-shadow: inset 0 0 0 1px rgba(200, 137, 73, 0.08);
+  box-shadow: inset 0 0 0 1px var(--copper-fill-soft);
 }
 
 .contenderTop {
@@ -792,8 +820,8 @@
 
 .statusPillWin {
   color: var(--copper-hot);
-  border-color: rgba(200, 137, 73, 0.4);
-  background: rgba(200, 137, 73, 0.1);
+  border-color: var(--copper-border);
+  background: var(--copper-fill);
 }
 
 .statusPillRun {
@@ -900,7 +928,7 @@
   border-radius: 50%;
   flex-shrink: 0;
   background: var(--copper-hot);
-  box-shadow: 0 0 0 3px rgba(200, 137, 73, 0.14);
+  box-shadow: 0 0 0 3px var(--copper-fill);
 }
 
 .budgetBlock {
@@ -922,9 +950,9 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.6rem;
-  border: 1px solid rgba(200, 137, 73, 0.35);
+  border: 1px solid var(--copper-border);
   border-radius: var(--radius-sm);
-  background: rgba(200, 137, 73, 0.08);
+  background: var(--copper-fill-soft);
   font-size: 0.7rem;
   color: var(--mute);
 }
@@ -987,7 +1015,7 @@
 .pipelineActive .pipelineDot {
   background: var(--copper);
   border-color: var(--copper);
-  box-shadow: 0 0 0 3px rgba(200, 137, 73, 0.15);
+  box-shadow: 0 0 0 3px var(--copper-ring);
 }
 
 .pipelineActive .pipelineLabel {
@@ -1161,6 +1189,7 @@
 .sectionTitle {
   margin: 0;
   max-width: 18ch;
+  font-family: var(--font-display);
   font-size: clamp(1.9rem, 3.5vw, 2.75rem);
   font-weight: 650;
   letter-spacing: -0.035em;
@@ -1208,7 +1237,7 @@
 }
 
 .step:hover {
-  border-color: rgba(200, 137, 73, 0.4);
+  border-color: var(--copper-border);
   transform: translateY(-1px);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
 }
@@ -1252,7 +1281,7 @@
 }
 
 .stepVisualArena {
-  border-color: rgba(200, 137, 73, 0.22);
+  border-color: var(--copper-fill-strong);
 }
 
 .stepVisualTournament .barTrack {
@@ -1260,7 +1289,7 @@
 }
 
 .stepVisualFitness {
-  background: linear-gradient(180deg, rgba(200, 137, 73, 0.06), var(--ink-soft));
+  background: linear-gradient(180deg, var(--copper-fill-soft), var(--ink-soft));
 }
 
 .stepVisualSurvivor .winnerCard {
@@ -1308,8 +1337,8 @@
 
 .chipAccent {
   color: var(--copper-hot);
-  border-color: rgba(200, 137, 73, 0.4);
-  background: rgba(200, 137, 73, 0.1);
+  border-color: var(--copper-border);
+  background: var(--copper-fill);
 }
 
 .tourProgress {
@@ -1353,9 +1382,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0.6rem;
-  border: 1px solid rgba(200, 137, 73, 0.4);
+  border: 1px solid var(--copper-border);
   border-radius: var(--radius-sm);
-  background: rgba(200, 137, 73, 0.1);
+  background: var(--copper-fill);
   font-size: 0.78rem;
   font-weight: 600;
 }
@@ -1440,7 +1469,7 @@
     height: 7px;
     border-radius: 50%;
     background: var(--copper);
-    box-shadow: 0 0 0 3px rgba(200, 137, 73, 0.12);
+    box-shadow: 0 0 0 3px var(--copper-ring);
   }
 }
 
@@ -1496,7 +1525,7 @@
 }
 
 .featureCard:hover {
-  border-color: rgba(200, 137, 73, 0.4);
+  border-color: var(--copper-border);
   transform: translateY(-2px);
 }
 
@@ -1824,6 +1853,86 @@
   }
 }
 
+/* —— Docs layout with TOC —— */
+.docsLayout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 1.5rem;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 3.25rem) max(var(--gutter), env(safe-area-inset-left))
+    clamp(3.5rem, 8vw, 5rem);
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+
+.docsAside {
+  display: none;
+}
+
+.docsMain {
+  min-width: 0;
+}
+
+.docsToc {
+  position: sticky;
+  top: 5.5rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.docsTocTitle {
+  margin: 0 0 0.55rem;
+  color: var(--mute-soft);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.docsTocList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.docsTocLink {
+  display: block;
+  padding: 0.35rem 0.45rem;
+  border-radius: 6px;
+  color: var(--mute);
+  font-size: 0.86rem;
+  text-decoration: none;
+}
+
+.docsTocLink:hover {
+  color: var(--paper);
+  background: var(--overlay);
+}
+
+.docsTocLinkActive {
+  color: var(--paper);
+  background: var(--copper-fill-soft);
+  box-shadow: inset 2px 0 0 var(--copper);
+}
+
+@media (min-width: 900px) {
+  .docsLayout {
+    grid-template-columns: 12.5rem minmax(0, 1fr);
+    gap: 2.25rem;
+    align-items: start;
+  }
+
+  .docsAside {
+    display: block;
+  }
+}
+
 /* —— Inner content pages (docs / legal / auth) —— */
 .contentPage {
   position: relative;
@@ -1833,6 +1942,12 @@
   padding: clamp(2.5rem, 6vw, 3.75rem) max(var(--gutter), env(safe-area-inset-left))
     clamp(3.5rem, 8vw, 5rem);
   padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+
+.docsMain .contentPage {
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .contentWide {
@@ -1850,6 +1965,7 @@
 
 .pageTitle {
   margin: 0;
+  font-family: var(--font-display);
   font-size: clamp(1.85rem, 3.5vw, 2.5rem);
   font-weight: 650;
   letter-spacing: -0.03em;
@@ -2039,8 +2155,13 @@
 .authMark {
   display: block;
   width: 3.25rem;
-  height: auto;
   margin: 0 auto 1.25rem;
+}
+
+.authMark img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .authTitle {
@@ -2231,7 +2352,7 @@
 }
 
 .integrationPill:hover {
-  border-color: rgba(200, 137, 73, 0.45);
+  border-color: var(--copper-border);
   background: var(--surface-elevated);
 }
 
@@ -2255,7 +2376,7 @@
   font-size: 0.86rem;
   font-weight: 600;
   letter-spacing: -0.015em;
-  color: var(--fg, #f2f2f0);
+  color: var(--paper);
   white-space: nowrap;
 }
 
@@ -2386,8 +2507,8 @@
 }
 
 .previewRowWin {
-  border-color: rgba(200, 137, 73, 0.4);
-  background: rgba(200, 137, 73, 0.07);
+  border-color: var(--copper-border);
+  background: var(--copper-fill-soft);
 }
 
 .previewRowMuted {
@@ -2592,7 +2713,7 @@
   height: 0.45rem;
   border-radius: 50%;
   background: var(--copper-hot);
-  box-shadow: 0 0 0 3px rgba(200, 137, 73, 0.18);
+  box-shadow: 0 0 0 3px var(--copper-fill);
 }
 
 .storyMicroCopy {
@@ -2649,8 +2770,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem 1rem;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
   padding: 0 0.15rem;
+  opacity: 0.85;
 }
 
 .storyPause {
@@ -2671,7 +2794,7 @@
 }
 
 .storyPause:hover:not(:disabled) {
-  border-color: rgba(200, 137, 73, 0.4);
+  border-color: var(--copper-border);
   color: var(--paper);
   background: var(--overlay);
 }
@@ -2775,7 +2898,7 @@
 .demoNoticeMark {
   display: inline-flex;
   padding: 0.15rem 0.45rem;
-  border: 1px solid rgba(200, 137, 73, 0.35);
+  border: 1px solid var(--copper-border);
   border-radius: 999px;
   color: var(--copper-hot);
   font-size: 0.68rem;
@@ -2900,13 +3023,13 @@
 }
 
 .arenaRowWin {
-  border-color: rgba(200, 137, 73, 0.38);
-  background: rgba(200, 137, 73, 0.06);
+  border-color: var(--copper-border);
+  background: var(--copper-fill-soft);
 }
 
 .arenaRowWin.arenaRowActive {
-  border-color: rgba(200, 137, 73, 0.55);
-  background: rgba(200, 137, 73, 0.1);
+  border-color: var(--copper-border);
+  background: var(--copper-fill);
 }
 
 .arenaRowMuted {
@@ -3027,8 +3150,8 @@
   margin-top: 1rem;
   padding: 0.95rem 1rem;
   border-radius: 10px;
-  border: 1px solid rgba(200, 137, 73, 0.32);
-  background: rgba(200, 137, 73, 0.07);
+  border: 1px solid var(--copper-fill-strong);
+  background: var(--copper-fill-soft);
 }
 
 .selectionCalloutMuted {
@@ -3190,8 +3313,8 @@
   margin: 0 1.35rem 1.25rem;
   padding: 1rem 1.05rem;
   border-radius: 10px;
-  border: 1px solid rgba(200, 137, 73, 0.28);
-  background: rgba(200, 137, 73, 0.06);
+  border: 1px solid var(--copper-fill-strong);
+  background: var(--copper-fill-soft);
 }
 
 .deliveryReasonLabel {

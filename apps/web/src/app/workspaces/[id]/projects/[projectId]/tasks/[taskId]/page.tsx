@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   getProjectForWorkspace,
   getTaskForWorkspace,
   getWorkspaceForMember,
 } from "@coppergate/db";
+import { Breadcrumbs } from "@/components/app/ui";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { TaskDetailPanel } from "./task-detail-panel";
@@ -38,14 +38,16 @@ export default async function TaskDetailPage({ params }: PageProps) {
 
   return (
     <main className={styles.main}>
-      <p className={styles.crumb}>
-        <Link
-          href={`/workspaces/${workspaceId}/projects/${projectId}`}
-          className={styles.crumbLink}
-        >
-          {project.project.name}
-        </Link>
-      </p>
+      <Breadcrumbs
+        items={[
+          { label: "Projects", href: `/workspaces/${workspaceId}/projects` },
+          {
+            label: project.project.name,
+            href: `/workspaces/${workspaceId}/projects/${projectId}`,
+          },
+          { label: task.title },
+        ]}
+      />
 
       <div className={styles.panel}>
         <TaskDetailPanel

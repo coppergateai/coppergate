@@ -5,6 +5,10 @@ import {
   reserveEstimateForTask,
 } from "./budgets.js";
 import type { Database } from "./client.js";
+import {
+  clampTournamentFanout,
+  resolveWorkspacePlanLimits,
+} from "./plan-policy.js";
 import { enqueueAgentRun } from "./runs.js";
 import {
   agentRuns,
@@ -611,10 +615,12 @@ export async function startTournamentFanout(
       budgetMicrosRemaining: c.budgetMicrosRemaining,
     }),
   );
+  const { plan } = await resolveWorkspacePlanLimits(db, input.workspaceId);
   const requested = input.n ?? arena.defaultContenderN;
+  const planCapped = clampTournamentFanout(requested, plan);
   const n = Math.min(
     MAX_TOURNAMENT_FANOUT,
-    Math.max(1, requested),
+    Math.max(1, planCapped),
     eligible.length,
   );
   if (n < 1) {

@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Breadcrumbs } from "@/components/app/ui";
 import styles from "./project-detail.module.css";
+import { type ProjectTab } from "./project-tabs";
 
-export type ProjectTab = "overview" | "delivery" | "arena" | "more";
+export type { ProjectTab } from "./project-tabs";
 
 type Props = {
   workspaceId: string;
@@ -29,10 +31,10 @@ type Props = {
 
 function tabFromHash(hash: string): ProjectTab | null {
   const id = hash.replace(/^#/, "");
-  if (id === "budget" || id === "brief") return "overview";
+  if (id === "budget" || id === "brief" || id === "issues") return "overview";
   if (id === "plan" || id === "board") return "delivery";
   if (id === "arena") return "arena";
-  if (id === "issues" || id === "merge") return "more";
+  if (id === "merge" || id === "policy" || id === "repos") return "more";
   return null;
 }
 
@@ -98,41 +100,59 @@ export function ProjectShell({
           ? more
           : overview;
 
+  const primaryChips = (
+    <>
+      <span className={styles.chip}>{repoFullName}</span>
+      <span
+        className={
+          budgetStatus === "paused"
+            ? `${styles.chip} ${styles.chipWarn}`
+            : styles.chip
+        }
+      >
+        {budgetStatus === "paused" ? "Paused" : "Budget"}{" "}
+        {formatCap(capMicros, currency)}
+      </span>
+      {pendingApprovals > 0 ? (
+        <span className={`${styles.chip} ${styles.chipWarn}`}>
+          {pendingApprovals} pending
+        </span>
+      ) : null}
+    </>
+  );
+
   return (
     <main className={styles.shell}>
       <header className={styles.pageBar}>
         <div className={styles.pageBarLeft}>
+          <Breadcrumbs
+            items={[
+              {
+                label: "Projects",
+                href: `/workspaces/${workspaceId}/projects`,
+              },
+              { label: name },
+            ]}
+          />
           <h1 className={styles.pageTitle}>Project</h1>
           <span className={styles.pageName}>{name}</span>
-          <div className={styles.chips}>
-            <span className={styles.chip}>{repoFullName}</span>
-            <span className={styles.chip}>{mode}</span>
-            <span className={styles.chip}>{stack}</span>
-            <span className={styles.chip}>{autonomyLevel}</span>
-            <span
-              className={
-                budgetStatus === "paused"
-                  ? `${styles.chip} ${styles.chipWarn}`
-                  : styles.chip
-              }
-            >
-              {budgetStatus === "paused" ? "Paused" : "Budget"}{" "}
-              {formatCap(capMicros, currency)}
-            </span>
-            {pendingApprovals > 0 ? (
-              <span className={`${styles.chip} ${styles.chipWarn}`}>
-                {pendingApprovals} pending
-              </span>
-            ) : null}
-            {lastRunStatus ? (
-              <span className={styles.chip}>Run {lastRunStatus}</span>
-            ) : null}
-            {stack !== "nextjs_ts" ? (
-              <span className={`${styles.chip} ${styles.chipMute}`}>
-                Agent best-effort
-              </span>
-            ) : null}
-          </div>
+          <div className={styles.chips}>{primaryChips}</div>
+          <details className={styles.detailsMeta}>
+            <summary>Details</summary>
+            <div className={styles.chips}>
+              <span className={styles.chip}>{mode}</span>
+              <span className={styles.chip}>{stack}</span>
+              <span className={styles.chip}>{autonomyLevel}</span>
+              {lastRunStatus ? (
+                <span className={styles.chip}>Run {lastRunStatus}</span>
+              ) : null}
+              {stack !== "nextjs_ts" ? (
+                <span className={`${styles.chip} ${styles.chipMute}`}>
+                  Agent best-effort
+                </span>
+              ) : null}
+            </div>
+          </details>
         </div>
       </header>
 
@@ -141,7 +161,7 @@ export function ProjectShell({
           [
             ["overview", "Overview", null],
             ["delivery", "Delivery", taskCount > 0 ? taskCount : null],
-            ["arena", "Arena", null],
+            ["arena", "Agents", null],
             ["more", "More", null],
           ] as const
         ).map(([id, label, count]) => (
@@ -168,9 +188,4 @@ export function ProjectShell({
       </div>
     </main>
   );
-}
-
-export function parseProjectTab(raw: string | undefined): ProjectTab {
-  if (raw === "delivery" || raw === "arena" || raw === "more") return raw;
-  return "overview";
 }

@@ -14,12 +14,25 @@ type Plan = {
 type BillingState = {
   configured: boolean;
   plan: string;
+  limits?: {
+    maxConcurrentRuns: number;
+    maxTournamentFanout: number;
+    previewEnabled: boolean;
+    arenaEnabled: boolean;
+  };
+  usage?: {
+    periodLabel: string;
+    spentMicros: number;
+    eventCount: number;
+    byKind: Array<{ kind: string; spentMicros: number; count: number }>;
+  };
   subscription: {
     plan: string;
     status: string;
     currentPeriodEnd: string | null;
     cancelAtPeriodEnd: boolean;
     hasCustomer: boolean;
+    paymentFailed?: boolean;
   } | null;
   plans: Plan[];
 };
@@ -166,12 +179,66 @@ export function BillingPanel({ workspaceId, isOwner, checkoutFlag }: Props) {
             Checkout cancelled — no charge was made.
           </p>
         ) : null}
+        {state?.subscription?.paymentFailed ? (
+          <p className={styles.error} role="alert">
+            Payment failed — update your card in Manage billing to restore
+            hosted concurrency and previews.
+          </p>
+        ) : null}
         {error ? <p className={styles.error}>{error}</p> : null}
 
         {!state ? (
-          <p className={styles.note}>Loading billing…</p>
+          <div className={styles.note} aria-busy="true">
+            <span className={styles.skeletonLine} />
+            <span className={styles.skeletonLine} style={{ width: "55%" }} />
+          </div>
         ) : (
           <>
+            {state.usage ? (
+              <div className={styles.section} style={{ marginBottom: "1.25rem" }}>
+                <p className={styles.statLabel}>
+                  Usage this month ({state.usage.periodLabel})
+                </p>
+                <p className={styles.statValue}>
+                  ${(state.usage.spentMicros / 1_000_000).toFixed(4)}
+                </p>
+                <p className={styles.statHint}>
+                  {state.usage.eventCount} ledger events · same source as project
+                  budgets · synced to Stripe customer metadata when paid
+                </p>
+                {state.limits ? (
+                  <p className={styles.note}>
+                    Limits: {state.limits.maxConcurrentRuns} concurrent run
+                    {state.limits.maxConcurrentRuns === 1 ? "" : "s"}, fan-out{" "}
+                    {state.limits.maxTournamentFanout}
+                    {state.limits.previewEnabled ? ", previews on" : ", no preview"}
+                    {!isPaid ? (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <button
+                          type="button"
+                          className={styles.ghostBtn}
+                          disabled={pending || !state.configured}
+                          onClick={() => void startCheckout("starter")}
+                        >
+                          Upgrade for higher limits
+                        </button>
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
+                <p className={styles.note}>
+                  <a
+                    href={`/api/workspaces/${workspaceId}/cost?days=31&format=csv`}
+                    download={`coppergate-usage-${state.usage.periodLabel}.csv`}
+                  >
+                    Export CSV (31d)
+                  </a>
+                </p>
+              </div>
+            ) : null}
+
             <div className={styles.statGrid}>
               <div className={styles.statCard}>
                 <p className={styles.statLabel}>Current plan</p>

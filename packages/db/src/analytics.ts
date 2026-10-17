@@ -174,6 +174,59 @@ export async function getProjectCostExplorer(
   };
 }
 
+/** Month-to-date usage from the same ledger as budgets (`usage_events`). */
+export async function getWorkspaceMonthToDateUsage(
+  db: Database,
+  workspaceId: string,
+  now: Date = new Date(),
+): Promise<{
+  periodStart: string;
+  periodLabel: string;
+  spentMicros: number;
+  eventCount: number;
+  byKind: Array<{ kind: string; spentMicros: number; count: number }>;
+}> {
+  const periodStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0),
+  );
+  const periodLabel = `${periodStart.getUTCFullYear()}-${String(periodStart.getUTCMonth() + 1).padStart(2, "0")}`;
+
+  const usage = await db
+    .select({
+      kind: usageEvents.kind,
+      cost: usageEvents.costMicros,
+    })
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.workspaceId, workspaceId),
+        gte(usageEvents.createdAt, periodStart),
+      ),
+    );
+
+  const byKindMap = new Map<string, { spentMicros: number; count: number }>();
+  let spentMicros = 0;
+  for (const u of usage) {
+    spentMicros += u.cost || 0;
+    const cur = byKindMap.get(u.kind) ?? { spentMicros: 0, count: 0 };
+    cur.spentMicros += u.cost || 0;
+    cur.count += 1;
+    byKindMap.set(u.kind, cur);
+  }
+
+  return {
+    periodStart: periodStart.toISOString(),
+    periodLabel,
+    spentMicros,
+    eventCount: usage.length,
+    byKind: [...byKindMap.entries()].map(([kind, v]) => ({
+      kind,
+      spentMicros: v.spentMicros,
+      count: v.count,
+    })),
+  };
+}
+
 /** Workspace rollup for cost strip: 7d spend per project. */
 export async function getWorkspaceCostExplorer(
   db: Database,
