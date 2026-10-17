@@ -15,7 +15,7 @@ export const HOSTED_PLANS: readonly PlanDefinition[] = [
   {
     id: "starter",
     name: "Starter",
-    monthlyUsd: 79,
+    monthlyUsd: 99,
     blurb: "Hosted sandboxes for solo founders on the issue→PR wedge.",
     features: [
       "Managed sandboxes + execution history",
@@ -28,7 +28,7 @@ export const HOSTED_PLANS: readonly PlanDefinition[] = [
   {
     id: "pro",
     name: "Pro",
-    monthlyUsd: 179,
+    monthlyUsd: 199,
     blurb: "Higher concurrency, previews, and multi-project arenas.",
     features: [
       "Everything in Starter",

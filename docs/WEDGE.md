@@ -26,14 +26,16 @@ GitHub PR + CI remains the fitness surface. Quality/runtime signals (Sentry, Son
 
 ## Pilot checklist (issue path)
 
-- [ ] Repo connected + GitHub App install
-- [ ] Spend cap set; arena funded
-- [ ] Brief approved (required before issue import)
-- [ ] Import open issue from product UI (not seed SQL)
-- [ ] Task queued → worker claims (`GITHUB_DELIVERY_MODE=http`, OpenHands or BYOK)
-- [ ] Live PR opens with `Closes #N`
-- [ ] CI evidence visible on task review (check_run webhook → `ingestCiEvidence`)
-- [ ] Accept disabled while CI pending or failed; enabled when green
-- [ ] Accept → DONE in-product
+- [x] Repo connected + GitHub App install
+- [x] Spend cap set; arena funded
+- [x] Brief approved (required before issue import)
+- [x] Import open issue via product APIs (`importGithubIssueAsTask` / Issues **Import → queue**) — [issue #4](https://github.com/coppergateai/coppergate-staging-smoke/issues/4) (2026-10-17)
+- [x] Task queued → worker claims (`GITHUB_DELIVERY_MODE=http`, OpenHands)
+- [x] Live PR opens with `Closes #N` — [PR #5](https://github.com/coppergateai/coppergate-staging-smoke/pull/5)
+- [x] CI evidence attached (`ingestCiEvidence` / check_run path) on task review
+- [x] Accept disabled while CI pending or failed; enabled when green
+- [x] Accept → DONE — proven 2026-10-17 (`prove-issue-wedge.mjs` + negative CI reject)
+
+Operator proof script: [`apps/worker/scripts/prove-issue-wedge.mjs`](../apps/worker/scripts/prove-issue-wedge.mjs) · notes: [`scripts/manual-issue-wedge.md`](../scripts/manual-issue-wedge.md).
 
 Sonar / CI-fail seed scripts remain for the **secondary** signal vertical — see [SIGNALS.md](./SIGNALS.md) and [STAGING.md](./STAGING.md).

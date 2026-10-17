@@ -207,20 +207,20 @@ export default async function ProjectDetailPage({
                     },
                     {
                       id: "issue",
-                      title: "Import a GitHub issue",
+                      title: "Import → queue a GitHub issue",
                       detail:
-                        "Primary wedge: one small open issue → draft task (PR will Closes #N). Brief/plan remains available for new-product demos.",
+                        "Primary wedge: Issues panel → Import → queue (one small open issue). PR will include Closes #N.",
                       href: hasIssueTask
                         ? undefined
                         : `${basePath}?tab=overview#issues`,
                       ctaLabel: "Open issues",
-                      done: hasIssueTask || (hasApprovedBrief && hasPlan),
+                      done: hasIssueTask || hasQueuedOrBeyond,
                     },
                     {
                       id: "task",
-                      title: "Approve / queue the task",
+                      title: "Wait for the worker PR",
                       detail:
-                        "Autonomy ≥ L1 + worker. min_human arenas auto-queue after arm.",
+                        "Autonomy ≥ L1. Hosted worker claims the queue; stay on the task until REVIEW_REQUIRED.",
                       href: hasQueuedOrBeyond
                         ? undefined
                         : `${basePath}?tab=delivery`,
@@ -229,9 +229,9 @@ export default async function ProjectDetailPage({
                     },
                     {
                       id: "review",
-                      title: "Review the survivor PR",
+                      title: "Review cost, diff, and CI — then Accept",
                       detail:
-                        "Checks, cost, and diff evidence — then accept or retry. See /docs/recovery if it fails.",
+                        "Accept stays closed while CI is pending or failed. Recovery: /docs/recovery.",
                       href: hasAcceptedPr
                         ? undefined
                         : `${basePath}?tab=delivery`,

@@ -12,7 +12,7 @@ Use with `PRODUCTION_SIGNAL_BACKLOG.md` Phase X. Do **not** claim “production 
 - [x] Issue import → queue product path (`Issues` panel **Import → queue**; Sonar seed = secondary)
 - [x] Pilot agent default: http delivery → BYOK/OpenAI else OpenHands; Fake only for fake delivery / CI
 - [ ] Fitness ingest: coverage, e2e, perf, preview, visual, load (under load)
-- [ ] Staging proof: issue import → live CI evidence → Accept in UI (see `docs/STAGING.md` / `docs/WEDGE.md`)
+- [x] Staging proof: issue import → live CI evidence → Accept — [PR #5](https://github.com/coppergateai/coppergate-staging-smoke/pull/5) + CI-fail reject (2026-10-17; `docs/WEDGE.md`)
 - [ ] Provider storm shed + workspace ingest quotas verified under load
 
 ## Security & tenancy

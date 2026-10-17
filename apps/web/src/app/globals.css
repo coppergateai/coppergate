@@ -13,8 +13,17 @@ html[data-theme="dark"] {
   --copper: #c88949;
   --copper-hot: #e3a76a;
   --copper-dim: rgba(200, 137, 73, 0.28);
+  --copper-border: rgba(200, 137, 73, 0.45);
+  --copper-border-strong: rgba(200, 137, 73, 0.85);
+  --copper-fill-soft: rgba(200, 137, 73, 0.06);
+  --copper-fill: rgba(200, 137, 73, 0.12);
+  --copper-fill-strong: rgba(200, 137, 73, 0.22);
+  --copper-ring: rgba(200, 137, 73, 0.15);
   --success: #6fbf8a;
+  --success-bright: #9ed4a4;
+  --warn: #f0c070;
   --danger: #d46a6a;
+  --page-bar-bg: rgba(16, 17, 20, 0.92);
   --line: #26282d;
   --line-soft: rgba(255, 255, 255, 0.06);
   --overlay: rgba(255, 255, 255, 0.04);
@@ -65,8 +74,17 @@ html[data-theme="light"] {
   --copper: #9a652e;
   --copper-hot: #a86f35;
   --copper-dim: rgba(154, 101, 46, 0.05);
+  --copper-border: rgba(154, 101, 46, 0.4);
+  --copper-border-strong: rgba(154, 101, 46, 0.7);
+  --copper-fill-soft: rgba(154, 101, 46, 0.05);
+  --copper-fill: rgba(154, 101, 46, 0.1);
+  --copper-fill-strong: rgba(154, 101, 46, 0.18);
+  --copper-ring: rgba(154, 101, 46, 0.12);
   --success: #1f7a45;
+  --success-bright: #2d9a58;
+  --warn: #a86f35;
   --danger: #b53d3d;
+  --page-bar-bg: rgba(255, 255, 255, 0.96);
   --line: #e4e4e7;
   --line-soft: rgba(24, 24, 27, 0.08);
   --overlay: rgba(24, 24, 27, 0.035);
@@ -170,6 +188,15 @@ a {
   }
   to {
     transform: scaleX(1);
+  }
+}
+
+@keyframes cg-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
 

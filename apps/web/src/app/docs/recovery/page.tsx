@@ -5,7 +5,7 @@ import { SiteChrome } from "../../site-chrome";
 export const metadata = {
   title: "Recovery · Coppergate Docs",
   description:
-    "Self-serve recovery when arena runs fail — cancel, retry, budget, and kill-switch.",
+    "Self-serve recovery when arena runs fail — cancel, retry, CI Accept gate, budget, and kill-switch.",
 };
 
 export default function RecoveryPage() {
@@ -22,6 +22,38 @@ export default function RecoveryPage() {
             Pilots should recover without an operator. Every failure keeps logs
             and cost events; retry never silently duplicates side effects.
           </p>
+
+          <h2>One-session path (issue → PR)</h2>
+          <ol>
+            <li>Connect GitHub App + bind a low-risk repo.</li>
+            <li>Set an active spend cap (Settings / project budget).</li>
+            <li>
+              Approve a brief if prompted, then Project →{" "}
+              <strong>Issues → Import → queue</strong>.
+            </li>
+            <li>
+              On the task: wait for REVIEW_REQUIRED, confirm cost + diff + CI,
+              then <strong>Accept → Done</strong>.
+            </li>
+          </ol>
+          <p>
+            Accept stays closed while CI is pending or failed. See{" "}
+            <Link href="/docs/pricing">pricing</Link> for hosted Starter/Pro.
+          </p>
+
+          <h2>Accept disabled (CI pending / failed)</h2>
+          <ul>
+            <li>
+              <strong>Pending:</strong> wait for GitHub Actions / check runs on
+              the PR head. Refresh the task — evidence appears under Delivery
+              for review.
+            </li>
+            <li>
+              <strong>Failed:</strong> fix the check on the branch, push, or
+              Request changes / Retry after the next green run. Accept will not
+              succeed while a blocking check is attached.
+            </li>
+          </ul>
 
           <h2>Run failed</h2>
           <ol>
