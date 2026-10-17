@@ -108,6 +108,8 @@ STAGING_ALLOW_LOCAL=1 SIGNAL_PROVIDER=sonar \
 5. Accept stays disabled while CI pending/failed; enable when green → **Accept → DONE** in UI.
 6. Negative proof: force a failing check on the head SHA → Accept API returns policy error.
 
+**Proven (2026-10-17):** [issue #4](https://github.com/coppergateai/coppergate-staging-smoke/issues/4) → [PR #5](https://github.com/coppergateai/coppergate-staging-smoke/pull/5) (`Closes #4`, `app/page.tsx`) → Accept DONE; failing CI rejects Accept (`prove-issue-wedge.mjs` + `PROVE_NEGATIVE=1`). Operator notes: [`scripts/manual-issue-wedge.md`](../scripts/manual-issue-wedge.md).
+
 Operator Accept fallback (secondary):
 
 ```bash
@@ -133,8 +135,8 @@ Checklist: [`scripts/manual-signal-closed-loop.md`](../scripts/manual-signal-clo
 - [x] Worker logs `github delivery resolved` with `mode: "http"`
 - [x] Real PR on `coppergate/task-…` — [PR #1](https://github.com/coppergateai/coppergate-staging-smoke/pull/1)
 - [x] Accept → task `DONE` without operator SQL surgery
-- [ ] Issue import → queue → live CI evidence → Accept in UI (primary wedge)
-- [ ] Accept rejected while blocking CI fail is attached
+- [x] Issue import → queue → live CI evidence → Accept — [PR #5](https://github.com/coppergateai/coppergate-staging-smoke/pull/5) (2026-10-17)
+- [x] Accept rejected while blocking CI fail is attached (`PROVE_NEGATIVE=1`)
 
 ## Rollback
 

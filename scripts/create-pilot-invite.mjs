@@ -2,7 +2,8 @@
 /**
  * Create a pilot invite code (TASK035 / GTM Phase 0).
  * Usage (from repo root):
- *   DATABASE_URL=… pnpm exec tsx scripts/create-pilot-invite.mjs [CODE] [MAX_USES] [kind]
+ *   DATABASE_URL=… pnpm --filter @coppergate/db exec node --import tsx \
+ *     ../../scripts/create-pilot-invite.mjs [CODE] [MAX_USES] [kind]
  * kind: invite | paid_pilot (default invite)
  */
 import { createDb, createPilotInvite, closeDb } from "../packages/db/src/index.ts";

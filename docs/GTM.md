@@ -67,6 +67,10 @@ Exact Stripe Price IDs live in env (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`).
 | `scripts/list-pilot-invites.mjs` | List invites + redemption |
 | `scripts/pilot-go-no-go.mjs` | Retention + paid invite snapshot |
 | `scripts/retention-snapshot.mjs` | Accepted-PR retention only |
+| `scripts/manual-billing-smoke.md` | Stripe Checkout + portal + webhook smoke |
+| `scripts/manual-issue-wedge.md` | Primary issue→CI Accept operator proof |
+
+Billing UI: Settings → **Billing** (`BillingPanel` polls after Checkout success).
 
 ## Contact
 

@@ -38,7 +38,9 @@ a one-time deposit). 30-min walkthrough?
 
 ## Concierge checklist
 
-- [ ] Invite redeem + GitHub App on low-risk repo
+- [x] Staging wedge proven (issue → PR → CI → Accept) — [PR #5](https://github.com/coppergateai/coppergate-staging-smoke/pull/5) (2026-10-17)
+- [x] Paid invite script ready (`create-pilot-invite.mjs … paid_pilot`) + billing smoke doc
+- [ ] Invite redeem + GitHub App on low-risk repo (per pilot)
 - [ ] Budget cap set (e.g. $25–50)
 - [ ] Import one small issue → approve → PR
 - [ ] User reviews in-product (diff, checks, cost)

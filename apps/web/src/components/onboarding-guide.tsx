@@ -95,7 +95,8 @@ export function OnboardingGuide({
         <div className={styles.complete}>
           <p className={styles.completeTitle}>You’re set.</p>
           <p className={styles.completeDetail}>
-            Import an issue or approve a task — survivors ship the PR.
+            Path to first PR: Issues → Import → queue → review cost, diff, and
+            CI → Accept. Stuck? See /docs/recovery.
           </p>
         </div>
       ) : next ? (

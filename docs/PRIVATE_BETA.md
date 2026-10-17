@@ -47,7 +47,7 @@ See [WEDGE.md](./WEDGE.md) and [GTM.md](./GTM.md) for paid-pilot process.
 4. When the PR is reviewable: confirm cost + diff + CI evidence → **Accept → Done** in-product.
 5. Share feedback on time-to-first-PR, cost, and rework; schedule a second issue within 7 days.
 
-Checklist: [WEDGE.md](./WEDGE.md). Sonar/CI-fail seed scripts are a **secondary** vertical — not the join path.
+Checklist: [WEDGE.md](./WEDGE.md) (staging proven 2026-10-17 — [PR #5](https://github.com/coppergateai/coppergate-staging-smoke/pull/5)). Recovery: [/docs/recovery](/docs/recovery). Billing smoke: [`scripts/manual-billing-smoke.md`](../scripts/manual-billing-smoke.md). Sonar/CI-fail seed scripts are a **secondary** vertical — not the join path.
 
 Paid / waitlist ops: [PILOT_OUTREACH.md](./PILOT_OUTREACH.md). Self-serve failure recovery: [/docs/recovery](/docs/recovery).
 
