@@ -1,6 +1,6 @@
 import Link from "next/link";
 import styles from "@/components/marketing/marketing.module.css";
-import { SiteChrome } from "../../site-chrome";
+import { DocsShell } from "@/components/docs/docs-shell";
 
 export const metadata = {
   title: "Recovery · Coppergate Docs",
@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function RecoveryPage() {
   return (
-    <SiteChrome>
+    <DocsShell>
       <main className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
@@ -41,7 +41,7 @@ export default function RecoveryPage() {
             <Link href="/docs/pricing">pricing</Link> for hosted Starter/Pro.
           </p>
 
-          <h2>Accept disabled (CI pending / failed)</h2>
+          <h2 id="ci">Accept disabled (CI pending / failed)</h2>
           <ul>
             <li>
               <strong>Pending:</strong> wait for GitHub Actions / check runs on
@@ -54,6 +54,26 @@ export default function RecoveryPage() {
               succeed while a blocking check is attached.
             </li>
           </ul>
+
+          <h2 id="validation">Validation failed</h2>
+          <p>
+            Sandbox lint/test or acceptance checks failed before PR delivery.
+            Tighten the task scope / allowed paths, confirm the repo tree
+            cloned (<code>sandboxMode: git</code>), then Retry.
+          </p>
+
+          <h2 id="budget">Budget paused or exceeded</h2>
+          <p>
+            Open Settings → project budget, raise the cap or unpause, then
+            Retry. Estimates and actual spend share the same{" "}
+            <code>usage_events</code> ledger.
+          </p>
+
+          <h2 id="agent">Agent error</h2>
+          <p>
+            OpenHands / BYOK exited without a completion payload. Check BYOK
+            keys, worker logs, and sandbox create errors, then Retry.
+          </p>
 
           <h2>Run failed</h2>
           <ol>
@@ -100,6 +120,6 @@ export default function RecoveryPage() {
           </p>
         </div>
       </main>
-    </SiteChrome>
+    </DocsShell>
   );
 }

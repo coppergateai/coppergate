@@ -28,11 +28,11 @@ export function HeroSection({ signedIn }: Props) {
 
           <div className={styles.ctaRow}>
             <Link className={styles.btnHeroPrimary} href={primaryHref}>
-              Open workspaces
+              {signedIn ? "Open workspaces" : "Request access"}
               <IconArrow />
             </Link>
             <a className={styles.btnSecondary} href="#arena">
-              Explore a real Arena
+              Explore Arena
             </a>
           </div>
           <p className={styles.metaRow}>

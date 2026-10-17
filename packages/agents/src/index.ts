@@ -17,6 +17,11 @@ export {
   type FakeValidationReport,
 } from "./validation.js";
 export {
+  runStackValidation,
+  type StackValidationInput,
+  type StackValidationReport,
+} from "./stack-validation.js";
+export {
   OpenAiCompatibleCodingAgent,
   type OpenAiCompatibleConfig,
 } from "./openai-compatible.js";

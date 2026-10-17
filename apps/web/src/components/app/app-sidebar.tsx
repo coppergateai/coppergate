@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { LogoutButton } from "@/app/logout-button";
 import { BrandMark } from "./ui";
+import { WorkspaceSwitcher } from "./workspace-switcher";
 import { useWorkspaceNav } from "./workspace-nav-context";
 import styles from "./app.module.css";
 
@@ -72,17 +73,7 @@ export function AppSidebar({
       </Link>
 
       {nav ? (
-        <Link
-          href="/workspaces"
-          className={styles.workspaceChip}
-          onClick={onClose}
-          title="Switch workspace"
-        >
-          <span className={styles.workspaceChipName}>{nav.workspaceName}</span>
-          <span className={styles.workspaceChipMeta}>
-            /{nav.workspaceSlug} · Switch
-          </span>
-        </Link>
+        <WorkspaceSwitcher workspaces={workspaces} onNavigate={onClose} />
       ) : null}
 
       {onWorkspaceHome || !workspaceId ? (
@@ -215,6 +206,17 @@ export function AppSidebar({
       </nav>
 
       <div className={styles.footer}>
+        <button
+          type="button"
+          className={styles.cmdSidebarHint}
+          onClick={() => {
+            onClose();
+            window.dispatchEvent(new Event("cg:open-command-palette"));
+          }}
+        >
+          Command palette
+          <kbd>⌘K</kbd>
+        </button>
         <Link href="/docs" className={styles.footerItem} onClick={onClose}>
           Documentation
         </Link>

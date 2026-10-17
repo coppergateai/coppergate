@@ -2,7 +2,7 @@ import {
   FakeCodingAgent,
   isContenderStrategy,
   isFakeCompletionPayload,
-  runFakeValidation,
+  runStackValidation,
   strategyGuidance,
   type CodingAgent,
   type FakeCompletionPayload,
@@ -11,14 +11,18 @@ import {
   appendRunEvent,
   appendUsageEvent,
   applyTaskTransition,
+  assertSecondaryRepoAllowed,
   assertSufficientBudget,
   attachSandboxToRun,
   buildDeliveryReport,
   buildDiffSummary,
   createArtifact,
+  effectivePlan,
   getContenderById,
+  getProjectForWorkspace,
   getSignalEventForTask,
   getTaskById,
+  getWorkspaceSubscription,
   ingestCiEvidence,
   ingestSonarFitness,
   isRunCancelRequested,
@@ -37,17 +41,76 @@ import {
   type Task,
 } from "@coppergate/db";
 import type { GithubDeliveryClient } from "@coppergate/github";
-import { LocalSandboxManager, type SandboxHandle } from "@coppergate/sandbox";
+import {
+  LocalSandboxManager,
+  type SandboxCloneMode,
+  type SandboxHandle,
+} from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
 import { buildDeliveryFiles } from "./delivery-files.js";
 import {
+  mergeArchitectureContext,
+  resolveMultiRepoRunContext,
+} from "./multi-repo-context.js";
+import {
   resolveDeliveryMode,
   resolveGithubDelivery,
+  type ResolvedGithubDelivery,
 } from "./github-delivery.js";
 
 function resolveSandboxMode(): "local" | "off" {
   const raw = (process.env.SANDBOX_MODE ?? "local").trim().toLowerCase();
   return raw === "off" || raw === "0" || raw === "false" ? "off" : "local";
+}
+
+/**
+ * sim = fixture tree; git = real clone-at-SHA.
+ * SANDBOX_CLONE_MODE wins; else git when http delivery + token, else sim.
+ */
+function resolveSandboxCloneMode(input: {
+  deliveryMode: "fake" | "http";
+  hasAuth: boolean;
+}): SandboxCloneMode {
+  const raw = (process.env.SANDBOX_CLONE_MODE ?? "").trim().toLowerCase();
+  if (raw === "sim" || raw === "git") return raw;
+  if (input.deliveryMode === "fake" || !input.hasAuth) return "sim";
+  return "git";
+}
+
+function resolvePreviewUrl(input: {
+  planAllowsPreview: boolean;
+  stack: string | null | undefined;
+  runId: string;
+  prNumber: number | null | undefined;
+}): { previewUrl: string | null; previewError: string | null } {
+  if (!input.prNumber) {
+    return { previewUrl: null, previewError: "Preview not available — no PR" };
+  }
+  if (!input.planAllowsPreview) {
+    return {
+      previewUrl: null,
+      previewError: "Preview is a Pro feature — upgrade to enable ephemeral URLs",
+    };
+  }
+  const stack = (input.stack ?? "").trim();
+  if (stack !== "nextjs_ts") {
+    return {
+      previewUrl: null,
+      previewError: `Preview unavailable for stack ${stack || "unknown"}`,
+    };
+  }
+  const base = (process.env.PREVIEW_BASE_URL ?? "").trim().replace(/\/$/, "");
+  if (!base) {
+    return {
+      previewUrl: null,
+      previewError:
+        "Preview unavailable — set PREVIEW_BASE_URL for ephemeral environments",
+    };
+  }
+  return {
+    previewUrl: `${base}/r/${input.runId}`,
+    previewError: null,
+  };
 }
 
 async function maybeResolveTournamentAfterRun(
@@ -150,6 +213,9 @@ export async function executeClaimedRun(
   }
 
   let completion: FakeCompletionPayload | null = null;
+  let validationReport: Awaited<
+    ReturnType<typeof runStackValidation>
+  > | null = null;
   let actualCost = 0;
   let sawCancel = false;
 
@@ -174,15 +240,87 @@ export async function executeClaimedRun(
   let deliveryBundle: Awaited<ReturnType<typeof buildDeliveryFiles>> | null =
     null;
 
+  let deliveryResolved: ResolvedGithubDelivery | null = null;
+  if (!input.github) {
+    try {
+      deliveryResolved = await resolveGithubDelivery(db, {
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        baseSha: run.baseSha,
+      });
+    } catch (err) {
+      log.warn("early github delivery resolve failed; sandbox may use sim", {
+        runId: run.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const project = await getProjectForWorkspace(
+    db,
+    run.workspaceId,
+    run.projectId,
+  );
+  const projectStack = project?.project.stack ?? "nextjs_ts";
+
+  let multiRepoContext: Awaited<
+    ReturnType<typeof resolveMultiRepoRunContext>
+  > | null = null;
+  if (project) {
+    multiRepoContext = await resolveMultiRepoRunContext(db, {
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      project: project.project,
+      filesTouchedEstimate: 0,
+    });
+    if (
+      multiRepoContext.allowed &&
+      multiRepoContext.secondaries.length > 0
+    ) {
+      await appendRunEvent(db, {
+        runId: run.id,
+        workspaceId: run.workspaceId,
+        kind: "progress",
+        payload: {
+          message: "Multi-repo secondary context attached (read)",
+          secondaries: multiRepoContext.secondaries.map((s) => s.fullName),
+          coordinatedPrs: multiRepoContext.policy.coordinatedPrs,
+        },
+      });
+      strategyContext = mergeArchitectureContext(
+        strategyContext,
+        multiRepoContext.contextBlock,
+      );
+    }
+  }
+
+  const deliveryModeHint =
+    input.github != null
+      ? ("fake" as const)
+      : (deliveryResolved?.mode ?? resolveDeliveryMode());
+  const cloneMode = resolveSandboxCloneMode({
+    deliveryMode: deliveryModeHint,
+    hasAuth: Boolean(deliveryResolved?.authToken && deliveryResolved?.cloneUrl),
+  });
+
   try {
     if (sandboxManager) {
       try {
+        const repoUrl =
+          cloneMode === "git" && deliveryResolved?.cloneUrl
+            ? deliveryResolved.cloneUrl
+            : `coppergate://project/${run.projectId}`;
+        const baseSha =
+          deliveryResolved?.baseSha || run.baseSha || "unknown";
         sandbox = await sandboxManager.create({
           runId: run.id,
           workspaceId: run.workspaceId,
-          repoUrl: `coppergate://project/${run.projectId}`,
-          baseSha: run.baseSha || "unknown",
+          repoUrl,
+          baseSha,
           branchName: run.branchName ?? undefined,
+          cloneMode,
+          authToken:
+            cloneMode === "git" ? deliveryResolved?.authToken : null,
         });
         await attachSandboxToRun(db, {
           runId: run.id,
@@ -197,12 +335,15 @@ export async function executeClaimedRun(
             message: "Sandbox ready",
             sandboxId: sandbox.id,
             runtime: sandbox.runtime,
+            sandboxMode: sandbox.cloneMode ?? cloneMode,
+            cloneMode: sandbox.cloneMode ?? cloneMode,
           },
         });
         log.info("sandbox created", {
           runId: run.id,
           sandboxId: sandbox.id,
           runtime: sandbox.runtime,
+          cloneMode: sandbox.cloneMode ?? cloneMode,
         });
       } catch (err) {
         log.warn("sandbox create failed; continuing without sandbox", {
@@ -311,6 +452,62 @@ export async function executeClaimedRun(
       await maybeResolveTournamentAfterRun(db, run, workerId, log);
       return "failed";
     }
+
+    if (sawCancel || !completion) {
+      await markRunFailed(db, {
+        runId: run.id,
+        workerId,
+        errorCode: sawCancel ? "cancelled" : "incomplete",
+        errorMessage: sawCancel
+          ? "Run cancelled"
+          : "Agent finished without completion payload",
+      });
+      await safeTaskTransition(
+        db,
+        task,
+        sawCancel ? "CANCELLED" : "FAILED",
+        workerId,
+        log,
+      );
+      await maybeResolveTournamentAfterRun(db, run, workerId, log);
+      return sawCancel ? "cancelled" : "failed";
+    }
+
+    await applyTaskTransition(db, {
+      workspaceId: run.workspaceId,
+      taskId: task.id,
+      toStatus: "VALIDATING",
+      actor: `worker:${workerId}`,
+      reason: "agent completed",
+    }).catch((err: unknown) => {
+      log.warn("task VALIDATING transition skipped", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    await markRunValidating(db, { runId: run.id, workerId });
+    await renewRunLease(db, run.id, workerId, leaseMs);
+
+    // Stack lint/test must run before sandbox destroy (git clone workdir).
+    const forceFakeValidation =
+      deliveryModeHint === "fake" ||
+      cloneMode === "sim" ||
+      !sandbox ||
+      !sandboxManager;
+
+    validationReport = await runStackValidation({
+      goal: task.goal,
+      acceptanceCriteria: parseJsonArray(task.acceptanceCriteria),
+      completion,
+      workdir: sandbox?.workdir,
+      stack: projectStack,
+      forceFake: forceFakeValidation,
+      exec:
+        sandbox && sandboxManager
+          ? (command, options) =>
+              sandboxManager.exec(sandbox!, command, options)
+          : undefined,
+    });
   } finally {
     if (sandbox && sandboxManager) {
       await sandboxManager.destroy(sandbox).catch((err: unknown) => {
@@ -322,46 +519,20 @@ export async function executeClaimedRun(
     }
   }
 
-  if (sawCancel || !completion) {
+  if (!completion || !validationReport) {
     await markRunFailed(db, {
       runId: run.id,
       workerId,
-      errorCode: sawCancel ? "cancelled" : "incomplete",
-      errorMessage: sawCancel
-        ? "Run cancelled"
-        : "Agent finished without completion payload",
+      errorCode: "incomplete",
+      errorMessage: "Agent finished without validation",
     });
-    await safeTaskTransition(
-      db,
-      task,
-      sawCancel ? "CANCELLED" : "FAILED",
-      workerId,
-      log,
-    );
+    await safeTaskTransition(db, task, "FAILED", workerId, log);
     await maybeResolveTournamentAfterRun(db, run, workerId, log);
-    return sawCancel ? "cancelled" : "failed";
+    return "failed";
   }
 
-  await applyTaskTransition(db, {
-    workspaceId: run.workspaceId,
-    taskId: task.id,
-    toStatus: "VALIDATING",
-    actor: `worker:${workerId}`,
-    reason: "fake agent completed",
-  }).catch((err: unknown) => {
-    log.warn("task VALIDATING transition skipped", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  });
-
-  await markRunValidating(db, { runId: run.id, workerId });
-  await renewRunLease(db, run.id, workerId, leaseMs);
-
-  const report = runFakeValidation({
-    goal: task.goal,
-    acceptanceCriteria: parseJsonArray(task.acceptanceCriteria),
-    completion,
-  });
+  const report = validationReport;
+  const sandboxModeLabel = cloneMode;
 
   await createArtifact(db, {
     workspaceId: run.workspaceId,
@@ -375,6 +546,7 @@ export async function executeClaimedRun(
       summary: report.summary,
       checks: report.checks,
       validator: report.validator,
+      sandboxMode: sandboxModeLabel,
     },
   });
 
@@ -386,6 +558,7 @@ export async function executeClaimedRun(
       message: report.summary,
       validation: report.passed ? "passed" : "failed",
       validator: report.validator,
+      sandboxMode: sandboxModeLabel,
     },
   });
 
@@ -414,6 +587,15 @@ export async function executeClaimedRun(
     github = input.github;
     // Injected clients (tests) are treated as fake for synthetic fitness attach.
     deliveryMode = "fake";
+  } else if (deliveryResolved) {
+    github = deliveryResolved.client;
+    repo = deliveryResolved.repo;
+    baseSha = deliveryResolved.baseSha;
+    deliveryMode = deliveryResolved.mode;
+    log.info("github delivery resolved", {
+      mode: deliveryResolved.mode,
+      repo: `${repo.owner}/${repo.repo}`,
+    });
   } else {
     const resolved = await resolveGithubDelivery(db, {
       workspaceId: run.workspaceId,
@@ -452,14 +634,17 @@ export async function executeClaimedRun(
     idempotencyKey: `task:${task.id}:run:${run.id}`,
   });
 
-  // TASK038 — stub preview for nextjs_ts (non-blocking).
-  const previewUrl =
-    task /* stack checked via project later */ && delivery.prNumber
-      ? `https://preview.coppergate.local/r/${run.id}`
-      : null;
-  const previewError = previewUrl
-    ? null
-    : "Preview not available for this run";
+  // Honest preview: real PREVIEW_BASE_URL + Pro plan, else explicit unavailable.
+  const sub = await getWorkspaceSubscription(db, run.workspaceId);
+  const plan = effectivePlan(sub);
+  const preview = resolvePreviewUrl({
+    planAllowsPreview: plan === "pro",
+    stack: projectStack,
+    runId: run.id,
+    prNumber: delivery.prNumber,
+  });
+  const previewUrl = preview.previewUrl;
+  const previewError = preview.previewError;
 
   await appendRunEvent(db, {
     runId: run.id,
@@ -474,6 +659,46 @@ export async function executeClaimedRun(
       created: delivery.created,
     },
   });
+
+  if (
+    multiRepoContext?.allowed &&
+    multiRepoContext.policy.coordinatedPrs &&
+    multiRepoContext.secondaries.length > 0
+  ) {
+    const coordinatedFiles = prepared.files.length;
+    const coordGate = assertSecondaryRepoAllowed(multiRepoContext.policy, {
+      secondaryCount: multiRepoContext.secondaries.length,
+      filesTouched: coordinatedFiles,
+    });
+    await appendRunEvent(db, {
+      runId: run.id,
+      workspaceId: run.workspaceId,
+      kind: "evidence",
+      payload: {
+        message: coordGate.ok
+          ? "Coordinated secondary PRs queued (linked to primary)"
+          : `Coordinated secondary PRs skipped: ${coordGate.reason}`,
+        primaryPrUrl: delivery.prUrl,
+        secondaries: multiRepoContext.secondaries.map((s) => s.fullName),
+        filesTouched: coordinatedFiles,
+        coordinated: coordGate.ok,
+      },
+    });
+    if (coordGate.ok) {
+      await createArtifact(db, {
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        taskId: task.id,
+        runId: run.id,
+        kind: "coordinated_secondary_prs",
+        body: {
+          primaryPrUrl: delivery.prUrl,
+          secondaries: multiRepoContext.secondaries,
+          note: "Secondary writes deferred to linked follow-up; primary remains source of truth for this run.",
+        },
+      });
+    }
+  }
 
   trackFunnelEvent(log, {
     stage: "pr_opened",
@@ -520,7 +745,7 @@ export async function executeClaimedRun(
     taskId: task.id,
     toStatus: "REVIEW_REQUIRED",
     actor: `worker:${workerId}`,
-    reason: "fake validation passed — human review required",
+    reason: "validation passed — human review required",
   }).catch((err: unknown) => {
     log.warn("task REVIEW_REQUIRED transition skipped", {
       error: err instanceof Error ? err.message : String(err),

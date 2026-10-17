@@ -15,7 +15,7 @@
   gap: 0.65rem 1rem;
   padding: 0.7rem 1.15rem;
   border-bottom: 1px solid var(--line);
-  background: rgba(16, 17, 20, 0.92);
+  background: var(--page-bar-bg);
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
@@ -116,7 +116,7 @@
 
 .tabActive {
   color: var(--paper);
-  border-bottom-color: rgba(200, 137, 73, 0.85);
+  border-bottom-color: var(--copper-border-strong);
 }
 
 .tabCount {
@@ -174,8 +174,8 @@
 }
 
 .rowBtnActive {
-  background: rgba(200, 137, 73, 0.08);
-  box-shadow: inset 2px 0 0 rgba(200, 137, 73, 0.75);
+  background: var(--copper-fill-soft);
+  box-shadow: inset 2px 0 0 var(--copper-border-strong);
 }
 
 .statusRing {
@@ -253,7 +253,7 @@
   margin: 1rem 1.15rem;
   padding: 1.1rem 1rem;
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.015);
 }
 
@@ -305,13 +305,13 @@
 .detailPillPending {
   border: 1px solid rgba(232, 168, 72, 0.35);
   background: rgba(232, 168, 72, 0.1);
-  color: #f0c070;
+  color: var(--warn);
 }
 
 .detailPillApproved {
   border: 1px solid rgba(110, 180, 120, 0.35);
   background: rgba(110, 180, 120, 0.1);
-  color: #9ed4a4;
+  color: var(--success-bright);
 }
 
 .detailPillSettled {
@@ -436,13 +436,13 @@
 }
 
 .btnPrimary {
-  border: 1px solid rgba(200, 137, 73, 0.55);
-  background: rgba(200, 137, 73, 0.18);
-  color: #f0c070;
+  border: 1px solid var(--copper-border);
+  background: var(--copper-fill);
+  color: var(--warn);
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: rgba(200, 137, 73, 0.28);
+  background: var(--copper-fill-strong);
 }
 
 .btnDanger {
@@ -501,7 +501,7 @@
 
 .noteInput:focus {
   outline: none;
-  border-color: rgba(200, 137, 73, 0.55);
+  border-color: var(--copper-border);
 }
 
 .body {

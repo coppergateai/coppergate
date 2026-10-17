@@ -1,6 +1,13 @@
 import { and, eq, isNull, ne } from "drizzle-orm";
 import type { Database } from "./client.js";
 import {
+  assertSecondaryRepoAllowed,
+  parseMultiRepoPolicyJson,
+  resolveMultiRepoPolicy,
+  serializeMultiRepoPolicy,
+  type MultiRepoPolicy,
+} from "./multi-repo.js";
+import {
   githubInstallations,
   projects,
   repositoryConnections,
@@ -17,7 +24,11 @@ export class ProjectBindError extends Error {
     | "wrong_workspace"
     | "install_inactive"
     | "repo_already_bound"
-    | "invalid_mode";
+    | "invalid_mode"
+    | "multi_repo_disabled"
+    | "max_secondary_repos"
+    | "cannot_detach_primary"
+    | "policy_denied";
 
   constructor(code: ProjectBindError["code"], message: string) {
     super(message);
@@ -191,6 +202,7 @@ export async function createProjectWithRepo(
       .update(repositoryConnections)
       .set({
         projectId,
+        repoRole: "primary",
         compatibility,
         updatedAt: now,
       })
@@ -213,6 +225,11 @@ export async function createProjectWithRepo(
   });
 }
 
+const primaryRepoJoin = and(
+  eq(repositoryConnections.projectId, projects.id),
+  eq(repositoryConnections.repoRole, "primary"),
+);
+
 export async function listProjectsForWorkspace(
   db: Database,
   workspaceId: string,
@@ -223,10 +240,7 @@ export async function listProjectsForWorkspace(
       repository: repositoryConnections,
     })
     .from(projects)
-    .innerJoin(
-      repositoryConnections,
-      eq(repositoryConnections.projectId, projects.id),
-    )
+    .innerJoin(repositoryConnections, primaryRepoJoin)
     .where(
       and(
         eq(projects.workspaceId, workspaceId),
@@ -251,10 +265,7 @@ export async function getProjectForWorkspace(
       repository: repositoryConnections,
     })
     .from(projects)
-    .innerJoin(
-      repositoryConnections,
-      eq(repositoryConnections.projectId, projects.id),
-    )
+    .innerJoin(repositoryConnections, primaryRepoJoin)
     .where(
       and(
         eq(projects.id, projectId),
@@ -266,6 +277,302 @@ export async function getProjectForWorkspace(
   const row = rows[0];
   if (!row) return undefined;
   return { project: row.project, repository: row.repository };
+}
+
+export async function listReposForProject(
+  db: Database,
+  workspaceId: string,
+  projectId: string,
+): Promise<RepositoryConnection[]> {
+  const project = await db
+    .select()
+    .from(projects)
+    .where(
+      and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)),
+    )
+    .limit(1);
+  if (!project[0]) return [];
+
+  return db
+    .select()
+    .from(repositoryConnections)
+    .where(eq(repositoryConnections.projectId, projectId));
+}
+
+export function getProjectMultiRepoPolicy(project: Project): MultiRepoPolicy {
+  return parseMultiRepoPolicyJson(project.multiRepoPolicy);
+}
+
+export async function setProjectMultiRepoPolicy(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    policy: Partial<MultiRepoPolicy>;
+  },
+): Promise<Project> {
+  const bound = await getProjectForWorkspace(
+    db,
+    input.workspaceId,
+    input.projectId,
+  );
+  if (!bound) {
+    throw new ProjectBindError("not_found", "Project not found");
+  }
+  const next = serializeMultiRepoPolicy(
+    resolveMergedPolicy(bound.project, input.policy),
+  );
+  const [updated] = await db
+    .update(projects)
+    .set({ multiRepoPolicy: next, updatedAt: new Date() })
+    .where(
+      and(
+        eq(projects.id, input.projectId),
+        eq(projects.workspaceId, input.workspaceId),
+      ),
+    )
+    .returning();
+  if (!updated) {
+    throw new ProjectBindError("not_found", "Project not found");
+  }
+  return updated;
+}
+
+function resolveMergedPolicy(
+  project: Project,
+  patch: Partial<MultiRepoPolicy>,
+): MultiRepoPolicy {
+  const current = parseMultiRepoPolicyJson(project.multiRepoPolicy);
+  return resolveMultiRepoPolicy({
+    enabled: patch.enabled ?? current.enabled,
+    maxSecondaryRepos: patch.maxSecondaryRepos ?? current.maxSecondaryRepos,
+    maxSecondaryFiles: patch.maxSecondaryFiles ?? current.maxSecondaryFiles,
+    coordinatedPrs: patch.coordinatedPrs ?? current.coordinatedPrs,
+  });
+}
+
+/**
+ * Attach an unbound workspace repo as secondary under a project.
+ * Requires multi-repo policy enabled on the project.
+ */
+export async function attachSecondaryRepo(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    repositoryConnectionId: string;
+  },
+): Promise<RepositoryConnection> {
+  return db.transaction(async (tx) => {
+    const [project] = await tx
+      .select()
+      .from(projects)
+      .where(
+        and(
+          eq(projects.id, input.projectId),
+          eq(projects.workspaceId, input.workspaceId),
+        ),
+      )
+      .limit(1);
+    if (!project) {
+      throw new ProjectBindError("not_found", "Project not found");
+    }
+
+    const policy = parseMultiRepoPolicyJson(project.multiRepoPolicy);
+    const existing = await tx
+      .select()
+      .from(repositoryConnections)
+      .where(eq(repositoryConnections.projectId, input.projectId));
+    const secondaryCount =
+      existing.filter((r) => r.repoRole === "secondary").length + 1;
+    const gate = assertSecondaryRepoAllowed(policy, {
+      secondaryCount,
+      filesTouched: 0,
+    });
+    if (!gate.ok) {
+      throw new ProjectBindError(
+        gate.reason === "multi_repo_disabled"
+          ? "multi_repo_disabled"
+          : gate.reason === "max_secondary_repos"
+            ? "max_secondary_repos"
+            : "policy_denied",
+        gate.reason === "multi_repo_disabled"
+          ? "Enable multi-repo policy before attaching secondary repos"
+          : gate.reason === "max_secondary_repos"
+            ? "Secondary repo limit reached"
+            : `Secondary attach denied: ${gate.reason}`,
+      );
+    }
+
+    const [conn] = await tx
+      .select()
+      .from(repositoryConnections)
+      .where(eq(repositoryConnections.id, input.repositoryConnectionId))
+      .limit(1);
+    if (!conn) {
+      throw new ProjectBindError("not_found", "Repository connection not found");
+    }
+    if (conn.workspaceId !== input.workspaceId) {
+      throw new ProjectBindError(
+        "wrong_workspace",
+        "Repository connection not in workspace",
+      );
+    }
+    if (conn.projectId) {
+      throw new ProjectBindError(
+        "repo_already_bound",
+        "Repository is already bound to a project",
+      );
+    }
+    if (conn.installationStatus !== "active") {
+      throw new ProjectBindError(
+        "install_inactive",
+        "Repository connection is not active",
+      );
+    }
+
+    const now = new Date();
+    const [bound] = await tx
+      .update(repositoryConnections)
+      .set({
+        projectId: input.projectId,
+        repoRole: "secondary",
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(repositoryConnections.id, conn.id),
+          isNull(repositoryConnections.projectId),
+        ),
+      )
+      .returning();
+    if (!bound) {
+      throw new ProjectBindError(
+        "repo_already_bound",
+        "Repository is already bound to a project",
+      );
+    }
+    return bound;
+  });
+}
+
+/** Detach a secondary repo from a project (unbind; does not delete connection). */
+export async function detachSecondaryRepo(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    repositoryConnectionId: string;
+  },
+): Promise<RepositoryConnection> {
+  const [conn] = await db
+    .select()
+    .from(repositoryConnections)
+    .where(eq(repositoryConnections.id, input.repositoryConnectionId))
+    .limit(1);
+  if (!conn || conn.workspaceId !== input.workspaceId) {
+    throw new ProjectBindError("not_found", "Repository connection not found");
+  }
+  if (conn.projectId !== input.projectId) {
+    throw new ProjectBindError(
+      "wrong_workspace",
+      "Repository is not bound to this project",
+    );
+  }
+  if (conn.repoRole === "primary") {
+    throw new ProjectBindError(
+      "cannot_detach_primary",
+      "Cannot detach the primary repo — promote another first",
+    );
+  }
+
+  const [updated] = await db
+    .update(repositoryConnections)
+    .set({
+      projectId: null,
+      repoRole: "primary",
+      updatedAt: new Date(),
+    })
+    .where(eq(repositoryConnections.id, conn.id))
+    .returning();
+  if (!updated) {
+    throw new ProjectBindError("not_found", "Repository connection not found");
+  }
+  return updated;
+}
+
+/**
+ * Promote a secondary to primary; demote previous primary to secondary.
+ */
+export async function promotePrimaryRepo(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    repositoryConnectionId: string;
+  },
+): Promise<{ primary: RepositoryConnection; previous: RepositoryConnection }> {
+  return db.transaction(async (tx) => {
+    const [project] = await tx
+      .select()
+      .from(projects)
+      .where(
+        and(
+          eq(projects.id, input.projectId),
+          eq(projects.workspaceId, input.workspaceId),
+        ),
+      )
+      .limit(1);
+    if (!project) {
+      throw new ProjectBindError("not_found", "Project not found");
+    }
+
+    const [next] = await tx
+      .select()
+      .from(repositoryConnections)
+      .where(eq(repositoryConnections.id, input.repositoryConnectionId))
+      .limit(1);
+    if (!next || next.projectId !== input.projectId) {
+      throw new ProjectBindError(
+        "not_found",
+        "Repository is not bound to this project",
+      );
+    }
+    if (next.repoRole === "primary") {
+      return { primary: next, previous: next };
+    }
+
+    const [currentPrimary] = await tx
+      .select()
+      .from(repositoryConnections)
+      .where(
+        and(
+          eq(repositoryConnections.projectId, input.projectId),
+          eq(repositoryConnections.repoRole, "primary"),
+        ),
+      )
+      .limit(1);
+    if (!currentPrimary) {
+      throw new ProjectBindError("not_found", "No primary repo on project");
+    }
+
+    const now = new Date();
+    // Temporarily clear unique primary constraint by demoting first.
+    const [demoted] = await tx
+      .update(repositoryConnections)
+      .set({ repoRole: "secondary", updatedAt: now })
+      .where(eq(repositoryConnections.id, currentPrimary.id))
+      .returning();
+    const [promoted] = await tx
+      .update(repositoryConnections)
+      .set({ repoRole: "primary", updatedAt: now })
+      .where(eq(repositoryConnections.id, next.id))
+      .returning();
+    if (!demoted || !promoted) {
+      throw new ProjectBindError("not_found", "Failed to promote primary");
+    }
+    return { primary: promoted, previous: demoted };
+  });
 }
 
 export type UpdateProjectStackInput = {
@@ -300,7 +607,12 @@ export async function updateProjectStack(
     const [conn] = await tx
       .select()
       .from(repositoryConnections)
-      .where(eq(repositoryConnections.projectId, project.id))
+      .where(
+        and(
+          eq(repositoryConnections.projectId, project.id),
+          eq(repositoryConnections.repoRole, "primary"),
+        ),
+      )
       .limit(1);
 
     if (!conn) return undefined;

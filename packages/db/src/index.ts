@@ -202,11 +202,17 @@ export {
 export {
   MVP_STACK,
   ProjectBindError,
+  attachSecondaryRepo,
   buildCompatibility,
   createProjectWithRepo,
+  detachSecondaryRepo,
   getProjectForWorkspace,
+  getProjectMultiRepoPolicy,
   listProjectsForWorkspace,
+  listReposForProject,
+  promotePrimaryRepo,
   resolveProjectStack,
+  setProjectMultiRepoPolicy,
   updateProjectStack,
   type CreateProjectInput,
   type ProjectWithRepo,
@@ -302,6 +308,7 @@ export {
   claimNextRun,
   claimRunById,
   countClaimableRuns,
+  countInflightRunsForWorkspace,
   createTaskRun,
   enqueueAgentRun,
   getAgentRun,
@@ -378,6 +385,7 @@ export {
   getRetentionSnapshot,
   getWorkspaceCostAnalytics,
   getWorkspaceCostExplorer,
+  getWorkspaceMonthToDateUsage,
   type CostAnalytics30d,
   type ProjectCostExplorer,
   type RetentionSnapshot,
@@ -447,8 +455,12 @@ export {
 export {
   DEFAULT_MULTI_REPO_POLICY,
   assertSecondaryRepoAllowed,
+  isRepoRole,
+  parseMultiRepoPolicyJson,
   resolveMultiRepoPolicy,
+  serializeMultiRepoPolicy,
   type MultiRepoPolicy,
+  type RepoRole,
 } from "./multi-repo.js";
 export {
   SIGNAL_SLOS,
@@ -475,6 +487,15 @@ export {
   upsertWorkspaceSubscription,
   type UpsertSubscriptionInput,
 } from "./billing.js";
+export {
+  PLAN_LIMITS,
+  PlanLimitError,
+  assertPlanConcurrency,
+  clampTournamentFanout,
+  limitsForPlan,
+  resolveWorkspacePlanLimits,
+  type PlanLimits,
+} from "./plan-policy.js";
 export {
   countPaidPilotInvites,
   getPilotGoNoGoSnapshot,

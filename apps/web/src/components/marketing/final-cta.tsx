@@ -34,7 +34,7 @@ export function FinalCta({ signedInLogin = null }: Props) {
             className={styles.btnHeroPrimary}
             href={signedIn ? "/workspaces" : "/login"}
           >
-            Open workspaces
+            {signedIn ? "Open workspaces" : "Request access"}
             <IconArrow />
           </Link>
           <a className={styles.btnSecondary} href="mailto:hello@coppergate.ai">

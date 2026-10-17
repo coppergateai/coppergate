@@ -97,26 +97,26 @@ export default async function WorkspacesPage() {
                     ctaLabel: inviteRequired
                       ? "Enter invite above"
                       : "Create workspace above",
-                    done: false,
+                    done: !empty,
                   },
                   {
                     id: "github",
                     title: "Connect GitHub App",
                     detail: "Install on a throwaway or low-risk repo in Settings.",
-                    done: false,
+                    done: !empty,
                   },
                   {
                     id: "project",
-                    title: "Create a project + set budget",
+                    title: "Import issue → verified PR",
                     detail:
-                      "Bind one repo, raise the spend cap, set autonomy ≥ L1.",
+                      "Bind one repo, set spend cap, Import → queue a small issue.",
                     done: false,
                   },
                   {
-                    id: "brief",
-                    title: "Approve brief → plan → first task",
+                    id: "review",
+                    title: "Review cost, diff, CI — Accept",
                     detail:
-                      "Submit and approve a small scoped task to queue a run.",
+                      "Accept stays closed until checks pass. See /docs/recovery if stuck.",
                     done: false,
                   },
                 ]}

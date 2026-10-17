@@ -17,6 +17,10 @@ import type { Database } from "./client.js";
 import { assertCanStartTasks, recordAuditEvent } from "./briefs.js";
 import { getRunCiFitness } from "./ci-evidence.js";
 import { notifyWorkspace } from "./notify.js";
+import {
+  assertPlanConcurrency,
+  resolveWorkspacePlanLimits,
+} from "./plan-policy.js";
 import { enqueueAgentRun, listRunsForTask } from "./runs.js";
 import {
   githubInstallations,
@@ -159,13 +163,21 @@ async function enqueueQueuedTask(
     reason: string;
   },
 ): Promise<Task> {
+  await assertPlanConcurrency(db, input.workspaceId);
+  const { limits } = await resolveWorkspacePlanLimits(db, input.workspaceId);
+
   const nextAttempt = input.task.attemptCount + 1;
   const arena = await getArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.task.projectId,
   });
 
-  if (arena && arena.status !== "KILLED" && arena.status !== "PAUSED") {
+  if (
+    limits.arenaEnabled &&
+    arena &&
+    arena.status !== "KILLED" &&
+    arena.status !== "PAUSED"
+  ) {
     await startTournamentFanout(db, {
       workspaceId: input.workspaceId,
       taskId: input.task.id,

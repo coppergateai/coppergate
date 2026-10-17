@@ -119,7 +119,11 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
             <RedetectStacksButton workspaceId={id} />
           ) : null}
           {canCreate ? (
-            <Suspense fallback={null}>
+            <Suspense
+              fallback={
+                <span className={styles.chip}>Loading create form…</span>
+              }
+            >
               <CreateProjectForm
                 workspaceId={id}
                 repositories={unbound.map((r) => ({
@@ -172,7 +176,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                     title: "Bind a repository into a project",
                     detail:
                       "After repos are connected, return here and bind one — stack is detected from the repository.",
-                    done: false,
+                    done: projects.length > 0,
                   },
                   {
                     id: "budget",
@@ -185,7 +189,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                     id: "brief",
                     title: "Approve brief → plan → task",
                     detail:
-                      "Keep the first task tiny so the first PR lands in one session.",
+                      "Keep the first task tiny so the first PR lands in one session. Then open the project Agents tab to arm the arena.",
                     done: false,
                   },
                 ]}
@@ -200,7 +204,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                 </h2>
                 <p className={styles.wizardLede}>
                   Connected repos below are unbound. Bind one to unlock budget,
-                  brief, and the arena loop.
+                  brief, and the Agents arena loop.
                 </p>
               </div>
               <OnboardingGuide
@@ -231,7 +235,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                     id: "brief",
                     title: "Approve brief → plan → task",
                     detail:
-                      "Keep the first task tiny so the first PR lands in one session.",
+                      "Keep the first task tiny so the first PR lands in one session. Then open the project Agents tab to arm the arena.",
                     done: false,
                   },
                 ]}

@@ -48,7 +48,7 @@ export default async function WorkspaceInboxPage({
     typeof sp.a === "string" && sp.a.length > 0 ? sp.a : null;
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div style={{ padding: "1rem" }}>Loading inbox…</div>}>
       <InboxShell
         workspaceId={id}
         workspaceName={access.workspace.name}

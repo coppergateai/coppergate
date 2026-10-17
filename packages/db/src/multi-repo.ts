@@ -39,6 +39,23 @@ export function resolveMultiRepoPolicy(
   };
 }
 
+/** Parse projects.multi_repo_policy JSON (null/invalid → defaults). */
+export function parseMultiRepoPolicyJson(
+  raw: string | null | undefined,
+): MultiRepoPolicy {
+  if (!raw?.trim()) return resolveMultiRepoPolicy(null);
+  try {
+    const parsed = JSON.parse(raw) as Partial<MultiRepoPolicy>;
+    return resolveMultiRepoPolicy(parsed);
+  } catch {
+    return resolveMultiRepoPolicy(null);
+  }
+}
+
+export function serializeMultiRepoPolicy(policy: MultiRepoPolicy): string {
+  return JSON.stringify(resolveMultiRepoPolicy(policy));
+}
+
 export function assertSecondaryRepoAllowed(
   policy: MultiRepoPolicy,
   input: { secondaryCount: number; filesTouched: number },
@@ -53,4 +70,10 @@ export function assertSecondaryRepoAllowed(
     return { ok: false, reason: "max_secondary_files" };
   }
   return { ok: true };
+}
+
+export type RepoRole = "primary" | "secondary";
+
+export function isRepoRole(value: unknown): value is RepoRole {
+  return value === "primary" || value === "secondary";
 }

@@ -32,6 +32,14 @@ Store dumps encrypted at rest; retain ≥ 14 days for private beta.
 6. Record drill date in `PRODUCTION_READINESS.md`.
 
 SLO burn helper for on-call triage: `evaluateSloBurn` / `SIGNAL_SLOS` in `@coppergate/telemetry`.
+Worker posts burns to `SLO_ALERT_WEBHOOK` via `dispatchSloBurnAlert`.
+
+## Drill sign-off
+
+| Drill | Date | Signer | Notes |
+|---|---|---|---|
+| Backup restore | 2026-10-17 | coppergate-ops | Staging clone restored; login + workspace list + kill-switch OK |
+| Credential rotation | 2026-10-17 | coppergate-ops | App key + BYOK rotated; next run minted fresh installation token |
 
 ## Failover notes
 

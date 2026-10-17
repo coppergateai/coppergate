@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { AgentPolicyError } from "./fake.js";
 import { buildFakeCompletion } from "./fake.js";
 import type {
@@ -100,22 +102,28 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       return;
     }
 
-    const path = input.allowedPaths[0] ?? "app/page.tsx";
+    const relPath = resolveWritePath(input.allowedPaths);
+    const workdir = input.sandboxWorkdir?.trim();
+    if (workdir) {
+      const absPath = join(workdir, relPath);
+      await mkdir(dirname(absPath), { recursive: true });
+      const body = materializeModelPatch(relPath, input, result.content);
+      await writeFile(absPath, body, "utf8");
+    }
+
     yield {
       kind: "file",
-      message: "Proposed change",
+      message: workdir ? `wrote ${relPath}` : "Proposed change",
       payload: {
-        path,
-        action: "modify",
+        path: relPath,
+        action: workdir ? "write" : "modify",
         summary: result.content.slice(0, 240),
+        sandbox: Boolean(workdir),
       },
     };
 
     const completion = buildFakeCompletion(input, costMicros);
-    // Prefer model-suggested path when present
-    if (!completion.filesChanged.includes(path)) {
-      completion.filesChanged = [path, ...completion.filesChanged];
-    }
+    completion.filesChanged = [relPath];
 
     yield {
       kind: "completion",
@@ -188,4 +196,56 @@ function buildPrompt(input: AgentRunInput): string {
     "Propose the smallest change that satisfies acceptance criteria.",
   );
   return lines.join("\n");
+}
+
+function resolveWritePath(allowedPaths: string[]): string {
+  const first = allowedPaths[0]?.trim();
+  if (!first || first === "**/*" || first.includes("*")) {
+    return "app/page.tsx";
+  }
+  return first.replace(/^\.\//, "");
+}
+
+/** Persist a minimal, reviewable file from model text into the sandbox tree. */
+function materializeModelPatch(
+  relPath: string,
+  input: AgentRunInput,
+  modelText: string,
+): string {
+  const goalOneLine = input.goal.slice(0, 160).replace(/\n/g, " ");
+  const excerpt = modelText.slice(0, 1200).replace(/\r/g, "");
+  if (relPath.endsWith(".tsx") || relPath.endsWith(".jsx")) {
+    return [
+      `/**`,
+      ` * Coppergate BYOK sandbox fix`,
+      ` * run: ${input.runId}`,
+      ` * goal: ${goalOneLine}`,
+      ` */`,
+      `export default function Page() {`,
+      `  return (`,
+      `    <main data-coppergate-run="${input.runId}">`,
+      `      <h1>Signal fix</h1>`,
+      `      <p>${goalOneLine.replace(/"/g, "'")}</p>`,
+      `      <pre>${excerpt.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`,
+      `    </main>`,
+      `  );`,
+      `}`,
+      ``,
+    ].join("\n");
+  }
+  return [
+    `/**`,
+    ` * Coppergate BYOK sandbox fix`,
+    ` * run: ${input.runId}`,
+    ` * goal: ${goalOneLine}`,
+    ` */`,
+    `export function coppergateSignalFix() {`,
+    `  return {`,
+    `    runId: ${JSON.stringify(input.runId)},`,
+    `    ok: true as const,`,
+    `    note: ${JSON.stringify(excerpt.slice(0, 400))},`,
+    `  };`,
+    `}`,
+    ``,
+  ].join("\n");
 }

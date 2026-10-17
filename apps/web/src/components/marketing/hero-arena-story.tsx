@@ -135,14 +135,7 @@ export function HeroArenaStory({ signedIn }: Props) {
             <p className={styles.storyBeatStep}>{current.step}</p>
             <p className={styles.storyBeatTitle}>{current.title}</p>
           </div>
-          <span className={styles.storyDemoTag}>{ILLUSTRATIVE_ARENA.label}</span>
-        </div>
-
-        <div className={styles.previewChrome}>
-          <p className={styles.previewCrumb}>
-            Arena <span>/</span> Checkout race
-          </p>
-          <span className={styles.previewBadge}>Illustrative</span>
+          <span className={styles.storyDemoTag}>Illustrative</span>
         </div>
 
         <div className={styles.previewTop}>
@@ -242,15 +235,6 @@ export function HeroArenaStory({ signedIn }: Props) {
       </div>
 
       <div className={styles.storyControls}>
-        <button
-          type="button"
-          className={styles.storyPause}
-          onClick={() => setPaused((p) => !p)}
-          aria-pressed={paused}
-          disabled={reducedMotion}
-        >
-          {paused || reducedMotion ? "Play" : "Pause"}
-        </button>
         <div className={styles.storyDots} role="tablist" aria-label="Story beats">
           {BEATS.map((b) => (
             <button
@@ -269,7 +253,15 @@ export function HeroArenaStory({ signedIn }: Props) {
             />
           ))}
         </div>
-        <span className={styles.storyControlLabel}>{current.step}</span>
+        <button
+          type="button"
+          className={styles.storyPause}
+          onClick={() => setPaused((p) => !p)}
+          aria-pressed={paused}
+          disabled={reducedMotion}
+        >
+          {paused || reducedMotion ? "Play" : "Pause"}
+        </button>
       </div>
     </div>
   );

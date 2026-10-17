@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { DocsShell } from "@/components/docs/docs-shell";
 import styles from "@/components/marketing/marketing.module.css";
-import { SiteChrome } from "../site-chrome";
 
 export const metadata = {
   title: "Docs · Coppergate",
@@ -38,7 +38,7 @@ const items = [
 
 export default function DocsIndexPage() {
   return (
-    <SiteChrome>
+    <DocsShell>
       <main className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Private beta</p>
         <h1 className={styles.pageTitle}>Documentation</h1>
@@ -63,6 +63,6 @@ export default function DocsIndexPage() {
           <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
         </p>
       </main>
-    </SiteChrome>
+    </DocsShell>
   );
 }

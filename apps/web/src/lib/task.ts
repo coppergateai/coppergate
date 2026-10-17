@@ -1,4 +1,4 @@
-import { TaskTransitionError } from "@coppergate/db";
+import { PlanLimitError, TaskTransitionError } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 import type { Task, TaskStatusTransition } from "@coppergate/db";
 
@@ -36,6 +36,11 @@ export function serializeTransition(t: TaskStatusTransition) {
 }
 
 export function mapTaskTransitionError(err: unknown): never {
+  if (err instanceof PlanLimitError) {
+    throw new ApiError("conflict", err.message, {
+      details: { code: "plan_limit", limit: err.limit, plan: err.plan },
+    });
+  }
   if (err instanceof TaskTransitionError) {
     switch (err.code) {
       case "not_found":

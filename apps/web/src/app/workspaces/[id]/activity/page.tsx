@@ -51,8 +51,28 @@ function hrefFor(
   return null;
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  "brief.approved": "Brief approved",
+  "brief.submitted": "Brief submitted",
+  "task.approved": "Task approved",
+  "task.submitted": "Task submitted",
+  "task.accepted": "Task accepted",
+  "task.rejected": "Task rejected",
+  "run.started": "Run started",
+  "run.completed": "Run completed",
+  "run.failed": "Run failed",
+  "run.cancelled": "Run cancelled",
+  "signal.ingested": "Signal ingested",
+  "signal.armed": "Signal armed",
+  "project.created": "Project created",
+  "workspace.updated": "Workspace updated",
+  "approval.resolved": "Approval resolved",
+  "merge.enabled": "Merge enabled",
+  "merge.disabled": "Merge disabled",
+};
+
 function labelFor(action: string): string {
-  return action.replace(/\./g, " · ");
+  return ACTION_LABELS[action] ?? action.replace(/\./g, " · ");
 }
 
 export default async function WorkspaceActivityPage({ params }: PageProps) {

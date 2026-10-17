@@ -58,8 +58,9 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
         LLM BYOK
       </h2>
       <p className={styles.sectionLede}>
-        Bring your own OpenAI-compatible API key. Keys are sealed at rest and
-        never returned in plaintext.
+        Workspace-wide OpenAI-compatible API key for coding runs across all
+        project arenas. Agents themselves are managed per project under the
+        Agents tab. Keys are sealed at rest and never returned in plaintext.
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
       {cred ? (

@@ -1,6 +1,36 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import styles from "./marketing.module.css";
 
+const STORAGE_KEY = "cg-announce-dismissed";
+
 export function AnnouncementBar() {
+  const [hidden, setHidden] = useState(true);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(STORAGE_KEY) === "1") {
+        setHidden(true);
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    setHidden(false);
+  }, []);
+
+  function dismiss() {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setHidden(true);
+  }
+
+  if (hidden) return null;
+
   return (
     <div className={styles.announce}>
       <div className={styles.announceInner}>
@@ -8,9 +38,19 @@ export function AnnouncementBar() {
           <span className={styles.announceDot} aria-hidden="true" />
           <p className={styles.announceText}>Private beta · design partners</p>
         </div>
-        <a className={styles.announceLink} href="mailto:hello@coppergate.ai">
-          Talk to us
-        </a>
+        <div className={styles.announceRight}>
+          <a className={styles.announceLink} href="mailto:hello@coppergate.ai">
+            Talk to us
+          </a>
+          <button
+            type="button"
+            className={styles.announceDismiss}
+            onClick={dismiss}
+            aria-label="Dismiss announcement"
+          >
+            ×
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -29,3 +29,7 @@ export {
   type SloBurnInput,
   type SloBurnResult,
 } from "./slos.js";
+export {
+  dispatchSloBurnAlert,
+  type SloAlertDispatchResult,
+} from "./slo-alerts.js";

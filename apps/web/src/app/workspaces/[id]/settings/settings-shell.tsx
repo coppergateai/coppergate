@@ -10,40 +10,49 @@ export const SETTINGS_TABS = [
     id: "connections",
     label: "Connections",
     blurb: "GitHub & GitLab",
+    group: "Connections",
   },
   {
     id: "general",
     label: "General",
     blurb: "Workspace & budgets",
+    group: "Workspace",
   },
   {
     id: "billing",
     label: "Billing",
     blurb: "Hosted Starter & Pro",
+    group: "Spend",
   },
   {
     id: "signals",
     label: "Signals",
     blurb: "Adapters & notify",
+    group: "Workspace",
   },
   {
     id: "llm",
     label: "LLM",
     blurb: "Bring your own key",
+    group: "Advanced",
   },
   {
     id: "analytics",
     label: "Analytics",
     blurb: "Spend by source",
+    group: "Spend",
   },
   {
     id: "danger",
     label: "Danger",
     blurb: "Delete workspace",
+    group: "Advanced",
   },
 ] as const;
 
 export type SettingsTabId = (typeof SETTINGS_TABS)[number]["id"];
+
+const GROUP_ORDER = ["Connections", "Workspace", "Spend", "Advanced"] as const;
 
 function isTabId(value: string | null): value is SettingsTabId {
   return SETTINGS_TABS.some((t) => t.id === value);
@@ -108,19 +117,31 @@ export function SettingsShell({
       </header>
 
       <nav className={styles.tabNav} aria-label="Settings sections">
-        {SETTINGS_TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`${styles.tabBtn} ${
-              active === t.id ? styles.tabBtnActive : ""
-            } ${t.id === "danger" ? styles.tabBtnDanger : ""}`}
-            aria-current={active === t.id ? "page" : undefined}
-            onClick={() => select(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
+        {GROUP_ORDER.map((group) => {
+          const tabs = SETTINGS_TABS.filter((t) => t.group === group);
+          if (tabs.length === 0) return null;
+          return (
+            <div key={group} className={styles.tabGroup}>
+              <p className={styles.tabGroupLabel}>{group}</p>
+              <div className={styles.tabGroupRow}>
+                {tabs.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`${styles.tabBtn} ${
+                      active === t.id ? styles.tabBtnActive : ""
+                    } ${t.id === "danger" ? styles.tabBtnDanger : ""}`}
+                    aria-current={active === t.id ? "page" : undefined}
+                    onClick={() => select(t.id)}
+                    title={t.blurb}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </nav>
 
       <div className={styles.tabPanel} key={active}>

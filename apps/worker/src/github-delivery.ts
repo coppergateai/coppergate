@@ -121,6 +121,18 @@ export async function fetchDefaultBranchHeadSha(
  * Build delivery client + repo context for a project.
  * Routes to GitHub PR or GitLab MR based on installation.provider (D12).
  */
+export type ResolvedGithubDelivery = {
+  client: GithubDeliveryClient | ScmDeliveryClient;
+  repo: RepoRef;
+  baseSha: string;
+  mode: DeliveryMode;
+  provider: "github" | "gitlab";
+  /** HTTPS clone URL (no credentials). */
+  cloneUrl: string | null;
+  /** Installation / PAT for git clone — never log. */
+  authToken: string | null;
+};
+
 export async function resolveGithubDelivery(
   db: Database,
   input: {
@@ -129,13 +141,7 @@ export async function resolveGithubDelivery(
     baseSha: string;
     mode?: DeliveryMode;
   },
-): Promise<{
-  client: GithubDeliveryClient | ScmDeliveryClient;
-  repo: RepoRef;
-  baseSha: string;
-  mode: DeliveryMode;
-  provider: "github" | "gitlab";
-}> {
+): Promise<ResolvedGithubDelivery> {
   const mode = input.mode ?? resolveDeliveryMode();
   if (mode === "fake") {
     return {
@@ -144,6 +150,8 @@ export async function resolveGithubDelivery(
       baseSha: input.baseSha === "unknown" ? "0".repeat(40) : input.baseSha,
       mode,
       provider: "github",
+      cloneUrl: null,
+      authToken: null,
     };
   }
 
@@ -177,6 +185,10 @@ export async function resolveGithubDelivery(
     const token = resolveGitlabToken(installation);
     const projectId =
       project.repository.githubRepoId || installation.githubInstallationId;
+    const baseUrl = (env.GITLAB_BASE_URL ?? "https://gitlab.com").replace(
+      /\/$/,
+      "",
+    );
     return {
       client: new HttpGitlabDelivery(token, env.GITLAB_BASE_URL, projectId),
       repo: {
@@ -189,6 +201,8 @@ export async function resolveGithubDelivery(
           : input.baseSha,
       mode,
       provider,
+      cloneUrl: `${baseUrl}/${repo.owner}/${repo.repo}.git`,
+      authToken: token,
     };
   }
 
@@ -204,6 +218,8 @@ export async function resolveGithubDelivery(
     baseSha,
     mode,
     provider,
+    cloneUrl: `https://github.com/${repo.owner}/${repo.repo}.git`,
+    authToken: token,
   };
 }
 

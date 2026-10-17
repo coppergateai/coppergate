@@ -68,6 +68,8 @@ export async function createCheckoutSession(input: {
       metadata: {
         workspaceId: input.workspaceId,
         plan: input.plan,
+        usage_billing:
+          "Month-to-date usage synced to customer metadata; metered price optional via STRIPE_PRICE_USAGE",
       },
     },
     allow_promotion_codes: true,
@@ -142,6 +144,40 @@ export async function syncSubscriptionFromStripe(
     currentPeriodEnd: periodEnd,
     cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
   });
+}
+
+/**
+ * Minimum usage trust for hosted plans: attach month-to-date spend as a
+ * Stripe customer invoice note (or subscription metadata). Full metered
+ * billing can replace this when STRIPE_PRICE_USAGE is configured.
+ */
+export async function reportUsageSummaryToStripe(input: {
+  stripe: Stripe;
+  customerId: string;
+  workspaceId: string;
+  periodLabel: string;
+  spentMicros: number;
+  eventCount: number;
+}): Promise<{ ok: boolean; mode: "metadata" | "skipped"; detail?: string }> {
+  const spentUsd = (input.spentMicros / 1_000_000).toFixed(4);
+  const note = `Coppergate usage ${input.periodLabel}: $${spentUsd} (${input.eventCount} events) ws=${input.workspaceId}`;
+  try {
+    await input.stripe.customers.update(input.customerId, {
+      metadata: {
+        coppergate_usage_period: input.periodLabel,
+        coppergate_usage_usd: spentUsd,
+        coppergate_usage_events: String(input.eventCount),
+        coppergate_usage_note: note.slice(0, 500),
+      },
+    });
+    return { ok: true, mode: "metadata" };
+  } catch (err) {
+    return {
+      ok: false,
+      mode: "skipped",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 export async function handleStripeWebhookEvent(input: {
