@@ -19,6 +19,7 @@ import { db } from "@/lib/db";
 import { ArenaPanel } from "./arena-panel";
 import { CostExplorerStrip } from "./cost-explorer";
 import { IssuesPanel } from "./issues-panel";
+import { PullsPanel } from "./pulls-panel";
 import { MergePanel } from "./merge-panel";
 import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
@@ -266,6 +267,11 @@ export default async function ProjectDetailPage({
               isOwner={isOwner}
             />
             <IssuesPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              isOwner={isOwner}
+            />
+            <PullsPanel
               workspaceId={workspaceId}
               projectId={projectId}
               isOwner={isOwner}

@@ -2,6 +2,7 @@ export type {
   AgentEvent,
   AgentEventKind,
   AgentRunInput,
+  AgentRunMode,
   CodingAgent,
   FakeCompletionPayload,
 } from "./types.js";

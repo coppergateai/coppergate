@@ -9,11 +9,14 @@ import {
 import {
   claimNextRun,
   createDb,
-  getActiveLlmByok,
+  getDefaultLlmByok,
+  getEffectiveAgentProfile,
+  getLlmByokById,
   purgeExpiredSoftDeletedWorkspaces,
   reapStaleRuns,
   touchLlmByokUsed,
   type Database,
+  type IntegrationCredential,
 } from "@coppergate/db";
 import { openSecret, parseEncryptionKey } from "@coppergate/github";
 import {
@@ -54,7 +57,54 @@ function resolveHarnessKind(): ContenderHarnessKind | null {
   return null;
 }
 
-function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
+async function resolveByokForProfile(
+  db: Database,
+  workspaceId: string,
+  agentProfileKey: string | null | undefined,
+): Promise<{
+  byok: IntegrationCredential;
+  model: string | undefined;
+  profileKey: string | null;
+} | null> {
+  let preferredModel: string | null = null;
+  let credentialId: string | null = null;
+  let profileKey: string | null = null;
+
+  if (agentProfileKey) {
+    const profile = await getEffectiveAgentProfile(
+      db,
+      workspaceId,
+      agentProfileKey,
+    );
+    if (profile) {
+      profileKey = profile.key;
+      preferredModel = profile.preferredModel;
+      credentialId = profile.llmCredentialId;
+    }
+  }
+
+  let byok: IntegrationCredential | null = null;
+  if (credentialId) {
+    byok = await getLlmByokById(db, workspaceId, credentialId);
+  }
+  if (!byok) {
+    byok = await getDefaultLlmByok(db, workspaceId);
+  }
+  if (!byok) return null;
+
+  return {
+    byok,
+    model: preferredModel?.trim() || byok.model || undefined,
+    profileKey,
+  };
+}
+
+function resolveWorkerAgent(
+  db: Database,
+  workspaceId: string,
+  log: Logger,
+  agentProfileKey?: string | null,
+) {
   return (async (): Promise<CodingAgent> => {
     const explicit = parseHarnessEnv();
     const delivery = resolveDeliveryModeHint();
@@ -77,15 +127,27 @@ function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
     // Prefer BYOK / env OpenAI before OpenHands default (plan Sprint 3).
     if (!forceFakePath || explicit === "native_openai") {
       try {
-        const byok = await getActiveLlmByok(db, workspaceId);
+        const resolved = await resolveByokForProfile(
+          db,
+          workspaceId,
+          agentProfileKey,
+        );
         const keyHex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
-        if (byok?.encryptedPayload && keyHex) {
+        if (resolved?.byok.encryptedPayload && keyHex) {
+          const { byok, model, profileKey } = resolved;
           const apiKey = openSecret(
             byok.encryptedPayload,
             parseEncryptionKey(keyHex),
           );
-          await touchLlmByokUsed(db, workspaceId);
-          log.info("using workspace BYOK for coding agent", { workspaceId });
+          await touchLlmByokUsed(db, workspaceId, byok.id);
+          log.info("using workspace BYOK for coding agent", {
+            workspaceId,
+            credentialId: byok.id,
+            label: byok.label,
+            vendor: byok.vendor,
+            model,
+            profileKey,
+          });
           if (explicit === "native_openai") {
             return harnessAsCodingAgent(
               createContenderHarness({
@@ -93,7 +155,7 @@ function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
                 openai: {
                   apiKey,
                   baseUrl: byok.baseUrl ?? undefined,
-                  model: byok.model ?? undefined,
+                  model,
                 },
               }),
             );
@@ -101,7 +163,7 @@ function resolveWorkerAgent(db: Database, workspaceId: string, log: Logger) {
           return createCodingAgent({
             apiKey,
             baseUrl: byok.baseUrl ?? undefined,
-            model: byok.model ?? undefined,
+            model,
           });
         }
       } catch (err) {
@@ -229,7 +291,12 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
         });
 
         const started = Date.now();
-        const agent = await resolveWorkerAgent(db, run.workspaceId, log);
+        const agent = await resolveWorkerAgent(
+          db,
+          run.workspaceId,
+          log,
+          run.agentProfileKey,
+        );
         const outcome = await executeClaimedRun(db, {
           run,
           workerId,

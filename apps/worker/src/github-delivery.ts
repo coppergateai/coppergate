@@ -163,6 +163,13 @@ export async function resolveGithubDelivery(
   if (!project) {
     throw new Error("Project not found for SCM delivery");
   }
+  // TASK121: writes always target the primary binding — never a secondary that
+  // happens to sort first in an unfiltered projectId join (dogfood regression).
+  if (project.repository.repoRole !== "primary") {
+    throw new Error(
+      `SCM delivery refused non-primary repo ${project.repository.baseRepoFullName} (role=${project.repository.repoRole})`,
+    );
+  }
   const repo: RepoRef = {
     owner: project.repository.owner,
     repo: project.repository.name,

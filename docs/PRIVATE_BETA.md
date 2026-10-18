@@ -20,7 +20,7 @@ See [WEDGE.md](./WEDGE.md) and [GTM.md](./GTM.md) for paid-pilot process.
 
 ## Explicit non-goals (this pilot)
 
-- Multi-repo / monorepo orchestration across many packages
+- Full org multi-repo merge (dogfood uses capped secondaries — see [KPROMPT_DOGFOOD.md](./KPROMPT_DOGFOOD.md); max 5 secondaries, primary writes only)
 - Autonomous merge or production deploy
 - Design-agent UI generation and marketing asset pipelines
 - Enterprise SSO, SCIM, or custom VPC sandbox fleets

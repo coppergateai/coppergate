@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import {
   assertSecondaryRepoAllowed,
@@ -270,12 +270,21 @@ export async function getProjectForWorkspace(
       and(
         eq(projects.id, projectId),
         eq(projects.workspaceId, workspaceId),
+        // Belt-and-suspenders: never surface a secondary as the project repo.
+        eq(repositoryConnections.repoRole, "primary"),
       ),
     )
     .limit(1);
 
   const row = rows[0];
   if (!row) return undefined;
+  if (row.repository.repoRole !== "primary") {
+    // Fail closed — multi-repo joins must never deliver against a secondary.
+    throw new ProjectBindError(
+      "not_found",
+      `Project ${projectId} resolved a non-primary repo (${row.repository.baseRepoFullName})`,
+    );
+  }
   return { project: row.project, repository: row.repository };
 }
 
@@ -296,7 +305,11 @@ export async function listReposForProject(
   return db
     .select()
     .from(repositoryConnections)
-    .where(eq(repositoryConnections.projectId, projectId));
+    .where(eq(repositoryConnections.projectId, projectId))
+    .orderBy(
+      sql`CASE WHEN ${repositoryConnections.repoRole} = 'primary' THEN 0 ELSE 1 END`,
+      asc(repositoryConnections.baseRepoFullName),
+    );
 }
 
 export function getProjectMultiRepoPolicy(project: Project): MultiRepoPolicy {
@@ -454,6 +467,40 @@ export async function attachSecondaryRepo(
     }
     return bound;
   });
+}
+
+/**
+ * Unbind every repository connection from a project (primary + secondary).
+ * Used when archiving so repos can re-attach elsewhere.
+ */
+export async function unbindReposForProject(
+  db: Database,
+  input: { workspaceId: string; projectId: string },
+): Promise<RepositoryConnection[]> {
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(
+      and(
+        eq(projects.id, input.projectId),
+        eq(projects.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!project) {
+    throw new ProjectBindError("not_found", "Project not found");
+  }
+
+  const now = new Date();
+  return db
+    .update(repositoryConnections)
+    .set({
+      projectId: null,
+      repoRole: "primary",
+      updatedAt: now,
+    })
+    .where(eq(repositoryConnections.projectId, input.projectId))
+    .returning();
 }
 
 /** Detach a secondary repo from a project (unbind; does not delete connection). */
