@@ -28,7 +28,7 @@ export function MarketingFooter() {
               />
             </Link>
             <p className={styles.footerLede}>
-              Agents compete. Survivors ship. Selection over supervision.
+              Set a budget. Agents war. Survivors ship.
             </p>
             <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
               hello@coppergate.ai

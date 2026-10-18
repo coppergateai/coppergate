@@ -14,16 +14,17 @@ export function HeroSection({ signedIn }: Props) {
     <section className={styles.hero} aria-labelledby="hero-title">
       <div className={styles.heroInner}>
         <div className={`${styles.heroCopy} cg-rise`}>
-          <p className={styles.eyebrow}>Selection over supervision</p>
+          <p className={styles.eyebrow}>Budget in. Selection out.</p>
           <h1 id="hero-title" className={styles.headline}>
-            Agents compete.
+            Set a budget. Agents war.
             <br />
             <span className={styles.headlineAccent}>Survivors ship.</span>
           </h1>
           <p className={styles.lede}>
-            Start from a GitHub issue. Contenders compete; CI and cost decide.
-            The survivor opens a verified pull request — you hold the
-            kill-switch.
+            Coppergate builds your project inside a spend cap — from $5/mo.
+            Contenders fight the same work; weak agents lose budget and get
+            eliminated; strong agents win, ship, and improve. Selection
+            pressure is the cost optimizer.
           </p>
 
           <div className={styles.ctaRow}>
@@ -36,7 +37,7 @@ export function HeroSection({ signedIn }: Props) {
             </a>
           </div>
           <p className={styles.metaRow}>
-            Private beta · Issue → verified PR · Budget-controlled
+            Private beta · $5/mo micro-envelope · Survivors improve
           </p>
         </div>
 

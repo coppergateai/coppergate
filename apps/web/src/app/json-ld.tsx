@@ -23,7 +23,7 @@ const jsonLd = {
       url: siteUrl,
       name: "Coppergate",
       description:
-        "AI software execution platform where agents compete on engineering tasks. Coppergate verifies work, prices spend, and delivers the strongest qualifying result as a pull request.",
+        "Set a monthly spend cap. Agents compete on your project — losers get eliminated, winners ship and improve. Coppergate turns selection pressure into agent cost efficiency.",
       publisher: { "@id": `${siteUrl}/#organization` },
       inLanguage: "en",
     },
@@ -35,7 +35,7 @@ const jsonLd = {
       operatingSystem: "Web",
       url: siteUrl,
       description:
-        "Agents compete on an engineering task. Fitness and cost select a survivor. You review the PR — selection over supervision.",
+        "Set a budget. Agents war. Survivors ship. Weak agents lose budget and get eliminated; strong agents win, ship, and improve. Selection pressure optimizes agent cost efficiency.",
       offers: {
         "@type": "Offer",
         price: "0",
