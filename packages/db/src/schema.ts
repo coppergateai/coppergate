@@ -175,6 +175,19 @@ export const projects = pgTable(
     /** L2 merge opt-in after accept + green CI (TASK043). Default OFF. */
     mergeEnabled: boolean("merge_enabled").notNull().default(false),
     /**
+     * Fully autonomous maintainer mode (MAINTAINER.md).
+     * When on: auto-accept + auto-merge under MaintainerPolicy; no human PR approve.
+     */
+    maintainerEnabled: boolean("maintainer_enabled").notNull().default(false),
+    /** JSON MaintainerPolicy — see parseMaintainerPolicy. */
+    maintainerPolicyJson: text("maintainer_policy_json"),
+    lastMaintainerTickAt: timestamp("last_maintainer_tick_at", {
+      withTimezone: true,
+    }),
+    lastVisionReplanAt: timestamp("last_vision_replan_at", {
+      withTimezone: true,
+    }),
+    /**
      * JSON MultiRepoPolicy override (TASK121). Null = platform defaults (off).
      */
     multiRepoPolicy: text("multi_repo_policy"),
@@ -187,7 +200,10 @@ export const projects = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("projects_workspace_id_idx").on(t.workspaceId)],
+  (t) => [
+    index("projects_workspace_id_idx").on(t.workspaceId),
+    index("projects_maintainer_enabled_idx").on(t.maintainerEnabled),
+  ],
 );
 
 /** Immutable brief revisions — TASK008. */
@@ -592,6 +608,9 @@ export const budgets = pgTable(
     currency: text("currency").notNull().default("USD"),
     /** active | paused */
     status: text("status").notNull().default("active"),
+    /** lifetime | monthly — monthly rolls the spend window */
+    period: text("period").notNull().default("lifetime"),
+    periodStartedAt: timestamp("period_started_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -885,6 +904,10 @@ export const agentProfiles = pgTable(
     /** Optional BYOK connection for this profile (workspace overrides only). */
     llmCredentialId: uuid("llm_credential_id"),
     preferredModel: text("preferred_model"),
+    /** Self-improve versioning (MAINTAINER.md). */
+    version: integer("version").notNull().default(1),
+    parentProfileId: uuid("parent_profile_id"),
+    evolvedFromRunId: uuid("evolved_from_run_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -896,6 +919,29 @@ export const agentProfiles = pgTable(
     uniqueIndex("agent_profiles_ws_key_uidx").on(t.workspaceId, t.key),
     index("agent_profiles_key_idx").on(t.key),
     index("agent_profiles_llm_credential_id_idx").on(t.llmCredentialId),
+  ],
+);
+
+/** Maintainer scheduler / self-improve / release audit trail. */
+export const maintainerEvents = pgTable(
+  "maintainer_events",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    /** tick | auto_accept | auto_merge | release | self_improve | replan | triage | community */
+    kind: text("kind").notNull(),
+    payload: text("payload").notNull().default("{}"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("maintainer_events_project_created_idx").on(t.projectId, t.createdAt),
   ],
 );
 
@@ -1098,11 +1144,23 @@ export type DeliveryShareToken = typeof deliveryShareTokens.$inferSelect;
 export type SignalEvent = typeof signalEvents.$inferSelect;
 export type AutoArmRule = typeof autoArmRules.$inferSelect;
 export type AgentProfile = typeof agentProfiles.$inferSelect;
+export type MaintainerEvent = typeof maintainerEvents.$inferSelect;
 export type SignalEventStatus =
   | "received"
   | "armed"
   | "ignored"
   | "failed";
+export type BudgetPeriod = "lifetime" | "monthly";
+export type MaintainerEventKind =
+  | "tick"
+  | "auto_accept"
+  | "auto_merge"
+  | "release"
+  | "self_improve"
+  | "replan"
+  | "triage"
+  | "community"
+  | "period_roll";
 
 export type ArenaStatus = "ARMED" | "RUNNING" | "KILLED" | "PAUSED";
 export type ContenderStatus = "ACTIVE" | "ELIMINATED";

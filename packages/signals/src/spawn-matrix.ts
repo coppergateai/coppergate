@@ -10,6 +10,9 @@ export const BOUNDED_PROFILE_KEYS = [
   "perf",
   "docs",
   "qa",
+  "triager",
+  "community",
+  "release",
 ] as const;
 
 export type BoundedProfileKey = (typeof BOUNDED_PROFILE_KEYS)[number];
@@ -118,5 +121,32 @@ export const PROFILE_CATALOG: ProfileSeed[] = [
     toolAllowlist: ["read", "edit", "test", "git"],
     strategyDefault: "fortress",
     maxSpendMicros: 60_000,
+  },
+  {
+    key: "triager",
+    displayName: "Triager",
+    promptGuidance:
+      "Triage issues and signals: severity, duplicate, effort band, labels. Prefer actionable next steps; do not expand scope.",
+    toolAllowlist: ["read", "git"],
+    strategyDefault: "blitz",
+    maxSpendMicros: 40_000,
+  },
+  {
+    key: "community",
+    displayName: "Community",
+    promptGuidance:
+      "Reply helpfully on GitHub issues/Discussions. Stay on-topic, never share secrets, escalate security reports.",
+    toolAllowlist: ["read"],
+    strategyDefault: "balanced",
+    maxSpendMicros: 30_000,
+  },
+  {
+    key: "release",
+    displayName: "Release",
+    promptGuidance:
+      "Prepare changelog and release notes from merged work. Do not change runtime behavior outside version bump files.",
+    toolAllowlist: ["read", "edit", "git"],
+    strategyDefault: "fortress",
+    maxSpendMicros: 50_000,
   },
 ];

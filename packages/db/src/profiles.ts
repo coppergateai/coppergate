@@ -77,6 +77,33 @@ export const SYSTEM_PROFILE_SEEDS = [
     strategyDefault: "fortress",
     maxSpendMicros: 60_000,
   },
+  {
+    key: "triager",
+    displayName: "Triager",
+    promptGuidance:
+      "Triage issues and signals: severity, duplicate, effort band, labels. Prefer actionable next steps; do not expand scope.",
+    toolAllowlist: ["read", "git"],
+    strategyDefault: "blitz",
+    maxSpendMicros: 40_000,
+  },
+  {
+    key: "community",
+    displayName: "Community",
+    promptGuidance:
+      "Reply helpfully on GitHub issues/Discussions. Stay on-topic, never share secrets, escalate security reports.",
+    toolAllowlist: ["read"],
+    strategyDefault: "balanced",
+    maxSpendMicros: 30_000,
+  },
+  {
+    key: "release",
+    displayName: "Release",
+    promptGuidance:
+      "Prepare changelog and release notes from merged work. Do not change runtime behavior outside version bump files.",
+    toolAllowlist: ["read", "edit", "git"],
+    strategyDefault: "fortress",
+    maxSpendMicros: 50_000,
+  },
 ] as const;
 
 export const BOUNDED_KEYS: Set<string> = new Set(

@@ -25,6 +25,8 @@ import {
   type Logger,
 } from "@coppergate/telemetry";
 import { executeClaimedRun } from "./execute.js";
+import { runMaintainerSchedulerTick } from "./maintainer-tick.js";
+import { resolveWorkerInstallationToken } from "./github-delivery.js";
 
 function resolveDeliveryModeHint(): "http" | "fake" {
   const raw = (process.env.GITHUB_DELIVERY_MODE ?? "fake").trim().toLowerCase();
@@ -217,6 +219,7 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
   const { workerId, log } = options;
   let lastPurgeAt = 0;
   let lastSloCheckAt = 0;
+  let lastMaintainerTickAt = 0;
   let consecutiveErrors = 0;
   let processedWindow = 0;
   let terminalFailWindow = 0;
@@ -245,6 +248,20 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           if (purged.purged > 0) {
             log.info("purged soft-deleted workspaces", {
               count: purged.purged,
+            });
+          }
+        }
+
+        // Autonomous maintainer scheduler — every 60s.
+        if (Date.now() - lastMaintainerTickAt > 60_000) {
+          lastMaintainerTickAt = Date.now();
+          try {
+            await runMaintainerSchedulerTick(db, log, {
+              resolveToken: resolveWorkerInstallationToken,
+            });
+          } catch (err) {
+            log.warn("maintainer scheduler tick failed", {
+              error: err instanceof Error ? err.message : String(err),
             });
           }
         }

@@ -21,6 +21,7 @@ import { CostExplorerStrip } from "./cost-explorer";
 import { IssuesPanel } from "./issues-panel";
 import { PullsPanel } from "./pulls-panel";
 import { MergePanel } from "./merge-panel";
+import { MaintainerPanel } from "./maintainer-panel";
 import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
 import { DeliveryBoard } from "./delivery-board";
@@ -303,6 +304,12 @@ export default async function ProjectDetailPage({
         }
         more={
           <>
+            <MaintainerPanel
+              workspaceId={workspaceId}
+              projectId={projectId}
+              initialEnabled={row.project.maintainerEnabled}
+              isOwner={isOwner}
+            />
             <MultiRepoPanel
               workspaceId={workspaceId}
               projectId={projectId}

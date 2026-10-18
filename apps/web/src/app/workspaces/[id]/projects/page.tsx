@@ -11,6 +11,7 @@ import { currentUser } from "@/lib/auth";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
 import { CreateProjectForm } from "./create-project-form";
+import { MaintainerRollup } from "./maintainer-rollup";
 import { RedetectStacksButton } from "./redetect-stacks-button";
 import { UnboundReposPanel } from "./unbound-repos-panel";
 import styles from "./projects.module.css";
@@ -143,6 +144,8 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
           ) : null}
         </div>
       </header>
+
+      <MaintainerRollup workspaceId={id} />
 
       {empty ? (
         <div className={styles.bodyPad}>
