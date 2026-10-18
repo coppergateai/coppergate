@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import {
   auditEvents,
@@ -48,6 +48,8 @@ export async function setProjectBudget(
     softAlertMicros?: number | null;
     actor: string;
     status?: "active" | "paused";
+    /** lifetime (default) | monthly */
+    period?: "lifetime" | "monthly";
   },
 ): Promise<Budget> {
   if (!Number.isFinite(input.capMicros) || input.capMicros < 0) {
@@ -71,6 +73,7 @@ export async function setProjectBudget(
     }
 
     const now = new Date();
+    const period = input.period ?? "lifetime";
     const [existing] = await tx
       .select()
       .from(budgets)
@@ -88,6 +91,11 @@ export async function setProjectBudget(
               ? existing.softAlertMicros
               : input.softAlertMicros,
           status: input.status ?? existing.status,
+          period,
+          periodStartedAt:
+            period === "monthly"
+              ? (existing.periodStartedAt ?? now)
+              : null,
           updatedAt: now,
         })
         .where(eq(budgets.id, existing.id))
@@ -103,6 +111,8 @@ export async function setProjectBudget(
           softAlertMicros: input.softAlertMicros ?? null,
           currency: "USD",
           status: input.status ?? "active",
+          period,
+          periodStartedAt: period === "monthly" ? now : null,
           createdAt: now,
           updatedAt: now,
         })
@@ -123,7 +133,10 @@ export async function setProjectBudget(
       action: "budget.set",
       targetType: "project",
       targetId: input.projectId,
-      meta: JSON.stringify({ capMicros: input.capMicros }),
+      meta: JSON.stringify({
+        capMicros: input.capMicros,
+        period,
+      }),
       createdAt: now,
     });
 
@@ -135,6 +148,7 @@ async function sumUsage(
   db: DbLike,
   projectId: string,
   kinds: UsageKind[],
+  since?: Date | null,
 ): Promise<number> {
   if (!kinds.length) return 0;
   const [row] = await db
@@ -146,9 +160,69 @@ async function sumUsage(
       and(
         eq(usageEvents.projectId, projectId),
         inArray(usageEvents.kind, kinds),
+        since ? gte(usageEvents.createdAt, since) : undefined,
       ),
     );
   return Number(row?.total ?? 0);
+}
+
+/** True when monthly period started ≥ ~30 days ago (or calendar month crossed). */
+export function shouldRollMonthlyPeriod(
+  periodStartedAt: Date | null | undefined,
+  now = new Date(),
+): boolean {
+  if (!periodStartedAt) return true;
+  const ms = now.getTime() - periodStartedAt.getTime();
+  if (ms >= 30 * 24 * 60 * 60 * 1000) return true;
+  return (
+    periodStartedAt.getUTCFullYear() !== now.getUTCFullYear() ||
+    periodStartedAt.getUTCMonth() !== now.getUTCMonth()
+  );
+}
+
+/**
+ * Roll monthly budget window: advance periodStartedAt and un-pause if soft-paused by prior period.
+ * Does not delete ledger rows — spend is scoped by periodStartedAt in getProjectSpendSummary.
+ */
+export async function rollMonthlyBudgetIfDue(
+  db: Database,
+  input: { workspaceId: string; projectId: string; actor: string },
+): Promise<{ rolled: boolean; budget: Budget | null }> {
+  const [budget] = await db
+    .select()
+    .from(budgets)
+    .where(eq(budgets.projectId, input.projectId))
+    .limit(1);
+  if (!budget || budget.period !== "monthly") {
+    return { rolled: false, budget: budget ?? null };
+  }
+  if (!shouldRollMonthlyPeriod(budget.periodStartedAt)) {
+    return { rolled: false, budget };
+  }
+  const now = new Date();
+  const [updated] = await db
+    .update(budgets)
+    .set({
+      periodStartedAt: now,
+      status: "active",
+      updatedAt: now,
+    })
+    .where(eq(budgets.id, budget.id))
+    .returning();
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "budget.period_roll",
+    targetType: "project",
+    targetId: input.projectId,
+    meta: JSON.stringify({
+      previousPeriodStartedAt: budget.periodStartedAt?.toISOString() ?? null,
+      periodStartedAt: now.toISOString(),
+    }),
+    createdAt: now,
+  });
+  return { rolled: true, budget: updated ?? budget };
 }
 
 export async function getProjectSpendSummary(
@@ -175,10 +249,12 @@ export async function getProjectSpendSummary(
     .limit(1);
 
   const capMicros = budget?.capMicros ?? project.maxBudgetMicros;
-  const spentMicros = await sumUsage(db, projectId, SPENT_KINDS);
+  const since =
+    budget?.period === "monthly" ? (budget.periodStartedAt ?? null) : null;
+  const spentMicros = await sumUsage(db, projectId, SPENT_KINDS, since);
   const reserved =
-    (await sumUsage(db, projectId, ["estimate_reserve"])) -
-    (await sumUsage(db, projectId, ["estimate_release"]));
+    (await sumUsage(db, projectId, ["estimate_reserve"], since)) -
+    (await sumUsage(db, projectId, ["estimate_release"], since));
   const reservedMicros = Math.max(0, reserved);
   const availableMicros = Math.max(0, capMicros - spentMicros - reservedMicros);
 

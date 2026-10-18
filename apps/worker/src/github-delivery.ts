@@ -43,6 +43,14 @@ export function resolveDeliveryMode(
   return raw === "http" ? "http" : "fake";
 }
 
+/** Exported for maintainer auto-merge scheduler. */
+export async function resolveWorkerInstallationToken(
+  db: Database,
+  installation: GithubInstallation,
+): Promise<string> {
+  return resolveInstallationToken(db, installation);
+}
+
 async function resolveInstallationToken(
   db: Database,
   installation: GithubInstallation,

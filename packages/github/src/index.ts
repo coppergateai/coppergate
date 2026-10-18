@@ -36,6 +36,17 @@ export {
   type GithubIssueSummary,
 } from "./issues.js";
 export {
+  addIssueComment,
+  createDiscussionComment,
+  setIssueLabels,
+  type GithubIssueCommentResult,
+} from "./community.js";
+export {
+  createGithubRelease,
+  formatReleaseNotes,
+  type GithubReleaseResult,
+} from "./release.js";
+export {
   getPullRequestContext,
   listOpenPulls,
   submitPullRequestReview,

@@ -21,6 +21,6 @@ describe("spawn matrix", () => {
   });
 
   it("seeds full catalog", () => {
-    assert.equal(PROFILE_CATALOG.length, 6);
+    assert.equal(PROFILE_CATALOG.length, 9);
   });
 });
