@@ -5,6 +5,7 @@ import {
   ensureArenaForProject,
   MAX_TOURNAMENT_FANOUT,
 } from "./arena.js";
+import { getLlmByokById } from "./credentials.js";
 import {
   agentProfiles,
   contenders,
@@ -173,6 +174,35 @@ export async function listAgentProfiles(
     .orderBy(asc(agentProfiles.key));
 }
 
+/** Workspace override wins over system seed for a profile key. */
+export async function getEffectiveAgentProfile(
+  db: Database,
+  workspaceId: string,
+  key: string,
+): Promise<AgentProfile | null> {
+  if (!BOUNDED_KEYS.has(key)) return null;
+  await ensureSystemAgentProfiles(db);
+  const [override] = await db
+    .select()
+    .from(agentProfiles)
+    .where(
+      and(
+        eq(agentProfiles.workspaceId, workspaceId),
+        eq(agentProfiles.key, key),
+      ),
+    )
+    .limit(1);
+  if (override) return override;
+  const [system] = await db
+    .select()
+    .from(agentProfiles)
+    .where(
+      and(isNull(agentProfiles.workspaceId), eq(agentProfiles.key, key)),
+    )
+    .limit(1);
+  return system ?? null;
+}
+
 /**
  * Constrained profile editor — cannot add unbounded tools or raise autonomy (TASK103).
  */
@@ -186,6 +216,8 @@ export async function updateWorkspaceAgentProfile(
     strategyDefault?: string;
     maxSpendMicros?: number;
     toolAllowlist?: string[];
+    llmCredentialId?: string | null;
+    preferredModel?: string | null;
   },
 ): Promise<AgentProfile> {
   if (!BOUNDED_KEYS.has(input.key)) {
@@ -215,6 +247,17 @@ export async function updateWorkspaceAgentProfile(
     throw new ProfileError("invalid", "maxSpendMicros must be positive");
   }
 
+  if (input.llmCredentialId) {
+    const cred = await getLlmByokById(
+      db,
+      input.workspaceId,
+      input.llmCredentialId,
+    );
+    if (!cred) {
+      throw new ProfileError("invalid", "llmCredentialId not found in workspace");
+    }
+  }
+
   await ensureSystemAgentProfiles(db);
   const now = new Date();
   const [existing] = await db
@@ -227,6 +270,11 @@ export async function updateWorkspaceAgentProfile(
       ),
     )
     .limit(1);
+
+  const preferredModel =
+    input.preferredModel === undefined
+      ? undefined
+      : input.preferredModel?.trim() || null;
 
   if (existing) {
     if (existing.locked) {
@@ -242,6 +290,14 @@ export async function updateWorkspaceAgentProfile(
           input.toolAllowlist !== undefined
             ? JSON.stringify(input.toolAllowlist)
             : existing.toolAllowlistJson,
+        llmCredentialId:
+          input.llmCredentialId === undefined
+            ? existing.llmCredentialId
+            : input.llmCredentialId,
+        preferredModel:
+          preferredModel === undefined
+            ? existing.preferredModel
+            : preferredModel,
         updatedAt: now,
       })
       .where(eq(agentProfiles.id, existing.id))
@@ -274,6 +330,8 @@ export async function updateWorkspaceAgentProfile(
           : system.toolAllowlistJson,
       strategyDefault: input.strategyDefault ?? system.strategyDefault,
       maxSpendMicros: input.maxSpendMicros ?? system.maxSpendMicros,
+      llmCredentialId: input.llmCredentialId ?? null,
+      preferredModel: preferredModel ?? null,
       locked: false,
       createdAt: now,
       updatedAt: now,

@@ -36,6 +36,15 @@ export {
   type GithubIssueSummary,
 } from "./issues.js";
 export {
+  getPullRequestContext,
+  listOpenPulls,
+  submitPullRequestReview,
+  type GithubPullContext,
+  type GithubPullFileSummary,
+  type GithubPullSummary,
+} from "./pulls.js";
+
+export {
   FakeGithubDelivery,
   GithubDeliveryError,
   HttpGithubDelivery,

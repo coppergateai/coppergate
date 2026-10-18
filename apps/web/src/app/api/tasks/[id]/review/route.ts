@@ -108,7 +108,9 @@ export async function POST(request: Request, context: RouteContext) {
         );
         if (
           bound?.project.mergeEnabled &&
-          bound.project.autonomyLevel === "L2"
+          bound.project.autonomyLevel === "L2" &&
+          // Review-import tasks target an existing PR — never auto-merge it.
+          result.task.githubPrNumber == null
         ) {
           const runs = await listRunsForTask(
             db,

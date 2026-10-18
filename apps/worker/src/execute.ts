@@ -40,7 +40,11 @@ import {
   type Database,
   type Task,
 } from "@coppergate/db";
-import type { GithubDeliveryClient } from "@coppergate/github";
+import {
+  getPullRequestContext,
+  submitPullRequestReview,
+  type GithubDeliveryClient,
+} from "@coppergate/github";
 import {
   LocalSandboxManager,
   type SandboxCloneMode,
@@ -354,6 +358,38 @@ export async function executeClaimedRun(
       }
     }
 
+    const isPrReview = task.githubPrNumber != null;
+    let reviewContext: string | undefined;
+    if (isPrReview && deliveryResolved?.authToken && deliveryResolved.mode === "http") {
+      try {
+        const ctx = await getPullRequestContext({
+          token: deliveryResolved.authToken,
+          owner: deliveryResolved.repo.owner,
+          repo: deliveryResolved.repo.repo,
+          prNumber: task.githubPrNumber!,
+        });
+        reviewContext = [
+          `PR #${ctx.number}: ${ctx.title}`,
+          `URL: ${ctx.htmlUrl}`,
+          `Base: ${ctx.baseRef} ← Head: ${ctx.headRef}`,
+          ctx.body ? `Body:\n${ctx.body.slice(0, 4_000)}` : "",
+          "Files:",
+          ...ctx.files
+            .slice(0, 80)
+            .map(
+              (f) =>
+                `- ${f.filename} (${f.status}, +${f.additions}/-${f.deletions})`,
+            ),
+        ]
+          .filter(Boolean)
+          .join("\n");
+      } catch (err) {
+        log.warn("PR context fetch failed; continuing with task goal only", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     try {
       for await (const event of agent.run({
         runId: run.id,
@@ -369,9 +405,11 @@ export async function executeClaimedRun(
         spendCapMicros: run.spendCapMicros,
         strategy,
         architectureContext: strategyContext,
-        sandboxWorkdir: sandbox?.workdir,
+        sandboxWorkdir: isPrReview ? undefined : sandbox?.workdir,
         sandboxId: sandbox?.id,
         isCancelRequested: () => isRunCancelRequested(db, run.id),
+        mode: isPrReview ? "pr_review" : "implement",
+        reviewContext,
       })) {
         await renewRunLease(db, run.id, workerId, leaseMs);
 
@@ -414,7 +452,7 @@ export async function executeClaimedRun(
         }
       }
 
-      if (completion && !sawCancel) {
+      if (completion && !sawCancel && !isPrReview) {
         deliveryBundle = await buildDeliveryFiles({
           workdir: sandbox?.workdir,
           filesChanged: completion.filesChanged,
@@ -489,11 +527,13 @@ export async function executeClaimedRun(
     await renewRunLease(db, run.id, workerId, leaseMs);
 
     // Stack lint/test must run before sandbox destroy (git clone workdir).
+    // PR review tasks do not produce code patches — use fake validation gate.
     const forceFakeValidation =
       deliveryModeHint === "fake" ||
       cloneMode === "sim" ||
       !sandbox ||
-      !sandboxManager;
+      !sandboxManager ||
+      task.githubPrNumber != null;
 
     validationReport = await runStackValidation({
       goal: task.goal,
@@ -583,6 +623,7 @@ export async function executeClaimedRun(
   let repo = { owner: "example", repo: "repo", defaultBranch: "main" };
   let baseSha = run.baseSha;
   let deliveryMode = resolveDeliveryMode();
+  let authToken: string | null = null;
   if (input.github) {
     github = input.github;
     // Injected clients (tests) are treated as fake for synthetic fitness attach.
@@ -592,9 +633,12 @@ export async function executeClaimedRun(
     repo = deliveryResolved.repo;
     baseSha = deliveryResolved.baseSha;
     deliveryMode = deliveryResolved.mode;
+    authToken = deliveryResolved.authToken;
     log.info("github delivery resolved", {
       mode: deliveryResolved.mode,
       repo: `${repo.owner}/${repo.repo}`,
+      primaryFullName: project?.repository.baseRepoFullName ?? null,
+      repoRole: project?.repository.repoRole ?? null,
     });
   } else {
     const resolved = await resolveGithubDelivery(db, {
@@ -606,10 +650,152 @@ export async function executeClaimedRun(
     repo = resolved.repo;
     baseSha = resolved.baseSha;
     deliveryMode = resolved.mode;
+    authToken = resolved.authToken;
     log.info("github delivery resolved", {
       mode: resolved.mode,
       repo: `${repo.owner}/${repo.repo}`,
+      primaryFullName: project?.repository.baseRepoFullName ?? null,
+      repoRole: project?.repository.repoRole ?? null,
     });
+  }
+
+  // Fail closed: http delivery must match the project's primary binding.
+  if (
+    deliveryMode === "http" &&
+    project?.repository.repoRole === "primary" &&
+    (repo.owner !== project.repository.owner ||
+      repo.repo !== project.repository.name)
+  ) {
+    throw new Error(
+      `Delivery repo ${repo.owner}/${repo.repo} !== primary ${project.repository.baseRepoFullName}`,
+    );
+  }
+
+  // Brownfield: review an existing open PR — do not open a new PR.
+  if (task.githubPrNumber != null) {
+    const prNumber = task.githubPrNumber;
+    const prUrl =
+      deliveryMode === "http"
+        ? `https://github.com/${repo.owner}/${repo.repo}/pull/${prNumber}`
+        : `https://github.com/${repo.owner}/${repo.repo}/pull/${prNumber}`;
+    const reviewBody =
+      (typeof completion.reviewBody === "string" &&
+        completion.reviewBody.trim()) ||
+      `## Coppergate review\n\nAutomated review for task \`${task.id}\` / run \`${run.id}\`.\n`;
+
+    if (deliveryMode === "http" && authToken) {
+      await submitPullRequestReview({
+        token: authToken,
+        owner: repo.owner,
+        repo: repo.repo,
+        prNumber,
+        body: reviewBody,
+        event: "COMMENT",
+      });
+    }
+
+    await appendRunEvent(db, {
+      runId: run.id,
+      workspaceId: run.workspaceId,
+      kind: "evidence",
+      payload: {
+        message:
+          deliveryMode === "http" && authToken
+            ? "PR review comment posted"
+            : "PR review prepared (fake delivery — no GitHub POST)",
+        prUrl,
+        prNumber,
+        reviewMode: true,
+        repo: `${repo.owner}/${repo.repo}`,
+      },
+    });
+
+    await persistDeliveryArtifacts(db, {
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      taskId: task.id,
+      runId: run.id,
+      diff: buildDiffSummary({
+        branchName: `review/pr-${prNumber}`,
+        headSha: run.baseSha,
+        baseSha: run.baseSha,
+        filesChanged: [],
+        notes: ["PR review — no code delivery"],
+      }),
+      report: buildDeliveryReport({
+        taskId: task.id,
+        runId: run.id,
+        prUrl,
+        prNumber,
+        branchName: `review/pr-${prNumber}`,
+        headSha: run.baseSha,
+        actualCostMicros: actualCost,
+        validationPassed: true,
+        filesChanged: [],
+        previewUrl: null,
+        previewError: "Preview not applicable for PR review tasks",
+      }),
+    });
+
+    await applyTaskTransition(db, {
+      workspaceId: run.workspaceId,
+      taskId: task.id,
+      toStatus: "REVIEW_REQUIRED",
+      actor: `worker:${workerId}`,
+      reason: "PR review posted — human review required",
+    }).catch((err: unknown) => {
+      log.warn("task REVIEW_REQUIRED transition skipped", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    const awaiting = await markRunAwaitingReview(db, {
+      runId: run.id,
+      workerId,
+      branchName: `review/pr-${prNumber}`,
+      headSha: run.baseSha,
+      prNumber,
+      prUrl,
+      actualCostMicros: actualCost,
+      previewUrl: null,
+    });
+
+    await persistReviewFindings(db, {
+      workspaceId: run.workspaceId,
+      run: awaiting,
+    }).catch((err: unknown) => {
+      log.warn("review findings skipped", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    void notifyWorkspace(db, {
+      event: "review_ready",
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      taskId: task.id,
+      runId: run.id,
+      message: `PR review ready: ${task.title}`,
+      meta: { prUrl, reviewMode: true },
+    }).catch(() => undefined);
+
+    if (actualCost > 0) {
+      await appendUsageEvent(db, {
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        taskId: task.id,
+        runId: run.id,
+        kind: "llm_tokens",
+        costMicros: actualCost,
+        quantity: String(completion.estimatedTokens),
+        provider: usageProvider,
+        model: usageModel,
+      });
+    }
+
+    await setTaskPrUrl(db, task.id, prUrl);
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
+    return "review_required";
   }
 
   const issueLine =
@@ -657,6 +843,8 @@ export async function executeClaimedRun(
       headSha: delivery.headSha,
       branchName: delivery.branchName,
       created: delivery.created,
+      repo: `${repo.owner}/${repo.repo}`,
+      repoRole: "primary",
     },
   });
 

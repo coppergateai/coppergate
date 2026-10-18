@@ -2,6 +2,8 @@
  * CodingAgent port — ARCHITECTURE §5.6.
  */
 
+export type AgentRunMode = "implement" | "pr_review";
+
 export type AgentRunInput = {
   runId: string;
   taskId: string;
@@ -24,6 +26,10 @@ export type AgentRunInput = {
   sandboxId?: string;
   /** Cooperative cancel check between events. */
   isCancelRequested?: () => boolean | Promise<boolean>;
+  /** implement (default) opens/updates code; pr_review posts review markdown only. */
+  mode?: AgentRunMode;
+  /** Extra PR context for pr_review mode (title, files, etc.). */
+  reviewContext?: string;
 };
 
 export type AgentEventKind =
@@ -49,6 +55,8 @@ export type FakeCompletionPayload = {
   filesChanged: string[];
   estimatedTokens: number;
   actualCostMicros: number;
+  /** Present when mode is pr_review — markdown review body for GitHub COMMENT. */
+  reviewBody?: string;
 };
 
 export interface CodingAgent {

@@ -13,7 +13,11 @@ import {
   upsertGithubInstallation,
 } from "./github.js";
 import { createProjectWithRepo } from "./projects.js";
-import { auditEvents, githubInstallations } from "./schema.js";
+import {
+  auditEvents,
+  githubInstallations,
+  repositoryConnections,
+} from "./schema.js";
 import {
   createWorkspaceWithOwner,
   getWorkspaceForMember,
@@ -71,13 +75,21 @@ describe("deletion controls", { skip: !url }, () => {
     await closeDb(db);
   });
 
-  it("archives a project and audits", async () => {
+  it("archives a project, unbinds repos, and audits", async () => {
     const archived = await archiveProject(db, {
       workspaceId,
       projectId,
       actor: ownerId,
     });
     assert.equal(archived.status, "archived");
+
+    const [conn] = await db
+      .select()
+      .from(repositoryConnections)
+      .where(eq(repositoryConnections.workspaceId, workspaceId))
+      .limit(1);
+    assert.ok(conn);
+    assert.equal(conn.projectId, null);
 
     const audits = await db
       .select()

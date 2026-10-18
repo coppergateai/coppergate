@@ -67,6 +67,44 @@ export class FakeCodingAgent implements CodingAgent {
       return;
     }
 
+    if (input.mode === "pr_review") {
+      yield {
+        kind: "progress",
+        message: "Drafting PR review",
+        payload: { mode: "pr_review" },
+      };
+      if (await cancelled()) {
+        yield {
+          kind: "error",
+          message: "Cancelled",
+          payload: { code: "cancelled" },
+        };
+        return;
+      }
+      const costMicros = Math.min(
+        15_000,
+        input.spendCapMicros > 0 ? input.spendCapMicros : 15_000,
+      );
+      yield {
+        kind: "cost",
+        message: "Token usage estimate",
+        payload: {
+          estimatedTokens: 800,
+          costMicros,
+          provider: "fake",
+          model: "fake-coding-agent-v1",
+          mode: "pr_review",
+        },
+      };
+      const completion = buildFakeCompletion(input, costMicros);
+      yield {
+        kind: "completion",
+        message: "Fake PR review ready (not DONE)",
+        payload: completion as unknown as Record<string, unknown>,
+      };
+      return;
+    }
+
     const path = input.allowedPaths[0] ?? "app/page.tsx";
     yield {
       kind: "tool",
@@ -147,6 +185,31 @@ export function buildFakeCompletion(
   );
   const prNumber =
     (parseInt(shortId(input.taskId).slice(0, 4), 16) % 9000) + 1000;
+  if (input.mode === "pr_review") {
+    return {
+      branchName: `review/pr-${slug}`,
+      headSha,
+      prNumber,
+      prUrl: `https://github.com/example/repo/pull/${prNumber}`,
+      filesChanged: [],
+      estimatedTokens: 800,
+      actualCostMicros,
+      reviewBody: [
+        "## Coppergate review (fake)",
+        "",
+        "### Summary",
+        `Reviewed task \`${input.taskId}\` against scope: ${input.scope}`,
+        "",
+        "### Findings",
+        "- No blocking issues in fake mode.",
+        "- Confirm CI and ownership before merge.",
+        "",
+        "### Verdict",
+        "COMMENT — human approval still required.",
+      ].join("\n"),
+    };
+  }
+
   const filesChanged = [
     input.allowedPaths[0] ?? "app/page.tsx",
     "README.md",

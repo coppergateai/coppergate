@@ -102,6 +102,19 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       return;
     }
 
+    if (input.mode === "pr_review") {
+      const reviewBody = result.content.trim() || DEFAULT_PR_REVIEW_BODY;
+      const completion = buildFakeCompletion(input, costMicros);
+      completion.filesChanged = [];
+      completion.reviewBody = reviewBody;
+      yield {
+        kind: "completion",
+        message: "PR review ready (not DONE)",
+        payload: completion as unknown as Record<string, unknown>,
+      };
+      return;
+    }
+
     const relPath = resolveWritePath(input.allowedPaths);
     const workdir = input.sandboxWorkdir?.trim();
     if (workdir) {
@@ -178,7 +191,38 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
   }
 }
 
+const DEFAULT_PR_REVIEW_BODY = `## Coppergate review
+
+### Summary
+Automated review of the pull request.
+
+### Findings
+- Please verify tests and CI before merge.
+
+### Verdict
+COMMENT — human approval still required.`;
+
 function buildPrompt(input: AgentRunInput): string {
+  if (input.mode === "pr_review") {
+    const lines = [
+      "You are reviewing an existing GitHub pull request.",
+      "Write a structured markdown review only — do NOT propose code patches or new files.",
+      `Goal / PR description: ${input.goal}`,
+      `Scope: ${input.scope}`,
+      `Acceptance: ${input.acceptanceCriteria.join("; ")}`,
+    ];
+    if (input.reviewContext?.trim()) {
+      lines.push(`PR context:\n${input.reviewContext.trim()}`);
+    }
+    if (input.architectureContext?.trim()) {
+      lines.push(`Extra context: ${input.architectureContext.trim()}`);
+    }
+    lines.push(
+      "Sections: Summary, Findings (bullets), Risks, Verdict (COMMENT only).",
+    );
+    return lines.join("\n");
+  }
+
   const lines = [
     `Goal: ${input.goal}`,
     `Scope: ${input.scope}`,

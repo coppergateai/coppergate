@@ -213,6 +213,7 @@ export {
   promotePrimaryRepo,
   resolveProjectStack,
   setProjectMultiRepoPolicy,
+  unbindReposForProject,
   updateProjectStack,
   type CreateProjectInput,
   type ProjectWithRepo,
@@ -359,11 +360,18 @@ export {
 } from "./delivery-artifacts.js";
 export {
   CredentialError,
+  createLlmByok,
   getActiveLlmByok,
+  getDefaultLlmByok,
+  getLlmByokById,
+  listLlmByok,
   purgeLlmByokCredentials,
   revokeLlmByok,
   rotateLlmByokCredential,
+  setDefaultLlmByok,
+  suggestLlmConnectionLabel,
   touchLlmByokUsed,
+  updateLlmByok,
   upsertLlmByok,
   type LlmByokMeta,
 } from "./credentials.js";
@@ -400,6 +408,10 @@ export {
   IssueImportError,
   importGithubIssueAsTask,
 } from "./issue-import.js";
+export {
+  PrImportError,
+  importGithubPrAsTask,
+} from "./pr-import.js";
 export {
   setProjectAutonomyLevel,
   setProjectMergeEnabled,
@@ -439,6 +451,7 @@ export {
   SYSTEM_PROFILE_SEEDS,
   applySpawnProfilesToArena,
   ensureSystemAgentProfiles,
+  getEffectiveAgentProfile,
   listAgentProfiles,
   resolveSpawnProfileKeys,
   updateWorkspaceAgentProfile,

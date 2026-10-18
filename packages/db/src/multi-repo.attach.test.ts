@@ -6,6 +6,7 @@ import {
   attachSecondaryRepo,
   createProjectWithRepo,
   detachSecondaryRepo,
+  getProjectForWorkspace,
   listReposForProject,
   ProjectBindError,
   promotePrimaryRepo,
@@ -20,6 +21,8 @@ describe("multi-repo attach", { skip: !url }, () => {
   let workspaceId = "";
   let primaryConn = "";
   let secondaryConn = "";
+  /** Connected before primary — wins unfiltered projectId joins (dogfood bug). */
+  let earlySecondaryConn = "";
   let projectId = "";
 
   before(async () => {
@@ -41,6 +44,19 @@ describe("multi-repo attach", { skip: !url }, () => {
       accountLogin: "org-mrepo",
       status: "active",
     });
+
+    // Insert first so PostgreSQL often returns this row on an unfiltered join.
+    earlySecondaryConn = (
+      await connectRepository(db, {
+        workspaceId,
+        installationId: install.id,
+        githubRepoId: "900",
+        owner: "org-mrepo",
+        name: "website",
+        defaultBranch: "main",
+        baseRepoFullName: "org-mrepo/website",
+      })
+    ).id;
 
     primaryConn = (
       await connectRepository(db, {
@@ -98,8 +114,16 @@ describe("multi-repo attach", { skip: !url }, () => {
     await setProjectMultiRepoPolicy(db, {
       workspaceId,
       projectId,
-      policy: { enabled: true, maxSecondaryRepos: 2, coordinatedPrs: false },
+      policy: { enabled: true, maxSecondaryRepos: 3, coordinatedPrs: false },
     });
+    // Attach early-created website first — reproduces dogfood join-order hazard.
+    const early = await attachSecondaryRepo(db, {
+      workspaceId,
+      projectId,
+      repositoryConnectionId: earlySecondaryConn,
+    });
+    assert.equal(early.repoRole, "secondary");
+
     const attached = await attachSecondaryRepo(db, {
       workspaceId,
       projectId,
@@ -109,7 +133,17 @@ describe("multi-repo attach", { skip: !url }, () => {
     assert.equal(attached.projectId, projectId);
 
     const repos = await listReposForProject(db, workspaceId, projectId);
-    assert.equal(repos.length, 2);
+    assert.equal(repos.length, 3);
+    // Primary first even when an older secondary would win an unfiltered join.
+    assert.equal(repos[0]?.repoRole, "primary");
+    assert.equal(repos[0]?.id, primaryConn);
+
+    const bound = await getProjectForWorkspace(db, workspaceId, projectId);
+    assert.ok(bound);
+    assert.equal(bound.repository.repoRole, "primary");
+    assert.equal(bound.repository.id, primaryConn);
+    assert.equal(bound.repository.baseRepoFullName, "org-mrepo/primary");
+    assert.notEqual(bound.repository.baseRepoFullName, "org-mrepo/website");
   });
 
   it("promotes secondary to primary", async () => {
@@ -131,8 +165,14 @@ describe("multi-repo attach", { skip: !url }, () => {
       repositoryConnectionId: primaryConn,
     });
     assert.equal(detached.projectId, null);
+    await detachSecondaryRepo(db, {
+      workspaceId,
+      projectId,
+      repositoryConnectionId: earlySecondaryConn,
+    });
     const repos = await listReposForProject(db, workspaceId, projectId);
     assert.equal(repos.length, 1);
     assert.equal(repos[0]?.id, secondaryConn);
+    assert.equal(repos[0]?.repoRole, "primary");
   });
 });

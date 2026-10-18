@@ -325,6 +325,8 @@ export const tasks = pgTable(
     prUrl: text("pr_url"),
     /** Linked GitHub issue number when imported (TASK040). */
     githubIssueNumber: integer("github_issue_number"),
+    /** Source open PR to review (brownfield) — not a Coppergate-created PR. */
+    githubPrNumber: integer("github_pr_number"),
     priority: integer("priority").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -880,6 +882,9 @@ export const agentProfiles = pgTable(
       .default(100_000),
     /** Cannot raise autonomy via profile editor (SECURITY) */
     locked: boolean("locked").notNull().default(false),
+    /** Optional BYOK connection for this profile (workspace overrides only). */
+    llmCredentialId: uuid("llm_credential_id"),
+    preferredModel: text("preferred_model"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -890,6 +895,7 @@ export const agentProfiles = pgTable(
   (t) => [
     uniqueIndex("agent_profiles_ws_key_uidx").on(t.workspaceId, t.key),
     index("agent_profiles_key_idx").on(t.key),
+    index("agent_profiles_llm_credential_id_idx").on(t.llmCredentialId),
   ],
 );
 
@@ -979,7 +985,7 @@ export const autoArmRules = pgTable(
   ],
 );
 
-/** Sealed BYOK / integration secrets — TASK037. */
+/** Sealed BYOK / integration secrets — TASK037 / multi-LLM. */
 export const integrationCredentials = pgTable(
   "integration_credentials",
   {
@@ -989,10 +995,14 @@ export const integrationCredentials = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     /** llm_byok | … */
     provider: text("provider").notNull().default("llm_byok"),
+    /** Connection slug (unique per workspace+provider), e.g. openai-gpt-4o */
     label: text("label").notNull().default("default"),
+    /** openai | groq | openrouter | ollama | lmstudio | custom */
+    vendor: text("vendor").notNull().default("custom"),
     encryptedPayload: text("encrypted_payload").notNull(),
     baseUrl: text("base_url"),
     model: text("model"),
+    isDefault: boolean("is_default").notNull().default(false),
     /** active | revoked */
     status: text("status").notNull().default("active"),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
@@ -1004,9 +1014,10 @@ export const integrationCredentials = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("integration_credentials_ws_provider_uidx").on(
+    uniqueIndex("integration_credentials_ws_provider_label_uidx").on(
       t.workspaceId,
       t.provider,
+      t.label,
     ),
     index("integration_credentials_workspace_id_idx").on(t.workspaceId),
   ],

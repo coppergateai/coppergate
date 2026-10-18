@@ -3,6 +3,7 @@ import type { Database } from "./client.js";
 import { recordAuditEvent } from "./briefs.js";
 import { purgeLlmByokCredentials } from "./credentials.js";
 import { markInstallationRemoved } from "./github.js";
+import { unbindReposForProject } from "./projects.js";
 import { projects, workspaces, type Project, type Workspace } from "./schema.js";
 
 /** Soft-deleted workspaces are hard-purged after this retention window. */
@@ -117,13 +118,19 @@ export async function archiveProject(
     throw new DeletionError("not_found", "Project not found");
   }
 
+  /** Release all bound repos so they can re-attach (e.g. multi-repo dogfood). */
+  const unbound = await unbindReposForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+  });
+
   await recordAuditEvent(db, {
     workspaceId: input.workspaceId,
     actor: input.actor,
     action: "project.archived",
     targetType: "project",
     targetId: input.projectId,
-    meta: { name: row.name },
+    meta: { name: row.name, unboundRepos: unbound.length },
   });
 
   return row;

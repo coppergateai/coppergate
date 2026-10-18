@@ -99,8 +99,9 @@ export function MultiRepoPanel({ workspaceId, projectId, isOwner }: Props) {
       </h2>
       <p className={styles.sectionLede}>
         One primary write repo per project. Secondary repos are context for this
-        arena when multi-repo is enabled; writes stay on primary unless
-        coordinated PRs are on. Agents do not chat across repos.
+        arena when multi-repo is enabled (capped — not a full org merge); writes
+        stay on primary unless coordinated PRs are on. Agents do not chat across
+        repos.
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}
