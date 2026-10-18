@@ -29,9 +29,9 @@ const themeInitScript = `(function(){try{var t=localStorage.getItem("cg-theme");
 const siteUrl =
   process.env.APP_URL?.replace(/\/$/, "") || "https://www.coppergate.ai";
 
-const title = "Coppergate — Agents compete. Survivors ship.";
+const title = "Coppergate — Set a budget. Agents war. Survivors ship.";
 const description =
-  "Give Coppergate an engineering task. Multiple AI agents compete to solve it. Coppergate verifies quality and cost, then delivers the strongest qualifying result as a pull request.";
+  "Set a monthly spend cap. Agents compete on your project — losers get eliminated, winners ship and improve. Coppergate turns selection pressure into agent cost efficiency.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
