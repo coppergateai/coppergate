@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { Database } from "./client.js";
 import { waitlistSignups, type WaitlistSignup } from "./schema.js";
@@ -51,4 +51,11 @@ export async function joinWaitlist(
     throw new Error("waitlist_lookup_failed");
   }
   return { status: "already", row: existing };
+}
+
+/** Newest-first waitlist export for Phase 0 outreach. */
+export async function listWaitlistSignups(
+  db: Database,
+): Promise<WaitlistSignup[]> {
+  return db.select().from(waitlistSignups).orderBy(desc(waitlistSignups.createdAt));
 }

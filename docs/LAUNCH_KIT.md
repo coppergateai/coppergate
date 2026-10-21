@@ -1,6 +1,8 @@
 # Launch kit — distribution content
 
-Use with [GTM.md](./GTM.md). Prefer real cost/fail evidence over vapor.
+Use with [GTM.md](./GTM.md) after Phase 0 go. Prefer real cost/fail evidence over vapor.
+
+Ready-to-paste posts: [`launch/show-hn.md`](./launch/show-hn.md) · [`launch/indie-hackers.md`](./launch/indie-hackers.md) · [`launch/failed-run-template.md`](./launch/failed-run-template.md).
 
 ## Hero demo (90s script)
 
@@ -14,39 +16,16 @@ Line: **“I armed an arena. Contenders fought. The survivor opened a tested PR.
 
 ## Channels
 
-| Channel | Angle |
-|---|---|
-| Indie Hackers | Solo founder babysitting agents → spend-capped arena |
-| Hacker News Show HN | Honest limitations + cost/accepted PR numbers |
-| X / Instagram `@coppergateai` | Short tournament board clips + Selection thesis |
-| Medium | Selection over Supervision (existing article) |
+| Channel | Angle | Asset |
+|---|---|---|
+| Indie Hackers | Solo founder babysitting agents → spend-capped arena | [launch/indie-hackers.md](./launch/indie-hackers.md) |
+| Hacker News Show HN | Honest limitations + cost/accepted PR numbers | [launch/show-hn.md](./launch/show-hn.md) |
+| X / Instagram `@coppergateai` | Short tournament board clips + Selection thesis | [failed-run-template](./launch/failed-run-template.md) |
+| Medium | Selection over Supervision (existing article) | architecture `docs/articles/` |
 
-## Post templates
+## One-session TTFV (product)
 
-### Show HN
-
-```
-Show HN: Coppergate – agents compete; survivors open the PR
-
-Wedge: GitHub issue → verified PR under a hard spend cap.
-Selection (CI + efficiency) over human approval inbox.
-
-Limitations: nextjs_ts strongest path; private beta invite-gated.
-Happy to share median cost per accepted PR from design partners.
-```
-
-### Failed-run post (trust)
-
-```
-Arena run failed today — here's the ledger.
-
-Task: {title}
-Spend before fail: ${x}
-Why: {ci_failed | sandbox | agent}
-Recovery: Retry in-product (no operator). Docs: /docs/recovery
-
-Selection pressure only works if failures are visible.
-```
+Onboarding title **Path to first PR**: budget → Import→queue issue → worker PR → Accept on green CI. Recovery: [/docs/recovery](/docs/recovery). Pricing: [/docs/pricing](/docs/pricing) ($99 / $199).
 
 ## Assets
 
@@ -59,3 +38,4 @@ Selection pressure only works if failures are visible.
 - Inject promo text into customer PRs without opt-in attribution.
 - Promise Bitbucket/ADO/SSO in public launch copy.
 - Lead with org charts or chat-employee metaphors.
+- Post Show HN before you have at least one second-accepted-PR story or clear cost numbers.

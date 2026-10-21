@@ -15,6 +15,8 @@ describe("billing helpers", () => {
   it("normalizes status", () => {
     assert.equal(normalizeSubscriptionStatus("active"), "active");
     assert.equal(normalizeSubscriptionStatus("weird"), "incomplete");
+    assert.equal(normalizeSubscriptionStatus("unpaid"), "past_due");
+    assert.equal(normalizeSubscriptionStatus("incomplete_expired"), "past_due");
   });
 
   it("effectivePlan requires active/trialing", () => {

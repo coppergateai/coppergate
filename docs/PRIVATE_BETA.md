@@ -49,7 +49,7 @@ See [WEDGE.md](./WEDGE.md) and [GTM.md](./GTM.md) for paid-pilot process.
 
 Checklist: [WEDGE.md](./WEDGE.md) (staging proven 2026-10-17 — [PR #5](https://github.com/coppergateai/coppergate-staging-smoke/pull/5)). Recovery: [/docs/recovery](/docs/recovery). Billing smoke: [`scripts/manual-billing-smoke.md`](../scripts/manual-billing-smoke.md). Sonar/CI-fail seed scripts are a **secondary** vertical — not the join path.
 
-Paid / waitlist ops: [PILOT_OUTREACH.md](./PILOT_OUTREACH.md). Self-serve failure recovery: [/docs/recovery](/docs/recovery).
+Paid / waitlist ops: [PHASE0_OPS.md](./PHASE0_OPS.md) · [PILOT_OUTREACH.md](./PILOT_OUTREACH.md) · [CONCIERGE_RUNBOOK.md](./CONCIERGE_RUNBOOK.md). Self-serve failure recovery: [/docs/recovery](/docs/recovery). Stripe: [STRIPE_PRODUCTION.md](./STRIPE_PRODUCTION.md).
 
 ## Ops
 

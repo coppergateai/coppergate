@@ -57,6 +57,37 @@ export async function createPilotInvite(
   return row;
 }
 
+export async function getPilotInviteByCode(
+  db: Database,
+  code: string,
+): Promise<PilotInvite | null> {
+  const normalized = normalizeInviteCode(code);
+  const [row] = await db
+    .select()
+    .from(pilotInvites)
+    .where(eq(pilotInvites.code, normalized))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Append or replace operator note (WTP / concierge checklist). */
+export async function updatePilotInviteNote(
+  db: Database,
+  code: string,
+  note: string,
+): Promise<PilotInvite> {
+  const normalized = normalizeInviteCode(code);
+  const [row] = await db
+    .update(pilotInvites)
+    .set({ note, updatedAt: new Date() })
+    .where(eq(pilotInvites.code, normalized))
+    .returning();
+  if (!row) {
+    throw new InviteError("invalid", "Invite code not found");
+  }
+  return row;
+}
+
 /**
  * Redeem an invite for workspace creation. Increments use_count atomically.
  */

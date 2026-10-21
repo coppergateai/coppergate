@@ -1,0 +1,41 @@
+id,name,handle,channel,email,invite_code,status,notes
+1,Levels.io,@levelsio,x/indiehackers,,PAID-001,ready,Public indie hacker; AI tooling discourse
+2,Pieter Levels circle,@levelsio_peers,indiehackers,,PAID-002,ready,IH builders babysitting agents
+3,Marc Lou,@marc_louv,x,,PAID-003,ready,Ships fast; agent PR pain likely
+4,Tony Dinh,@tdinh_me,x,,PAID-004,ready,Devtools founder
+5,Danny Postma,@dannypostmaa,x,,PAID-005,ready,AI product builder
+6,Steven Tey,@steventey,x,,PAID-006,ready,OSS + AI adjacent
+7,Guillermo Rauch adjacent builders,@rauchg_orbit,x,,PAID-007,ready,Next.js / Vercel ecosystem founders
+8,OpenHands users,@all-hands-ai,github/discord,,PAID-008,ready,Already run coding agents
+9,Aider power users,@paul-gauthier,github,,PAID-009,ready,CLI agent → want CI gate
+10,Continue.dev builders,@continuedev,discord,,PAID-010,ready,IDE agent users
+11,Cursor power users,cursor-forum,forum,,PAID-011,ready,Cloud agent babysitters
+12,Devin early adopters,cognition-waitlist,linkedin,,PAID-012,ready,Compare autonomy + spend
+13,Tempo-class factory refugees,tempo-alts,linkedin,,PAID-013,ready,HITL fatigue
+14,Paperclip explorers,@paperclipai,x,,PAID-014,ready,Company OS ≠ survivor
+15,OpenClaw explorers,@openclaw,x,,PAID-015,ready,Chat employee ≠ arena
+16,Sentry-heavy SaaS founder,sentry-icp,linkedin,,PAID-016,ready,Secondary: alert→PR later
+17,CI-fail haunted team,gh-actions-pain,github,,PAID-017,ready,Secondary signal vertical
+18,Solo Next.js founder A,nextjs-solo-a,indiehackers,,PAID-018,ready,nextjs_ts best path
+19,Solo Next.js founder B,nextjs-solo-b,indiehackers,,PAID-019,ready,nextjs_ts best path
+20,Solo Next.js founder C,nextjs-solo-c,indiehackers,,PAID-020,ready,nextjs_ts best path
+21,Y Combinator W26 builder,yc-w26-ai,email,,PAID-021,ready,Technical solo
+22,Y Combinator alumni micro-SaaS,yc-micro,email,,PAID-022,ready,Budget-capped ops
+23,Turkish indie hacker A,tr-ih-a,x,,PAID-023,ready,Local network warm intro
+24,Turkish indie hacker B,tr-ih-b,x,,PAID-024,ready,Local network warm intro
+25,Turkish indie hacker C,tr-ih-c,linkedin,,PAID-025,ready,Local network warm intro
+26,GitHub Sponsors maintainer,gh-maintainer,github,,PAID-026,ready,Issue backlog → PR wedge
+27,Popular OSS issue triage lead,oss-triage,github,,PAID-027,ready,Issue→PR volume
+28,Bounty hunter turned founder,bounty-founder,x,,PAID-028,ready,Wants selection not inbox
+29,Agency freelancers AI ops,agency-ai,linkedin,,PAID-029,ready,Client repo PR delivery
+30,Product Hunt makers club,ph-makers,producthunt,,PAID-030,ready,Launch-aware builders
+31,Hacker News Show HN regulars,hn-showhn,hn,,PAID-031,ready,Warm for Phase 1 launch
+32,Reddit r/SideProject builders,r-sideproject,reddit,,PAID-032,ready,Solo founder ICP
+33,Reddit r/MachineLearning eng,r-ml-eng,reddit,,PAID-033,ready,Agent orchestration curious
+34,Latent Space listeners,latent-space,podcast,,PAID-034,ready,AI eng podcast audience
+35,AI Engineer meetup attendee,aieng-meetup,meetup,,PAID-035,ready,In-person follow-up
+36,Waitlist signup warm-1,waitlist-1,waitlist,,PAID-036,ready,Fill email via ops:waitlist
+37,Waitlist signup warm-2,waitlist-2,waitlist,,PAID-037,ready,Fill email via ops:waitlist
+38,Waitlist signup warm-3,waitlist-3,waitlist,,PAID-038,ready,Fill email via ops:waitlist
+39,Waitlist signup warm-4,waitlist-4,waitlist,,PAID-039,ready,Fill email via ops:waitlist
+40,Waitlist signup warm-5,waitlist-5,waitlist,,PAID-040,ready,Fill email via ops:waitlist

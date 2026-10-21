@@ -35,17 +35,21 @@ packages/
 
 Commercial wedge (**D14**): GitHub **issue → verified PR**. Playbooks:
 
+- [`docs/PHASE0_OPS.md`](./docs/PHASE0_OPS.md) — 30-day paid-proof checklist
 - [`docs/GTM.md`](./docs/GTM.md) — path to $1M ARR
-- [`docs/WEDGE.md`](./docs/WEDGE.md) · [`docs/PILOT_OUTREACH.md`](./docs/PILOT_OUTREACH.md)
+- [`docs/STRIPE_PRODUCTION.md`](./docs/STRIPE_PRODUCTION.md) · [`docs/EMAIL.md`](./docs/EMAIL.md)
+- [`docs/WEDGE.md`](./docs/WEDGE.md) · [`docs/PILOT_OUTREACH.md`](./docs/PILOT_OUTREACH.md) · [`docs/CONCIERGE_RUNBOOK.md`](./docs/CONCIERGE_RUNBOOK.md)
 - [`docs/EXPAND_PULL.md`](./docs/EXPAND_PULL.md) · [`docs/LAUNCH_KIT.md`](./docs/LAUNCH_KIT.md)
 
 ```bash
-DATABASE_URL=… pnpm exec tsx scripts/list-waitlist.mjs
-DATABASE_URL=… pnpm exec tsx scripts/create-pilot-invite.mjs PAID-DEMO 1 paid_pilot
-DATABASE_URL=… pnpm exec tsx scripts/pilot-go-no-go.mjs
+pnpm ops:stripe-env
+pnpm ops:waitlist
+pnpm ops:outreach-pack          # 40 ICP invites + outbox
+pnpm ops:pilot-invite -- PAID-DEMO 1 paid_pilot
+pnpm ops:pilot-go-no-go
 ```
 
-Hosted billing: set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` — owners upgrade under **Settings → Billing**.
+Hosted billing: Starter **$99** / Pro **$199** — set `STRIPE_*` Price IDs; owners upgrade under **Settings → Billing**.
 
 ## Prerequisites
 

@@ -200,7 +200,7 @@ export default async function ProjectDetailPage({
                       id: "budget",
                       title: "Set an active spend cap",
                       detail:
-                        "Hard cap is selection pressure — pause blocks new runs.",
+                        "Hard cap is selection pressure — pause blocks new runs. Start at $25–50 for the first issue.",
                       href: hasBudget
                         ? undefined
                         : `${basePath}?tab=overview#budget`,
@@ -211,7 +211,7 @@ export default async function ProjectDetailPage({
                       id: "issue",
                       title: "Import → queue a GitHub issue",
                       detail:
-                        "Primary wedge: Issues panel → Import → queue (one small open issue). PR will include Closes #N.",
+                        "Primary wedge in one session: Issues → Import → queue (one tiny open issue). PR will include Closes #N.",
                       href: hasIssueTask
                         ? undefined
                         : `${basePath}?tab=overview#issues`,
@@ -222,7 +222,7 @@ export default async function ProjectDetailPage({
                       id: "task",
                       title: "Wait for the worker PR",
                       detail:
-                        "Autonomy ≥ L1. Hosted worker claims the queue; stay on the task until REVIEW_REQUIRED.",
+                        "Autonomy ≥ L1. Hosted worker claims the queue; stay on Delivery until REVIEW_REQUIRED — do not leave mid-run.",
                       href: hasQueuedOrBeyond
                         ? undefined
                         : `${basePath}?tab=delivery`,
@@ -233,7 +233,7 @@ export default async function ProjectDetailPage({
                       id: "review",
                       title: "Review cost, diff, and CI — then Accept",
                       detail:
-                        "Accept stays closed while CI is pending or failed. Recovery: /docs/recovery.",
+                        "Accept stays closed while CI is pending or failed. Then queue a second small issue within 7 days.",
                       href: hasAcceptedPr
                         ? undefined
                         : `${basePath}?tab=delivery`,
