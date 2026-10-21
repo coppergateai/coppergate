@@ -77,4 +77,52 @@ describe("runStackValidation", () => {
     assert.equal(report.passed, true);
     assert.ok(calls.some((c) => c[0] === "npm" && c[2] === "lint"));
   });
+
+  it("runs go test when go.mod present", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "cg-stack-go-"));
+    await writeFile(join(workdir, "go.mod"), "module example.com/x\n", "utf8");
+    const calls: string[][] = [];
+    const report = await runStackValidation({
+      goal: "ship go fix",
+      acceptanceCriteria: ["ok"],
+      completion: {
+        ...completion,
+        filesChanged: ["cmd/server/main.go"],
+      },
+      workdir,
+      stack: "go",
+      forceFake: false,
+      exec: async (command) => {
+        calls.push(command);
+        return { exitCode: 0, stdout: "ok", stderr: "", durationMs: 1 };
+      },
+    });
+    assert.equal(report.validator, "stack-v1");
+    assert.equal(report.passed, true);
+    assert.ok(
+      calls.some((c) => c[0] === "go" && c[1] === "test" && c[2] === "./..."),
+    );
+    assert.ok(report.checks.some((c) => c.name === "go_test" && c.passed));
+  });
+
+  it("fails go stack when go test exits non-zero", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "cg-stack-go-fail-"));
+    await writeFile(join(workdir, "go.mod"), "module example.com/x\n", "utf8");
+    const report = await runStackValidation({
+      goal: "ship go fix",
+      acceptanceCriteria: ["ok"],
+      completion,
+      workdir,
+      stack: "go",
+      forceFake: false,
+      exec: async () => ({
+        exitCode: 1,
+        stdout: "",
+        stderr: "FAIL",
+        durationMs: 1,
+      }),
+    });
+    assert.equal(report.passed, false);
+    assert.ok(report.checks.some((c) => c.name === "go_test" && !c.passed));
+  });
 });

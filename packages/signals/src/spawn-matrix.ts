@@ -6,6 +6,8 @@
 export const BOUNDED_PROFILE_KEYS = [
   "fixer",
   "engineer",
+  "proposer",
+  "reviewer",
   "security",
   "perf",
   "docs",
@@ -20,11 +22,14 @@ export type BoundedProfileKey = (typeof BOUNDED_PROFILE_KEYS)[number];
 export const DEFAULT_SPAWN_MATRIX: Record<string, BoundedProfileKey[]> = {
   fake: ["fixer"],
   sonar: ["fixer", "security"],
-  ci_failure: ["fixer"],
+  ci_failure: ["fixer", "engineer"],
   sentry: ["fixer"],
   datadog: ["fixer"],
-  jira: ["engineer"],
-  linear: ["engineer"],
+  jira: ["engineer", "proposer"],
+  linear: ["engineer", "proposer"],
+  github_issue: ["engineer", "proposer"],
+  vision_replan: ["proposer", "engineer"],
+  maintainer: ["engineer", "reviewer"],
   azure_boards: ["engineer"],
   asana: ["engineer"],
   clickup: ["engineer"],
@@ -40,7 +45,7 @@ export const DEFAULT_SPAWN_MATRIX: Record<string, BoundedProfileKey[]> = {
   pagerduty: ["fixer"],
   opsgenie: ["fixer"],
   bugsnag: ["fixer"],
-  "*": ["fixer"],
+  "*": ["fixer", "engineer"],
 };
 
 export function isBoundedProfileKey(key: string): key is BoundedProfileKey {
@@ -81,10 +86,28 @@ export const PROFILE_CATALOG: ProfileSeed[] = [
     key: "engineer",
     displayName: "Engineer",
     promptGuidance:
-      "Implement the feature or issue within scope and acceptance criteria. Keep diffs reviewable.",
+      "Implement the feature or issue within scope and acceptance criteria. Keep diffs reviewable. For Go repos prefer go test ./... and small packages.",
     toolAllowlist: ["read", "edit", "test", "git"],
     strategyDefault: "balanced",
     maxSpendMicros: 120_000,
+  },
+  {
+    key: "proposer",
+    displayName: "Proposer",
+    promptGuidance:
+      "Propose the next smallest high-ROI improvement from the vision brief. Prefer bugs, CI, and docs over large features. Output a scoped task, not a rewrite.",
+    toolAllowlist: ["read", "git"],
+    strategyDefault: "blitz",
+    maxSpendMicros: 40_000,
+  },
+  {
+    key: "reviewer",
+    displayName: "Reviewer",
+    promptGuidance:
+      "Adversarial review: reject scope creep, missing tests, unsafe changes, and path-allowlist violations. Prefer fail-closed judgments with concrete fix notes.",
+    toolAllowlist: ["read", "test", "git"],
+    strategyDefault: "fortress",
+    maxSpendMicros: 60_000,
   },
   {
     key: "security",

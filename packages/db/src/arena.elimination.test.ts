@@ -240,7 +240,7 @@ describe("elimination + kill-switch (TASK051/052)", { skip: !url }, () => {
       arenaId: arena.id,
       actor,
     });
-    assert.equal(resumed.status, "ARMED");
+    assert.equal(resumed.status, "RUNNING");
     assert.equal(resumed.killedAt, null);
 
     // Only one active contender left → fan-out n=1

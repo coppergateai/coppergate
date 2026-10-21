@@ -41,6 +41,7 @@ export type StackValidationReport = {
  * Stack-aware validation (premium Phase B).
  * - forceFake / no workdir / no exec → FakeValidation only.
  * - nextjs_ts with package.json → lint (and test when script present).
+ * - go with go.mod → `go test ./...`
  */
 export async function runStackValidation(
   input: StackValidationInput,
@@ -64,6 +65,38 @@ export async function runStackValidation(
     return {
       passed: false,
       summary: fake.summary,
+      checks,
+      validator: "stack-v1",
+    };
+  }
+
+  const goModPath = join(input.workdir, "go.mod");
+  let hasGoMod = false;
+  try {
+    await access(goModPath);
+    hasGoMod = true;
+  } catch {
+    hasGoMod = false;
+  }
+
+  if (stack === "go" || hasGoMod) {
+    const goTest = await input.exec(["go", "test", "./..."], {
+      timeoutMs: 300_000,
+    });
+    checks.push({
+      name: "go_test",
+      passed: goTest.exitCode === 0,
+      detail:
+        goTest.exitCode === 0
+          ? undefined
+          : (goTest.stderr || goTest.stdout).slice(0, 400),
+    });
+    const passed = checks.every((c) => c.passed);
+    return {
+      passed,
+      summary: passed
+        ? "Go stack validation passed — human review still required"
+        : "Go stack validation failed — auto-completion blocked",
       checks,
       validator: "stack-v1",
     };

@@ -8,7 +8,17 @@ import {
 } from "./budgets.js";
 import { getRunCiFitness } from "./ci-evidence.js";
 import { setProjectAutonomyLevel, setProjectMergeEnabled } from "./project-policy.js";
-import { ensureArenaForProject, setArenaMinHuman } from "./arena.js";
+import {
+  ensureArenaForProject,
+  getArenaForProject,
+  pauseArena,
+  resumeArena,
+  setArenaMinHuman,
+} from "./arena.js";
+import {
+  applySpawnProfilesToArena,
+  BOUNDED_KEYS,
+} from "./profiles.js";
 import {
   agentProfiles,
   agentRuns,
@@ -16,14 +26,21 @@ import {
   auditEvents,
   budgets,
   maintainerEvents,
+  milestones,
   projects,
   tasks,
   type AgentProfile,
+  type Arena,
   type MaintainerEvent,
   type Project,
   type Task,
 } from "./schema.js";
-import { decideTaskReview } from "./task-transitions.js";
+import {
+  approveTask,
+  decideTaskReview,
+  enqueueQueuedTask,
+  submitTaskForApproval,
+} from "./task-transitions.js";
 import { listRunsForTask } from "./runs.js";
 import { armSignalEvent, listSignalEvents } from "./signals.js";
 import { generateProjectPlan } from "./plans.js";
@@ -48,6 +65,12 @@ export type MaintainerPolicy = {
   maxTournamentN: number;
   visionBriefId: string | null;
   replanIntervalDays: number;
+  /** After vision replan, auto-submit root DRAFT tasks (min_human queues them). */
+  autoQueueReplanTasks: boolean;
+  /** Cap how many replan tasks are submitted per cycle. */
+  maxAutoQueuePerReplan: number;
+  /** daily = maintainer-YYYY-MM-DD; semver_patch = v0.YYYYMMDD.N */
+  releaseTagStyle: "daily" | "semver_patch";
 };
 
 export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
@@ -64,6 +87,9 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   maxTournamentN: 2,
   visionBriefId: null,
   replanIntervalDays: 7,
+  autoQueueReplanTasks: true,
+  maxAutoQueuePerReplan: 2,
+  releaseTagStyle: "daily",
 };
 
 export class MaintainerError extends Error {
@@ -108,10 +134,80 @@ export function parseMaintainerPolicy(
         typeof v.replanIntervalDays === "number" && v.replanIntervalDays >= 1
           ? Math.floor(v.replanIntervalDays)
           : 7,
+      autoQueueReplanTasks:
+        typeof v.autoQueueReplanTasks === "boolean"
+          ? v.autoQueueReplanTasks
+          : DEFAULT_MAINTAINER_POLICY.autoQueueReplanTasks,
+      maxAutoQueuePerReplan:
+        typeof v.maxAutoQueuePerReplan === "number" &&
+        v.maxAutoQueuePerReplan >= 1
+          ? Math.min(5, Math.floor(v.maxAutoQueuePerReplan))
+          : DEFAULT_MAINTAINER_POLICY.maxAutoQueuePerReplan,
+      releaseTagStyle:
+        v.releaseTagStyle === "semver_patch" ? "semver_patch" : "daily",
     };
   } catch {
     return { ...DEFAULT_MAINTAINER_POLICY, enabled: false };
   }
+}
+
+/**
+ * Pick the run eligible for maintainer auto-accept.
+ * Tournament tasks require an explicit WINNER; solo tasks use latest run.
+ */
+export function selectAutoAcceptRun<
+  T extends {
+    tournamentId: string | null;
+    tournamentResult: string | null;
+  },
+>(runs: T[]): T | null {
+  if (runs.length === 0) return null;
+  const winner = runs.find((r) => r.tournamentResult === "WINNER");
+  if (winner) return winner;
+  const inTournament = runs.some((r) => r.tournamentId != null);
+  if (inTournament) return null;
+  return runs[0] ?? null;
+}
+
+/** True when task allowedPaths intersects policy pathAllowlist (empty allowlist = allow all). */
+export function taskMatchesPathAllowlist(
+  allowedPathsJson: string | null | undefined,
+  pathAllowlist: string[],
+): boolean {
+  if (!pathAllowlist.length) return true;
+  let paths: string[] = [];
+  try {
+    const parsed = JSON.parse(allowedPathsJson ?? "[]");
+    if (Array.isArray(parsed)) {
+      paths = parsed.filter((p): p is string => typeof p === "string");
+    }
+  } catch {
+    paths = [];
+  }
+  if (paths.includes("**/*") || paths.includes("**")) return true;
+  return pathAllowlist.some((allow) =>
+    paths.some(
+      (p) =>
+        p === allow ||
+        p.startsWith(allow.replace(/\*\*$/, "")) ||
+        allow.startsWith(p.replace(/\*\*$/, "")),
+    ),
+  );
+}
+
+export function buildMaintainerReleaseTag(
+  style: MaintainerPolicy["releaseTagStyle"],
+  when = new Date(),
+  mergeCount = 1,
+): string {
+  if (style === "semver_patch") {
+    const y = when.getUTCFullYear();
+    const m = String(when.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(when.getUTCDate()).padStart(2, "0");
+    const n = Math.max(1, Math.min(99, mergeCount));
+    return `v0.${y}${m}${d}.${n}`;
+  }
+  return `maintainer-${when.toISOString().slice(0, 10)}`;
 }
 
 export function serializeMaintainerPolicy(policy: MaintainerPolicy): string {
@@ -273,6 +369,259 @@ export async function enableMaintainerMode(
   });
 
   return { project: updated, policy };
+}
+
+export type ArenaControlResult = {
+  arena: Arena;
+  project: Project;
+  resumedTasks: number;
+  maintainerEnabled: boolean;
+};
+
+/**
+ * Start — one switch. Arms/resumes arena, turns on min_human + maintainer,
+ * continues QUEUED / READY work without waiting for human Accept.
+ */
+export async function startProjectArena(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+  },
+): Promise<ArenaControlResult> {
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(
+      and(
+        eq(projects.id, input.projectId),
+        eq(projects.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!project) {
+    throw new MaintainerError("not_found", "Project not found");
+  }
+
+  let { arena } = await ensureArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    actor: input.actor,
+    minHuman: true,
+    defaultContenderN: 2,
+    contenderCount: 2,
+  });
+
+  if (!arena.minHuman) {
+    arena = await setArenaMinHuman(db, {
+      workspaceId: input.workspaceId,
+      arenaId: arena.id,
+      minHuman: true,
+      actor: input.actor,
+    });
+  }
+
+  if (arena.status === "KILLED" || arena.status === "PAUSED") {
+    arena = await resumeArena(db, {
+      workspaceId: input.workspaceId,
+      arenaId: arena.id,
+      actor: input.actor,
+    });
+  } else if (arena.status !== "RUNNING") {
+    const [running] = await db
+      .update(arenas)
+      .set({ status: "RUNNING", killedAt: null, updatedAt: new Date() })
+      .where(eq(arenas.id, arena.id))
+      .returning();
+    if (running) arena = running;
+  }
+
+  let liveProject = project;
+  if (!project.maintainerEnabled) {
+    try {
+      const enabled = await enableMaintainerMode(db, {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        actor: input.actor,
+        policy: {
+          autoMerge: true,
+          autoRelease: true,
+          selfImprove: true,
+          autoQueueReplanTasks: true,
+        },
+      });
+      liveProject = enabled.project;
+      const refreshed = await getArenaForProject(db, {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+      });
+      if (refreshed) arena = refreshed;
+    } catch {
+      // Brief may be missing — still run arena with min_human only
+    }
+  }
+
+  // Auto-queue anything sitting in the human inbox
+  const awaiting = await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.projectId, input.projectId),
+        eq(tasks.workspaceId, input.workspaceId),
+        inArray(tasks.status, ["READY_FOR_APPROVAL", "DRAFT"]),
+      ),
+    )
+    .limit(20);
+
+  let resumedTasks = 0;
+  for (const task of awaiting) {
+    try {
+      if (task.status === "DRAFT" || task.status === "NEEDS_REPLAN") {
+        await submitTaskForApproval(db, {
+          workspaceId: input.workspaceId,
+          taskId: task.id,
+          actor: input.actor,
+        });
+        resumedTasks += 1;
+      } else if (task.status === "READY_FOR_APPROVAL") {
+        await approveTask(db, {
+          workspaceId: input.workspaceId,
+          taskId: task.id,
+          actor: input.actor,
+        });
+        resumedTasks += 1;
+      }
+    } catch {
+      // skip blocked tasks
+    }
+  }
+
+  // Re-enqueue QUEUED tasks whose runs were cancelled by Stop
+  const queued = await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.projectId, input.projectId),
+        eq(tasks.workspaceId, input.workspaceId),
+        eq(tasks.status, "QUEUED"),
+      ),
+    )
+    .limit(20);
+
+  for (const task of queued) {
+    const runs = await listRunsForTask(db, input.workspaceId, task.id);
+    const active = runs.some((r) =>
+      ["QUEUED", "RUNNING", "VALIDATING"].includes(r.status),
+    );
+    if (active) continue;
+    try {
+      await enqueueQueuedTask(db, {
+        workspaceId: input.workspaceId,
+        task,
+        actor: input.actor,
+        reason: "arena_start_resume",
+      });
+      resumedTasks += 1;
+    } catch {
+      // skip
+    }
+  }
+
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.start",
+    targetType: "arena",
+    targetId: arena.id,
+    meta: { resumedTasks, maintainerEnabled: liveProject.maintainerEnabled },
+  });
+  await recordMaintainerEvent(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    kind: "tick",
+    payload: { action: "arena_start", resumedTasks },
+  });
+
+  return {
+    arena,
+    project: liveProject,
+    resumedTasks,
+    maintainerEnabled: liveProject.maintainerEnabled,
+  };
+}
+
+/**
+ * Stop — one switch. Soft-pauses arena; development freezes until Start.
+ * REVIEW_REQUIRED / DONE work is kept so Start continues from there.
+ */
+export async function stopProjectArena(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+  },
+): Promise<ArenaControlResult> {
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(
+      and(
+        eq(projects.id, input.projectId),
+        eq(projects.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!project) {
+    throw new MaintainerError("not_found", "Project not found");
+  }
+
+  let arena = await getArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+  });
+  if (!arena) {
+    const ensured = await ensureArenaForProject(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor: input.actor,
+      minHuman: true,
+      defaultContenderN: 2,
+      contenderCount: 2,
+    });
+    arena = ensured.arena;
+  }
+
+  arena = await pauseArena(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+    actor: input.actor,
+  });
+
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.stop",
+    targetType: "arena",
+    targetId: arena.id,
+    meta: {},
+  });
+  await recordMaintainerEvent(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    kind: "tick",
+    payload: { action: "arena_stop" },
+  });
+
+  return {
+    arena,
+    project,
+    resumedTasks: 0,
+    maintainerEnabled: project.maintainerEnabled,
+  };
 }
 
 export async function disableMaintainerMode(
@@ -460,8 +809,10 @@ export async function tickMaintainerProject(
     .from(arenas)
     .where(eq(arenas.projectId, input.projectId))
     .limit(1);
-  if (arena?.status === "KILLED") {
-    result.errors.push("arena killed");
+  if (arena?.status === "KILLED" || arena?.status === "PAUSED") {
+    result.errors.push(
+      arena.status === "PAUSED" ? "arena paused" : "arena killed",
+    );
     result.paused = true;
     return result;
   }
@@ -564,7 +915,7 @@ export async function tickMaintainerProject(
     );
   }
 
-  // Auto-accept REVIEW_REQUIRED tasks when CI accept-ready
+  // Auto-accept REVIEW_REQUIRED when CI green AND tournament WINNER (or solo)
   if (policy.autoMerge) {
     try {
       const pending = await db
@@ -582,10 +933,15 @@ export async function tickMaintainerProject(
       for (const task of pending) {
         // Never auto-accept imported PR review tasks
         if (task.githubPrNumber != null) continue;
+        if (
+          !taskMatchesPathAllowlist(task.allowedPaths, policy.pathAllowlist)
+        ) {
+          continue;
+        }
         const runs = await listRunsForTask(db, input.workspaceId, task.id);
-        const latest = runs[0];
-        if (!latest) continue;
-        const fitness = await getRunCiFitness(db, latest.id);
+        const candidate = selectAutoAcceptRun(runs);
+        if (!candidate) continue;
+        const fitness = await getRunCiFitness(db, candidate.id);
         if (!fitness.acceptReady) continue;
 
         try {
@@ -594,13 +950,13 @@ export async function tickMaintainerProject(
             taskId: task.id,
             actor,
             decision: "accept",
-            note: "maintainer auto-accept (CI green)",
+            note: "maintainer auto-accept (winner + CI green)",
           });
           result.autoAccepted += 1;
           result.autoMergedCandidates.push({
             taskId: task.id,
-            prNumber: latest.prNumber ?? null,
-            runId: latest.id,
+            prNumber: candidate.prNumber ?? null,
+            runId: candidate.id,
           });
           await recordMaintainerEvent(db, {
             workspaceId: input.workspaceId,
@@ -608,8 +964,9 @@ export async function tickMaintainerProject(
             kind: "auto_accept",
             payload: {
               taskId: task.id,
-              runId: latest.id,
-              prNumber: latest.prNumber,
+              runId: candidate.id,
+              prNumber: candidate.prNumber,
+              tournamentResult: candidate.tournamentResult,
             },
           });
         } catch (err) {
@@ -702,8 +1059,49 @@ export async function tickAllMaintainerProjects(
   return out;
 }
 
+/** Pick a bounded challenger role distinct from the champion for meta-tournaments. */
+export function pickMetaTournamentChallenger(
+  championKey: string,
+): string {
+  const key = BOUNDED_KEYS.has(championKey) ? championKey : "engineer";
+  if (key === "engineer") return "reviewer";
+  if (key === "reviewer") return "engineer";
+  if (key === "proposer") return "engineer";
+  if (key === "fixer") return "qa";
+  if (key === "qa") return "fixer";
+  return "engineer";
+}
+
 /**
- * Evolve workspace AgentProfile prompt within allowlists (cannot raise autonomy / tools).
+ * Fitness gate: rollback when recent winner efficiency falls below the
+ * efficiency that justified the last self_improve evolution.
+ */
+export function shouldRollbackProfileForFitness(input: {
+  recentWinnerEfficiencies: number[];
+  lastEvolveAvgEfficiency: number | null;
+  minSamples?: number;
+  dropRatio?: number;
+}): boolean {
+  const minSamples = input.minSamples ?? 2;
+  const dropRatio = input.dropRatio ?? 0.7;
+  const samples = input.recentWinnerEfficiencies.filter(
+    (n) => Number.isFinite(n) && n > 0,
+  );
+  if (samples.length < minSamples) return false;
+  if (
+    input.lastEvolveAvgEfficiency == null ||
+    input.lastEvolveAvgEfficiency <= 0
+  ) {
+    return false;
+  }
+  const avg =
+    samples.reduce((s, n) => s + n, 0) / samples.length;
+  return avg < input.lastEvolveAvgEfficiency * dropRatio;
+}
+
+/**
+ * Evolve workspace AgentProfile from winners; also arm a bounded
+ * meta-tournament (champion vs challenger roles) on the project arena.
  */
 export async function maybeSelfImproveProfile(
   db: Database,
@@ -728,7 +1126,8 @@ export async function maybeSelfImproveProfile(
 
   if (winners.length < 2) return false;
 
-  const profileKey = winners[0]?.agentProfileKey ?? "engineer";
+  const rawKey = winners[0]?.agentProfileKey ?? "engineer";
+  const profileKey = BOUNDED_KEYS.has(rawKey) ? rawKey : "engineer";
   const [profile] = await db
     .select()
     .from(agentProfiles)
@@ -780,47 +1179,169 @@ export async function maybeSelfImproveProfile(
     winners.reduce((s, r) => s + (r.efficiencyScore ?? 0), 0) / winners.length;
   if (avgEfficiency <= 0) return false;
 
-  const tip =
-    " Prefer minimal diffs, deterministic tests, and stay within path allowlist. Cut spend when fitness is already high.";
-  if (base.promptGuidance.includes("Prefer minimal diffs")) {
-    return false;
+  // Fitness gate: auto-rollback if evolution hurt recent winner efficiency
+  const priorImprove = await db
+    .select()
+    .from(maintainerEvents)
+    .where(
+      and(
+        eq(maintainerEvents.projectId, input.projectId),
+        eq(maintainerEvents.kind, "self_improve"),
+      ),
+    )
+    .orderBy(desc(maintainerEvents.createdAt))
+    .limit(1);
+  let lastEvolveAvg: number | null = null;
+  if (priorImprove[0]) {
+    try {
+      const payload = JSON.parse(priorImprove[0].payload) as {
+        avgEfficiency?: number;
+      };
+      lastEvolveAvg =
+        typeof payload.avgEfficiency === "number"
+          ? payload.avgEfficiency
+          : null;
+    } catch {
+      lastEvolveAvg = null;
+    }
+  }
+  if (
+    shouldRollbackProfileForFitness({
+      recentWinnerEfficiencies: winners.map((r) => r.efficiencyScore ?? 0),
+      lastEvolveAvgEfficiency: lastEvolveAvg,
+    }) &&
+    base.parentProfileId
+  ) {
+    await rollbackProfileEvolution(db, {
+      workspaceId: input.workspaceId,
+      profileId: base.id,
+      actor: input.actor,
+    });
+    await recordMaintainerEvent(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      kind: "self_improve",
+      payload: {
+        action: "fitness_rollback",
+        profileId: base.id,
+        key: base.key,
+        avgEfficiency,
+        lastEvolveAvg,
+      },
+    });
+    return true;
   }
 
-  const nextGuidance = `${base.promptGuidance.trim()}${tip}`.slice(0, 4000);
-  const [evolved] = await db
-    .update(agentProfiles)
-    .set({
-      promptGuidance: nextGuidance,
-      version: (base.version ?? 1) + 1,
-      parentProfileId: base.id,
-      evolvedFromRunId: winners[0]?.id ?? null,
-      updatedAt: new Date(),
-    })
-    .where(eq(agentProfiles.id, base.id))
-    .returning();
+  let changed = false;
+  const tip =
+    " Prefer minimal diffs, deterministic tests, and stay within path allowlist. Cut spend when fitness is already high.";
+  if (!base.promptGuidance.includes("Prefer minimal diffs")) {
+    const nextGuidance = `${base.promptGuidance.trim()}${tip}`.slice(0, 4000);
+    const [evolved] = await db
+      .update(agentProfiles)
+      .set({
+        promptGuidance: nextGuidance,
+        version: (base.version ?? 1) + 1,
+        parentProfileId: base.id,
+        evolvedFromRunId: winners[0]?.id ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(agentProfiles.id, base.id))
+      .returning();
 
-  if (!evolved) return false;
+    if (evolved) {
+      changed = true;
+      await recordMaintainerEvent(db, {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        kind: "self_improve",
+        payload: {
+          profileId: evolved.id,
+          key: evolved.key,
+          version: evolved.version,
+          avgEfficiency,
+        },
+      });
+      await recordAuditEvent(db, {
+        workspaceId: input.workspaceId,
+        actor: input.actor,
+        action: "maintainer.self_improve",
+        targetType: "agent_profile",
+        targetId: evolved.id,
+        meta: { version: evolved.version, key: evolved.key },
+      });
+      base = evolved;
+    }
+  }
 
-  await recordMaintainerEvent(db, {
-    workspaceId: input.workspaceId,
-    projectId: input.projectId,
-    kind: "self_improve",
-    payload: {
-      profileId: evolved.id,
-      key: evolved.key,
-      version: evolved.version,
-      avgEfficiency,
-    },
-  });
-  await recordAuditEvent(db, {
-    workspaceId: input.workspaceId,
-    actor: input.actor,
-    action: "maintainer.self_improve",
-    targetType: "agent_profile",
-    targetId: evolved.id,
-    meta: { version: evolved.version, key: evolved.key },
-  });
-  return true;
+  // Meta-tournament: champion vs bounded challenger on the project arena
+  if (winners.length >= 3) {
+    const challengerKey = pickMetaTournamentChallenger(base.key);
+    const recentMeta = await db
+      .select()
+      .from(maintainerEvents)
+      .where(
+        and(
+          eq(maintainerEvents.projectId, input.projectId),
+          eq(maintainerEvents.kind, "meta_tournament"),
+        ),
+      )
+      .orderBy(desc(maintainerEvents.createdAt))
+      .limit(1);
+    let alreadyArmed = false;
+    if (recentMeta[0]) {
+      try {
+        const p = JSON.parse(recentMeta[0].payload) as {
+          championKey?: string;
+          challengerKey?: string;
+        };
+        alreadyArmed =
+          p.championKey === base.key && p.challengerKey === challengerKey;
+      } catch {
+        alreadyArmed = false;
+      }
+    }
+    if (!alreadyArmed) {
+      const flip =
+        base.strategyDefault === "blitz"
+          ? "fortress"
+          : base.strategyDefault === "fortress"
+            ? "blitz"
+            : "fortress";
+      await applySpawnProfilesToArena(db, {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        actor: input.actor,
+        profileKeys: [base.key, challengerKey],
+      });
+      changed = true;
+      await recordMaintainerEvent(db, {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        kind: "meta_tournament",
+        payload: {
+          championKey: base.key,
+          challengerKey,
+          challengerStrategy: flip,
+          avgEfficiency,
+        },
+      });
+      await recordAuditEvent(db, {
+        workspaceId: input.workspaceId,
+        actor: input.actor,
+        action: "maintainer.meta_tournament",
+        targetType: "project",
+        targetId: input.projectId,
+        meta: {
+          championKey: base.key,
+          challengerKey,
+          challengerStrategy: flip,
+        },
+      });
+    }
+  }
+
+  return changed;
 }
 
 /** Rollback profile to parent version guidance if present. */
@@ -881,8 +1402,8 @@ export async function rollbackProfileEvolution(
 }
 
 /**
- * Vision-driven replan: append a small cycle milestone from the approved brief
- * without per-feature human approve (maintainer mode).
+ * Vision-driven replan: append a small cycle milestone from the approved brief,
+ * activate it, and auto-queue root DRAFT tasks (propose → queue).
  */
 export async function runVisionReplan(
   db: Database,
@@ -890,8 +1411,11 @@ export async function runVisionReplan(
     workspaceId: string;
     projectId: string;
     actor: string;
+    /** Override policy auto-queue (default: from project maintainer policy). */
+    autoQueue?: boolean;
+    maxAutoQueue?: number;
   },
-): Promise<{ taskCount: number }> {
+): Promise<{ taskCount: number; queued: number }> {
   const brief = await getLatestBriefForProject(
     db,
     input.workspaceId,
@@ -900,6 +1424,17 @@ export async function runVisionReplan(
   if (!brief || brief.status !== "approved") {
     throw new MaintainerError("invalid", "Approved vision brief required");
   }
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, input.projectId))
+    .limit(1);
+  const policy = parseMaintainerPolicy(project?.maintainerPolicyJson);
+  const autoQueue =
+    input.autoQueue ?? policy.autoQueueReplanTasks;
+  const maxAutoQueue =
+    input.maxAutoQueue ?? policy.maxAutoQueuePerReplan;
 
   const stamp = new Date().toISOString().slice(0, 10);
   const plan = await generateProjectPlan(db, {
@@ -912,13 +1447,15 @@ export async function runVisionReplan(
         description: `Autonomous replan from vision: ${brief.title}`,
         tasks: [
           {
-            key: `m-${stamp}-triage`,
-            title: "Triage backlog against vision",
-            goal: `Align open work with: ${brief.problem.slice(0, 200)}`,
-            scope: brief.scope.slice(0, 500) || "Small scoped improvements only",
+            key: `m-${stamp}-propose`,
+            title: "Propose next scoped improvement",
+            goal: `From vision, pick one tiny improvement: ${brief.problem.slice(0, 200)}`,
+            scope:
+              brief.scope.slice(0, 500) ||
+              "One file / one package; prefer bugs and docs over large features",
             allowedPaths: ["**/*"],
             acceptanceCriteria: [
-              "At least one verified PR or explicit noop with rationale",
+              "Scoped proposal implemented as a reviewable PR or explicit noop",
               "Stay within monthly budget",
             ],
             estimateMicros: 80_000,
@@ -930,7 +1467,8 @@ export async function runVisionReplan(
             key: `m-${stamp}-ship`,
             title: "Ship highest-ROI fix or feature",
             goal: `Advance acceptance: ${(brief.acceptanceCriteria || "").slice(0, 200)}`,
-            scope: "One small deliverable; prefer bugs/CI over large features under micro-budget",
+            scope:
+              "One small deliverable; prefer bugs/CI over large features under micro-budget",
             allowedPaths: ["**/*"],
             acceptanceCriteria: [
               "CI green on primary",
@@ -938,13 +1476,65 @@ export async function runVisionReplan(
             ],
             estimateMicros: 120_000,
             estimateComplexity: "S" as const,
-            dependsOn: [`m-${stamp}-triage`],
+            dependsOn: [`m-${stamp}-propose`],
             priority: 20,
           },
         ],
       },
     ],
   });
+
+  // Activate milestones so the board leaves draft/setup posture
+  for (const m of plan.milestones) {
+    await db
+      .update(milestones)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(eq(milestones.id, m.milestone.id));
+  }
+
+  // Arm proposer/engineer contenders for the autonomous backlog cycle
+  try {
+    await applySpawnProfilesToArena(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor: input.actor,
+      profileKeys: ["proposer", "engineer"],
+    });
+  } catch {
+    // arena may not exist yet — tick/enable creates it
+  }
+
+  let queued = 0;
+  if (autoQueue) {
+    for (const m of plan.milestones) {
+      for (const tv of m.tasks) {
+        if (queued >= maxAutoQueue) break;
+        // Only root tasks (no deps) — dependents wait for later ticks / human
+        if ((tv.dependsOnTaskIds?.length ?? 0) > 0) continue;
+        if (tv.task.status !== "DRAFT") continue;
+        try {
+          await submitTaskForApproval(db, {
+            workspaceId: input.workspaceId,
+            taskId: tv.task.id,
+            actor: input.actor,
+          });
+          queued += 1;
+        } catch (err) {
+          // keep going — surface via audit
+          await recordAuditEvent(db, {
+            workspaceId: input.workspaceId,
+            actor: input.actor,
+            action: "maintainer.replan_queue_failed",
+            targetType: "task",
+            targetId: tv.task.id,
+            meta: {
+              error: err instanceof Error ? err.message : String(err),
+            },
+          });
+        }
+      }
+    }
+  }
 
   await db
     .update(projects)
@@ -960,7 +1550,7 @@ export async function runVisionReplan(
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     kind: "replan",
-    payload: { briefId: brief.id, taskCount },
+    payload: { briefId: brief.id, taskCount, queued, autoQueue },
   });
   await recordAuditEvent(db, {
     workspaceId: input.workspaceId,
@@ -968,10 +1558,10 @@ export async function runVisionReplan(
     action: "maintainer.replan",
     targetType: "project",
     targetId: input.projectId,
-    meta: { briefId: brief.id, taskCount },
+    meta: { briefId: brief.id, taskCount, queued },
   });
 
-  return { taskCount };
+  return { taskCount, queued };
 }
 
 export type MaintainerMetrics = {
@@ -986,6 +1576,12 @@ export type MaintainerMetrics = {
   policyViolations: number;
   autoAccepts: number;
   selfImproves: number;
+  metaTournaments: number;
+  replans: number;
+  /** micros / accepted merge (0 when no merges). */
+  costPerAcceptedMergeMicros: number;
+  /** Distinct winning profile keys in the window. */
+  winningProfileKeys: string[];
   ticks: number;
   maintainerEnabled: boolean;
 };
@@ -1063,16 +1659,36 @@ export async function getMaintainerMetrics(
 
   const autoAccepts = events.filter((e) => e.kind === "auto_accept").length;
   const selfImproves = events.filter((e) => e.kind === "self_improve").length;
+  const metaTournaments = events.filter(
+    (e) => e.kind === "meta_tournament",
+  ).length;
+  const replans = events.filter((e) => e.kind === "replan").length;
   const ticks = events.filter((e) => e.kind === "tick").length;
   const policyViolations = events.filter(
     (e) => e.kind === "tick" && e.payload.includes("policy_violation"),
   ).length;
 
+  const winnerRuns = await db
+    .select({ key: agentRuns.agentProfileKey })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.workspaceId, input.workspaceId),
+        eq(agentRuns.projectId, input.projectId),
+        eq(agentRuns.tournamentResult, "WINNER"),
+        gte(agentRuns.createdAt, since),
+      ),
+    );
+  const winningProfileKeys = [
+    ...new Set(winnerRuns.map((r) => r.key).filter(Boolean)),
+  ].sort();
+
+  const merges = doneTasks.length;
   return {
     projectId: input.projectId,
     workspaceId: input.workspaceId,
     windowDays: days,
-    merges: doneTasks.length,
+    merges,
     spendMicros: spend.spentMicros,
     capMicros: spend.capMicros,
     spendWithinCap: spend.spentMicros <= spend.capMicros,
@@ -1080,6 +1696,11 @@ export async function getMaintainerMetrics(
     policyViolations,
     autoAccepts,
     selfImproves,
+    metaTournaments,
+    replans,
+    costPerAcceptedMergeMicros:
+      merges > 0 ? Math.round(spend.spentMicros / merges) : 0,
+    winningProfileKeys,
     ticks,
     maintainerEnabled: project.maintainerEnabled,
   };

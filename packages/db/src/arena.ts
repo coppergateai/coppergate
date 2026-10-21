@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import {
   assertSufficientBudget,
   BudgetError,
@@ -865,6 +865,175 @@ export async function getContenderById(
   return row ?? null;
 }
 
+/** Cancel open tournament runs for an arena (queued hard-cancel; inflight soft-cancel). */
+async function freezeArenaOpenWork(
+  db: Database,
+  input: { workspaceId: string; arenaId: string; now: Date },
+): Promise<void> {
+  const openTournaments = await db
+    .select({ id: tournaments.id })
+    .from(tournaments)
+    .where(eq(tournaments.arenaId, input.arenaId));
+  const tournamentIds = openTournaments.map((t) => t.id);
+  if (tournamentIds.length === 0) return;
+
+  await db
+    .update(tournaments)
+    .set({ status: "CANCELLED", updatedAt: input.now })
+    .where(
+      and(
+        eq(tournaments.arenaId, input.arenaId),
+        inArray(tournaments.status, ["OPEN", "SCORING"]),
+      ),
+    );
+
+  const activeRuns = await db
+    .select()
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.workspaceId, input.workspaceId),
+        inArray(agentRuns.tournamentId, tournamentIds),
+      ),
+    );
+  const queuedIds = activeRuns
+    .filter((r) => r.status === "QUEUED")
+    .map((r) => r.id);
+  const inflightIds = activeRuns
+    .filter((r) => ["RUNNING", "VALIDATING"].includes(r.status))
+    .map((r) => r.id);
+
+  if (queuedIds.length > 0) {
+    await db
+      .update(agentRuns)
+      .set({
+        status: "CANCELLED",
+        cancelRequestedAt: input.now,
+        tournamentResult: "CANCELLED",
+        finishedAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(inArray(agentRuns.id, queuedIds));
+  }
+  if (inflightIds.length > 0) {
+    await db
+      .update(agentRuns)
+      .set({
+        cancelRequestedAt: input.now,
+        tournamentResult: "CANCELLED",
+        updatedAt: input.now,
+      })
+      .where(inArray(agentRuns.id, inflightIds));
+  }
+
+  // Also freeze non-tournament solo runs on this project
+  const [arena] = await db
+    .select()
+    .from(arenas)
+    .where(eq(arenas.id, input.arenaId))
+    .limit(1);
+  if (!arena) return;
+  const soloQueued = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.projectId, arena.projectId),
+        eq(agentRuns.workspaceId, input.workspaceId),
+        eq(agentRuns.status, "QUEUED"),
+        isNull(agentRuns.tournamentId),
+      ),
+    );
+  if (soloQueued.length > 0) {
+    await db
+      .update(agentRuns)
+      .set({
+        status: "CANCELLED",
+        cancelRequestedAt: input.now,
+        finishedAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(
+        inArray(
+          agentRuns.id,
+          soloQueued.map((r) => r.id),
+        ),
+      );
+  }
+  const soloInflight = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.projectId, arena.projectId),
+        eq(agentRuns.workspaceId, input.workspaceId),
+        inArray(agentRuns.status, ["RUNNING", "VALIDATING"]),
+        isNull(agentRuns.tournamentId),
+      ),
+    );
+  if (soloInflight.length > 0) {
+    await db
+      .update(agentRuns)
+      .set({
+        cancelRequestedAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(
+        inArray(
+          agentRuns.id,
+          soloInflight.map((r) => r.id),
+        ),
+      );
+  }
+}
+
+/**
+ * Soft stop — PAUSED. Freezes new fan-out/claims; REVIEW_REQUIRED work is kept
+ * so Start can continue from where it left off.
+ */
+export async function pauseArena(
+  db: Database,
+  input: { workspaceId: string; arenaId: string; actor: string },
+): Promise<Arena> {
+  const [arena] = await db
+    .select()
+    .from(arenas)
+    .where(
+      and(
+        eq(arenas.id, input.arenaId),
+        eq(arenas.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!arena) throw new ArenaError("not_found", "arena not found");
+  if (arena.status === "PAUSED") return arena;
+
+  const now = new Date();
+  const [updated] = await db
+    .update(arenas)
+    .set({ status: "PAUSED", updatedAt: now })
+    .where(eq(arenas.id, arena.id))
+    .returning();
+
+  await freezeArenaOpenWork(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+    now,
+  });
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.pause",
+    targetType: "arena",
+    targetId: arena.id,
+    meta: JSON.stringify({ from: arena.status }),
+  });
+
+  return updated!;
+}
+
 export async function killArena(
   db: Database,
   input: { workspaceId: string; arenaId: string; actor: string },
@@ -888,62 +1057,11 @@ export async function killArena(
     .where(eq(arenas.id, arena.id))
     .returning();
 
-  const openTournaments = await db
-    .select({ id: tournaments.id })
-    .from(tournaments)
-    .where(eq(tournaments.arenaId, arena.id));
-  const tournamentIds = openTournaments.map((t) => t.id);
-
-  if (tournamentIds.length > 0) {
-    await db
-      .update(tournaments)
-      .set({ status: "CANCELLED", updatedAt: now })
-      .where(
-        and(
-          eq(tournaments.arenaId, arena.id),
-          inArray(tournaments.status, ["OPEN", "SCORING"]),
-        ),
-      );
-
-    const activeRuns = await db
-      .select()
-      .from(agentRuns)
-      .where(
-        and(
-          eq(agentRuns.workspaceId, input.workspaceId),
-          inArray(agentRuns.tournamentId, tournamentIds),
-        ),
-      );
-    const queuedIds = activeRuns
-      .filter((r) => r.status === "QUEUED")
-      .map((r) => r.id);
-    const inflightIds = activeRuns
-      .filter((r) => ["RUNNING", "VALIDATING"].includes(r.status))
-      .map((r) => r.id);
-
-    if (queuedIds.length > 0) {
-      await db
-        .update(agentRuns)
-        .set({
-          status: "CANCELLED",
-          cancelRequestedAt: now,
-          tournamentResult: "CANCELLED",
-          finishedAt: now,
-          updatedAt: now,
-        })
-        .where(inArray(agentRuns.id, queuedIds));
-    }
-    if (inflightIds.length > 0) {
-      await db
-        .update(agentRuns)
-        .set({
-          cancelRequestedAt: now,
-          tournamentResult: "CANCELLED",
-          updatedAt: now,
-        })
-        .where(inArray(agentRuns.id, inflightIds));
-    }
-  }
+  await freezeArenaOpenWork(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+    now,
+  });
 
   await db.insert(auditEvents).values({
     id: crypto.randomUUID(),
@@ -985,7 +1103,7 @@ export async function resumeArena(
   const [updated] = await db
     .update(arenas)
     .set({
-      status: "ARMED",
+      status: "RUNNING",
       killedAt: null,
       updatedAt: now,
     })

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { SkeletonStack } from "@/components/app/ui";
+import { ArenaPitch, type PitchMetrics } from "./arena-pitch";
 import styles from "./project-detail.module.css";
 
 type ArenaView = {
@@ -28,30 +29,55 @@ type Props = {
   isOwner: boolean;
 };
 
+function isRunning(status: string) {
+  return status === "RUNNING" || status === "ARMED";
+}
+
 export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
   const [arena, setArena] = useState<ArenaView | null>(null);
   const [contenders, setContenders] = useState<ContenderView[]>([]);
+  const [metrics, setMetrics] = useState<PitchMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [budgetMicros, setBudgetMicros] = useState("100000");
 
   const load = useCallback(async () => {
-    const res = await fetch(
-      `/api/projects/${projectId}/arena?workspaceId=${encodeURIComponent(workspaceId)}`,
-    );
-    const data = (await res.json()) as {
+    const [arenaRes, maintRes] = await Promise.all([
+      fetch(
+        `/api/projects/${projectId}/arena?workspaceId=${encodeURIComponent(workspaceId)}`,
+      ),
+      fetch(
+        `/api/projects/${projectId}/maintainer?workspaceId=${encodeURIComponent(workspaceId)}`,
+      ),
+    ]);
+
+    const arenaData = (await arenaRes.json()) as {
       arena?: ArenaView | null;
       contenders?: ContenderView[];
       error?: { message?: string };
     };
-    if (!res.ok) {
-      setError(data.error?.message ?? "Failed to load arena");
+    if (!arenaRes.ok) {
+      setError(arenaData.error?.message ?? "Failed to load arena");
       setLoading(false);
       return;
     }
-    setArena(data.arena ?? null);
-    setContenders(data.contenders ?? []);
+    setArena(arenaData.arena ?? null);
+    setContenders(arenaData.contenders ?? []);
+
+    if (maintRes.ok) {
+      const maintData = (await maintRes.json()) as {
+        metrics?: PitchMetrics;
+      };
+      if (maintData.metrics) {
+        setMetrics({
+          merges: maintData.metrics.merges,
+          autoAccepts: maintData.metrics.autoAccepts,
+          humanTouches: maintData.metrics.humanTouches,
+          winningProfileKeys: maintData.metrics.winningProfileKeys,
+        });
+      }
+    }
+
     setError(null);
     setLoading(false);
   }, [projectId, workspaceId]);
@@ -60,18 +86,23 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
     void load();
   }, [load]);
 
-  async function mutate(
-    path: string,
-    method: string,
-    body?: Record<string, unknown>,
-  ) {
+  // Live refresh while the match is on
+  useEffect(() => {
+    if (!arena || !isRunning(arena.status)) return;
+    const id = window.setInterval(() => {
+      void load();
+    }, 8000);
+    return () => window.clearInterval(id);
+  }, [arena, load]);
+
+  async function control(action: "start" | "stop") {
     setPending(true);
     setError(null);
     try {
-      const res = await fetch(path, {
-        method,
+      const res = await fetch(`/api/projects/${projectId}/arena/${action}`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId, ...body }),
+        body: JSON.stringify({ workspaceId }),
       });
       const data = (await res.json()) as {
         error?: { message?: string };
@@ -86,6 +117,8 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
     }
   }
 
+  const running = arena ? isRunning(arena.status) : false;
+
   return (
     <section
       id="arena"
@@ -96,137 +129,27 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
         Survivor arena
       </h2>
       <p className={styles.sectionLede}>
-        These are this project&apos;s agents. Contenders compete on queued
-        tasks; kill-switch freezes this arena only. By default one primary repo
-        — agents do not auto-sync other projects&apos; repos. When multi-repo is
-        enabled under More → Repositories, secondaries are read context for this
-        arena; writes go to primary unless coordinated PRs are enabled.
+        Watch the match. Start and Stop is the only control — agents keep
+        shipping while the clock runs.
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}
 
       {loading ? (
         <div className={styles.arenaBoard}>
-          <SkeletonStack rows={3} />
+          <SkeletonStack rows={4} />
         </div>
-      ) : !arena ? (
-        isOwner ? (
-          <div className={`${styles.panel} ${styles.arenaBoard}`}>
-            <p className={styles.arenaBoardKicker}>
-              No agents armed for this project yet.
-            </p>
-            <div className={styles.btnRow}>
-              <label className={styles.field}>
-                Contender budget (µUSD)
-                <input
-                  className={styles.inputNarrow}
-                  value={budgetMicros}
-                  onChange={(e) => setBudgetMicros(e.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                className={styles.primaryBtn}
-                disabled={pending}
-                onClick={() =>
-                  void mutate(`/api/projects/${projectId}/arena`, "POST", {
-                    contenderBudgetMicros: Number(budgetMicros) || 0,
-                    defaultContenderN: 2,
-                  })
-                }
-              >
-                Arm arena
-              </button>
-            </div>
-          </div>
-        ) : (
-          <p className={styles.muted}>
-            No agents armed for this project yet.
-          </p>
-        )
       ) : (
-        <div className={`${styles.panel} ${styles.arenaBoard}`}>
-          <div className={styles.metaRow}>
-            <span className={styles.arenaStatusChip}>
-              Status <strong>{arena.status}</strong>
-            </span>
-            <span>N={arena.defaultContenderN}</span>
-            <span>
-              α={arena.payoffAlpha ?? 0.5}
-            </span>
-            <span>
-              min_human <strong>{arena.minHuman ? "on" : "off"}</strong>
-            </span>
-            {arena.killedAt ? (
-              <span className={styles.killed}>killed</span>
-            ) : null}
-          </div>
-
-          <p className={styles.arenaBoardKicker}>Agents</p>
-          {contenders.length === 0 ? (
-            <p className={styles.muted}>
-              Arena armed — contenders appear when the pool is seeded.
-            </p>
-          ) : (
-            <ul className={styles.arenaList}>
-              {contenders.map((c) => (
-                <li key={c.id} className={styles.arenaItem}>
-                  <div className={styles.arenaItemTop}>
-                    <strong>{c.profileKey}</strong>
-                    <span className={styles.arenaItemStatus}>{c.status}</span>
-                  </div>
-                  <div className={styles.arenaItemMeta}>
-                    <span>{c.strategy} · agent</span>
-                    <span>{c.budgetMicrosRemaining} µUSD</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {isOwner ? (
-            <div className={styles.btnRow}>
-              <button
-                type="button"
-                className={styles.ghostBtn}
-                disabled={pending}
-                onClick={() =>
-                  void mutate(`/api/projects/${projectId}/arena`, "PATCH", {
-                    minHuman: !arena.minHuman,
-                  })
-                }
-              >
-                {arena.minHuman ? "Disable min_human" : "Enable min_human"}
-              </button>
-              {arena.status === "KILLED" || arena.status === "PAUSED" ? (
-                <button
-                  type="button"
-                  className={styles.primaryBtn}
-                  disabled={pending}
-                  onClick={() =>
-                    void mutate(
-                      `/api/projects/${projectId}/arena/resume`,
-                      "POST",
-                    )
-                  }
-                >
-                  Resume
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className={styles.dangerBtn}
-                  disabled={pending}
-                  onClick={() =>
-                    void mutate(`/api/projects/${projectId}/arena/kill`, "POST")
-                  }
-                >
-                  Kill-switch
-                </button>
-              )}
-            </div>
-          ) : null}
-        </div>
+        <ArenaPitch
+          running={running}
+          arenaStatus={arena?.status ?? "idle"}
+          contenders={contenders}
+          metrics={metrics}
+          isOwner={isOwner}
+          pending={pending}
+          onStart={() => void control("start")}
+          onStop={() => void control("stop")}
+        />
       )}
     </section>
   );

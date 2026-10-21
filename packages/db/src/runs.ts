@@ -421,19 +421,21 @@ async function claimWithFilter(
           started_at = coalesce(r.started_at, now()),
           updated_at = now()
         WHERE r.id = (
-          SELECT id
-          FROM agent_runs
-          WHERE cancel_requested_at IS NULL
+          SELECT ar.id
+          FROM agent_runs AS ar
+          LEFT JOIN arenas AS a ON a.project_id = ar.project_id
+          WHERE ar.cancel_requested_at IS NULL
             AND (
-              status = 'QUEUED'
+              ar.status = 'QUEUED'
               OR (
-                status = 'RUNNING'
-                AND lease_until IS NOT NULL
-                AND lease_until < now()
+                ar.status = 'RUNNING'
+                AND ar.lease_until IS NOT NULL
+                AND ar.lease_until < now()
               )
             )
-          ORDER BY created_at ASC
-          FOR UPDATE SKIP LOCKED
+            AND (a.id IS NULL OR a.status NOT IN ('KILLED', 'PAUSED'))
+          ORDER BY ar.created_at ASC
+          FOR UPDATE OF ar SKIP LOCKED
           LIMIT 1
         )
         RETURNING *
