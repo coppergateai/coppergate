@@ -92,9 +92,8 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
         GitHub issues → tasks
       </h2>
       <p className={styles.sectionLede}>
-        Primary pilot path: import an open issue, approve/queue, review the PR
-        with CI evidence and cost, then Accept in-product. The PR includes
-        Closes #N.
+        Optional: pull a specific open issue into the board. The autonomous
+        loop on Agents does not need this — Start invents work under budget.
         {repo ? ` · ${repo}` : null}
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}

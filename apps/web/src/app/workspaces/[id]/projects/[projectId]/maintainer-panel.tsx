@@ -124,9 +124,10 @@ export function MaintainerPanel({
         Autonomous maintainer
       </h2>
       <p className={styles.sectionLede}>
-        Set vision + monthly budget. Agents compete, merge without your PR
-        approve, release, and self-improve. Intervene only via vision, budget,
-        or kill-switch. Canonical micro-envelope: $5/mo.
+        Start on Agents invents vision and backlog — no plan entry. While the
+        monthly budget allows, the worker keeps inventing the next cycle in the
+        background. Cap hit → hard pause until the next period. Intervene via
+        budget or Stop. Canonical micro-envelope: $5/mo.
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
 

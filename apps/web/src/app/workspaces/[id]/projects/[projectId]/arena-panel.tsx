@@ -129,8 +129,9 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
         Survivor arena
       </h2>
       <p className={styles.sectionLede}>
-        Watch the match. Start and Stop is the only control — agents keep
-        shipping while the clock runs.
+        Start invents vision and backlog; the loop keeps shipping in the
+        background while budget remains — propose → build → PR → merge. Stop
+        freezes everything. No brief or plan entry.
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}

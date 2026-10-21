@@ -106,11 +106,6 @@ export default async function ProjectDetailPage({
   const hasApprovedBrief = !!row.project.currentBriefId;
   const usage = await getProjectSpendSummary(db, workspaceId, projectId);
   const hasBudget = usage.capMicros > 0 && usage.budgetStatus === "active";
-  const hasPlan = !!plan && plan.milestones.some((m) => m.tasks.length > 0);
-  const hasIssueTask =
-    plan?.milestones.some(({ tasks }) =>
-      tasks.some(({ task }) => task.githubIssueNumber != null),
-    ) ?? false;
   const hasQueuedOrBeyond =
     plan?.milestones.some(({ tasks }) =>
       tasks.some(
@@ -126,9 +121,6 @@ export default async function ProjectDetailPage({
           !!task.prUrl,
       ),
     ) ?? false;
-  /** Wedge (D14): issue path OR classic brief+plan both unlock first PR. */
-  const wedgeReady = hasIssueTask || (hasApprovedBrief && hasPlan);
-
   const boardTasks =
     plan?.milestones.flatMap(({ milestone, tasks }) =>
       tasks.map(({ task }) => ({
@@ -141,8 +133,8 @@ export default async function ProjectDetailPage({
       })),
     ) ?? [];
 
-  const showGuide =
-    !hasBudget || !wedgeReady || !hasQueuedOrBeyond || !hasAcceptedPr;
+  /** Guide until budget + first autonomous cycle has shipped. */
+  const showGuide = !hasBudget || !hasQueuedOrBeyond || !hasAcceptedPr;
 
   const isOwner = access.role === "owner";
   const basePath = `/workspaces/${workspaceId}/projects/${projectId}`;
@@ -194,13 +186,13 @@ export default async function ProjectDetailPage({
               <div className={styles.path}>
                 <OnboardingGuide
                   compact
-                  title="Path to first PR"
+                  title="Autonomous ship loop"
                   steps={[
                     {
                       id: "budget",
                       title: "Set an active spend cap",
                       detail:
-                        "Hard cap is selection pressure — pause blocks new runs. Start at $25–50 for the first issue.",
+                        "Hard cap is the only brake. Start small ($5–50); the loop pauses when the envelope is spent.",
                       href: hasBudget
                         ? undefined
                         : `${basePath}?tab=overview#budget`,
@@ -208,35 +200,24 @@ export default async function ProjectDetailPage({
                       done: hasBudget,
                     },
                     {
-                      id: "issue",
-                      title: "Import → queue a GitHub issue",
+                      id: "start",
+                      title: "Agents → Start",
                       detail:
-                        "Primary wedge in one session: Issues → Import → queue (one tiny open issue). PR will include Closes #N.",
-                      href: hasIssueTask
-                        ? undefined
-                        : `${basePath}?tab=overview#issues`,
-                      ctaLabel: "Open issues",
-                      done: hasIssueTask || hasQueuedOrBeyond,
-                    },
-                    {
-                      id: "task",
-                      title: "Wait for the worker PR",
-                      detail:
-                        "Autonomy ≥ L1. Hosted worker claims the queue; stay on Delivery until REVIEW_REQUIRED — do not leave mid-run.",
+                        "No idea or brief to write. Start invents vision, queues work, and keeps shipping under budget.",
                       href: hasQueuedOrBeyond
                         ? undefined
-                        : `${basePath}?tab=delivery`,
-                      ctaLabel: "Open delivery",
-                      done: hasQueuedOrBeyond,
+                        : `${basePath}?tab=arena`,
+                      ctaLabel: "Open Agents",
+                      done: hasQueuedOrBeyond || hasAcceptedPr,
                     },
                     {
-                      id: "review",
-                      title: "Review cost, diff, and CI — then Accept",
+                      id: "watch",
+                      title: "Watch Delivery / merges",
                       detail:
-                        "Accept stays closed while CI is pending or failed. Then queue a second small issue within 7 days.",
-                      href: hasAcceptedPr
-                        ? undefined
-                        : `${basePath}?tab=delivery`,
+                        "Contenders open PRs; maintainer auto-accepts winners when CI is green. Stop freezes the loop.",
+                      href: hasQueuedOrBeyond
+                        ? `${basePath}?tab=delivery`
+                        : undefined,
                       ctaLabel: "Open delivery",
                       done: hasAcceptedPr,
                     },

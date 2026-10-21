@@ -114,33 +114,36 @@ export function PlanPanel({
     }
   }
 
+  const agentsHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
+
   return (
     <section id="plan" className={styles.section} aria-labelledby="plan-heading">
       <h2 id="plan-heading" className={styles.sectionLabel}>
         Delivery plan
       </h2>
       <p className={styles.sectionLede}>
-        Milestones and tasks from the approved brief — scope, estimates, and
-        acceptance criteria.
+        Autonomously generated from Start — propose, build, review, merge. No
+        manual brief or plan entry required.
       </p>
 
-      {isOwner ? (
+      {!plan ? (
+        <p className={styles.muted}>
+          Open{" "}
+          <Link href={agentsHref}>Agents</Link>{" "}
+          and press Start. Coppergate invents the vision, queues the next
+          improvement, and ships through PR merge.
+        </p>
+      ) : null}
+
+      {isOwner && plan ? (
         <button
           type="button"
           className={styles.primaryBtn}
           disabled={pending || !hasApprovedBrief}
           onClick={() => void generate()}
         >
-          {pending
-            ? "Generating…"
-            : plan
-              ? "Regenerate plan"
-              : "Generate plan"}
+          {pending ? "Generating…" : "Regenerate plan"}
         </button>
-      ) : null}
-
-      {!hasApprovedBrief ? (
-        <p className={styles.muted}>Approve a product brief first.</p>
       ) : null}
 
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -222,10 +225,6 @@ export function PlanPanel({
             </div>
           ))}
         </div>
-      ) : hasApprovedBrief ? (
-        <p className={styles.muted}>
-          No plan yet. Generate one from the approved brief.
-        </p>
       ) : null}
     </section>
   );

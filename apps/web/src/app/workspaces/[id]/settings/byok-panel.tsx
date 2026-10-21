@@ -35,8 +35,23 @@ type ProfileRow = {
   workspaceId: string | null;
 };
 
+type RoutingDraft = {
+  credId: string;
+  model: string;
+};
+
 function vendorName(vendor: string): string {
   return getLlmProvider(vendor)?.name ?? vendor;
+}
+
+function shortTime(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function ByokPanel({ workspaceId, isOwner }: Props) {
@@ -53,9 +68,14 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
   const [modelCustom, setModelCustom] = useState("");
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
-  const [routingPending, setRoutingPending] = useState<string | null>(null);
+  const [routingPending, setRoutingPending] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [routingDraft, setRoutingDraft] = useState<Record<string, RoutingDraft>>(
+    {},
+  );
 
   const preset = getLlmProvider(vendor)!;
 
@@ -86,6 +106,20 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
         : true) &&
     (preset.hideBaseUrl || Boolean(baseUrl.trim()) || Boolean(preset.baseUrl));
 
+  const defaultCred = credentials.find((c) => c.isDefault) ?? null;
+
+  const dirtyKeys = useMemo(() => {
+    const dirty: string[] = [];
+    for (const p of profiles) {
+      const d = routingDraft[p.key];
+      if (!d) continue;
+      const origCred = p.llmCredentialId ?? "";
+      const origModel = p.preferredModel ?? "";
+      if (d.credId !== origCred || d.model !== origModel) dirty.push(p.key);
+    }
+    return dirty;
+  }, [profiles, routingDraft]);
+
   const loadCreds = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${workspaceId}/credentials/llm`);
     const data = (await res.json()) as {
@@ -110,13 +144,29 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
       setError(data.error?.message ?? "Failed to load profiles");
       return;
     }
-    setProfiles(data.profiles ?? []);
+    const rows = data.profiles ?? [];
+    setProfiles(rows);
+    setRoutingDraft(
+      Object.fromEntries(
+        rows.map((p) => [
+          p.key,
+          {
+            credId: p.llmCredentialId ?? "",
+            model: p.preferredModel ?? "",
+          },
+        ]),
+      ),
+    );
   }, [workspaceId]);
 
   useEffect(() => {
     void loadCreds();
     void loadProfiles();
   }, [loadCreds, loadProfiles]);
+
+  useEffect(() => {
+    if (credentials.length === 0) setShowAdd(true);
+  }, [credentials.length]);
 
   useEffect(() => {
     if (sameVendorCreds.length === 0) {
@@ -191,6 +241,7 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
     if (!canSave) return;
     setPending(true);
     setError(null);
+    setOkMsg(null);
     try {
       const res = await fetch(`/api/workspaces/${workspaceId}/credentials/llm`, {
         method: "POST",
@@ -213,6 +264,8 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
       }
       setApiKey("");
       setReuseKey(sameVendorCreds.length > 0);
+      setOkMsg("Connection added");
+      setShowAdd(false);
       await loadCreds();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -224,6 +277,7 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
   async function setDefault(id: string) {
     setPending(true);
     setError(null);
+    setOkMsg(null);
     try {
       const res = await fetch(`/api/workspaces/${workspaceId}/credentials/llm`, {
         method: "PATCH",
@@ -234,6 +288,7 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
         const data = (await res.json()) as { error?: { message?: string } };
         throw new Error(data.error?.message ?? "Set default failed");
       }
+      setOkMsg("Default connection updated");
       await loadCreds();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -245,12 +300,14 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
   async function revoke(id: string) {
     setPending(true);
     setError(null);
+    setOkMsg(null);
     try {
       const res = await fetch(
         `/api/workspaces/${workspaceId}/credentials/llm?id=${encodeURIComponent(id)}`,
         { method: "DELETE" },
       );
       if (!res.ok) throw new Error("Revoke failed");
+      setOkMsg("Connection revoked");
       await loadCreds();
       await loadProfiles();
     } catch (err: unknown) {
@@ -260,328 +317,488 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
     }
   }
 
-  async function saveRouting(
-    key: string,
-    llmCredentialId: string | null,
-    preferredModel: string | null,
-  ) {
-    setRoutingPending(key);
+  function patchDraft(key: string, patch: Partial<RoutingDraft>) {
+    setRoutingDraft((prev) => {
+      const cur = prev[key] ?? { credId: "", model: "" };
+      return { ...prev, [key]: { ...cur, ...patch } };
+    });
+  }
+
+  async function saveAllRouting() {
+    if (dirtyKeys.length === 0) return;
+    setRoutingPending(true);
     setError(null);
+    setOkMsg(null);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/profiles`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key,
-          llmCredentialId,
-          preferredModel,
-        }),
-      });
-      const data = (await res.json()) as { error?: { message?: string } };
-      if (!res.ok) {
-        throw new Error(data.error?.message ?? "Failed to save routing");
+      for (const key of dirtyKeys) {
+        const d = routingDraft[key];
+        if (!d) continue;
+        const res = await fetch(`/api/workspaces/${workspaceId}/profiles`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            key,
+            llmCredentialId: d.credId.trim() || null,
+            preferredModel: d.model.trim() || null,
+          }),
+        });
+        const data = (await res.json()) as { error?: { message?: string } };
+        if (!res.ok) {
+          throw new Error(data.error?.message ?? `Failed to save ${key}`);
+        }
       }
+      setOkMsg(
+        dirtyKeys.length === 1
+          ? "Agent routing saved"
+          : `${dirtyKeys.length} agent routes saved`,
+      );
       await loadProfiles();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setRoutingPending(null);
+      setRoutingPending(false);
     }
+  }
+
+  function resetRouting() {
+    setRoutingDraft(
+      Object.fromEntries(
+        profiles.map((p) => [
+          p.key,
+          {
+            credId: p.llmCredentialId ?? "",
+            model: p.preferredModel ?? "",
+          },
+        ]),
+      ),
+    );
   }
 
   if (!isOwner) {
     return (
       <section className={styles.section}>
-        <h2 className={styles.sectionLabel}>LLM BYOK</h2>
+        <h2 className={styles.sectionLabel}>LLM</h2>
         <p className={styles.note}>Only owners can manage provider keys.</p>
       </section>
     );
   }
 
   return (
-    <section className={styles.section} aria-labelledby="byok-heading">
-      <h2 id="byok-heading" className={styles.sectionLabel}>
-        LLM BYOK
-      </h2>
-      <p className={styles.sectionLede}>
-        Add named connections (same OpenAI key can power multiple models via
-        reuse). Route each agent profile to a connection. Keys are sealed at
-        rest and never returned in plaintext.
-      </p>
-      {error ? <p className={styles.error}>{error}</p> : null}
-
-      <div className={styles.panel}>
-        <h3 className={styles.sectionLabel}>Connections</h3>
-        {credentials.length === 0 ? (
-          <p className={styles.note}>
-            No connections yet — worker uses FakeAgent / LLM_API_KEY.
+    <section className={styles.llmLayout} aria-labelledby="byok-heading">
+      <header className={styles.llmHero}>
+        <div>
+          <h2 id="byok-heading" className={styles.llmTitle}>
+            Bring your own key
+          </h2>
+          <p className={styles.llmLede}>
+            Connect a provider once, then route which agents use it. Keys stay
+            sealed — never shown again in plaintext.
           </p>
-        ) : (
-          <ul className={styles.note}>
-            {credentials.map((c) => (
-              <li key={c.id} style={{ marginBottom: "0.5rem" }}>
-                <strong>{c.label}</strong>
-                {c.isDefault ? " · Default" : ""}
-                {` · ${vendorName(c.vendor)}`}
-                {c.model ? ` · ${c.model}` : ""}
-                {c.baseUrl ? ` · ${c.baseUrl}` : ""}
-                <div className={styles.btnRow} style={{ marginTop: "0.35rem" }}>
-                  {!c.isDefault ? (
-                    <button
-                      type="button"
-                      className={styles.copyBtn}
-                      disabled={pending}
-                      onClick={() => void setDefault(c.id)}
-                    >
-                      Set default
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.dangerBtn}
-                    disabled={pending}
-                    onClick={() => void revoke(c.id)}
-                  >
-                    Revoke
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className={styles.panel}>
-        <h3 className={styles.sectionLabel}>Add connection</h3>
-        <label className={styles.field}>
-          Provider
-          <select
-            className={styles.select}
-            value={vendor}
-            onChange={(e) => onVendorChange(e.target.value as LlmVendorId)}
-          >
-            {LLM_PROVIDERS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className={styles.note}>
-          {preset.hint}
-          {resolvedModel
-            ? ` Name will be auto-generated from provider + model.`
-            : ""}
-        </p>
-        {sameVendorCreds.length > 0 ? (
-          <label className={styles.field}>
-            <span>
-              <input
-                type="checkbox"
-                checked={reuseKey}
-                onChange={(e) => setReuseKey(e.target.checked)}
-              />{" "}
-              Use existing {vendorName(vendor)} key
-            </span>
-            {reuseKey ? (
-              <select
-                className={styles.select}
-                value={reuseFromId}
-                onChange={(e) => setReuseFromId(e.target.value)}
-              >
-                {sameVendorCreds.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                    {c.model ? ` (${c.model})` : ""}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-          </label>
-        ) : null}
-        {!reuseKey ? (
-          <label className={styles.field}>
-            API key
-            <input
-              className={styles.input}
-              type="password"
-              autoComplete="off"
-              placeholder={preset.keyPlaceholder}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </label>
-        ) : null}
-        {!preset.hideBaseUrl ? (
-          <label className={styles.field}>
-            Base URL
-            <input
-              className={styles.input}
-              placeholder="https://…/v1"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-            />
-          </label>
-        ) : null}
-        <div className={styles.fieldGridTwo}>
-          <label className={styles.field}>
-            Model
-            <select
-              className={styles.select}
-              value={
-                modelOptions.includes(modelSelect)
-                  ? modelSelect
-                  : OTHER_MODEL_VALUE
-              }
-              onChange={(e) => {
-                const v = e.target.value;
-                setModelSelect(v);
-                if (v !== OTHER_MODEL_VALUE) setModelCustom("");
-              }}
-            >
-              {modelOptions.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-              <option value={OTHER_MODEL_VALUE}>Other…</option>
-            </select>
-          </label>
-          {modelSelect === OTHER_MODEL_VALUE ||
-          !modelOptions.includes(modelSelect) ? (
-            <label className={styles.field}>
-              Model id
-              <input
-                className={styles.input}
-                placeholder="model-id"
-                value={modelCustom}
-                onChange={(e) => {
-                  setModelSelect(OTHER_MODEL_VALUE);
-                  setModelCustom(e.target.value);
-                }}
-              />
-            </label>
-          ) : (
-            <div />
-          )}
         </div>
-        <div className={styles.btnRow}>
+        <div className={styles.llmStats} aria-label="LLM summary">
+          <div className={styles.llmStat}>
+            <span className={styles.llmStatLabel}>Connections</span>
+            <span className={styles.llmStatValue}>{credentials.length}</span>
+          </div>
+          <div className={styles.llmStat}>
+            <span className={styles.llmStatLabel}>Default</span>
+            <span className={styles.llmStatValue}>
+              {defaultCred
+                ? defaultCred.model ?? vendorName(defaultCred.vendor)
+                : "Hosted fallback"}
+            </span>
+          </div>
+          <div className={styles.llmStat}>
+            <span className={styles.llmStatLabel}>Agents</span>
+            <span className={styles.llmStatValue}>{profiles.length}</span>
+          </div>
+        </div>
+      </header>
+
+      {error ? <p className={styles.error}>{error}</p> : null}
+      {okMsg ? <p className={styles.ok}>{okMsg}</p> : null}
+
+      <div className={styles.llmSection}>
+        <div className={styles.llmSectionHead}>
+          <div>
+            <h3 className={styles.llmSectionTitle}>Connections</h3>
+            <p className={styles.llmSectionHint}>
+              Named provider + model pairs. Reuse the same key across models.
+            </p>
+          </div>
           <button
             type="button"
-            className={styles.primaryBtn}
-            disabled={!canSave}
-            onClick={() => void saveConnection()}
+            className={showAdd ? styles.ghostBtn : styles.primaryBtn}
+            disabled={pending}
+            onClick={() => setShowAdd((v) => !v)}
           >
-            Add connection
+            {showAdd ? "Cancel" : "Add connection"}
           </button>
-          {preset.supportsDiscover ? (
+        </div>
+
+        {credentials.length === 0 && !showAdd ? (
+          <div className={styles.llmEmpty}>
+            <p className={styles.llmEmptyTitle}>No connections yet</p>
+            <p className={styles.note}>
+              Until you add one, the worker falls back to the hosted key /
+              FakeAgent.
+            </p>
             <button
               type="button"
-              className={styles.copyBtn}
-              disabled={pending || fetchingModels}
-              onClick={() => void fetchModels()}
+              className={styles.primaryBtn}
+              onClick={() => setShowAdd(true)}
             >
-              {fetchingModels ? "Fetching…" : "Fetch models"}
+              Add your first connection
             </button>
+          </div>
+        ) : null}
+
+        {credentials.length > 0 ? (
+          <ul className={styles.llmCredGrid}>
+            {credentials.map((c) => {
+              const used = shortTime(c.lastUsedAt);
+              return (
+                <li
+                  key={c.id}
+                  className={`${styles.llmCredCard} ${
+                    c.isDefault ? styles.llmCredCardDefault : ""
+                  }`}
+                >
+                  <div className={styles.llmCredTop}>
+                    <span className={styles.llmVendorChip}>
+                      {vendorName(c.vendor)}
+                    </span>
+                    {c.isDefault ? (
+                      <span className={styles.llmDefaultBadge}>Default</span>
+                    ) : null}
+                  </div>
+                  <p className={styles.llmCredModel}>
+                    {c.model ?? "No model set"}
+                  </p>
+                  <p className={styles.llmCredMeta}>
+                    {c.label}
+                    {used ? ` · last used ${used}` : ""}
+                    {c.baseUrl && !getLlmProvider(c.vendor)?.hideBaseUrl
+                      ? ` · ${c.baseUrl}`
+                      : ""}
+                  </p>
+                  <div className={styles.llmCredActions}>
+                    {!c.isDefault ? (
+                      <button
+                        type="button"
+                        className={styles.ghostBtn}
+                        disabled={pending}
+                        onClick={() => void setDefault(c.id)}
+                      >
+                        Make default
+                      </button>
+                    ) : (
+                      <span className={styles.note}>Workspace default</span>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.linkBtn}
+                      disabled={pending}
+                      onClick={() => void revoke(c.id)}
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
+        {showAdd ? (
+          <div className={styles.llmAddPanel}>
+            <p className={styles.llmAddLabel}>New connection</p>
+            <div className={styles.llmProviderRow} role="list">
+              {LLM_PROVIDERS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="listitem"
+                  className={`${styles.llmProviderChip} ${
+                    vendor === p.id ? styles.llmProviderChipActive : ""
+                  }`}
+                  onClick={() => onVendorChange(p.id)}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <p className={styles.note}>{preset.hint}</p>
+
+            {sameVendorCreds.length > 0 ? (
+              <label className={styles.toggleRow}>
+                <span className={styles.toggleCopy}>
+                  <span className={styles.toggleTitle}>
+                    Reuse existing {vendorName(vendor)} key
+                  </span>
+                  <span className={styles.toggleHint}>
+                    Same sealed key, different model label.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className={styles.toggle}
+                  checked={reuseKey}
+                  onChange={(e) => setReuseKey(e.target.checked)}
+                />
+              </label>
+            ) : null}
+
+            {reuseKey ? (
+              <label className={styles.field}>
+                Key source
+                <select
+                  className={styles.select}
+                  value={reuseFromId}
+                  onChange={(e) => setReuseFromId(e.target.value)}
+                >
+                  {sameVendorCreds.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                      {c.model ? ` (${c.model})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <label className={styles.field}>
+                API key
+                <input
+                  className={styles.input}
+                  type="password"
+                  autoComplete="off"
+                  placeholder={preset.keyPlaceholder}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+              </label>
+            )}
+
+            {!preset.hideBaseUrl ? (
+              <label className={styles.field}>
+                Base URL
+                <input
+                  className={styles.input}
+                  placeholder="https://…/v1"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                />
+              </label>
+            ) : null}
+
+            <div className={styles.fieldGridTwo}>
+              <label className={styles.field}>
+                Model
+                <select
+                  className={styles.select}
+                  value={
+                    modelOptions.includes(modelSelect)
+                      ? modelSelect
+                      : OTHER_MODEL_VALUE
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setModelSelect(v);
+                    if (v !== OTHER_MODEL_VALUE) setModelCustom("");
+                  }}
+                >
+                  {modelOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                  <option value={OTHER_MODEL_VALUE}>Other…</option>
+                </select>
+              </label>
+              {modelSelect === OTHER_MODEL_VALUE ||
+              !modelOptions.includes(modelSelect) ? (
+                <label className={styles.field}>
+                  Model id
+                  <input
+                    className={styles.input}
+                    placeholder="model-id"
+                    value={modelCustom}
+                    onChange={(e) => {
+                      setModelSelect(OTHER_MODEL_VALUE);
+                      setModelCustom(e.target.value);
+                    }}
+                  />
+                </label>
+              ) : (
+                <div className={styles.llmAddSpacer} />
+              )}
+            </div>
+
+            <div className={styles.btnRow}>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={!canSave}
+                onClick={() => void saveConnection()}
+              >
+                {pending ? "Saving…" : "Save connection"}
+              </button>
+              {preset.supportsDiscover ? (
+                <button
+                  type="button"
+                  className={styles.ghostBtn}
+                  disabled={pending || fetchingModels}
+                  onClick={() => void fetchModels()}
+                >
+                  {fetchingModels ? "Fetching…" : "Fetch models"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className={styles.llmSection}>
+        <div className={styles.llmSectionHead}>
+          <div>
+            <h3 className={styles.llmSectionTitle}>Agent routing</h3>
+            <p className={styles.llmSectionHint}>
+              Leave on workspace default unless an agent needs a different
+              connection or model.
+            </p>
+          </div>
+          {dirtyKeys.length > 0 ? (
+            <div className={styles.btnRow}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                disabled={routingPending}
+                onClick={resetRouting}
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={routingPending}
+                onClick={() => void saveAllRouting()}
+              >
+                {routingPending
+                  ? "Saving…"
+                  : `Save ${dirtyKeys.length} change${dirtyKeys.length === 1 ? "" : "s"}`}
+              </button>
+            </div>
           ) : null}
         </div>
-      </div>
 
-      <div className={styles.panel}>
-        <h3 className={styles.sectionLabel}>Agent routing</h3>
-        <p className={styles.note}>
-          Each agent profile uses the selected connection (or workspace
-          default). Optional model override wins over the connection default.
-        </p>
         {profiles.length === 0 ? (
-          <p className={styles.note}>No profiles loaded.</p>
+          <p className={styles.note}>No agent profiles loaded yet.</p>
         ) : (
-          profiles.map((p) => (
-            <AgentRoutingRow
-              key={p.key}
-              profile={p}
-              credentials={credentials}
-              pending={routingPending === p.key}
-              onSave={(credId, model) =>
-                void saveRouting(p.key, credId, model)
-              }
-            />
-          ))
+          <div className={styles.llmRouteTableWrap}>
+            <table className={styles.llmRouteTable}>
+              <thead>
+                <tr>
+                  <th scope="col">Agent</th>
+                  <th scope="col">Connection</th>
+                  <th scope="col">Model override</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profiles.map((p) => {
+                  const draft = routingDraft[p.key] ?? {
+                    credId: "",
+                    model: "",
+                  };
+                  const dirty = dirtyKeys.includes(p.key);
+                  const selected = credentials.find(
+                    (c) => c.id === draft.credId,
+                  );
+                  return (
+                    <tr
+                      key={p.key}
+                      className={dirty ? styles.llmRouteRowDirty : undefined}
+                    >
+                      <th scope="row">
+                        <span className={styles.llmAgentName}>
+                          {p.displayName}
+                        </span>
+                        {dirty ? (
+                          <span className={styles.llmDirtyDot} aria-label="Unsaved" />
+                        ) : null}
+                      </th>
+                      <td>
+                        <select
+                          className={styles.select}
+                          value={draft.credId}
+                          onChange={(e) =>
+                            patchDraft(p.key, { credId: e.target.value })
+                          }
+                          aria-label={`${p.displayName} connection`}
+                        >
+                          <option value="">Workspace default</option>
+                          {credentials.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.label}
+                              {c.model ? ` · ${c.model}` : ""}
+                              {c.isDefault ? " ★" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          className={styles.input}
+                          list={`models-${p.key}`}
+                          placeholder={
+                            selected?.model ?? "Connection default"
+                          }
+                          value={draft.model}
+                          onChange={(e) =>
+                            patchDraft(p.key, { model: e.target.value })
+                          }
+                          aria-label={`${p.displayName} model override`}
+                        />
+                        <datalist id={`models-${p.key}`}>
+                          {selected?.model ? (
+                            <option value={selected.model} />
+                          ) : null}
+                        </datalist>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
+
+        {dirtyKeys.length > 0 ? (
+          <div className={styles.llmStickyBar}>
+            <p className={styles.note}>
+              {dirtyKeys.length} unsaved route
+              {dirtyKeys.length === 1 ? "" : "s"}
+            </p>
+            <div className={styles.btnRow}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                disabled={routingPending}
+                onClick={resetRouting}
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={routingPending}
+                onClick={() => void saveAllRouting()}
+              >
+                {routingPending ? "Saving…" : "Save routing"}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
-  );
-}
-
-function AgentRoutingRow({
-  profile,
-  credentials,
-  pending,
-  onSave,
-}: {
-  profile: ProfileRow;
-  credentials: Cred[];
-  pending: boolean;
-  onSave: (credId: string | null, model: string | null) => void;
-}) {
-  const [credId, setCredId] = useState(profile.llmCredentialId ?? "");
-  const [model, setModel] = useState(profile.preferredModel ?? "");
-
-  useEffect(() => {
-    setCredId(profile.llmCredentialId ?? "");
-    setModel(profile.preferredModel ?? "");
-  }, [profile.llmCredentialId, profile.preferredModel]);
-
-  const selected = credentials.find((c) => c.id === credId);
-  const modelHints = selected?.model ? [selected.model] : [];
-
-  return (
-    <div
-      className={styles.fieldGridTwo}
-      style={{ marginTop: "0.75rem", alignItems: "end" }}
-    >
-      <label className={styles.field}>
-        {profile.displayName}
-        <select
-          className={styles.select}
-          value={credId}
-          onChange={(e) => setCredId(e.target.value)}
-        >
-          <option value="">Workspace default</option>
-          {credentials.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-              {c.model ? ` · ${c.model}` : ""}
-              {c.isDefault ? " (default)" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className={styles.field}>
-        Model override
-        <input
-          className={styles.input}
-          list={`models-${profile.key}`}
-          placeholder={selected?.model ?? "Connection default"}
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-        />
-        <datalist id={`models-${profile.key}`}>
-          {modelHints.map((m) => (
-            <option key={m} value={m} />
-          ))}
-        </datalist>
-      </label>
-      <button
-        type="button"
-        className={styles.copyBtn}
-        disabled={pending}
-        onClick={() =>
-          onSave(credId.trim() || null, model.trim() || null)
-        }
-      >
-        {pending ? "Saving…" : "Save"}
-      </button>
-    </div>
   );
 }

@@ -1,6 +1,11 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
-import { recordAuditEvent } from "./briefs.js";
+import {
+  approveBrief,
+  createBriefDraft,
+  getLatestBriefForProject,
+  recordAuditEvent,
+} from "./briefs.js";
 import {
   getProjectSpendSummary,
   rollMonthlyBudgetIfDue,
@@ -44,8 +49,10 @@ import {
 import { listRunsForTask } from "./runs.js";
 import { armSignalEvent, listSignalEvents } from "./signals.js";
 import { generateProjectPlan } from "./plans.js";
-import { getLatestBriefForProject } from "./briefs.js";
-import { setProjectMultiRepoPolicy } from "./projects.js";
+import {
+  getProjectForWorkspace,
+  setProjectMultiRepoPolicy,
+} from "./projects.js";
 
 /** Canonical micro-budget: $5/mo = 5_000_000 micros. */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 5_000_000;
@@ -69,6 +76,11 @@ export type MaintainerPolicy = {
   autoQueueReplanTasks: boolean;
   /** Cap how many replan tasks are submitted per cycle. */
   maxAutoQueuePerReplan: number;
+  /**
+   * While arena is RUNNING and budget remains, refill the backlog as soon as
+   * the board is idle (do not wait for replanIntervalDays).
+   */
+  continuousBacklog: boolean;
   /** daily = maintainer-YYYY-MM-DD; semver_patch = v0.YYYYMMDD.N */
   releaseTagStyle: "daily" | "semver_patch";
 };
@@ -89,8 +101,45 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   replanIntervalDays: 7,
   autoQueueReplanTasks: true,
   maxAutoQueuePerReplan: 2,
+  continuousBacklog: true,
   releaseTagStyle: "daily",
 };
+
+/** Open delivery statuses that keep the autonomous board "busy". */
+const OPEN_DELIVERY_STATUSES = [
+  "DRAFT",
+  "READY_FOR_APPROVAL",
+  "QUEUED",
+  "RUNNING",
+  "VALIDATING",
+  "REVIEW_REQUIRED",
+] as const;
+
+/** Minimum residual budget (micros) before inventing a new cycle. */
+export const MIN_REPLAN_AVAILABLE_MICROS = 100_000;
+
+/**
+ * Decide whether the scheduler should invent the next maintainer cycle.
+ * Continuous mode refills as soon as the board is idle under budget.
+ */
+export function shouldReplanVision(input: {
+  lastVisionReplanAt: Date | null | undefined;
+  replanIntervalDays: number;
+  continuousBacklog: boolean;
+  openWorkCount: number;
+  availableMicros: number;
+  minAvailableMicros?: number;
+  nowMs?: number;
+}): boolean {
+  const min =
+    input.minAvailableMicros ?? MIN_REPLAN_AVAILABLE_MICROS;
+  if (input.availableMicros <= min) return false;
+  if (input.continuousBacklog && input.openWorkCount === 0) return true;
+  const replanMs = Math.max(1, input.replanIntervalDays) * 24 * 60 * 60 * 1000;
+  if (!input.lastVisionReplanAt) return true;
+  const now = input.nowMs ?? Date.now();
+  return now - input.lastVisionReplanAt.getTime() >= replanMs;
+}
 
 export class MaintainerError extends Error {
   readonly code: "not_found" | "invalid" | "forbidden";
@@ -143,6 +192,10 @@ export function parseMaintainerPolicy(
         v.maxAutoQueuePerReplan >= 1
           ? Math.min(5, Math.floor(v.maxAutoQueuePerReplan))
           : DEFAULT_MAINTAINER_POLICY.maxAutoQueuePerReplan,
+      continuousBacklog:
+        typeof v.continuousBacklog === "boolean"
+          ? v.continuousBacklog
+          : DEFAULT_MAINTAINER_POLICY.continuousBacklog,
       releaseTagStyle:
         v.releaseTagStyle === "semver_patch" ? "semver_patch" : "daily",
     };
@@ -376,11 +429,117 @@ export type ArenaControlResult = {
   project: Project;
   resumedTasks: number;
   maintainerEnabled: boolean;
+  bootstrappedBrief: boolean;
+  queuedFromReplan: number;
 };
 
 /**
+ * No human brief/plan: approve a default vision and auto-queue the next
+ * maintainer cycle tasks so Start is the only gate.
+ */
+export async function ensureAutonomousVisionAndBacklog(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+  },
+): Promise<{ bootstrappedBrief: boolean; queuedFromReplan: number }> {
+  const bound = await getProjectForWorkspace(
+    db,
+    input.workspaceId,
+    input.projectId,
+  );
+  if (!bound) {
+    throw new MaintainerError("not_found", "Project not found");
+  }
+  const repo = bound.repository.baseRepoFullName;
+  const name = bound.project.name;
+
+  let bootstrappedBrief = false;
+  let brief = await getLatestBriefForProject(
+    db,
+    input.workspaceId,
+    input.projectId,
+  );
+  if (!brief || brief.status !== "approved") {
+    const draft = await createBriefDraft(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor: input.actor,
+      rawIdea: `Autonomous maintainer for ${repo}: propose, build, verify, merge, and release small improvements without human plan entry.`,
+      content: {
+        title: `${name} — autonomous ship loop`,
+        targetUser: "Product maintainers",
+        problem: `Keep ${repo} improving under a monthly spend cap with survivor selection.`,
+        scope:
+          "Tiny, reviewable changes on the primary repo: bugs, CI, docs, and small features. Prefer go test / CI green.",
+        nonGoals:
+          "Large rewrites, multi-repo coordinated ships without policy, unbounded spend.",
+        acceptanceCriteria: [
+          "Scoped task queued without human brief entry",
+          "Survivor PR opens on the primary repository",
+          "CI green; maintainer auto-accepts the tournament winner",
+        ],
+        clarifyingAnswers: [],
+      },
+    });
+    brief = await approveBrief(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      briefId: draft.id,
+      actor: input.actor,
+    });
+    bootstrappedBrief = true;
+  }
+
+  const openWork = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.projectId, input.projectId),
+        eq(tasks.workspaceId, input.workspaceId),
+        inArray(tasks.status, [...OPEN_DELIVERY_STATUSES]),
+      ),
+    )
+    .limit(1);
+
+  let queuedFromReplan = 0;
+  if (openWork.length === 0) {
+    // Force a replan cycle even if lastVisionReplanAt is recent
+    await db
+      .update(projects)
+      .set({ lastVisionReplanAt: null, updatedAt: new Date() })
+      .where(eq(projects.id, input.projectId));
+    const replan = await runVisionReplan(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor: input.actor,
+      autoQueue: true,
+    });
+    queuedFromReplan = replan.queued;
+  }
+
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "maintainer.autonomous_bootstrap",
+    targetType: "project",
+    targetId: input.projectId,
+    meta: {
+      briefId: brief.id,
+      bootstrappedBrief,
+      queuedFromReplan,
+    },
+  });
+
+  return { bootstrappedBrief, queuedFromReplan };
+}
+
+/**
  * Start — one switch. Arms/resumes arena, turns on min_human + maintainer,
- * continues QUEUED / READY work without waiting for human Accept.
+ * bootstraps vision/backlog, continues without human Accept or plan entry.
  */
 export async function startProjectArena(
   db: Database,
@@ -404,6 +563,7 @@ export async function startProjectArena(
     throw new MaintainerError("not_found", "Project not found");
   }
 
+  // Arm min_human before vision replan so submit auto-queues (no Accept inbox).
   let { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
@@ -422,6 +582,8 @@ export async function startProjectArena(
     });
   }
 
+  const bootstrap = await ensureAutonomousVisionAndBacklog(db, input);
+
   if (arena.status === "KILLED" || arena.status === "PAUSED") {
     arena = await resumeArena(db, {
       workspaceId: input.workspaceId,
@@ -439,27 +601,24 @@ export async function startProjectArena(
 
   let liveProject = project;
   if (!project.maintainerEnabled) {
-    try {
-      const enabled = await enableMaintainerMode(db, {
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        actor: input.actor,
-        policy: {
-          autoMerge: true,
-          autoRelease: true,
-          selfImprove: true,
-          autoQueueReplanTasks: true,
-        },
-      });
-      liveProject = enabled.project;
-      const refreshed = await getArenaForProject(db, {
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-      });
-      if (refreshed) arena = refreshed;
-    } catch {
-      // Brief may be missing — still run arena with min_human only
-    }
+    const enabled = await enableMaintainerMode(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor: input.actor,
+      policy: {
+        autoMerge: true,
+        autoRelease: true,
+        selfImprove: true,
+        autoQueueReplanTasks: true,
+        continuousBacklog: true,
+      },
+    });
+    liveProject = enabled.project;
+    const refreshed = await getArenaForProject(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+    });
+    if (refreshed) arena = refreshed;
   }
 
   // Auto-queue anything sitting in the human inbox
@@ -536,13 +695,23 @@ export async function startProjectArena(
     action: "arena.start",
     targetType: "arena",
     targetId: arena.id,
-    meta: { resumedTasks, maintainerEnabled: liveProject.maintainerEnabled },
+    meta: {
+      resumedTasks,
+      maintainerEnabled: liveProject.maintainerEnabled,
+      bootstrappedBrief: bootstrap.bootstrappedBrief,
+      queuedFromReplan: bootstrap.queuedFromReplan,
+    },
   });
   await recordMaintainerEvent(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     kind: "tick",
-    payload: { action: "arena_start", resumedTasks },
+    payload: {
+      action: "arena_start",
+      resumedTasks,
+      bootstrappedBrief: bootstrap.bootstrappedBrief,
+      queuedFromReplan: bootstrap.queuedFromReplan,
+    },
   });
 
   return {
@@ -550,6 +719,8 @@ export async function startProjectArena(
     project: liveProject,
     resumedTasks,
     maintainerEnabled: liveProject.maintainerEnabled,
+    bootstrappedBrief: bootstrap.bootstrappedBrief,
+    queuedFromReplan: bootstrap.queuedFromReplan,
   };
 }
 
@@ -621,6 +792,8 @@ export async function stopProjectArena(
     project,
     resumedTasks: 0,
     maintainerEnabled: project.maintainerEnabled,
+    bootstrappedBrief: false,
+    queuedFromReplan: 0,
   };
 }
 
@@ -809,10 +982,8 @@ export async function tickMaintainerProject(
     .from(arenas)
     .where(eq(arenas.projectId, input.projectId))
     .limit(1);
-  if (arena?.status === "KILLED" || arena?.status === "PAUSED") {
-    result.errors.push(
-      arena.status === "PAUSED" ? "arena paused" : "arena killed",
-    );
+  if (arena?.status === "KILLED") {
+    result.errors.push("arena killed");
     result.paused = true;
     return result;
   }
@@ -876,6 +1047,55 @@ export async function tickMaintainerProject(
       payload: { action: "hard_pause", spentMicros: spend.spentMicros },
     });
     return result;
+  }
+
+  // User Stop freezes the loop; budget exhaustion only pauses the ledger above.
+  // Arena stays RUNNING under a hard budget pause so a monthly roll (budget
+  // reactivated) continues shipping without another Start.
+  if (arena?.status === "PAUSED") {
+    result.errors.push("arena paused");
+    result.paused = true;
+    return result;
+  }
+
+  // Drain human inbox in the background (min_human): DRAFT → queue, approve → queue
+  if (arena?.minHuman) {
+    try {
+      const awaiting = await db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.projectId, input.projectId),
+            eq(tasks.workspaceId, input.workspaceId),
+            inArray(tasks.status, ["DRAFT", "READY_FOR_APPROVAL"]),
+          ),
+        )
+        .limit(20);
+      for (const task of awaiting) {
+        try {
+          if (task.status === "DRAFT") {
+            await submitTaskForApproval(db, {
+              workspaceId: input.workspaceId,
+              taskId: task.id,
+              actor,
+            });
+          } else if (task.status === "READY_FOR_APPROVAL") {
+            await approveTask(db, {
+              workspaceId: input.workspaceId,
+              taskId: task.id,
+              actor,
+            });
+          }
+        } catch {
+          // skip blocked
+        }
+      }
+    } catch (err) {
+      result.errors.push(
+        `inbox_drain: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   // Triage: arm received signals under policy + residual budget
@@ -998,12 +1218,26 @@ export async function tickMaintainerProject(
     }
   }
 
-  // Vision replan
-  const replanMs = policy.replanIntervalDays * 24 * 60 * 60 * 1000;
-  const due =
-    !project.lastVisionReplanAt ||
-    Date.now() - project.lastVisionReplanAt.getTime() >= replanMs;
-  if (due && spend.availableMicros > 100_000) {
+  // Vision replan — continuous backlog refills when the board is idle under budget
+  const openRows = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.projectId, input.projectId),
+        eq(tasks.workspaceId, input.workspaceId),
+        inArray(tasks.status, [...OPEN_DELIVERY_STATUSES]),
+      ),
+    )
+    .limit(50);
+  const due = shouldReplanVision({
+    lastVisionReplanAt: project.lastVisionReplanAt,
+    replanIntervalDays: policy.replanIntervalDays,
+    continuousBacklog: policy.continuousBacklog,
+    openWorkCount: openRows.length,
+    availableMicros: spend.availableMicros,
+  });
+  if (due) {
     try {
       await runVisionReplan(db, {
         workspaceId: input.workspaceId,

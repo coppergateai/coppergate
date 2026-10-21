@@ -33,7 +33,7 @@ export const SETTINGS_TABS = [
   {
     id: "llm",
     label: "LLM",
-    blurb: "Bring your own key",
+    blurb: "Keys & agent routing",
     group: "Advanced",
   },
   {
