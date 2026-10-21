@@ -77,43 +77,6 @@ export function PlanPanel({
     }
   }
 
-  async function transitionTask(
-    taskId: string,
-    action: "submit" | "approve",
-  ) {
-    setPending(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/tasks/${taskId}/${action}`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId }),
-      });
-      const body = (await res.json()) as {
-        task?: { id: string; status: string };
-        error?: { message: string };
-      };
-      if (!res.ok) throw new Error(body.error?.message ?? `${action} failed`);
-      if (body.task && plan) {
-        setPlan({
-          ...plan,
-          milestones: plan.milestones.map((m) => ({
-            ...m,
-            tasks: m.tasks.map((t) =>
-              t.id === body.task!.id ? { ...t, status: body.task!.status } : t,
-            ),
-          })),
-        });
-      }
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `${action} failed`);
-    } finally {
-      setPending(false);
-    }
-  }
-
   const agentsHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
 
   return (
@@ -163,7 +126,7 @@ export function PlanPanel({
               <p className={styles.muted}>
                 {m.description}
                 {m.estimatedCostMicros != null
-                  ? ` · ~${(m.estimatedCostMicros / 100).toFixed(0)}¢ est.`
+                  ? ` · ~$${(m.estimatedCostMicros / 1_000_000).toFixed(2)} est.`
                   : ""}
               </p>
               <ul className={styles.taskList}>
@@ -180,11 +143,11 @@ export function PlanPanel({
                     <div className={styles.taskMeta}>
                       {t.estimateComplexity ?? "?"} ·{" "}
                       {t.estimateMicros != null
-                        ? `${(t.estimateMicros / 100).toFixed(0)}¢`
+                        ? `$${(t.estimateMicros / 1_000_000).toFixed(2)}`
                         : "no estimate"}{" "}
                       · {t.status}
                       {t.dependsOnTaskIds.length
-                        ? ` · depends on ${t.dependsOnTaskIds.length}`
+                        ? ` · waits on ${t.dependsOnTaskIds.length} predecessor${t.dependsOnTaskIds.length === 1 ? "" : "s"}`
                         : ""}
                     </div>
                     <div className={styles.taskScope}>Scope: {t.scope}</div>
@@ -193,31 +156,11 @@ export function PlanPanel({
                         <li key={c}>{c}</li>
                       ))}
                     </ul>
-                    {isOwner &&
-                    (t.status === "DRAFT" ||
-                      t.status === "READY_FOR_APPROVAL") ? (
-                      <div className={styles.btnRow}>
-                        {t.status === "DRAFT" ? (
-                          <button
-                            type="button"
-                            className={styles.smallBtn}
-                            disabled={pending}
-                            onClick={() => void transitionTask(t.id, "submit")}
-                          >
-                            Submit
-                          </button>
-                        ) : null}
-                        {t.status === "READY_FOR_APPROVAL" ? (
-                          <button
-                            type="button"
-                            className={styles.smallBtn}
-                            disabled={pending}
-                            onClick={() => void transitionTask(t.id, "approve")}
-                          >
-                            Approve → queue
-                          </button>
-                        ) : null}
-                      </div>
+                    {t.status === "DRAFT" && t.dependsOnTaskIds.length > 0 ? (
+                      <p className={styles.hint}>
+                        Auto-queues after the predecessor is DONE — no Approve
+                        needed.
+                      </p>
                     ) : null}
                   </li>
                 ))}

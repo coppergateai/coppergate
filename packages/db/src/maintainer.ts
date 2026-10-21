@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
+import { expireStaleTaskApprovals } from "./approvals.js";
 import {
   approveBrief,
   createBriefDraft,
@@ -41,9 +42,11 @@ import {
   type Task,
 } from "./schema.js";
 import {
+  applyTaskTransition,
   approveTask,
   decideTaskReview,
   enqueueQueuedTask,
+  predecessorsAreDone,
   submitTaskForApproval,
 } from "./task-transitions.js";
 import { listRunsForTask } from "./runs.js";
@@ -563,7 +566,8 @@ export async function startProjectArena(
     throw new MaintainerError("not_found", "Project not found");
   }
 
-  // Arm min_human before vision replan so submit auto-queues (no Accept inbox).
+  // Arm + resume BEFORE vision replan. If backlog boots while PAUSED,
+  // min_human is skipped and a zombie Inbox approval is created.
   let { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
@@ -582,8 +586,6 @@ export async function startProjectArena(
     });
   }
 
-  const bootstrap = await ensureAutonomousVisionAndBacklog(db, input);
-
   if (arena.status === "KILLED" || arena.status === "PAUSED") {
     arena = await resumeArena(db, {
       workspaceId: input.workspaceId,
@@ -598,6 +600,12 @@ export async function startProjectArena(
       .returning();
     if (running) arena = running;
   }
+
+  const bootstrap = await ensureAutonomousVisionAndBacklog(db, input);
+  await expireStaleTaskApprovals(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+  });
 
   let liveProject = project;
   if (!project.maintainerEnabled) {
@@ -637,6 +645,18 @@ export async function startProjectArena(
   let resumedTasks = 0;
   for (const task of awaiting) {
     try {
+      if (!(await predecessorsAreDone(db, task.id))) {
+        if (task.status === "READY_FOR_APPROVAL") {
+          await applyTaskTransition(db, {
+            workspaceId: input.workspaceId,
+            taskId: task.id,
+            actor: input.actor,
+            toStatus: "DRAFT",
+            reason: "waiting on predecessor",
+          });
+        }
+        continue;
+      }
       if (task.status === "DRAFT" || task.status === "NEEDS_REPLAN") {
         await submitTaskForApproval(db, {
           workspaceId: input.workspaceId,
@@ -1058,6 +1078,17 @@ export async function tickMaintainerProject(
     return result;
   }
 
+  try {
+    await expireStaleTaskApprovals(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+    });
+  } catch (err) {
+    result.errors.push(
+      `stale_approvals: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   // Drain human inbox in the background (min_human): DRAFT → queue, approve → queue
   if (arena?.minHuman) {
     try {
@@ -1074,6 +1105,20 @@ export async function tickMaintainerProject(
         .limit(20);
       for (const task of awaiting) {
         try {
+          const depsOk = await predecessorsAreDone(db, task.id);
+          if (!depsOk) {
+            // Park dependents as DRAFT until the predecessor ships.
+            if (task.status === "READY_FOR_APPROVAL") {
+              await applyTaskTransition(db, {
+                workspaceId: input.workspaceId,
+                taskId: task.id,
+                actor,
+                toStatus: "DRAFT",
+                reason: "waiting on predecessor",
+              });
+            }
+            continue;
+          }
           if (task.status === "DRAFT") {
             await submitTaskForApproval(db, {
               workspaceId: input.workspaceId,

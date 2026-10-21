@@ -273,6 +273,7 @@ export {
   cancelTask,
   decideTaskReview,
   listTaskTransitions,
+  predecessorsAreDone,
   retryFailedTask,
   submitTaskForApproval,
   type ReviewDecision,
@@ -290,6 +291,7 @@ export {
 export {
   ApprovalError,
   expirePendingApprovals,
+  expireStaleTaskApprovals,
   getApprovalForWorkspace,
   getInboxApprovalForWorkspace,
   listInboxApprovalsForWorkspace,

@@ -126,12 +126,11 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
       aria-labelledby="arena-heading"
     >
       <h2 id="arena-heading" className={styles.sectionLabel}>
-        Survivor arena
+        War arena
       </h2>
       <p className={styles.sectionLede}>
-        Start invents vision and backlog; the loop keeps shipping in the
-        background while budget remains — propose → build → PR → merge. Stop
-        freezes everything. No brief or plan entry.
+        Open gates invents vision and backlog; contenders fight under budget
+        until a survivor ships. Seal the pit to freeze the loop.
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -142,6 +141,7 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
         </div>
       ) : (
         <ArenaPitch
+          projectId={projectId}
           running={running}
           arenaStatus={arena?.status ?? "idle"}
           contenders={contenders}
