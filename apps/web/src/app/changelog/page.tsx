@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
 
 export const metadata: Metadata = {
   title: "Changelog",
   description:
-    "What’s new in Coppergate — private beta progress on delivery, gates, and evidence.",
+    "What’s new in Coppergate — open-source progress on delivery, gates, and evidence.",
   alternates: { canonical: "/changelog" },
 };
 
