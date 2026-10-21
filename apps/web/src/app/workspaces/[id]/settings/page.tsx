@@ -15,9 +15,8 @@ import { ByokPanel } from "./byok-panel";
 import { CostExplorerPanel } from "./cost-explorer";
 import { DangerZone } from "./danger-zone";
 import { DemoSeedPanel } from "./demo-seed-panel";
-import { GithubPanel } from "./github-panel";
-import { GitlabPanel } from "./gitlab-panel";
 import { NotifyPanel } from "./notify-panel";
+import { ScmConnectionsPanel } from "./scm-connections";
 import {
   ProjectsBudgetPanel,
   type ProjectBudgetRow,
@@ -135,19 +134,20 @@ export default async function WorkspaceSettingsPage({
     </div>
   );
 
+  const preferScm =
+    githubFlag != null
+      ? ("github" as const)
+      : gitlabFlag != null
+        ? ("gitlab" as const)
+        : null;
+
   const connections = (
-    <div className={styles.splitGrid}>
-      <GithubPanel
-        workspaceId={workspace.id}
-        canManage={role === "owner"}
-        initialQuery={initialQuery}
-      />
-      <GitlabPanel
-        workspaceId={workspace.id}
-        canManage={role === "owner"}
-        initialQuery={initialQuery}
-      />
-    </div>
+    <ScmConnectionsPanel
+      workspaceId={workspace.id}
+      canManage={role === "owner"}
+      initialQuery={initialQuery}
+      prefer={preferScm}
+    />
   );
 
   const signals = (
