@@ -18,6 +18,12 @@ import {
   isSecureCookie,
   verifyInstallState,
 } from "@/lib/github-install";
+import {
+  appOrigin,
+  canonicalInstallCallbackRedirect,
+  hostedFallbackInstallRedirect,
+  installStateErrorMessage,
+} from "@/lib/github-install-callback";
 import { trackFunnel } from "@/lib/funnel";
 import { correlationIdFrom, jsonError } from "@/lib/http";
 import { logger } from "@/lib/logger";
@@ -27,12 +33,24 @@ export const dynamic = "force-dynamic";
 
 /**
  * GitHub App setup callback — persists installation + sealed token.
- * Configure the App's "Setup URL" to this route.
+ * Configure the App's "Setup URL" to `{APP_URL}/api/integrations/github/callback`
+ * (production: https://www.coppergate.ai/api/integrations/github/callback).
  */
 export async function GET(request: Request) {
   const correlationId = correlationIdFrom(request);
   try {
-    const user = await requireUser(request);
+    // If Setup URL still points at a non-canonical public host while this
+    // deployment's APP_URL is www, bounce first (apex → www).
+    const bounce = canonicalInstallCallbackRedirect(request.url, env.APP_URL);
+    if (bounce) {
+      logger.info("github install callback host rewrite", {
+        correlationId,
+        from: new URL(request.url).origin,
+        to: appOrigin(env.APP_URL),
+      });
+      return NextResponse.redirect(bounce, 307);
+    }
+
     const url = new URL(request.url);
     const installationId = url.searchParams.get("installation_id");
     const setupAction = url.searchParams.get("setup_action");
@@ -42,8 +60,9 @@ export async function GET(request: Request) {
       throw new ApiError("bad_request", "Missing installation_id or state");
     }
 
-    // HMAC-signed state is authoritative (cookie often missing after GitHub → localhost).
-    // Cookie match is an extra fast-path when the browser kept it.
+    // HMAC-signed state is authoritative (cookie often missing after GitHub → app).
+    // Resolve workspace before requireUser so a localhost Setup URL can 307 to
+    // hosted without needing a local session cookie.
     const jar = await cookies();
     const cookieState =
       jar.get(INSTALL_STATE_COOKIE)?.value ??
@@ -53,9 +72,18 @@ export async function GET(request: Request) {
       verifyInstallState(state, env.SESSION_SECRET);
 
     if (!workspaceId) {
-      throw new ApiError("forbidden", "Invalid install state");
+      const hosted = hostedFallbackInstallRedirect(request.url, env.APP_URL);
+      if (hosted) {
+        logger.info("github install callback hosted fallback", {
+          correlationId,
+          from: new URL(request.url).origin,
+        });
+        return NextResponse.redirect(hosted, 307);
+      }
+      throw new ApiError("forbidden", installStateErrorMessage(env.APP_URL));
     }
 
+    const user = await requireUser(request);
     await requireWorkspaceOwner(db, workspaceId, user.id);
 
     if (setupAction === "request") {
