@@ -94,7 +94,7 @@ export default function RecoveryPage() {
           <h2>Waiting forever in QUEUED</h2>
           <p>
             Ensure a worker is running and the project budget is active (not
-            paused). Hosted pilots: check status page / ping hello@.
+            paused). Self-host: check worker logs. Hosted: ping hello@coppergate.ai.
           </p>
 
           <h2>Arena kill-switch</h2>

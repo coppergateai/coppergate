@@ -30,7 +30,7 @@ const items = [
   {
     title: "Signal ingress controls",
     body: "Webhook secrets, fingerprint dedupe, and per-workspace storm quotas keep inbound floods from burning budget.",
-    availability: "Private beta",
+    availability: "In release",
   },
 ] as const;
 
@@ -48,7 +48,7 @@ export function SecuritySection() {
         </h2>
         <p className={styles.sectionLede}>
           Coppergate is built for controlled competition — not unbounded agent
-          access. Status labels below reflect what ships in private beta today.{" "}
+          access. Status labels below reflect what ships in the current release.{" "}
           <Link href="/security" className={styles.inlineDocLink}>
             Security overview
           </Link>

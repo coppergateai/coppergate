@@ -34,7 +34,13 @@ export default async function PublicSharePage({ params }: PageProps) {
           Built with{" "}
           <a href="https://www.coppergate.ai">Coppergate</a> — selection over
           supervision.{" "}
-          <a href="https://www.coppergate.ai/#early-access">Request early access</a>
+          <a
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open source on GitHub
+          </a>
           .
         </p>
       </main>

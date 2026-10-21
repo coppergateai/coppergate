@@ -6,7 +6,7 @@ import { DocsShell } from "@/components/docs/docs-shell";
 export const metadata = {
   title: "Pricing · Coppergate Docs",
   description:
-    "Hosted Starter and Pro plans, arena budgets, cost per survivor PR, and paid pilots.",
+    "MIT self-host is free. Optional hosted plans may come later — community path stays open source.",
 };
 
 export default function PricingPage() {
@@ -20,18 +20,37 @@ export default function PricingPage() {
         <h1 className={styles.pageTitle}>Pricing</h1>
         <div className={styles.prose}>
           <p>
-            MIT community / self-host is free. Hosted plans pay for managed
-            sandboxes and ops — not unlimited agent loops. Budget is selection
-            pressure: weak paths starve; survivors ship with a cost ledger.
+            Coppergate is <strong>open source (MIT)</strong>. Self-host and bring
+            your own keys — no license fee. Budget is selection pressure: weak
+            paths starve; survivors ship with a cost ledger.
           </p>
 
-          <h2>Community</h2>
+          <h2>Community (recommended)</h2>
           <ul>
-            <li>$0 — self-host (Compose), BYOK, user-managed sandboxes</li>
+            <li>
+              <strong>$0</strong> — self-host with Compose, BYOK, user-managed
+              sandboxes
+            </li>
             <li>Full product source under MIT</li>
+            <li>
+              Guide:{" "}
+              <a
+                href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Self-host docs
+              </a>
+            </li>
           </ul>
 
-          <h2>Hosted</h2>
+          <h2>Hosted (optional, later)</h2>
+          <p>
+            A public hosted instance may offer managed sandboxes. Early stage is
+            free to try when seats are open — paid Starter/Pro below are{" "}
+            <em>optional</em> SKUs for when you want us to run ops, not a
+            requirement to use Coppergate.
+          </p>
           {HOSTED_PLANS.map((plan) => (
             <div key={plan.id}>
               <h3>
@@ -46,27 +65,17 @@ export default function PricingPage() {
             </div>
           ))}
 
-          <h2>Pilot path</h2>
-          <ul>
-            <li>Invite-gated private beta; paid pilots redeem a <code>paid_pilot</code> invite</li>
-            <li>
-              Locked hosted prices: <strong>Starter $99/mo</strong>,{" "}
-              <strong>Pro $199/mo</strong> (+ usage) — or a one-time deposit
-              converted to Starter
-            </li>
-            <li>Wedge KPI: GitHub issue → verified PR in one session</li>
-            <li>Cost per accepted (survivor) PR is a first-class metric</li>
-            <li>
-              Self-serve recovery: <Link href="/docs/recovery">/docs/recovery</Link>
-            </li>
-          </ul>
-
           <p>
-            Owners upgrade in{" "}
-            <strong>Workspace settings → Billing</strong> when Stripe is
-            configured. Questions?{" "}
-            <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a> or{" "}
-            <Link href="/#early-access">join the waitlist</Link>.
+            Questions?{" "}
+            <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a> ·{" "}
+            <a
+              href="https://github.com/coppergateai/coppergate"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
+            .
           </p>
         </div>
       </main>

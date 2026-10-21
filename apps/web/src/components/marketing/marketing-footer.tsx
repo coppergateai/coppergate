@@ -49,6 +49,13 @@ export function MarketingFooter() {
             <nav className={styles.footerCol} aria-label="Resources">
               <h2>Resources</h2>
               <Link href="/docs">Documentation</Link>
+              <a
+                href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Self-host
+              </a>
               <Link href="/changelog">Changelog</Link>
               <a
                 href="https://github.com/coppergateai/coppergate"
@@ -84,7 +91,7 @@ export function MarketingFooter() {
 
         <div className={styles.footerBottom}>
           <p>© {year} Coppergate</p>
-          <p>Private beta · Design-partner onboarding</p>
+          <p>MIT · Open source · Free to self-host</p>
         </div>
       </div>
     </footer>

@@ -1,10 +1,23 @@
 # Coppergate
 
-Autonomous multi-agent Survivor arena — agents compete, fitness gates winners, losers lose budget. GitHub PR + CI is the first fitness wedge.
+**Open source (MIT)** autonomous multi-agent Survivor arena — agents compete, fitness gates winners, losers lose budget. GitHub PR + CI is the first fitness wedge.
 
 **Slogan:** Build inside the gate. Survive to ship.
 
-Product monorepo. Planning / ADRs: [`coppergate-architecture`](https://github.com/coppergateai/coppergate-architecture) (private).
+**Free to self-host.** Clone, Compose up, bring your own keys. Hosted demo at [coppergate.ai](https://www.coppergate.ai) — optional paid hosted plans may come later; the community path stays free.
+
+Product monorepo. Planning / ADRs: [`coppergate-architecture`](https://github.com/coppergateai/coppergate-architecture).
+
+## Quick start (self-host)
+
+```bash
+git clone https://github.com/coppergateai/coppergate.git
+cd coppergate
+cp .env.selfhost.example .env.selfhost
+docker compose -f docker-compose.selfhost.yml --env-file .env.selfhost up -d --build
+```
+
+Full guide: [`docs/SELF_HOST.md`](./docs/SELF_HOST.md).
 
 ## Layout
 
@@ -31,25 +44,11 @@ packages/
   coppergate/          # npm name reserve (placeholder SDK)
 ```
 
-## GTM / paid pilots
+## Product wedge
 
-Commercial wedge (**D14**): GitHub **issue → verified PR**. Playbooks:
+Primary loop: GitHub **issue → verified PR** (CI + cost + Accept). See [`docs/WEDGE.md`](./docs/WEDGE.md).
 
-- [`docs/PHASE0_OPS.md`](./docs/PHASE0_OPS.md) — 30-day paid-proof checklist
-- [`docs/GTM.md`](./docs/GTM.md) — path to $1M ARR
-- [`docs/STRIPE_PRODUCTION.md`](./docs/STRIPE_PRODUCTION.md) · [`docs/EMAIL.md`](./docs/EMAIL.md)
-- [`docs/WEDGE.md`](./docs/WEDGE.md) · [`docs/PILOT_OUTREACH.md`](./docs/PILOT_OUTREACH.md) · [`docs/CONCIERGE_RUNBOOK.md`](./docs/CONCIERGE_RUNBOOK.md)
-- [`docs/EXPAND_PULL.md`](./docs/EXPAND_PULL.md) · [`docs/LAUNCH_KIT.md`](./docs/LAUNCH_KIT.md)
-
-```bash
-pnpm ops:stripe-env
-pnpm ops:waitlist
-pnpm ops:outreach-pack          # 40 ICP invites + outbox
-pnpm ops:pilot-invite -- PAID-DEMO 1 paid_pilot
-pnpm ops:pilot-go-no-go
-```
-
-Hosted billing: Starter **$99** / Pro **$199** — set `STRIPE_*` Price IDs; owners upgrade under **Settings → Billing**.
+Optional later (not required for OSS use): hosted billing / GTM notes live under [`docs/GTM.md`](./docs/GTM.md) and [`docs/LAUNCH_KIT.md`](./docs/LAUNCH_KIT.md).
 
 ## Prerequisites
 
@@ -104,21 +103,14 @@ Closed-loop signal proof (needs `DATABASE_URL`):
 pnpm --filter @coppergate/worker test -- e2e-signal-closed-loop
 ```
 
-## Discovery landing
+## Website
 
-Public `/` is the early-access landing (Phase 0). Signups go to `waitlist_signups` via `POST /api/waitlist`.
+Public site: [coppergate.ai](https://www.coppergate.ai) — product story + links to this repo. Prefer GitHub / self-host CTAs over waitlist sales.
 
 ## Self-host (community / MIT)
 
-Run web + worker + Postgres on your own domain (e.g. `https://coppergate.shopify.com`) with GitHub and/or GitLab:
-
-```bash
-cp .env.selfhost.example .env.selfhost
-docker compose -f docker-compose.selfhost.yml --env-file .env.selfhost up -d --build
-```
-
-Full guide (DNS, GitHub App + GitLab OAuth URLs, limitations): [`docs/SELF_HOST.md`](./docs/SELF_HOST.md).  
-License: MIT. Hosted SaaS remains the commercial offering — see architecture [`DECISIONS.md`](https://github.com/coppergateai/coppergate-architecture/blob/main/docs/DECISIONS.md) (D4 / D9 / D12).
+See **Quick start** above. DNS, GitHub App, and GitLab OAuth details: [`docs/SELF_HOST.md`](./docs/SELF_HOST.md).  
+License: **MIT**. Optional hosted SKUs are not required to run Coppergate.
 
 ## Deploy (Vercel)
 
@@ -132,9 +124,11 @@ License: MIT. Hosted SaaS remains the commercial offering — see architecture [
 
 ## Status
 
-Private beta: MVP + Survivor arena + Signal foundation shipped. Live SCM delivery is **GitHub App + GitLab**; Bitbucket/Azure DevOps HTTP clients exist but the worker install/auth path is **deferred** until the GitHub closed loop is green on staging. Do not claim “production ready” until Phase X go/no-go (`docs/PRODUCTION_READINESS.md`).
+**Public MIT.** MVP + Survivor arena + Signal foundation shipped. Live SCM delivery is **GitHub App + GitLab**; Bitbucket/Azure DevOps HTTP clients exist but live worker paths are deferred. Honest limitations: [`docs/PRODUCTION_READINESS.md`](./docs/PRODUCTION_READINESS.md), [`docs/SIGNALS.md`](./docs/SIGNALS.md).
 
-See architecture `MVP_BACKLOG.md`, `PRODUCTION_SIGNAL_BACKLOG.md`, `/docs`, [`docs/SIGNALS.md`](./docs/SIGNALS.md), [`docs/PRIVATE_BETA.md`](./docs/PRIVATE_BETA.md).
+## License
+
+[MIT](./LICENSE) © 2026 Coppergate.
 
 ## Related repos
 

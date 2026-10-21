@@ -116,14 +116,16 @@ export function MarketingHeader({ signedIn }: Props) {
               <Link className={styles.navGhost} href="/login">
                 Sign in
               </Link>
-              <Link
+              <a
                 className={styles.btnPrimary}
-                href="/login"
-                onClick={() => track("cta_request_access", { location: "nav" })}
+                href="https://github.com/coppergateai/coppergate"
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => track("cta_github", { location: "nav" })}
               >
-                Request access
+                GitHub
                 <IconArrow />
-              </Link>
+              </a>
             </>
           )}
 
@@ -177,9 +179,15 @@ export function MarketingHeader({ signedIn }: Props) {
                 <Link href="/login" onClick={closeMenu}>
                   Sign in
                 </Link>
-                <Link className={styles.drawerCta} href="/login" onClick={closeMenu}>
-                  Request access
-                </Link>
+                <a
+                  className={styles.drawerCta}
+                  href="https://github.com/coppergateai/coppergate"
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={closeMenu}
+                >
+                  GitHub
+                </a>
               </>
             )}
           </nav>

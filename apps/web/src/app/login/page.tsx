@@ -57,7 +57,7 @@ export default async function LoginPage() {
             </p>
           ) : null}
           <p className={styles.authNote}>
-            Private beta · Kill-switch + spend caps · Policy-gated prod
+            MIT · Self-host or try hosted · Kill-switch + spend caps
           </p>
           <Link className={styles.authBack} href="/">
             ← Back home

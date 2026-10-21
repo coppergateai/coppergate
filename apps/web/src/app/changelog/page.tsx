@@ -78,7 +78,7 @@ export default function ChangelogPage() {
         <p className={styles.pageEyebrow}>Product</p>
         <h1 className={styles.pageTitle}>Changelog</h1>
         <p className={styles.pageLede}>
-          Private beta notes — what shipped recently
+          Release notes — what shipped recently
         </p>
 
         <div className={styles.changelogList}>
@@ -99,7 +99,13 @@ export default function ChangelogPage() {
         </div>
 
         <p className={styles.changelogMore}>
-          Want a seat? <Link href="/#early-access">Request access</Link>
+          <a
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Star on GitHub
+          </a>
           {" · "}
           <a href="mailto:hello@coppergate.ai">Contact</a>
         </p>

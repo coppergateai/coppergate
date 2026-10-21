@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { EarlyAccessForm } from "@/app/early-access-form";
 import { IconArrow } from "./icons";
 import styles from "./marketing.module.css";
 
 type Props = {
   signedInLogin?: string | null;
 };
+
+const REPO = "https://github.com/coppergateai/coppergate";
+const SELF_HOST = `${REPO}/blob/main/docs/SELF_HOST.md`;
 
 export function FinalCta({ signedInLogin = null }: Props) {
   const signedIn = Boolean(signedInLogin);
@@ -17,46 +19,44 @@ export function FinalCta({ signedInLogin = null }: Props) {
       aria-labelledby="final-title"
     >
       <div className={styles.finalInner}>
-        <p className={styles.sectionEyebrow}>Private beta</p>
+        <p className={styles.sectionEyebrow}>Open source</p>
         <h2 id="final-title" className={styles.finalTitle}>
-          Arm the arena.
+          Clone it. Arm the arena.
           <br />
           Build what survives.
         </h2>
         <p className={styles.finalLede}>
-          Bring your repository, define the objective, and explore controlled
-          AI-driven software delivery. Design-partner seats are invitation-led —
-          request access or open workspaces if you already have a seat.
+          Coppergate is MIT-licensed. Self-host with Compose and your own keys,
+          or try the hosted instance. No invite gate for the community path —
+          bring a repo, set a spend cap, ship a verified PR.
         </p>
 
         <div className={styles.finalActions}>
-          <Link
+          <a
             className={styles.btnHeroPrimary}
+            href={REPO}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View on GitHub
+            <IconArrow />
+          </a>
+          <a className={styles.btnSecondary} href={SELF_HOST} target="_blank" rel="noreferrer">
+            Self-host guide
+          </a>
+          <Link
+            className={styles.btnSecondary}
             href={signedIn ? "/workspaces" : "/login"}
           >
-            {signedIn ? "Open workspaces" : "Request access"}
-            <IconArrow />
+            {signedIn ? "Open workspaces" : "Try hosted"}
           </Link>
-          <a className={styles.btnSecondary} href="mailto:hello@coppergate.ai">
-            Contact us
-          </a>
         </div>
 
-        {signedIn ? (
-          <p id="early-access" className={styles.finalNote}>
-            Signed in as @{signedInLogin}. Open workspaces above to continue.
-          </p>
-        ) : (
-          <>
-            <div id="early-access" className={styles.finalForm}>
-              <EarlyAccessForm />
-            </div>
-            <p className={styles.finalNote}>
-              No fake signup — waitlist and GitHub auth are the real paths into
-              private beta.
-            </p>
-          </>
-        )}
+        <p id="early-access" className={styles.finalNote}>
+          {signedIn
+            ? `Signed in as @${signedInLogin}. Open workspaces above to continue.`
+            : "Questions? hello@coppergate.ai — community support, not a sales funnel."}
+        </p>
       </div>
     </section>
   );

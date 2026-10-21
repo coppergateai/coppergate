@@ -85,7 +85,7 @@ export default function OpenGraphImage() {
             fontSize: 22,
           }}
         >
-          <span>Private beta · GitHub-native</span>
+          <span>MIT · Open source · GitHub-native</span>
           <span style={{ color: "#c88949" }}>coppergate.ai</span>
         </div>
       </div>
