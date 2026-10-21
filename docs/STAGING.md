@@ -48,10 +48,12 @@ Settings: https://github.com/organizations/coppergateai/settings/apps/coppergate
 |---|---|
 | Homepage | `https://www.coppergate.ai` |
 | Callback URL | `https://www.coppergate.ai/api/integrations/github/callback` |
-| Setup URL | `https://www.coppergate.ai/api/integrations/github/callback` |
+| Setup URL | `https://www.coppergate.ai/api/integrations/github/callback` (**not** localhost — a localhost Setup URL breaks hosted install HMAC) |
 | Webhook Active | ✓ |
 | Webhook URL | `https://www.coppergate.ai/api/integrations/github/webhook` |
 | Webhook secret | same as `GITHUB_WEBHOOK_SECRET` |
+
+If Setup URL was temporarily pointed at localhost for dogfood, set it back to the production callback before connecting GitHub from [www.coppergate.ai](https://www.coppergate.ai/). The callback also 307s loopback → hosted when state verification fails.
 
 OAuth App (identity login) callback is already `https://www.coppergate.ai/api/auth/github/callback`.
 
