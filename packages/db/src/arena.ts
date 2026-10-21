@@ -195,6 +195,44 @@ export function canContenderEnqueue(input: {
   return input.budgetMicrosRemaining > 0;
 }
 
+/** Default per-contender purse when arena is armed without an explicit budget. */
+export const DEFAULT_CONTENDER_BUDGET_MICROS = 1_000_000;
+
+/**
+ * Top up ACTIVE contenders so fan-out can enqueue. Contenders created with
+ * budget 0 were permanently ineligible and left tasks stuck in QUEUED.
+ */
+export async function ensureContenderEnqueueBudget(
+  db: Database,
+  input: {
+    workspaceId: string;
+    arenaId: string;
+    /** Minimum remaining purse; defaults to DEFAULT_CONTENDER_BUDGET_MICROS. */
+    minMicros?: number;
+  },
+): Promise<number> {
+  const min = Math.max(
+    1,
+    input.minMicros ?? DEFAULT_CONTENDER_BUDGET_MICROS,
+  );
+  const pool = await listContendersForArena(db, {
+    workspaceId: input.workspaceId,
+    arenaId: input.arenaId,
+  });
+  let topped = 0;
+  const now = new Date();
+  for (const c of pool) {
+    if (c.status !== "ACTIVE") continue;
+    if (c.budgetMicrosRemaining >= min) continue;
+    await db
+      .update(contenders)
+      .set({ budgetMicrosRemaining: min, updatedAt: now })
+      .where(eq(contenders.id, c.id));
+    topped += 1;
+  }
+  return topped;
+}
+
 export async function getArenaForProject(
   db: Database,
   input: { workspaceId: string; projectId: string },
@@ -252,7 +290,8 @@ export async function ensureArenaForProject(
     throw new ArenaError("invalid", "defaultContenderN must be 1..16");
   }
   const contenderCount = input.contenderCount ?? n;
-  const budgetEach = input.contenderBudgetMicros ?? 0;
+  const budgetEach =
+    input.contenderBudgetMicros ?? DEFAULT_CONTENDER_BUDGET_MICROS;
   assertNonNegativeBudget(budgetEach);
 
   const arenaId = crypto.randomUUID();
@@ -596,17 +635,34 @@ export async function startTournamentFanout(
     };
   }
 
-  const { arena, contenders: pool } = await ensureArenaForProject(db, {
+  const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: task.projectId,
     actor: input.actor,
     defaultContenderN: MAX_TOURNAMENT_FANOUT,
     contenderCount: MAX_TOURNAMENT_FANOUT,
-    contenderBudgetMicros: Math.max(task.estimateMicros ?? 0, 1),
+    contenderBudgetMicros: Math.max(
+      task.estimateMicros ?? 0,
+      DEFAULT_CONTENDER_BUDGET_MICROS,
+    ),
   });
   if (arena.status === "KILLED" || arena.status === "PAUSED") {
     throw new ArenaError("killed", `arena is ${arena.status}`);
   }
+
+  const minPurse = Math.max(
+    task.estimateMicros ?? 0,
+    DEFAULT_CONTENDER_BUDGET_MICROS,
+  );
+  await ensureContenderEnqueueBudget(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+    minMicros: minPurse,
+  });
+  const pool = await listContendersForArena(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+  });
 
   const eligible = pool.filter((c) =>
     canContenderEnqueue({

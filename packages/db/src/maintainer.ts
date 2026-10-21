@@ -16,6 +16,7 @@ import { getRunCiFitness } from "./ci-evidence.js";
 import { setProjectAutonomyLevel, setProjectMergeEnabled } from "./project-policy.js";
 import {
   ensureArenaForProject,
+  ensureContenderEnqueueBudget,
   getArenaForProject,
   pauseArena,
   resumeArena,
@@ -437,6 +438,68 @@ export type ArenaControlResult = {
 };
 
 /**
+ * QUEUED tasks with no claimable agent_run (fan-out failed, Stop cancelled
+ * runs, contender budget 0, …) get a fresh enqueue while the arena is live.
+ */
+export async function requeueOrphanQueuedTasks(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+  },
+): Promise<{ resumed: number; errors: string[] }> {
+  const errors: string[] = [];
+  const arena = await getArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+  });
+  if (!arena || arena.status === "KILLED" || arena.status === "PAUSED") {
+    return { resumed: 0, errors };
+  }
+
+  await ensureContenderEnqueueBudget(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+  });
+
+  const queued = await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.projectId, input.projectId),
+        eq(tasks.workspaceId, input.workspaceId),
+        eq(tasks.status, "QUEUED"),
+      ),
+    )
+    .limit(20);
+
+  let resumed = 0;
+  for (const task of queued) {
+    const runs = await listRunsForTask(db, input.workspaceId, task.id);
+    const active = runs.some((r) =>
+      ["QUEUED", "RUNNING", "VALIDATING"].includes(r.status),
+    );
+    if (active) continue;
+    try {
+      await enqueueQueuedTask(db, {
+        workspaceId: input.workspaceId,
+        task,
+        actor: input.actor,
+        reason: "orphan_queued_requeue",
+      });
+      resumed += 1;
+    } catch (err) {
+      errors.push(
+        `${task.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+  return { resumed, errors };
+}
+
+/**
  * No human brief/plan: approve a default vision and auto-queue the next
  * maintainer cycle tasks so Start is the only gate.
  */
@@ -677,37 +740,13 @@ export async function startProjectArena(
     }
   }
 
-  // Re-enqueue QUEUED tasks whose runs were cancelled by Stop
-  const queued = await db
-    .select()
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.projectId, input.projectId),
-        eq(tasks.workspaceId, input.workspaceId),
-        eq(tasks.status, "QUEUED"),
-      ),
-    )
-    .limit(20);
+  await ensureContenderEnqueueBudget(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+  });
 
-  for (const task of queued) {
-    const runs = await listRunsForTask(db, input.workspaceId, task.id);
-    const active = runs.some((r) =>
-      ["QUEUED", "RUNNING", "VALIDATING"].includes(r.status),
-    );
-    if (active) continue;
-    try {
-      await enqueueQueuedTask(db, {
-        workspaceId: input.workspaceId,
-        task,
-        actor: input.actor,
-        reason: "arena_start_resume",
-      });
-      resumedTasks += 1;
-    } catch {
-      // skip
-    }
-  }
+  const orphan = await requeueOrphanQueuedTasks(db, input);
+  resumedTasks += orphan.resumed;
 
   await recordAuditEvent(db, {
     workspaceId: input.workspaceId,
@@ -717,6 +756,7 @@ export async function startProjectArena(
     targetId: arena.id,
     meta: {
       resumedTasks,
+      orphanRequeueErrors: orphan.errors,
       maintainerEnabled: liveProject.maintainerEnabled,
       bootstrappedBrief: bootstrap.bootstrappedBrief,
       queuedFromReplan: bootstrap.queuedFromReplan,
@@ -729,6 +769,7 @@ export async function startProjectArena(
     payload: {
       action: "arena_start",
       resumedTasks,
+      orphanRequeueErrors: orphan.errors,
       bootstrappedBrief: bootstrap.bootstrappedBrief,
       queuedFromReplan: bootstrap.queuedFromReplan,
     },
@@ -1086,6 +1127,23 @@ export async function tickMaintainerProject(
   } catch (err) {
     result.errors.push(
       `stale_approvals: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  try {
+    const orphan = await requeueOrphanQueuedTasks(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor,
+    });
+    if (orphan.errors.length) {
+      result.errors.push(
+        ...orphan.errors.map((e) => `orphan_requeue: ${e}`),
+      );
+    }
+  } catch (err) {
+    result.errors.push(
+      `orphan_requeue: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 

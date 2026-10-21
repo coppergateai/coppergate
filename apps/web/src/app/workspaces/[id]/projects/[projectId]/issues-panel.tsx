@@ -99,7 +99,11 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
       {error ? <p className={styles.error}>{error}</p> : null}
       <ul className={styles.arenaList}>
         {issues.length === 0 ? (
-          <li className={styles.muted}>No open issues (or GitHub not connected).</li>
+          <li className={styles.muted}>
+            {repo
+              ? `No open issues on ${repo}. Autonomous Start does not need them.`
+              : "Connect GitHub under Workspace settings → Connections to list issues."}
+          </li>
         ) : (
           issues.map((issue) => (
             <li key={issue.number} className={styles.arenaItem}>
