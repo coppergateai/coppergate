@@ -110,6 +110,53 @@ export async function expirePendingApprovals(
   return updated.length;
 }
 
+/**
+ * Drop orphan inbox rows: pending task approvals whose task already left
+ * READY_FOR_APPROVAL (e.g. min_human queued after a pause-window submit).
+ */
+export async function expireStaleTaskApprovals(
+  db: Database,
+  input: { workspaceId: string; projectId?: string },
+): Promise<number> {
+  const pending = await db
+    .select({
+      id: approvals.id,
+      targetId: approvals.targetId,
+      projectId: approvals.projectId,
+    })
+    .from(approvals)
+    .where(
+      and(
+        eq(approvals.workspaceId, input.workspaceId),
+        eq(approvals.targetType, "task"),
+        eq(approvals.status, "pending"),
+        ...(input.projectId
+          ? [eq(approvals.projectId, input.projectId)]
+          : []),
+      ),
+    );
+  if (pending.length === 0) return 0;
+
+  const taskRows = await db
+    .select({ id: tasks.id, status: tasks.status })
+    .from(tasks)
+    .where(
+      inArray(
+        tasks.id,
+        pending.map((p) => p.targetId),
+      ),
+    );
+  const byId = new Map(taskRows.map((t) => [t.id, t.status]));
+  const staleIds = pending
+    .filter((p) => {
+      const status = byId.get(p.targetId);
+      return !status || status !== "READY_FOR_APPROVAL";
+    })
+    .map((p) => p.targetId);
+
+  return expirePendingApprovals(db, "task", staleIds);
+}
+
 export async function resolvePendingApproval(
   db: DbLike,
   input: {

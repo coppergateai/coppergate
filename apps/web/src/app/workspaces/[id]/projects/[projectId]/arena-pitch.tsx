@@ -19,6 +19,7 @@ export type PitchMetrics = {
 };
 
 type Props = {
+  projectId: string;
   running: boolean;
   arenaStatus: string;
   contenders: PitchContender[];
@@ -32,7 +33,7 @@ type Props = {
 type AgentState = {
   id: string;
   label: string;
-  number: number;
+  short: string;
   team: "home" | "away";
   x: number;
   y: number;
@@ -41,10 +42,47 @@ type AgentState = {
   out: boolean;
 };
 
-function hashNum(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
+function clockStorageKey(projectId: string) {
+  return `cg.arena.clock.startedAt:${projectId}`;
+}
+
+function readClockStartedAt(projectId: string): number | null {
+  try {
+    const raw = sessionStorage.getItem(clockStorageKey(projectId));
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeClockStartedAt(projectId: string, startedAt: number) {
+  try {
+    sessionStorage.setItem(clockStorageKey(projectId), String(startedAt));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function clearClockStartedAt(projectId: string) {
+  try {
+    sessionStorage.removeItem(clockStorageKey(projectId));
+  } catch {
+    // ignore
+  }
+}
+
+function roleShort(profileKey: string) {
+  const key = profileKey.trim().toLowerCase();
+  if (key.startsWith("prop")) return "PR";
+  if (key.startsWith("eng")) return "EN";
+  if (key.startsWith("rev")) return "RV";
+  if (key.startsWith("fix")) return "FX";
+  if (key.startsWith("sec")) return "SC";
+  if (key.startsWith("doc")) return "DC";
+  if (key.startsWith("qa")) return "QA";
+  return profileKey.slice(0, 2).toUpperCase() || "??";
 }
 
 function usePrefersReducedMotion() {
@@ -72,23 +110,25 @@ function buildTicker(
   tick: number,
 ): string {
   if (!running) {
-    return "Arena stopped — press Start to resume the fight";
+    return "Pit sealed — Start opens the gates";
   }
   const lines: string[] = [
-    "Contenders clash for the next ship",
-    "Fitness gate chooses the survivor",
-    "Winner advances through CI",
+    "Contenders contest the objective",
+    "Fitness gate decides who survives",
+    "Only CI-green ships leave the pit",
   ];
   const active = contenders.filter((c) => c.status === "ACTIVE");
   for (const c of active.slice(0, 3)) {
-    lines.push(`${c.profileKey.toUpperCase()} presses in (${c.strategy})`);
+    lines.push(
+      `${c.profileKey.toUpperCase()} holds the line (${c.strategy})`,
+    );
   }
   if (metrics) {
     if (metrics.autoAccepts > 0) {
       lines.push(`AUTO-ACCEPT ×${metrics.autoAccepts}`);
     }
     if (metrics.merges > 0) {
-      lines.push(`SURVIVOR MERGED ×${metrics.merges}`);
+      lines.push(`BREACH COMPLETE ×${metrics.merges}`);
     }
     if (metrics.winningProfileKeys?.length) {
       lines.push(
@@ -100,6 +140,7 @@ function buildTicker(
 }
 
 export function ArenaPitch({
+  projectId,
   running,
   arenaStatus,
   contenders,
@@ -122,6 +163,7 @@ export function ArenaPitch({
   const focusRef = useRef({ x: 50, y: 50 });
   const runningRef = useRef(running);
   const lastTs = useRef<number | null>(null);
+  const frozenClock = useRef(0);
 
   runningRef.current = running;
 
@@ -161,15 +203,15 @@ export function ArenaPitch({
           return {
             ...existing,
             label: c.profileKey,
+            short: roleShort(c.profileKey),
             out,
             team,
-            number: (hashNum(c.id) % 40) + 1,
           };
         }
         return {
           id: c.id,
           label: c.profileKey,
-          number: (hashNum(c.id) % 40) + 1,
+          short: roleShort(c.profileKey),
           team,
           x: baseX,
           y: baseY,
@@ -183,13 +225,27 @@ export function ArenaPitch({
     });
   }, [roster]);
 
+  // Persist fight clock across tab switches (component remounts).
   useEffect(() => {
-    if (!running) return;
-    const id = window.setInterval(() => {
-      setClockSec((s) => s + 1);
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [running]);
+    if (running) {
+      let started = readClockStartedAt(projectId);
+      if (started == null) {
+        started = Date.now() - frozenClock.current * 1000;
+        writeClockStartedAt(projectId, started);
+      }
+      const startedAt = started;
+      const tick = () => {
+        const sec = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+        frozenClock.current = sec;
+        setClockSec(sec);
+      };
+      tick();
+      const id = window.setInterval(tick, 1000);
+      return () => window.clearInterval(id);
+    }
+    clearClockStartedAt(projectId);
+    setClockSec(frozenClock.current);
+  }, [running, projectId]);
 
   useEffect(() => {
     if (!running) return;
@@ -226,23 +282,29 @@ export function ArenaPitch({
     const pickTarget = (a: AgentState, t: number) => {
       if (a.out) {
         return {
-          tx: a.team === "home" ? 12 : 88,
-          ty: a.team === "home" ? 18 : 82,
+          tx: a.team === "home" ? 14 : 86,
+          ty: a.team === "home" ? 16 : 84,
         };
       }
       if (!runningRef.current) {
-        const angle = (a.number / 40) * Math.PI * 2 + t / 8000;
+        const angle = (a.short.charCodeAt(0) / 40) * Math.PI * 2 + t / 8000;
         return {
-          tx: 50 + Math.cos(angle) * 20,
-          ty: 50 + Math.sin(angle) * 16,
+          tx: 50 + Math.cos(angle) * 18,
+          ty: 50 + Math.sin(angle) * 14,
         };
       }
       const f = focusRef.current;
-      const bias = a.team === "home" ? 5 : -5;
-      const jitter = Math.sin(t / 380 + a.number * 1.7) * 7;
+      const bias = a.team === "home" ? 6 : -6;
+      const jitter = Math.sin(t / 380 + a.short.charCodeAt(0)) * 7;
       return {
-        tx: Math.min(88, Math.max(12, f.x + bias + jitter)),
-        ty: Math.min(85, Math.max(15, f.y + Math.cos(t / 450 + a.number) * 7)),
+        tx: Math.min(86, Math.max(14, f.x + bias + jitter)),
+        ty: Math.min(
+          84,
+          Math.max(
+            16,
+            f.y + Math.cos(t / 450 + (a.short.charCodeAt(1) || 1)) * 7,
+          ),
+        ),
       };
     };
 
@@ -294,38 +356,38 @@ export function ArenaPitch({
     };
   }, [reducedMotion]);
 
-  const homeScore = metrics?.merges ?? 0;
-  const awayScore = metrics?.humanTouches ?? 0;
+  const ships = metrics?.merges ?? 0;
+  const friction = metrics?.humanTouches ?? 0;
   const ticker = flashSurvivor
-    ? "SURVIVOR — MERGE LANDED"
+    ? "SURVIVOR — BREACH LANDED"
     : buildTicker(running, roster, metrics, tickerIdx);
 
   const statusLabel =
     arenaStatus === "PAUSED"
-      ? "stopped"
+      ? "sealed"
       : arenaStatus === "RUNNING" || arenaStatus === "ARMED"
         ? "live"
         : arenaStatus.toLowerCase();
 
   return (
-    <div className={styles.wrap} aria-label="Survivor arena view">
+    <div className={styles.wrap} aria-label="War arena view">
       <div className={styles.scorebar}>
         <div className={styles.side}>
-          <span className={styles.sideLabel}>Gate · Contenders</span>
+          <span className={styles.sideLabel}>Faction · Contenders</span>
           <span className={styles.sideName}>Coppergate</span>
         </div>
         <div className={styles.scoreCluster}>
           <div className={styles.score}>
-            <span>{homeScore}</span>
-            <span className={styles.scoreSep}>–</span>
-            <span>{awayScore}</span>
+            <span className={styles.scoreHome}>{ships}</span>
+            <span className={styles.scoreSep}>/</span>
+            <span className={styles.scoreAway}>{friction}</span>
           </div>
           <div className={styles.clock}>
             {formatClock(clockSec)} · {statusLabel}
           </div>
         </div>
         <div className={`${styles.side} ${styles.sideAway}`}>
-          <span className={styles.sideLabel}>Gate · Friction</span>
+          <span className={styles.sideLabel}>Faction · Friction</span>
           <span className={styles.sideName}>Human touch</span>
         </div>
       </div>
@@ -339,7 +401,7 @@ export function ArenaPitch({
               disabled={pending}
               onClick={onStop}
             >
-              Stop
+              Seal pit
             </button>
           ) : (
             <button
@@ -348,7 +410,7 @@ export function ArenaPitch({
               disabled={pending}
               onClick={onStart}
             >
-              Start
+              Open gates
             </button>
           )}
         </div>
@@ -356,62 +418,72 @@ export function ArenaPitch({
 
       <div className={styles.floorFrame}>
         <svg className={styles.floorSvg} viewBox="0 0 100 62" aria-hidden>
-          {/* Outer stone ring */}
-          <ellipse
+          {/* Outer stone wall */}
+          <rect
+            x="3"
+            y="3"
+            width="94"
+            height="56"
+            rx="1.2"
+            fill="none"
+            stroke="rgba(180, 140, 90, 0.45)"
+            strokeWidth="1.4"
+          />
+          <rect
+            x="6.5"
+            y="6.5"
+            width="87"
+            height="49"
+            rx="0.6"
+            fill="none"
+            stroke="rgba(120, 90, 55, 0.55)"
+            strokeWidth="0.5"
+          />
+          {/* Corner bastions */}
+          <rect x="3" y="3" width="7" height="7" fill="rgba(60, 48, 36, 0.85)" stroke="rgba(200, 160, 100, 0.4)" strokeWidth="0.4" />
+          <rect x="90" y="3" width="7" height="7" fill="rgba(60, 48, 36, 0.85)" stroke="rgba(200, 160, 100, 0.4)" strokeWidth="0.4" />
+          <rect x="3" y="52" width="7" height="7" fill="rgba(60, 48, 36, 0.85)" stroke="rgba(200, 160, 100, 0.4)" strokeWidth="0.4" />
+          <rect x="90" y="52" width="7" height="7" fill="rgba(60, 48, 36, 0.85)" stroke="rgba(200, 160, 100, 0.4)" strokeWidth="0.4" />
+          {/* Center kill circle */}
+          <circle
             cx="50"
             cy="31"
-            rx="46"
-            ry="27"
+            r="9"
             fill="none"
-            stroke="rgba(232,196,140,0.4)"
-            strokeWidth="1.2"
+            stroke="rgba(196, 92, 74, 0.35)"
+            strokeWidth="0.45"
+            strokeDasharray="1.5 1.2"
           />
-          <ellipse
-            cx="50"
-            cy="31"
-            rx="42"
-            ry="24"
-            fill="none"
-            stroke="rgba(232,196,140,0.22)"
-            strokeWidth="0.4"
-            strokeDasharray="1.2 1.4"
-          />
-          {/* Inner contest circle */}
-          <ellipse
-            cx="50"
-            cy="31"
-            rx="14"
-            ry="9"
-            fill="none"
-            stroke="rgba(232,196,140,0.35)"
-            strokeWidth="0.35"
-          />
-          {/* Gates */}
+          {/* Approach lanes */}
+          <line x1="14" y1="31" x2="38" y2="31" stroke="rgba(232, 196, 140, 0.18)" strokeWidth="0.35" strokeDasharray="1 1.2" />
+          <line x1="62" y1="31" x2="86" y2="31" stroke="rgba(232, 196, 140, 0.18)" strokeWidth="0.35" strokeDasharray="1 1.2" />
+          <line x1="50" y1="10" x2="50" y2="20" stroke="rgba(232, 196, 140, 0.18)" strokeWidth="0.35" strokeDasharray="1 1.2" />
+          {/* Gate banners */}
           <path
-            d="M 6 28 L 10 24 L 10 38 L 6 34 Z"
-            fill="rgba(232,184,74,0.25)"
-            stroke="rgba(232,184,74,0.55)"
+            d="M 8 26 L 13 22 L 13 40 L 8 36 Z"
+            fill="rgba(201, 162, 74, 0.28)"
+            stroke="rgba(201, 162, 74, 0.6)"
             strokeWidth="0.35"
           />
           <path
-            d="M 94 28 L 90 24 L 90 38 L 94 34 Z"
-            fill="rgba(196,92,74,0.28)"
-            stroke="rgba(196,92,74,0.55)"
+            d="M 92 26 L 87 22 L 87 40 L 92 36 Z"
+            fill="rgba(184, 80, 64, 0.32)"
+            stroke="rgba(184, 80, 64, 0.6)"
             strokeWidth="0.35"
           />
           <path
-            d="M 46 5 L 54 5 L 52 9 L 48 9 Z"
-            fill="rgba(232,196,140,0.2)"
-            stroke="rgba(232,196,140,0.45)"
+            d="M 44 7 L 56 7 L 53 12 L 47 12 Z"
+            fill="rgba(232, 196, 140, 0.22)"
+            stroke="rgba(232, 196, 140, 0.5)"
             strokeWidth="0.3"
           />
         </svg>
 
         <span className={`${styles.zoneLabel} ${styles.zonePropose}`}>
-          Propose
+          Scout
         </span>
-        <span className={`${styles.zoneLabel} ${styles.zoneBuild}`}>Build</span>
-        <span className={`${styles.zoneLabel} ${styles.zoneShip}`}>Ship</span>
+        <span className={`${styles.zoneLabel} ${styles.zoneBuild}`}>Forge</span>
+        <span className={`${styles.zoneLabel} ${styles.zoneShip}`}>Breach</span>
 
         {agents.map((a) => (
           <div
@@ -422,12 +494,12 @@ export function ArenaPitch({
               a.out ? styles.agentOut : "",
             ].join(" ")}
             style={{ left: `${a.x}%`, top: `${a.y}%` }}
-            title={`${a.label} · ${a.team}`}
+            title={`${a.label} · ${a.team === "home" ? "contender" : "friction"}`}
           >
             {labeledId === a.id ? (
               <span className={styles.agentLabel}>{a.label}</span>
             ) : null}
-            {a.number}
+            {a.short}
           </div>
         ))}
 
@@ -451,14 +523,13 @@ export function ArenaPitch({
           <span className={`${styles.dot} ${styles.dotHome}`} /> Contenders
         </span>
         <span className={styles.legendItem}>
-          <span className={`${styles.dot} ${styles.dotAway}`} /> Review /
-          friction
+          <span className={`${styles.dot} ${styles.dotAway}`} /> Friction
         </span>
         <span className={styles.legendItem}>
-          <span className={`${styles.dot} ${styles.dotFocus}`} /> Task focus
+          <span className={`${styles.dot} ${styles.dotFocus}`} /> Objective
         </span>
         <span className={styles.legendItem}>
-          Score = merges – human touches
+          Ships / human touches
         </span>
       </div>
     </div>

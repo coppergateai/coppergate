@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   ApprovalError,
+  expirePendingApprovals,
   requestApproval,
   resolvePendingApproval,
 } from "./approvals.js";
@@ -222,6 +223,30 @@ export async function enqueueQueuedTask(
   return bumped ?? input.task;
 }
 
+/** True when every predecessor is DONE (or there are none). */
+export async function predecessorsAreDone(
+  db: Database,
+  taskId: string,
+): Promise<boolean> {
+  const preds = await db
+    .select({
+      predecessorId: taskDependencies.predecessorTaskId,
+    })
+    .from(taskDependencies)
+    .where(eq(taskDependencies.successorTaskId, taskId));
+  if (preds.length === 0) return true;
+  const predTasks = await db
+    .select()
+    .from(tasks)
+    .where(
+      inArray(
+        tasks.id,
+        preds.map((p) => p.predecessorId),
+      ),
+    );
+  return predTasks.every((p) => p.status === "DONE");
+}
+
 /** DRAFT → READY_FOR_APPROVAL (or auto-queue when arena.min_human). */
 export async function submitTaskForApproval(
   db: Database,
@@ -232,6 +257,13 @@ export async function submitTaskForApproval(
     throw new TaskTransitionError(
       "illegal_transition",
       "Only DRAFT/NEEDS_REPLAN tasks can be submitted",
+    );
+  }
+  // Dependent tasks stay DRAFT until predecessors finish — never park in inbox.
+  if (!(await predecessorsAreDone(db, task.id))) {
+    throw new TaskTransitionError(
+      "policy",
+      "Predecessor tasks must be DONE before submit",
     );
   }
   if (task.status === "NEEDS_REPLAN") {
@@ -252,18 +284,32 @@ export async function submitTaskForApproval(
     projectId: ready.task.projectId,
   });
 
-  // TASK053 — min_human: skip inbox approve; queue immediately (default off).
+  // TASK053 — min_human: skip inbox approve; queue immediately.
+  // ARMED counts as live (Start arms then boots backlog before RUNNING).
+  // PAUSED/KILLED must not invent new work — caller should resume first.
   if (
     arena?.minHuman &&
     arena.status !== "KILLED" &&
     arena.status !== "PAUSED"
   ) {
-    await assertQueuePolicies(db, input.workspaceId, ready.task);
+    try {
+      await assertQueuePolicies(db, input.workspaceId, ready.task);
+    } catch (err) {
+      // Roll back out of the human inbox if queue policy still blocks.
+      await applyTaskTransition(db, {
+        ...input,
+        toStatus: "DRAFT",
+        reason: "min_human queue blocked — revert to draft",
+      });
+      throw err;
+    }
     const queued = await applyTaskTransition(db, {
       ...input,
       toStatus: "QUEUED",
       reason: "min_human auto-queue",
     });
+    // Clear any orphan pending approval from an earlier pause-window submit.
+    await expirePendingApprovals(db, "task", [queued.task.id]);
     const bumped = await enqueueQueuedTask(db, {
       workspaceId: input.workspaceId,
       task: queued.task,

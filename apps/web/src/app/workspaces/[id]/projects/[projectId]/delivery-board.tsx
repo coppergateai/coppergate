@@ -102,7 +102,7 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
                         <div className={styles.boardCardMeta}>
                           {t.milestoneTitle} · {t.status}
                           {t.estimateMicros != null
-                            ? ` · ${(t.estimateMicros / 100).toFixed(0)}¢`
+                            ? ` · $${(t.estimateMicros / 1_000_000).toFixed(2)}`
                             : ""}
                         </div>
                       </Link>
