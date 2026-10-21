@@ -29,9 +29,16 @@ type Props = {
   workspaceId: string;
   canManage: boolean;
   initialQuery?: string;
+  /** Hide outer section chrome when nested in ScmConnectionsPanel. */
+  embedded?: boolean;
 };
 
-export function GithubPanel({ workspaceId, canManage, initialQuery }: Props) {
+export function GithubPanel({
+  workspaceId,
+  canManage,
+  initialQuery,
+  embedded = false,
+}: Props) {
   const [installation, setInstallation] = useState<Installation>(null);
   const [connected, setConnected] = useState<ConnectedRepo[]>([]);
   const [selectable, setSelectable] = useState<SelectableRepo[]>([]);
@@ -92,17 +99,7 @@ export function GithubPanel({ workspaceId, canManage, initialQuery }: Props) {
     connected.map((c) => c.fullName.toLowerCase()),
   );
 
-  return (
-    <section className={styles.section} aria-labelledby="github-heading">
-      <h2 id="github-heading" className={styles.sectionLabel}>
-        GitHub credentials
-      </h2>
-      <p className={styles.sectionLede}>
-        Connect the Coppergate GitHub App, select repositories, and revoke
-        access anytime. Disconnect purges sealed installation credentials for
-        this workspace.
-      </p>
-
+  const body = (
       <div className={styles.panel}>
         {message ? <p className={styles.ok}>{message}</p> : null}
         {error ? <p className={styles.error}>{error}</p> : null}
@@ -113,7 +110,9 @@ export function GithubPanel({ workspaceId, canManage, initialQuery }: Props) {
             {installation.status})
           </p>
         ) : (
-          <p className={styles.statusMuted}>No GitHub App installation yet.</p>
+          <p className={styles.statusMuted}>
+            Install the GitHub App to bind repositories for arenas.
+          </p>
         )}
 
         {canManage ? (
@@ -289,6 +288,21 @@ export function GithubPanel({ workspaceId, canManage, initialQuery }: Props) {
           </div>
         ) : null}
       </div>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <section className={styles.section} aria-labelledby="github-heading">
+      <h2 id="github-heading" className={styles.sectionLabel}>
+        GitHub credentials
+      </h2>
+      <p className={styles.sectionLede}>
+        Connect the Coppergate GitHub App, select repositories, and revoke
+        access anytime. Disconnect purges sealed installation credentials for
+        this workspace.
+      </p>
+      {body}
     </section>
   );
 }

@@ -9,7 +9,7 @@ export const SETTINGS_TABS = [
   {
     id: "connections",
     label: "Connections",
-    blurb: "GitHub & GitLab",
+    blurb: "Source control",
     group: "Connections",
   },
   {

@@ -28,9 +28,16 @@ type Props = {
   workspaceId: string;
   canManage: boolean;
   initialQuery?: string;
+  /** Hide outer section chrome when nested in ScmConnectionsPanel. */
+  embedded?: boolean;
 };
 
-export function GitlabPanel({ workspaceId, canManage, initialQuery }: Props) {
+export function GitlabPanel({
+  workspaceId,
+  canManage,
+  initialQuery,
+  embedded = false,
+}: Props) {
   const [installation, setInstallation] = useState<Installation>(null);
   const [connected, setConnected] = useState<ConnectedRepo[]>([]);
   const [selectable, setSelectable] = useState<SelectableProject[]>([]);
@@ -89,17 +96,7 @@ export function GitlabPanel({ workspaceId, canManage, initialQuery }: Props) {
     connected.map((c) => c.fullName.toLowerCase()),
   );
 
-  return (
-    <section className={styles.section} aria-labelledby="gitlab-heading">
-      <h2 id="gitlab-heading" className={styles.sectionLabel}>
-        GitLab credentials
-      </h2>
-      <p className={styles.sectionLede}>
-        Connect GitLab (gitlab.com or self-managed via{" "}
-        <code>GITLAB_BASE_URL</code>), select a project, and deliver Merge
-        Requests. One primary SCM per workspace.
-      </p>
-
+  const body = (
       <div className={styles.panel}>
         {message ? <p className={styles.ok}>{message}</p> : null}
         {error ? <p className={styles.error}>{error}</p> : null}
@@ -110,7 +107,9 @@ export function GitlabPanel({ workspaceId, canManage, initialQuery }: Props) {
             {installation.status})
           </p>
         ) : (
-          <p className={styles.statusMuted}>No GitLab connection yet.</p>
+          <p className={styles.statusMuted}>
+            Connect GitLab to deliver merge requests from arenas.
+          </p>
         )}
 
         {canManage ? (
@@ -263,6 +262,21 @@ export function GitlabPanel({ workspaceId, canManage, initialQuery }: Props) {
           </div>
         ) : null}
       </div>
+  );
+
+  if (embedded) return body;
+
+  return (
+    <section className={styles.section} aria-labelledby="gitlab-heading">
+      <h2 id="gitlab-heading" className={styles.sectionLabel}>
+        GitLab credentials
+      </h2>
+      <p className={styles.sectionLede}>
+        Connect GitLab (gitlab.com or self-managed via{" "}
+        <code>GITLAB_BASE_URL</code>), select a project, and deliver Merge
+        Requests. One primary SCM per workspace.
+      </p>
+      {body}
     </section>
   );
 }
