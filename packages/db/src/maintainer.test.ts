@@ -3,11 +3,13 @@ import { describe, it } from "node:test";
 import {
   DEFAULT_MAINTAINER_POLICY,
   DEFAULT_MONTHLY_BUDGET_MICROS,
+  MIN_REPLAN_AVAILABLE_MICROS,
   buildMaintainerReleaseTag,
   parseMaintainerPolicy,
   pickMetaTournamentChallenger,
   selectAutoAcceptRun,
   serializeMaintainerPolicy,
+  shouldReplanVision,
   shouldRollbackProfileForFitness,
   taskMatchesPathAllowlist,
 } from "./maintainer.js";
@@ -21,7 +23,67 @@ describe("maintainer policy", () => {
     assert.equal(p.autoMerge, true);
     assert.equal(p.autoQueueReplanTasks, true);
     assert.equal(p.maxAutoQueuePerReplan, 2);
+    assert.equal(p.continuousBacklog, true);
     assert.equal(p.releaseTagStyle, "daily");
+  });
+
+  it("refills backlog when idle under budget (continuous)", () => {
+    assert.equal(
+      shouldReplanVision({
+        lastVisionReplanAt: new Date(),
+        replanIntervalDays: 7,
+        continuousBacklog: true,
+        openWorkCount: 0,
+        availableMicros: MIN_REPLAN_AVAILABLE_MICROS + 1,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldReplanVision({
+        lastVisionReplanAt: new Date(),
+        replanIntervalDays: 7,
+        continuousBacklog: true,
+        openWorkCount: 2,
+        availableMicros: 1_000_000,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldReplanVision({
+        lastVisionReplanAt: new Date(),
+        replanIntervalDays: 7,
+        continuousBacklog: true,
+        openWorkCount: 0,
+        availableMicros: MIN_REPLAN_AVAILABLE_MICROS,
+      }),
+      false,
+    );
+  });
+
+  it("honors interval when continuous backlog is off", () => {
+    const now = Date.UTC(2026, 0, 10);
+    assert.equal(
+      shouldReplanVision({
+        lastVisionReplanAt: new Date(Date.UTC(2026, 0, 9)),
+        replanIntervalDays: 7,
+        continuousBacklog: false,
+        openWorkCount: 0,
+        availableMicros: 1_000_000,
+        nowMs: now,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldReplanVision({
+        lastVisionReplanAt: new Date(Date.UTC(2026, 0, 1)),
+        replanIntervalDays: 7,
+        continuousBacklog: false,
+        openWorkCount: 3,
+        availableMicros: 1_000_000,
+        nowMs: now,
+      }),
+      true,
+    );
   });
 
   it("merges partial JSON", () => {

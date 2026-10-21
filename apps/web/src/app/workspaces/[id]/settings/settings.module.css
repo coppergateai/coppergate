@@ -1253,4 +1253,381 @@
   .billingPlanCard {
     transition: none;
   }
+
+  .llmCredCard,
+  .llmProviderChip {
+    transition: none;
+  }
+}
+
+/* —— LLM BYOK —— */
+
+.llmLayout {
+  display: grid;
+  gap: 1.75rem;
+  max-width: 56rem;
+}
+
+.llmHero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem 1.75rem;
+  padding-bottom: 0.25rem;
+}
+
+.llmTitle {
+  margin: 0;
+  color: var(--paper);
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.llmLede {
+  margin: 0.4rem 0 0;
+  max-width: 36rem;
+  color: var(--mute);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.llmStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.llmStat {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 6.5rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background:
+    radial-gradient(
+      90% 80% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 60%
+    ),
+    rgba(255, 255, 255, 0.02);
+}
+
+.llmStatLabel {
+  color: var(--mute-soft);
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.llmStatValue {
+  color: var(--paper);
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.llmSection {
+  display: grid;
+  gap: 1rem;
+}
+
+.llmSectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.llmSectionTitle {
+  margin: 0;
+  color: var(--paper);
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.llmSectionHint {
+  margin: 0.25rem 0 0;
+  color: var(--mute-soft);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  max-width: 34rem;
+}
+
+.llmEmpty {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+  padding: 1.35rem 1.25rem;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.llmEmptyTitle {
+  margin: 0;
+  color: var(--paper);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.llmCredGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+  .llmCredGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.llmCredCard {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background:
+    radial-gradient(
+      80% 70% at 100% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    var(--surface);
+  transition: border-color 0.15s ease;
+}
+
+.llmCredCard:hover {
+  border-color: var(--copper-border);
+}
+
+.llmCredCardDefault {
+  border-color: var(--copper-border);
+  background:
+    radial-gradient(
+      80% 70% at 0% 0%,
+      var(--copper-fill),
+      transparent 55%
+    ),
+    var(--surface);
+}
+
+.llmCredTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.llmVendorChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--mute-strong);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.llmDefaultBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--copper-border);
+  border-radius: 6px;
+  color: var(--copper-hot, #e8a86a);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.llmCredModel {
+  margin: 0;
+  color: var(--paper);
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.llmCredMeta {
+  margin: 0;
+  color: var(--mute-soft);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.llmCredActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.llmAddPanel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.15rem 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background:
+    radial-gradient(
+      70% 80% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    rgba(255, 255, 255, 0.02);
+  animation: cg-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.llmAddLabel {
+  margin: 0;
+  color: var(--mute-soft);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.llmProviderRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.llmProviderChip {
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--mute);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.llmProviderChip:hover {
+  color: var(--paper);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.llmProviderChipActive {
+  border-color: var(--copper-border);
+  background: var(--copper-fill);
+  color: var(--paper);
+}
+
+.llmAddSpacer {
+  min-height: 1px;
+}
+
+.llmRouteTableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.llmRouteTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 36rem;
+}
+
+.llmRouteTable th,
+.llmRouteTable td {
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+}
+
+.llmRouteTable thead th {
+  color: var(--mute-soft);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.llmRouteTable tbody th {
+  font-weight: 600;
+  color: var(--paper);
+  white-space: nowrap;
+}
+
+.llmRouteTable tbody tr:last-child th,
+.llmRouteTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.llmRouteTable .select,
+.llmRouteTable .input {
+  width: 100%;
+  min-width: 0;
+}
+
+.llmRouteRowDirty {
+  background: rgba(200, 137, 73, 0.06);
+}
+
+.llmAgentName {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.llmDirtyDot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--copper-hot, #e8a86a);
+  box-shadow: 0 0 0 3px rgba(200, 137, 73, 0.18);
+}
+
+.llmStickyBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--copper-border);
+  border-radius: 10px;
+  background: var(--copper-fill);
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 2;
 }

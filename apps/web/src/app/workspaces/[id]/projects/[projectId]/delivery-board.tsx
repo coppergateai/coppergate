@@ -65,19 +65,20 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
         Delivery board
       </h2>
       <p className={styles.sectionLede}>
-        Tasks by status. Open one to watch runs and cost.
+        Tasks by status. Open one to watch runs and cost. After Start, the
+        board refills itself under budget — no plan entry.
       </p>
 
       {tasks.length === 0 ? (
         <EmptyState
-          title="No tasks on the board yet"
-          body="Generate a plan from an approved brief, or import a GitHub issue from Overview to queue the first delivery."
+          title="Waiting for the autonomous loop"
+          body="Press Start on Agents. Coppergate detects the next feature or fix, runs the tournament, opens a PR, and merges when CI is green."
           action={
             <Link
-              href={`#plan`}
+              href={`/workspaces/${workspaceId}/projects/${projectId}?tab=arena`}
               className={styles.linkCta}
             >
-              Go to plan
+              Go to Agents → Start
             </Link>
           }
         />

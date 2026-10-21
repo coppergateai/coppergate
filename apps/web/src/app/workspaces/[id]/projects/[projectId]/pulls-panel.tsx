@@ -94,8 +94,8 @@ export function PullsPanel({ workspaceId, projectId, isOwner }: Props) {
         Open PRs → review
       </h2>
       <p className={styles.sectionLede}>
-        For existing repos: import an open pull request. Agents post a review
-        comment on that PR (no new PR). Accept in Coppergate when done.
+        Optional: import an existing open PR for review. The autonomous loop
+        opens its own PRs from Agents → Start.
         {repo ? ` · ${repo}` : null}
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
