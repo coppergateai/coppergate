@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PILOT_PROJECTS } from "./pilot-projects";
 import styles from "./marketing.module.css";
 
 export function MarketingFooter() {
@@ -30,6 +31,10 @@ export function MarketingFooter() {
             <p className={styles.footerLede}>
               Set a budget. Agents war. Survivors ship.
             </p>
+            <p className={styles.footerNote}>
+              Actively building open-source pilot projects alongside Coppergate —
+              including kprompt.
+            </p>
             <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
               hello@coppergate.ai
             </a>
@@ -45,6 +50,32 @@ export function MarketingFooter() {
               <Link href="/#signals">Integrations</Link>
               <Link href="/#controls">Controls</Link>
               <Link href="/#faq">FAQ</Link>
+            </nav>
+            <nav className={styles.footerCol} aria-label="Pilot projects">
+              <h2>Pilot projects</h2>
+              {PILOT_PROJECTS.map((p) => (
+                <a
+                  key={p.id}
+                  href={p.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.footerProject}
+                >
+                  <span className={styles.footerProjectRow}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className={styles.footerProjectLogo}
+                      src={p.logoSrc}
+                      alt=""
+                      width={20}
+                      height={22}
+                    />
+                    <span className={styles.footerProjectName}>{p.name}</span>
+                  </span>
+                  <span className={styles.footerProjectBlurb}>{p.blurb}</span>
+                </a>
+              ))}
+              <Link href="/#projects">All pilots →</Link>
             </nav>
             <nav className={styles.footerCol} aria-label="Resources">
               <h2>Resources</h2>
@@ -91,7 +122,7 @@ export function MarketingFooter() {
 
         <div className={styles.footerBottom}>
           <p>© {year} Coppergate</p>
-          <p>MIT · Open source · Free to self-host</p>
+          <p>MIT · Open source · Also shipping kprompt</p>
         </div>
       </div>
     </footer>

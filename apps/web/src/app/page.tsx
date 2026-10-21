@@ -5,6 +5,7 @@ import {
   FinalCta,
   FitnessSection,
   HeroSection,
+  PilotProjectsSection,
   SecuritySection,
   SignalAdaptersSection,
   SurvivorWorkflow,
@@ -28,6 +29,7 @@ export default async function HomePage() {
       <FitnessSection />
       <SignalAdaptersSection />
       <SecuritySection />
+      <PilotProjectsSection />
       <FaqBlock />
       <FinalCta signedInLogin={user?.login ?? null} />
     </SiteChrome>
