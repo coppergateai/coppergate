@@ -10,6 +10,11 @@ describe("hosted plans", () => {
     );
   });
 
+  it("locks pilot prices at $99 / $199", () => {
+    assert.equal(HOSTED_PLANS.find((p) => p.id === "starter")?.monthlyUsd, 99);
+    assert.equal(HOSTED_PLANS.find((p) => p.id === "pro")?.monthlyUsd, 199);
+  });
+
   it("maps price ids", () => {
     assert.equal(
       planFromPriceId("price_s", { starter: "price_s", pro: "price_p" }),

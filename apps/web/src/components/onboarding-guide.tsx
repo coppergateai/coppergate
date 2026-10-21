@@ -148,13 +148,21 @@ export function OnboardingGuide({
             <div className={styles.complete}>
               <p className={styles.completeTitle}>You’re set.</p>
               <p className={styles.completeDetail}>
-                Path to first PR: Issues → Import → queue → review cost, diff,
-                and CI → Accept. Stuck? See /docs/recovery.
+                One-session path: Issues → Import → queue → review cost, diff,
+                and CI → Accept. Schedule a second issue within 7 days.
               </p>
+              <div className={styles.focusActions}>
+                <Link href="/docs/recovery" className={styles.cta}>
+                  Recovery docs
+                  <span className={styles.ctaArrow} aria-hidden>
+                    →
+                  </span>
+                </Link>
+              </div>
             </div>
           ) : next ? (
             <div className={styles.focus}>
-              <p className={styles.focusEyebrow}>Up next</p>
+              <p className={styles.focusEyebrow}>One-session TTFV · up next</p>
               <h3 className={styles.focusTitle}>{next.title}</h3>
               <p className={styles.focusDetail}>{next.detail}</p>
               <div className={styles.focusActions}>
@@ -170,6 +178,9 @@ export function OnboardingGuide({
                     Complete this on this page when the controls appear.
                   </span>
                 )}
+                <Link href="/docs/recovery" className={styles.hint}>
+                  Stuck? Recovery →
+                </Link>
               </div>
             </div>
           ) : null}

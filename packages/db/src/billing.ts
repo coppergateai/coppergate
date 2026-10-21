@@ -34,6 +34,10 @@ export function normalizeSubscriptionStatus(
   ) {
     return raw;
   }
+  // Stripe unpaid / incomplete_expired → treat as past_due for plan gating.
+  if (raw === "unpaid" || raw === "incomplete_expired") {
+    return "past_due";
+  }
   return "incomplete";
 }
 
@@ -135,10 +139,17 @@ export async function countActiveHostedSubscriptions(
   db: Database,
 ): Promise<number> {
   const rows = await db
-    .select({ id: workspaceSubscriptions.id })
-    .from(workspaceSubscriptions)
-    .where(eq(workspaceSubscriptions.status, "active"));
-  return rows.filter((r) => r.id).length;
+    .select({
+      id: workspaceSubscriptions.id,
+      status: workspaceSubscriptions.status,
+      stripeSubscriptionId: workspaceSubscriptions.stripeSubscriptionId,
+    })
+    .from(workspaceSubscriptions);
+  return rows.filter(
+    (r) =>
+      (r.status === "active" || r.status === "trialing") &&
+      Boolean(r.stripeSubscriptionId),
+  ).length;
 }
 
 /** Effective plan: active/trialing hosted, else community. */

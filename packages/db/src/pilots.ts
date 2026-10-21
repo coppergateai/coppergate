@@ -1,7 +1,11 @@
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { countActiveHostedSubscriptions } from "./billing.js";
-import { pilotInvites, workspaceSubscriptions } from "./schema.js";
+import {
+  pilotInvites,
+  workspaceSubscriptions,
+  type PilotInvite,
+} from "./schema.js";
 
 export type PilotGoNoGoSnapshot = {
   invitesTotal: number;
@@ -9,6 +13,11 @@ export type PilotGoNoGoSnapshot = {
   paidPilotsRedeemed: number;
   activeHostedSubscriptions: number;
 };
+
+/** Newest-first invite list for ops dashboards. */
+export async function listPilotInvites(db: Database): Promise<PilotInvite[]> {
+  return db.select().from(pilotInvites).orderBy(desc(pilotInvites.createdAt));
+}
 
 /** Operator snapshot for GTM Phase 0 go/no-go. */
 export async function getPilotGoNoGoSnapshot(

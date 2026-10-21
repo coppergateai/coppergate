@@ -32,3 +32,6 @@ apps/web/next-env.d.ts.bak
 tmp/
 temp/
 .vercel
+
+# Phase 0 outreach outbox (regenerate via pnpm ops:outreach-pack)
+docs/ops/_generated/

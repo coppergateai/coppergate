@@ -49,8 +49,16 @@ export default function PricingPage() {
           <h2>Pilot path</h2>
           <ul>
             <li>Invite-gated private beta; paid pilots redeem a <code>paid_pilot</code> invite</li>
-            <li>Wedge KPI: GitHub issue → verified PR (see docs)</li>
+            <li>
+              Locked hosted prices: <strong>Starter $99/mo</strong>,{" "}
+              <strong>Pro $199/mo</strong> (+ usage) — or a one-time deposit
+              converted to Starter
+            </li>
+            <li>Wedge KPI: GitHub issue → verified PR in one session</li>
             <li>Cost per accepted (survivor) PR is a first-class metric</li>
+            <li>
+              Self-serve recovery: <Link href="/docs/recovery">/docs/recovery</Link>
+            </li>
           </ul>
 
           <p>

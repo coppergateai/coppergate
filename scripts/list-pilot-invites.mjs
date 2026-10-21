@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
  * List pilot invites for GTM ops.
- * Usage: DATABASE_URL=… pnpm exec tsx scripts/list-pilot-invites.mjs
+ * Usage: DATABASE_URL=… pnpm ops:pilot-invites
  */
-import { createDb, closeDb, pilotInvites } from "../packages/db/src/index.ts";
-import { desc } from "drizzle-orm";
+import {
+  createDb,
+  closeDb,
+  listPilotInvites,
+} from "../packages/db/src/index.ts";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -14,12 +17,10 @@ if (!url) {
 
 const db = createDb(url, { max: 1 });
 try {
-  const rows = await db
-    .select()
-    .from(pilotInvites)
-    .orderBy(desc(pilotInvites.createdAt));
+  const rows = await listPilotInvites(db);
   const paid = rows.filter(
-    (r) => (r.kind ?? "").includes("paid") || (r.note ?? "").includes("paid_pilot"),
+    (r) =>
+      (r.kind ?? "").includes("paid") || (r.note ?? "").includes("paid_pilot"),
   );
   console.log(
     JSON.stringify(

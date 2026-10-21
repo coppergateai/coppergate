@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 /**
  * Create a pilot invite code (TASK035 / GTM Phase 0).
- * Usage (from repo root):
- *   DATABASE_URL=… pnpm --filter @coppergate/db exec node --import tsx \
- *     ../../scripts/create-pilot-invite.mjs [CODE] [MAX_USES] [kind]
- * kind: invite | paid_pilot (default invite)
+ * Usage: DATABASE_URL=… pnpm ops:pilot-invite -- PAID-DEMO 1 paid_pilot
  */
 import { createDb, createPilotInvite, closeDb } from "../packages/db/src/index.ts";
+import { opsArgv } from "./ops-argv.mjs";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -14,9 +12,10 @@ if (!url) {
   process.exit(1);
 }
 
-const code = process.argv[2];
-const maxUses = Number(process.argv[3] ?? "1");
-const kindRaw = (process.argv[4] ?? "invite").trim().toLowerCase();
+const argv = opsArgv();
+const code = argv[0];
+const maxUses = Number(argv[1] ?? "1");
+const kindRaw = (argv[2] ?? "invite").trim().toLowerCase();
 const kind = kindRaw === "paid_pilot" || kindRaw === "paid" ? "paid_pilot" : "invite";
 
 const db = createDb(url, { max: 1 });

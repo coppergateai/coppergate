@@ -139,12 +139,15 @@ export {
 } from "./fitness.js";
 export {
   joinWaitlist,
+  listWaitlistSignups,
   normalizeWaitlistEmail,
   type JoinWaitlistResult,
 } from "./waitlist.js";
 export {
   InviteError,
   createPilotInvite,
+  getPilotInviteByCode,
+  updatePilotInviteNote,
   normalizeInviteCode,
   redeemPilotInvite,
 } from "./invites.js";
@@ -541,6 +544,7 @@ export {
 export {
   countPaidPilotInvites,
   getPilotGoNoGoSnapshot,
+  listPilotInvites,
   listPayingWorkspaceIds,
   type PilotGoNoGoSnapshot,
 } from "./pilots.js";

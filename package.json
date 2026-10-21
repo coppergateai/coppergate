@@ -13,7 +13,16 @@
     "test": "turbo run test",
     "db:generate": "pnpm --filter @coppergate/db generate",
     "db:migrate": "pnpm --filter @coppergate/db migrate",
-    "db:migrate:down": "pnpm --filter @coppergate/db migrate:down"
+    "db:migrate:down": "pnpm --filter @coppergate/db migrate:down",
+    "ops:stripe-env": "node scripts/stripe-env-check.mjs",
+    "ops:waitlist": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/list-waitlist.mjs",
+    "ops:pilot-invite": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/create-pilot-invite.mjs",
+    "ops:pilot-batch": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/batch-create-pilot-invites.mjs",
+    "ops:pilot-invites": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/list-pilot-invites.mjs",
+    "ops:pilot-wtp": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/record-pilot-wtp.mjs",
+    "ops:pilot-go-no-go": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/pilot-go-no-go.mjs",
+    "ops:outreach-pack": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/export-outreach-pack.mjs",
+    "ops:retention": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/retention-snapshot.mjs"
   },
   "devDependencies": {
     "turbo": "^2.5.4",

@@ -222,6 +222,12 @@
 .hint {
   color: var(--mute-soft);
   font-size: 0.78rem;
+  text-decoration: none;
+}
+
+a.hint:hover {
+  color: var(--paper);
+  text-decoration: underline;
 }
 
 .complete {

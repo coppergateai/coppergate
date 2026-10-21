@@ -214,6 +214,20 @@ export async function handleStripeWebhookEvent(input: {
       await syncSubscriptionFromStripe(input.db, input.cfg, sub);
       return { handled: event.type };
     }
+    case "invoice.payment_failed":
+    case "invoice.paid": {
+      const invoice = event.data.object as Stripe.Invoice & {
+        subscription?: string | { id: string } | null;
+      };
+      const subField = invoice.subscription;
+      const subId =
+        typeof subField === "string" ? subField : (subField?.id ?? null);
+      if (subId) {
+        const sub = await input.stripe.subscriptions.retrieve(subId);
+        await syncSubscriptionFromStripe(input.db, input.cfg, sub);
+      }
+      return { handled: event.type };
+    }
     default:
       return { handled: `ignored:${event.type}` };
   }
