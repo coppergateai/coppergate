@@ -2,18 +2,20 @@ import styles from "./landing.module.css";
 
 export function StatusBand() {
   return (
-    <section className={styles.statusBand} aria-label="Beta status">
+    <section className={styles.statusBand} aria-label="Open source status">
       <div className={styles.statusInner}>
         <span className={styles.statusDot} aria-hidden="true" />
         <p className={styles.statusText}>
-          <strong>Private beta</strong> — GitHub fitness wedge live; Survivor
-          tournament next. Design-partner seats by invitation.
+          <strong>Open source (MIT)</strong> — free to self-host. GitHub fitness
+          wedge live; Survivor tournament evolving.
         </p>
         <a
           className={styles.statusLink}
-          href="mailto:hello@coppergate.ai?subject=Design%20partner"
+          href="https://github.com/coppergateai/coppergate"
+          target="_blank"
+          rel="noreferrer"
         >
-          Talk to us
+          GitHub
         </a>
       </div>
     </section>

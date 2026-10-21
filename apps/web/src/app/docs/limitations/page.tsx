@@ -5,7 +5,7 @@ import { DocsShell } from "@/components/docs/docs-shell";
 export const metadata = {
   title: "Limitations · Coppergate Docs",
   description:
-    "Private beta limitations for the Coppergate Survivor arena — wedge vs north star.",
+    "Current-release limitations for the Coppergate Survivor arena — wedge vs north star.",
 };
 
 export default function LimitationsPage() {
@@ -20,9 +20,9 @@ export default function LimitationsPage() {
         <div className={styles.prose}>
           <p>
             North star: autonomous Survivor arena with selection over
-            supervision (efficiency contest, critic, elimination). Private beta
-            ships GitHub fitness (PR + CI) as the evidence wedge; armed arenas
-            run N≤2 efficiency contests today.
+            supervision (efficiency contest, critic, elimination). The current
+            release ships GitHub fitness (PR + CI) as the evidence wedge; armed
+            arenas run N≤2 efficiency contests today.
           </p>
 
           <section>

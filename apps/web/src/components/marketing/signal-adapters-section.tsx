@@ -45,19 +45,19 @@ const workflows = [
   {
     source: "Sentry",
     path: "Error detected → Arena → Verified fix PR",
-    status: "Private beta",
+    status: "Available",
     note: "Inbound webhook arms a bounded fixer tournament when configured.",
   },
   {
     source: "Jira",
     path: "Engineering issue → Arena → Candidate implementation",
-    status: "Private beta",
+    status: "Available",
     note: "Issue webhooks map to tasks; delivery is still PR/MR review.",
   },
   {
     source: "GitHub CI",
     path: "Failed workflow → Arena → Proposed repair",
-    status: "Private beta",
+    status: "Available",
     note: "CI failure adapters can arm repair contests against the failing SHA.",
   },
 ] as const;
@@ -178,7 +178,7 @@ export function SignalAdaptersSection() {
 
       <div className={styles.integrationRows}>
         <p className={styles.integrationRowsCaption}>
-          Adapter surface in private beta — enable per workspace after invite.
+          Adapter surface in the current release — enable per workspace when configured.
         </p>
         {categories.map((cat) => {
           const loop = loopItems(cat.items);

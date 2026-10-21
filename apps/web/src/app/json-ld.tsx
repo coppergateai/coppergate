@@ -40,7 +40,7 @@ const jsonLd = {
         "@type": "Offer",
         price: "0",
         priceCurrency: "USD",
-        description: "Private beta — request early access",
+        description: "MIT license — free to self-host",
       },
       publisher: { "@id": `${siteUrl}/#organization` },
     },

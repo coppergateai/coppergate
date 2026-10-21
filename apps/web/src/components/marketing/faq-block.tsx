@@ -22,7 +22,7 @@ const faqs = [
   },
   {
     q: "Is the efficiency contest available today?",
-    a: "Yes in private beta for armed Arenas: contenders fan out, the worker resolves by efficiency payoff among qualifying runs, and losers lose budget. Kill-switch and spend caps remain first-class.",
+    a: "Yes for armed Arenas: contenders fan out, the worker resolves by efficiency payoff among qualifying runs, and losers lose budget. Kill-switch and spend caps remain first-class.",
   },
   {
     q: "What are Signal Adapters?",
@@ -37,8 +37,8 @@ const faqs = [
     a: "Sign-in uses GitHub or GitLab OAuth for identity. Live delivery is PR/MR via GitHub App or GitLab. Bitbucket and Azure DevOps clients exist but are deferred until the GitHub closed loop is production-ready. You choose which orgs and repos to connect and can revoke anytime.",
   },
   {
-    q: "Is Coppergate generally available?",
-    a: "Coppergate is in private beta and onboarding design partners. Request access and we will reach out when a seat opens.",
+    q: "Is Coppergate free / open source?",
+    a: "Yes. The full product is MIT-licensed on GitHub. Self-host with Docker Compose and BYOK at $0. A hosted instance is available to try; optional paid hosted plans may come later — the community path stays free.",
   },
 ] as const;
 

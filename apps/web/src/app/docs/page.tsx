@@ -5,7 +5,7 @@ import styles from "@/components/marketing/marketing.module.css";
 export const metadata = {
   title: "Docs · Coppergate",
   description:
-    "Private beta docs for the Coppergate Survivor arena — stack, limitations, pricing intent.",
+    "Open-source docs for the Coppergate Survivor arena — stack, self-host, limitations, recovery.",
 };
 
 const items = [
@@ -22,7 +22,7 @@ const items = [
   {
     href: "/docs/pricing",
     title: "Pricing",
-    detail: "Community + Hosted Starter/Pro, usage, paid pilots",
+    detail: "MIT $0 self-host · optional hosted later",
   },
   {
     href: "/docs/recovery",
@@ -40,12 +40,13 @@ export default function DocsIndexPage() {
   return (
     <DocsShell>
       <main className={styles.contentPage}>
-        <p className={styles.pageEyebrow}>Private beta</p>
+        <p className={styles.pageEyebrow}>Open source</p>
         <h1 className={styles.pageTitle}>Documentation</h1>
         <p className={styles.pageLede}>
-          Guides for design partners. North star is the Survivor arena;
-          commercial wedge is <strong>GitHub issue → verified PR</strong> with
-          spend caps and a kill-switch.
+          Coppergate is MIT-licensed. North star is the Survivor arena; the
+          practical wedge is <strong>GitHub issue → verified PR</strong> with
+          spend caps and a kill-switch. Start with self-host or try the hosted
+          app.
         </p>
 
         <ul className={styles.docsList}>
@@ -58,9 +59,23 @@ export default function DocsIndexPage() {
         </ul>
 
         <p className={styles.changelogMore}>
-          Need an invite? <Link href="/#early-access">Join the waitlist</Link>{" "}
-          or email{" "}
-          <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
+          <a
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub
+          </a>
+          {" · "}
+          <a
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Self-host guide
+          </a>
+          {" · "}
+          <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>
         </p>
       </main>
     </DocsShell>

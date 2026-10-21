@@ -28,16 +28,21 @@ export function HeroSection({ signedIn }: Props) {
           </p>
 
           <div className={styles.ctaRow}>
-            <Link className={styles.btnHeroPrimary} href={primaryHref}>
-              {signedIn ? "Open workspaces" : "Request access"}
+            <a
+              className={styles.btnHeroPrimary}
+              href="https://github.com/coppergateai/coppergate"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Star on GitHub
               <IconArrow />
-            </Link>
-            <a className={styles.btnSecondary} href="#arena">
-              Explore Arena
             </a>
+            <Link className={styles.btnSecondary} href={primaryHref}>
+              {signedIn ? "Open workspaces" : "Try hosted"}
+            </Link>
           </div>
           <p className={styles.metaRow}>
-            Private beta · $5/mo micro-envelope · Survivors improve
+            MIT · free to self-host · BYOK · survivors improve
           </p>
         </div>
 
