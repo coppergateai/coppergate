@@ -1,4 +1,9 @@
-import { ArenaError, type Arena, type Contender } from "@coppergate/db";
+import {
+  ArenaError,
+  MaintainerError,
+  type Arena,
+  type Contender,
+} from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 
 export function mapArenaError(err: unknown): never {
@@ -14,6 +19,20 @@ export function mapArenaError(err: unknown): never {
       case "eliminated":
       case "conflict":
         throw new ApiError("conflict", e.message);
+      default: {
+        const _exhaustive: never = e.code;
+        throw new ApiError("internal", String(_exhaustive));
+      }
+    }
+  }
+  if (err instanceof MaintainerError) {
+    const e = err;
+    switch (e.code) {
+      case "not_found":
+        throw new ApiError("not_found", e.message);
+      case "invalid":
+      case "forbidden":
+        throw new ApiError("bad_request", e.message);
       default: {
         const _exhaustive: never = e.code;
         throw new ApiError("internal", String(_exhaustive));

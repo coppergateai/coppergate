@@ -13,10 +13,10 @@ See [WEDGE.md](./WEDGE.md) and [GTM.md](./GTM.md) for paid-pilot process.
 - **Template / fixture:** `nextjs_ts` (`coppergate-examples/nextjs_ts`) for `new_product` projects
 - **Existing repos:** stack is detected on bind from root files + SCM Languages API (`nextjs_ts`, `node`, `go`, `rust`, `python`, …, or `unknown`). Workspace owners can **Re-detect stacks** to backfill.
 - **Auth:** GitHub OAuth (user) + GitHub App (repo); GitLab OAuth + project connect also supported
-- **Agent (pilot default):** With `GITHUB_DELIVERY_MODE=http`, worker prefers workspace BYOK / env OpenAI, else `CONTENDER_HARNESS=openhands` (sandbox-backed). FakeCodingAgent only when delivery is `fake` or CI/test. Coding agent path is primarily `nextjs_ts`; other stacks are best-effort (UI soft warning).
-- **Sandbox:** Worker creates a `LocalSandboxManager` workdir per run (`SANDBOX_MODE=local` default).
+- **Agent (pilot default):** With `GITHUB_DELIVERY_MODE=http`, worker prefers workspace BYOK / env OpenAI, else `CONTENDER_HARNESS=openhands` (sandbox-backed). FakeCodingAgent only when delivery is `fake` or CI/test. Coding agent path supports `nextjs_ts` (npm lint/test) and **`go`** (`go test ./...` when `go.mod` is present); other stacks are best-effort (UI soft warning).
+- **Sandbox:** Worker creates a `LocalSandboxManager` workdir per run (`SANDBOX_MODE=local` default). Host/image must provide `go` on PATH for Go stack validation.
 - **Delivery:** Branch + PR/MR only (never default branch); live GitHub App + GitLab. Bitbucket/ADO deferred. FakeGithubDelivery in local/dev without App credentials
-- **CI gate:** Live `check_run` / Actions webhooks attach via `ingestCiEvidence`. Accept stays closed while fitness is pending or CI failed.
+- **CI gate:** Live `check_run` / Actions webhooks attach via `ingestCiEvidence`. Accept stays closed while fitness is pending or CI failed. Maintainer auto-accept additionally requires tournament **WINNER** (solo runs exempt).
 
 ## Explicit non-goals (this pilot)
 

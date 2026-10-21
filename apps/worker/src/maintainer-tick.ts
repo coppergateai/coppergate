@@ -2,6 +2,7 @@
  * Maintainer scheduler tick + unattended L2 merge for maintainer-mode projects.
  */
 import {
+  buildMaintainerReleaseTag,
   getInstallationForWorkspace,
   getProjectForWorkspace,
   listAutoMergeCandidates,
@@ -131,7 +132,11 @@ export async function runMaintainerSchedulerTick(
 
     if (policy.autoRelease && mergedTitles.length > 0) {
       try {
-        const tag = `maintainer-${new Date().toISOString().slice(0, 10)}`;
+        const tag = buildMaintainerReleaseTag(
+          policy.releaseTagStyle,
+          new Date(),
+          mergedTitles.length,
+        );
         const release = await createGithubRelease({
           token,
           owner,
@@ -153,6 +158,7 @@ export async function runMaintainerSchedulerTick(
           meta: {
             tagName: release.tagName,
             htmlUrl: release.htmlUrl,
+            releaseTagStyle: policy.releaseTagStyle,
           },
         });
       } catch (err) {

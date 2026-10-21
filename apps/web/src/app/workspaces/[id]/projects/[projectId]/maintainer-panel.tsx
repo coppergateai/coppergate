@@ -12,6 +12,10 @@ type Metrics = {
   humanTouches: number;
   autoAccepts: number;
   selfImproves: number;
+  metaTournaments?: number;
+  replans?: number;
+  costPerAcceptedMergeMicros?: number;
+  winningProfileKeys?: string[];
   ticks: number;
 };
 
@@ -22,6 +26,8 @@ type Policy = {
   autoRelease: boolean;
   selfImprove: boolean;
   communityReplies: boolean;
+  autoQueueReplanTasks?: boolean;
+  releaseTagStyle?: string;
 };
 
 type Props = {
@@ -170,6 +176,11 @@ export function MaintainerPanel({
           <li>Envelope: {dollars(policy.monthlyBudgetMicros)} / month</li>
           <li>Auto-merge: {policy.autoMerge ? "yes" : "no"}</li>
           <li>Auto-release: {policy.autoRelease ? "yes" : "no"}</li>
+          <li>
+            Auto-queue replan:{" "}
+            {policy.autoQueueReplanTasks === false ? "no" : "yes"}
+          </li>
+          <li>Release tags: {policy.releaseTagStyle ?? "daily"}</li>
           <li>Self-improve: {policy.selfImprove ? "yes" : "no"}</li>
           <li>Community replies: {policy.communityReplies ? "yes" : "no"}</li>
         </ul>
@@ -181,12 +192,19 @@ export function MaintainerPanel({
             Last 30d: {metrics.merges} merges · spend{" "}
             {dollars(metrics.spendMicros)} / {dollars(metrics.capMicros)}
             {metrics.spendWithinCap ? "" : " (over cap)"}
+            {metrics.costPerAcceptedMergeMicros != null && metrics.merges > 0
+              ? ` · ~${dollars(metrics.costPerAcceptedMergeMicros)}/merge`
+              : ""}
           </li>
           <li>
             Human PR touches: {metrics.humanTouches} · auto-accepts:{" "}
             {metrics.autoAccepts} · self-improves: {metrics.selfImproves} ·
-            ticks: {metrics.ticks}
+            meta-tournaments: {metrics.metaTournaments ?? 0} · replans:{" "}
+            {metrics.replans ?? 0} · ticks: {metrics.ticks}
           </li>
+          {metrics.winningProfileKeys && metrics.winningProfileKeys.length > 0 ? (
+            <li>Winning profiles: {metrics.winningProfileKeys.join(", ")}</li>
+          ) : null}
         </ul>
       ) : null}
     </section>

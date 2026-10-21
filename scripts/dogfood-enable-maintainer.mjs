@@ -80,6 +80,11 @@ try {
       autoRelease: true,
       selfImprove: true,
       communityReplies: true,
+      autoQueueReplanTasks: true,
+      maxAutoQueuePerReplan: 2,
+      // GoReleaser-friendly tags (v0.YYYYMMDD.N) for kprompt primary
+      releaseTagStyle: "semver_patch",
+      maxTournamentN: 2,
     },
   });
 

@@ -153,8 +153,9 @@ export async function applyTaskTransition(
 
 /**
  * Enqueue execution after task is QUEUED — arena fan-out or single run.
+ * Exported so Start can resume interrupted QUEUED work after Stop.
  */
-async function enqueueQueuedTask(
+export async function enqueueQueuedTask(
   db: Database,
   input: {
     workspaceId: string;
