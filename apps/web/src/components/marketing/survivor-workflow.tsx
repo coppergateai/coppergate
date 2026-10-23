@@ -1,3 +1,4 @@
+import { MarketingLottie } from "./marketing-lottie";
 import styles from "./marketing.module.css";
 
 const steps = [
@@ -32,7 +33,14 @@ export function SurvivorWorkflow() {
     >
       <div className={styles.sectionInner}>
         <header className={styles.workflowHead}>
-          <p className={styles.sectionEyebrow}>How it works</p>
+          <div className={styles.sectionEyebrowRow}>
+            <MarketingLottie
+              src="/lottie/selection-race.json"
+              className={styles.lottieSection}
+              label="Selection race"
+            />
+            <p className={styles.sectionEyebrow}>How it works</p>
+          </div>
           <h2 id="how-title" className={styles.sectionTitle}>
             From task to verified PR.
           </h2>

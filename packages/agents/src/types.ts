@@ -20,6 +20,8 @@ export type AgentRunInput = {
   architectureContext?: string;
   /** Contender strategy — blitz | fortress | balanced. */
   strategy?: string;
+  /** Contender / profile prompt guidance (non-secret). */
+  promptGuidance?: string;
   /** Absolute sandbox workdir when worker created a LocalSandboxManager clone. */
   sandboxWorkdir?: string;
   /** Sandbox id for evidence / audit (optional). */

@@ -10,6 +10,7 @@ export { HeroArenaStory } from "./hero-arena-story";
 export { HeroSection } from "./hero-section";
 export { MarketingFooter } from "./marketing-footer";
 export { MarketingHeader } from "./marketing-header";
+export { MarketingLottie } from "./marketing-lottie";
 export { PilotProjectsSection } from "./pilot-projects-section";
 export { ProductPreview } from "./product-preview";
 export { SecuritySection } from "./security-section";

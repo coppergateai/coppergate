@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { expireStaleTaskApprovals } from "./approvals.js";
 import {
@@ -10,7 +10,7 @@ import {
 import {
   getProjectSpendSummary,
   rollMonthlyBudgetIfDue,
-  setProjectBudget,
+  setWorkspaceBudget,
 } from "./budgets.js";
 import { getRunCiFitness } from "./ci-evidence.js";
 import { setProjectAutonomyLevel, setProjectMergeEnabled } from "./project-policy.js";
@@ -54,12 +54,18 @@ import { listRunsForTask } from "./runs.js";
 import { armSignalEvent, listSignalEvents } from "./signals.js";
 import { generateProjectPlan } from "./plans.js";
 import {
+  parseArchitectureOpenTasks,
+  pickNextArchitectureTask,
+} from "./architecture-backlog.js";
+import {
   getProjectForWorkspace,
   setProjectMultiRepoPolicy,
 } from "./projects.js";
 
 /** Canonical micro-budget: $5/mo = 5_000_000 micros. */
-export const DEFAULT_MONTHLY_BUDGET_MICROS = 5_000_000;
+/** Default monthly envelope for maintainer mode ($50). */
+/** Default workspace pooled envelope: $100/mo. */
+export const DEFAULT_MONTHLY_BUDGET_MICROS = 100_000_000;
 
 export type MaintainerPolicy = {
   enabled: boolean;
@@ -342,14 +348,15 @@ export async function enableMaintainerMode(
     policy.monthlyBudgetMicros * policy.softAlertRatio,
   );
 
-  await setProjectBudget(db, {
+  // Workspace pool: all projects share one monthly envelope.
+  await setWorkspaceBudget(db, {
     workspaceId: input.workspaceId,
-    projectId: input.projectId,
     capMicros: policy.monthlyBudgetMicros,
     softAlertMicros: softAlert,
     actor: input.actor,
     status: "active",
     period: "monthly",
+    pauseProjectBudgets: true,
   });
 
   await setProjectAutonomyLevel(db, {
@@ -533,19 +540,19 @@ export async function ensureAutonomousVisionAndBacklog(
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       actor: input.actor,
-      rawIdea: `Autonomous maintainer for ${repo}: propose, build, verify, merge, and release small improvements without human plan entry.`,
+      rawIdea: `Autonomous maintainer for ${repo}: invent and ship product-quality increments from the architecture roadmap under a spend cap.`,
       content: {
         title: `${name} — autonomous ship loop`,
-        targetUser: "Product maintainers",
-        problem: `Keep ${repo} improving under a monthly spend cap with survivor selection.`,
+        targetUser: "Product maintainers and end users",
+        problem: `Keep ${repo} shipping real capabilities under a monthly spend cap with survivor selection.`,
         scope:
-          "Tiny, reviewable changes on the primary repo: bugs, CI, docs, and small features. Prefer go test / CI green.",
+          "Product increments on the primary repo: named features, hardened behaviors, tests, and user-facing docs. Prefer M/L slices with measurable outcomes.",
         nonGoals:
-          "Large rewrites, multi-repo coordinated ships without policy, unbounded spend.",
+          "Typos, scaffold/empty structure, timestamp dogfood, docs-only placeholders, unbounded spend, multi-repo ships without policy.",
         acceptanceCriteria: [
-          "Scoped task queued without human brief entry",
-          "Survivor PR opens on the primary repository",
-          "CI green; maintainer auto-accepts the tournament winner",
+          "Backlog task maps to an architecture Open ID or a concrete product outcome",
+          "Survivor PR opens on the primary repository with a capability-describing title",
+          "Tests/validation cover the change; CI green; maintainer auto-accepts the winner",
         ],
         clarifyingAnswers: [],
       },
@@ -931,15 +938,15 @@ export async function updateMaintainerPolicy(
     ...input.patch,
   };
   if (typeof input.patch.monthlyBudgetMicros === "number") {
-    await setProjectBudget(db, {
+    await setWorkspaceBudget(db, {
       workspaceId: input.workspaceId,
-      projectId: input.projectId,
       capMicros: policy.monthlyBudgetMicros,
       softAlertMicros: Math.floor(
         policy.monthlyBudgetMicros * policy.softAlertRatio,
       ),
       actor: input.actor,
       period: "monthly",
+      pauseProjectBudgets: true,
     });
   }
   const [updated] = await db
@@ -1096,16 +1103,32 @@ export async function tickMaintainerProject(
     result.softAlert = true;
   }
   if (spend.availableMicros <= 0) {
-    await db
-      .update(budgets)
-      .set({ status: "paused", updatedAt: new Date() })
-      .where(eq(budgets.projectId, input.projectId));
+    if (spend.pooled) {
+      await db
+        .update(budgets)
+        .set({ status: "paused", updatedAt: new Date() })
+        .where(
+          and(
+            eq(budgets.workspaceId, input.workspaceId),
+            isNull(budgets.projectId),
+          ),
+        );
+    } else {
+      await db
+        .update(budgets)
+        .set({ status: "paused", updatedAt: new Date() })
+        .where(eq(budgets.projectId, input.projectId));
+    }
     result.paused = true;
     await recordMaintainerEvent(db, {
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       kind: "tick",
-      payload: { action: "hard_pause", spentMicros: spend.spentMicros },
+      payload: {
+        action: "hard_pause",
+        spentMicros: spend.spentMicros,
+        pooled: Boolean(spend.pooled),
+      },
     });
     return result;
   }
@@ -1571,8 +1594,8 @@ export async function maybeSelfImproveProfile(
 
   let changed = false;
   const tip =
-    " Prefer minimal diffs, deterministic tests, and stay within path allowlist. Cut spend when fitness is already high.";
-  if (!base.promptGuidance.includes("Prefer minimal diffs")) {
+    " Prefer capability-complete diffs with tests, stay within path allowlist, and refuse scaffold/typo-only PRs.";
+  if (!base.promptGuidance.includes("refuse scaffold/typo-only")) {
     const nextGuidance = `${base.promptGuidance.trim()}${tip}`.slice(0, 4000);
     const [evolved] = await db
       .update(agentProfiles)
@@ -1751,6 +1774,8 @@ export async function runVisionReplan(
     /** Override policy auto-queue (default: from project maintainer policy). */
     autoQueue?: boolean;
     maxAutoQueue?: number;
+    /** Optional architecture / roadmap markdown (Open P-/W-/A-/S- rows). */
+    roadmapMarkdown?: string;
   },
 ): Promise<{ taskCount: number; queued: number }> {
   const brief = await getLatestBriefForProject(
@@ -1774,6 +1799,44 @@ export async function runVisionReplan(
     input.maxAutoQueue ?? policy.maxAutoQueuePerReplan;
 
   const stamp = new Date().toISOString().slice(0, 10);
+  const roadmapMd =
+    input.roadmapMarkdown?.trim() ||
+    process.env.ARCHITECTURE_BACKLOG_MD?.trim() ||
+    (await fetchArchitectureBacklogMarkdown()) ||
+    "";
+  const archTask = pickNextArchitectureTask(
+    parseArchitectureOpenTasks(roadmapMd),
+  );
+  const estimateBand = {
+    S: 500_000,
+    M: 2_000_000,
+    L: 5_000_000,
+  } as const;
+  const complexity = archTask?.estimateComplexity ?? ("M" as const);
+  const shipTitle =
+    archTask?.title ??
+    `Ship: ${(brief.title || "product increment").slice(0, 120)}`;
+  const shipGoal =
+    archTask?.goal ??
+    `Ship a user-visible product increment for ${brief.title}: ${brief.problem.slice(0, 280)}`;
+  let briefCriteria: string[] = [];
+  try {
+    const parsed = JSON.parse(brief.acceptanceCriteria || "[]") as unknown;
+    if (Array.isArray(parsed)) {
+      briefCriteria = parsed.filter((x): x is string => typeof x === "string");
+    }
+  } catch {
+    briefCriteria = [];
+  }
+  const shipAcceptance =
+    archTask?.acceptanceCriteria ??
+    [
+      "Capability is implemented on the primary repo (not scaffold/typo)",
+      "Tests or validation cover the change",
+      "CI green; PR title describes the capability",
+      ...briefCriteria.slice(0, 2),
+    ];
+
   const plan = await generateProjectPlan(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
@@ -1781,40 +1844,23 @@ export async function runVisionReplan(
     milestones: [
       {
         title: `Maintainer cycle ${stamp}`,
-        description: `Autonomous replan from vision: ${brief.title}`,
+        description: `Autonomous replan from vision: ${brief.title}${
+          archTask ? ` · roadmap ${archTask.id}` : ""
+        }`,
         tasks: [
           {
-            key: `m-${stamp}-propose`,
-            title: "Propose next scoped improvement",
-            goal: `From vision, pick one tiny improvement: ${brief.problem.slice(0, 200)}`,
+            key: `m-${stamp}-ship`,
+            title: shipTitle.slice(0, 200),
+            goal: shipGoal.slice(0, 2000),
             scope:
-              brief.scope.slice(0, 500) ||
-              "One file / one package; prefer bugs and docs over large features",
+              brief.scope.slice(0, 800) ||
+              "Primary-repo product increment with tests and docs as needed",
             allowedPaths: ["**/*"],
-            acceptanceCriteria: [
-              "Scoped proposal implemented as a reviewable PR or explicit noop",
-              "Stay within monthly budget",
-            ],
-            estimateMicros: 80_000,
-            estimateComplexity: "S" as const,
+            acceptanceCriteria: shipAcceptance.slice(0, 8),
+            estimateMicros: estimateBand[complexity],
+            estimateComplexity: complexity,
             dependsOn: [],
             priority: 10,
-          },
-          {
-            key: `m-${stamp}-ship`,
-            title: "Ship highest-ROI fix or feature",
-            goal: `Advance acceptance: ${(brief.acceptanceCriteria || "").slice(0, 200)}`,
-            scope:
-              "One small deliverable; prefer bugs/CI over large features under micro-budget",
-            allowedPaths: ["**/*"],
-            acceptanceCriteria: [
-              "CI green on primary",
-              "PR merged under maintainer policy",
-            ],
-            estimateMicros: 120_000,
-            estimateComplexity: "S" as const,
-            dependsOn: [`m-${stamp}-propose`],
-            priority: 20,
           },
         ],
       },
@@ -2148,4 +2194,65 @@ export async function markAutoMerged(
       message: input.message,
     },
   });
+}
+
+/**
+ * Best-effort load of architecture Open tasks from GitHub.
+ * ARCHITECTURE_REPO=owner/repo (default kprompt/kprompt-architecture)
+ * ARCHITECTURE_PATHS=comma list of markdown files
+ */
+async function fetchArchitectureBacklogMarkdown(): Promise<string> {
+  const token =
+    process.env.ARCHITECTURE_GITHUB_TOKEN?.trim() ||
+    process.env.GITHUB_TOKEN?.trim() ||
+    process.env.GH_TOKEN?.trim();
+  if (!token) return "";
+
+  const repo =
+    process.env.ARCHITECTURE_REPO?.trim() || "kprompt/kprompt-architecture";
+  const [owner, name] = repo.split("/");
+  if (!owner || !name) return "";
+
+  const paths = (
+    process.env.ARCHITECTURE_PATHS?.trim() ||
+    "CONTENT-PLAN.md,PROVIDER-TASKS.md,DISTRIBUTION.md"
+  )
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const chunks: string[] = [];
+  for (const path of paths) {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${name}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`,
+        {
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${token}`,
+            "User-Agent": "coppergate-maintainer",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        },
+      );
+      if (!res.ok) continue;
+      const body = (await res.json()) as {
+        type?: string;
+        encoding?: string;
+        content?: string;
+      };
+      if (body.type !== "file" || !body.content) continue;
+      const text =
+        body.encoding === "base64"
+          ? Buffer.from(body.content.replace(/\n/g, ""), "base64").toString(
+              "utf8",
+            )
+          : body.content;
+      chunks.push(`# ${path}\n${text}`);
+    } catch {
+      /* ignore per-file errors */
+    }
+  }
+  return chunks.join("\n\n");
 }

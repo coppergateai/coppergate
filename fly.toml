@@ -11,7 +11,8 @@ primary_region = "iad"
   NODE_ENV = "production"
   GITHUB_DELIVERY_MODE = "http"
   SANDBOX_MODE = "local"
-  CONTENDER_HARNESS = "openhands"
+  # Prefer workspace BYOK / OPENAI_API_KEY. OpenHands scaffold stub is disabled.
+  # CONTENDER_HARNESS = "native_openai"
   APP_URL = "https://www.coppergate.ai"
 
 [processes]

@@ -1,12 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createLogger } from "@coppergate/telemetry";
-import {
-  FakeCodingAgent,
-  OpenHandsSandboxHarness,
-  harnessAsCodingAgent,
-  type CodingAgent,
-} from "@coppergate/agents";
+import { FakeCodingAgent, type CodingAgent } from "@coppergate/agents";
 import {
   approveBrief,
   approveTask,
@@ -198,11 +193,7 @@ async function runClosedLoop(
   const claimed = await claimRunById(db, run.id, "sig-e2e-worker", 60_000);
   assert.ok(claimed);
 
-  const agent =
-    input.agent ??
-    (input.provider === "sonar"
-      ? harnessAsCodingAgent(new OpenHandsSandboxHarness())
-      : new FakeCodingAgent());
+  const agent = input.agent ?? new FakeCodingAgent();
 
   const outcome = await executeClaimedRun(db, {
     run: claimed!,
@@ -278,7 +269,7 @@ describe("e2e signal closed loop", { skip: !url }, () => {
     await closeDb(db);
   });
 
-  it("Sonar → auto-arm → OpenHands sandbox harness → REVIEW_REQUIRED", async () => {
+  it("Sonar → auto-arm → FakeAgent → REVIEW_REQUIRED", async () => {
     const stamp = Date.now();
     const result = await runClosedLoop(db, {
       workspaceId,
@@ -296,6 +287,7 @@ describe("e2e signal closed loop", { skip: !url }, () => {
         urls: ["https://sonar.example/dashboard"],
         labels: ["sonar"],
       },
+      agent: new FakeCodingAgent(),
     });
     assert.ok(result.sandboxId.startsWith("local_"));
   });

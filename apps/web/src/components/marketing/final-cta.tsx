@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { IconArrow } from "./icons";
+import { MarketingLottie } from "./marketing-lottie";
 import styles from "./marketing.module.css";
 
 type Props = {
@@ -19,7 +20,17 @@ export function FinalCta({ signedInLogin = null }: Props) {
       aria-labelledby="final-title"
     >
       <div className={styles.finalInner}>
-        <p className={styles.sectionEyebrow}>Open source</p>
+        <div className={styles.finalHead}>
+          <div className={styles.sectionEyebrowRow}>
+            <p className={styles.sectionEyebrow}>Open source</p>
+          </div>
+          <MarketingLottie
+            src="/lottie/survivor-mark.json"
+            className={styles.lottieFinal}
+            label="Survivor mark"
+            loop
+          />
+        </div>
         <h2 id="final-title" className={styles.finalTitle}>
           Clone it. Arm the arena.
           <br />

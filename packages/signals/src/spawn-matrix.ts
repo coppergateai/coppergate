@@ -77,28 +77,28 @@ export const PROFILE_CATALOG: ProfileSeed[] = [
     key: "fixer",
     displayName: "Fixer",
     promptGuidance:
-      "Fix the reported bug or failure with minimal blast radius. Prefer tests that prove the fix.",
+      "Fix the reported bug or failure with focused blast radius and a regression test that proves the fix.",
     toolAllowlist: ["read", "edit", "test", "git"],
-    strategyDefault: "blitz",
-    maxSpendMicros: 80_000,
+    strategyDefault: "balanced",
+    maxSpendMicros: 500_000,
   },
   {
     key: "engineer",
     displayName: "Engineer",
     promptGuidance:
-      "Implement the feature or issue within scope and acceptance criteria. Keep diffs reviewable. For Go repos prefer go test ./... and small packages.",
+      "Ship the acceptance criteria as a user-visible product increment with tests and docs when needed. For Go prefer go test ./.... Refuse scaffold stubs, typos, and empty structure PRs.",
     toolAllowlist: ["read", "edit", "test", "git"],
     strategyDefault: "balanced",
-    maxSpendMicros: 120_000,
+    maxSpendMicros: 2_000_000,
   },
   {
     key: "proposer",
     displayName: "Proposer",
     promptGuidance:
-      "Propose the next smallest high-ROI improvement from the vision brief. Prefer bugs, CI, and docs over large features. Output a scoped task, not a rewrite.",
+      "Select the next product increment from the vision or architecture Open IDs (P-/W-/A-/S-). Prefer capabilities with tests over bugs/docs-only. Output a scoped ship task, not a rewrite or typo.",
     toolAllowlist: ["read", "git"],
-    strategyDefault: "blitz",
-    maxSpendMicros: 40_000,
+    strategyDefault: "balanced",
+    maxSpendMicros: 500_000,
   },
   {
     key: "reviewer",

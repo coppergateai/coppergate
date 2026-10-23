@@ -49,13 +49,12 @@ function parseHarnessEnv(): ContenderHarnessKind | null {
 }
 
 /**
- * Pilot default: BYOK/OpenAI when present; else OpenHands on http delivery.
+ * Live http prefers BYOK / env OpenAI. OpenHands stub is not a default.
  * Fake only for GITHUB_DELIVERY_MODE=fake / CI / explicit native_fake.
  */
 function resolveHarnessKind(): ContenderHarnessKind | null {
   const explicit = parseHarnessEnv();
   if (explicit) return explicit;
-  if (resolveDeliveryModeHint() === "http") return "openhands";
   return null;
 }
 
@@ -120,13 +119,14 @@ function resolveWorkerAgent(
       log.info("using ContenderHarness", {
         harnessKind: explicit,
         workspaceId,
+        stubAllowed: process.env.ALLOW_HARNESS_STUB === "1",
       });
       return harnessAsCodingAgent(
         createContenderHarness({ kind: explicit }),
       );
     }
 
-    // Prefer BYOK / env OpenAI before OpenHands default (plan Sprint 3).
+    // Prefer BYOK / env OpenAI — required for live http product work.
     if (!forceFakePath || explicit === "native_openai") {
       try {
         const resolved = await resolveByokForProfile(
@@ -193,10 +193,27 @@ function resolveWorkerAgent(
       return createCodingAgent({ forceFake: true });
     }
 
-    // Live http default without BYOK: OpenHands sandbox harness.
-    const kind = resolveHarnessKind() ?? "openhands";
-    log.info("using ContenderHarness", { harnessKind: kind, workspaceId });
-    return harnessAsCodingAgent(createContenderHarness({ kind }));
+    // Live http without BYOK: fail closed (no scaffold stub).
+    const kind = resolveHarnessKind();
+    if (kind) {
+      log.info("using ContenderHarness", { harnessKind: kind, workspaceId });
+      return harnessAsCodingAgent(createContenderHarness({ kind }));
+    }
+
+    log.error("no BYOK/OpenAI coding agent for live delivery", {
+      workspaceId,
+      hint: "Configure workspace LLM BYOK or OPENAI_API_KEY",
+    });
+    return {
+      async *run() {
+        yield {
+          kind: "error" as const,
+          message:
+            "BYOK required for live coding. OpenHands scaffold stub is disabled.",
+          payload: { code: "byok_required" },
+        };
+      },
+    };
   })();
 }
 

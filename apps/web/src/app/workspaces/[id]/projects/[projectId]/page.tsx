@@ -157,7 +157,7 @@ export default async function ProjectDetailPage({
         : row.project.stack === "node"
           ? "Node tip: one route or script change is enough for the smoke path."
           : row.project.stack !== "nextjs_ts"
-            ? "Best-effort agent on this stack — keep the first task tiny."
+            ? "Best-effort agent on this stack — keep the first task a concrete product slice."
             : null;
 
   return (

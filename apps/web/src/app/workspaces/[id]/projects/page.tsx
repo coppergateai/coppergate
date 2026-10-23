@@ -192,7 +192,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                     id: "brief",
                     title: "Approve brief → plan → task",
                     detail:
-                      "Keep the first task tiny so the first PR lands in one session. Then open the project Agents tab to arm the arena.",
+                      "Pick a concrete product increment so the first PR is reviewable and real. Then open Agents to arm the arena.",
                     done: false,
                   },
                 ]}
@@ -238,7 +238,7 @@ export default async function WorkspaceProjectsPage({ params }: PageProps) {
                     id: "brief",
                     title: "Approve brief → plan → task",
                     detail:
-                      "Keep the first task tiny so the first PR lands in one session. Then open the project Agents tab to arm the arena.",
+                      "Pick a concrete product increment so the first PR is reviewable and real. Then open Agents to arm the arena.",
                     done: false,
                   },
                 ]}

@@ -310,13 +310,22 @@ export {
   appendUsageEvent,
   assertSufficientBudget,
   getProjectSpendSummary,
+  getWorkspaceBudgetRow,
+  getWorkspaceSpendSummary,
   releaseEstimateForTask,
   reserveEstimateForTask,
   rollMonthlyBudgetIfDue,
   setProjectBudget,
+  setWorkspaceBudget,
   shouldRollMonthlyPeriod,
   type ProjectSpendSummary,
+  type WorkspaceSpendSummary,
 } from "./budgets.js";
+export {
+  parseArchitectureOpenTasks,
+  pickNextArchitectureTask,
+  type ArchitectureOpenTask,
+} from "./architecture-backlog.js";
 export {
   DEFAULT_MAINTAINER_POLICY,
   DEFAULT_MONTHLY_BUDGET_MICROS,

@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { AgentPolicyError } from "./fake.js";
 import { buildFakeCompletion } from "./fake.js";
+import { isStubFileContent } from "./stub-detect.js";
 import type {
   AgentEvent,
   AgentRunInput,
@@ -16,6 +17,8 @@ export type OpenAiCompatibleConfig = {
   priceMicrosPer1kTokens?: number;
   fetchImpl?: typeof fetch;
 };
+
+type ParsedFile = { path: string; content: string };
 
 /**
  * Single-provider CodingAgent (D6 / TASK023) behind OpenAI-compatible Chat Completions.
@@ -115,28 +118,62 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       return;
     }
 
-    const relPath = resolveWritePath(input.allowedPaths);
-    const workdir = input.sandboxWorkdir?.trim();
-    if (workdir) {
-      const absPath = join(workdir, relPath);
-      await mkdir(dirname(absPath), { recursive: true });
-      const body = materializeModelPatch(relPath, input, result.content);
-      await writeFile(absPath, body, "utf8");
+    const files = parseFileBlocks(result.content);
+    if (files.length === 0) {
+      yield {
+        kind: "error",
+        message:
+          "Model did not return FILE blocks. Refusing stub/scaffold fallback.",
+        payload: { code: "no_file_blocks" },
+      };
+      return;
     }
 
-    yield {
-      kind: "file",
-      message: workdir ? `wrote ${relPath}` : "Proposed change",
-      payload: {
-        path: relPath,
-        action: workdir ? "write" : "modify",
-        summary: result.content.slice(0, 240),
-        sandbox: Boolean(workdir),
-      },
-    };
+    for (const f of files) {
+      if (isStubFileContent(f.content)) {
+        yield {
+          kind: "error",
+          message: `Stub/scaffold content refused in ${f.path}`,
+          payload: { code: "stub_delivery", path: f.path },
+        };
+        return;
+      }
+    }
+
+    const workdir = input.sandboxWorkdir?.trim();
+    if (workdir) {
+      for (const f of files) {
+        const absPath = join(workdir, f.path);
+        await mkdir(dirname(absPath), { recursive: true });
+        await writeFile(absPath, f.content, "utf8");
+        yield {
+          kind: "file",
+          message: `wrote ${f.path}`,
+          payload: {
+            path: f.path,
+            action: "write",
+            summary: f.content.slice(0, 240),
+            sandbox: true,
+          },
+        };
+      }
+    } else {
+      for (const f of files) {
+        yield {
+          kind: "file",
+          message: `Proposed ${f.path}`,
+          payload: {
+            path: f.path,
+            action: "modify",
+            summary: f.content.slice(0, 240),
+            sandbox: false,
+          },
+        };
+      }
+    }
 
     const completion = buildFakeCompletion(input, costMicros);
-    completion.filesChanged = [relPath];
+    completion.filesChanged = files.map((f) => f.path);
 
     yield {
       kind: "completion",
@@ -160,8 +197,18 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
         messages: [
           {
             role: "system",
-            content:
-              "You are a careful coding agent. Propose a minimal file change plan. Never ask for secrets. Output plain text.",
+            content: [
+              "You are a senior product engineer shipping real capabilities.",
+              "Implement acceptance criteria with tests when applicable.",
+              "Prefer user-visible product increments over docs-only or typos.",
+              "Never emit coppergateSignalFix, scaffold stubs, or placeholder Signal fix pages.",
+              "Output one or more FILE blocks exactly as:",
+              "### FILE: relative/path.ext",
+              "```",
+              "full file contents",
+              "```",
+              "No secrets. Stay within allowed paths.",
+            ].join(" "),
           },
           { role: "user", content: userContent },
         ],
@@ -177,7 +224,11 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
 
     const json = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
-      usage?: { total_tokens?: number; prompt_tokens?: number; completion_tokens?: number };
+      usage?: {
+        total_tokens?: number;
+        prompt_tokens?: number;
+        completion_tokens?: number;
+      };
     };
     const content = json.choices?.[0]?.message?.content?.trim() || "(empty)";
     const usageTotal = json.usage?.total_tokens;
@@ -217,6 +268,9 @@ function buildPrompt(input: AgentRunInput): string {
     if (input.architectureContext?.trim()) {
       lines.push(`Extra context: ${input.architectureContext.trim()}`);
     }
+    if (input.promptGuidance?.trim()) {
+      lines.push(`Guidance: ${input.promptGuidance.trim()}`);
+    }
     lines.push(
       "Sections: Summary, Findings (bullets), Risks, Verdict (COMMENT only).",
     );
@@ -233,63 +287,31 @@ function buildPrompt(input: AgentRunInput): string {
   if (input.strategy) {
     lines.push(`Strategy: ${input.strategy}`);
   }
+  if (input.promptGuidance?.trim()) {
+    lines.push(`Profile guidance: ${input.promptGuidance.trim()}`);
+  }
   if (input.architectureContext?.trim()) {
     lines.push(`Context: ${input.architectureContext.trim()}`);
   }
   lines.push(
-    "Propose the smallest change that satisfies acceptance criteria.",
+    "Ship the acceptance criteria with a real product-quality change and tests when needed.",
+    "Prefer user-visible capability over docs-only or typo edits.",
+    "Refuse scaffold/empty structure and timestamp dogfood.",
+    "Respond with ### FILE blocks containing full file contents.",
   );
   return lines.join("\n");
 }
 
-function resolveWritePath(allowedPaths: string[]): string {
-  const first = allowedPaths[0]?.trim();
-  if (!first || first === "**/*" || first.includes("*")) {
-    return "app/page.tsx";
+/** Parse ### FILE: path ... fenced bodies from model output. */
+export function parseFileBlocks(text: string): ParsedFile[] {
+  const files: ParsedFile[] = [];
+  const re =
+    /###\s*FILE:\s*([^\n]+)\n```(?:[\w.-]*)?\n([\s\S]*?)```/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const path = m[1]!.trim().replace(/^\.\//, "");
+    const content = m[2]!.replace(/\s+$/, "") + "\n";
+    if (path && content.trim()) files.push({ path, content });
   }
-  return first.replace(/^\.\//, "");
-}
-
-/** Persist a minimal, reviewable file from model text into the sandbox tree. */
-function materializeModelPatch(
-  relPath: string,
-  input: AgentRunInput,
-  modelText: string,
-): string {
-  const goalOneLine = input.goal.slice(0, 160).replace(/\n/g, " ");
-  const excerpt = modelText.slice(0, 1200).replace(/\r/g, "");
-  if (relPath.endsWith(".tsx") || relPath.endsWith(".jsx")) {
-    return [
-      `/**`,
-      ` * Coppergate BYOK sandbox fix`,
-      ` * run: ${input.runId}`,
-      ` * goal: ${goalOneLine}`,
-      ` */`,
-      `export default function Page() {`,
-      `  return (`,
-      `    <main data-coppergate-run="${input.runId}">`,
-      `      <h1>Signal fix</h1>`,
-      `      <p>${goalOneLine.replace(/"/g, "'")}</p>`,
-      `      <pre>${excerpt.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`,
-      `    </main>`,
-      `  );`,
-      `}`,
-      ``,
-    ].join("\n");
-  }
-  return [
-    `/**`,
-    ` * Coppergate BYOK sandbox fix`,
-    ` * run: ${input.runId}`,
-    ` * goal: ${goalOneLine}`,
-    ` */`,
-    `export function coppergateSignalFix() {`,
-    `  return {`,
-    `    runId: ${JSON.stringify(input.runId)},`,
-    `    ok: true as const,`,
-    `    note: ${JSON.stringify(excerpt.slice(0, 400))},`,
-    `  };`,
-    `}`,
-    ``,
-  ].join("\n");
+  return files;
 }

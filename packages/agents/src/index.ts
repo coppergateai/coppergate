@@ -54,3 +54,10 @@ export {
   harnessCapability,
   type HarnessCapability,
 } from "./capability-matrix.js";
+export {
+  harnessStubAllowed,
+  isStubFileContent,
+  isStubOrToyDelivery,
+  isToyPrTitle,
+} from "./stub-detect.js";
+export { parseFileBlocks } from "./openai-compatible.js";

@@ -171,16 +171,18 @@ try {
     : null;
   let title =
     process.env.ISSUE_TITLE?.trim() ||
-    `Dogfood: tiny README typo ${stamp}`;
+    `feat(dogfood): ship a scoped product increment ${stamp}`;
   let body =
     process.env.ISSUE_BODY?.trim() ||
     [
-      "Coppergate dogfood — primary-only tiny change.",
+      "Coppergate dogfood — primary-repo product increment (not typo/scaffold).",
       "",
       "Acceptance:",
-      "- Touch a small docs/README line only",
+      "- Implement a user-visible or developer-visible capability on the primary repo",
+      "- Include a test or validation that covers the change",
+      "- PR title describes the capability (never Scaffold / tiny typo)",
       "- Open a PR that Closes this issue",
-      "- Do not edit secondary repos",
+      "- Do not edit secondary repos unless policy allows",
     ].join("\n");
 
   await setProjectAutonomyLevel(db, {

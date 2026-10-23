@@ -1,0 +1,19 @@
+{
+  "name": "@coppergate/e2e-hosted",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "login": "tsx scripts/login.ts",
+    "discover": "tsx scripts/discover-project.ts",
+    "test": "playwright test",
+    "check": "tsx scripts/check.ts",
+    "check:pw": "playwright test --reporter=list",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.8.3"
+  }
+}

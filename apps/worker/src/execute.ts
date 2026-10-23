@@ -2,6 +2,7 @@ import {
   FakeCodingAgent,
   isContenderStrategy,
   isFakeCompletionPayload,
+  isStubOrToyDelivery,
   runStackValidation,
   strategyGuidance,
   type CodingAgent,
@@ -19,6 +20,7 @@ import {
   createArtifact,
   effectivePlan,
   getContenderById,
+  getEffectiveAgentProfile,
   getProjectForWorkspace,
   getSignalEventForTask,
   getTaskById,
@@ -225,6 +227,7 @@ export async function executeClaimedRun(
 
   let strategy = "balanced";
   let strategyContext: string | undefined;
+  let promptGuidance: string | undefined;
   if (run.contenderId) {
     const contender = await getContenderById(db, {
       workspaceId: run.workspaceId,
@@ -234,7 +237,39 @@ export async function executeClaimedRun(
       strategy = contender.strategy;
       strategyContext = strategyGuidance(contender.strategy);
     }
+    const profileKey =
+      contender?.profileKey?.trim() || run.agentProfileKey?.trim();
+    if (profileKey) {
+      try {
+        const profile = await getEffectiveAgentProfile(
+          db,
+          run.workspaceId,
+          profileKey,
+        );
+        if (profile?.promptGuidance?.trim()) {
+          promptGuidance = profile.promptGuidance.trim();
+        }
+      } catch {
+        /* profile optional */
+      }
+    }
   }
+  // Vision / task acceptance always travel with architecture context
+  strategyContext = mergeArchitectureContext(
+    strategyContext,
+    [
+      task.goal ? `Task goal: ${task.goal.slice(0, 500)}` : "",
+      task.scope ? `Task scope: ${task.scope.slice(0, 400)}` : "",
+      (() => {
+        const ac = parseJsonArray(task.acceptanceCriteria);
+        return ac.length
+          ? `Acceptance: ${ac.slice(0, 6).join("; ").slice(0, 600)}`
+          : "";
+      })(),
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
 
   const sandboxMode = resolveSandboxMode();
   const sandboxManager =
@@ -404,6 +439,7 @@ export async function executeClaimedRun(
         toolAllowlist: parseJsonArray(run.toolAllowlist),
         spendCapMicros: run.spendCapMicros,
         strategy,
+        promptGuidance,
         architectureContext: strategyContext,
         sandboxWorkdir: isPrReview ? undefined : sandbox?.workdir,
         sandboxId: sandbox?.id,
@@ -458,6 +494,32 @@ export async function executeClaimedRun(
           filesChanged: completion.filesChanged,
           runId: run.id,
         });
+        const toy = isStubOrToyDelivery({
+          title: task.title,
+          filesChanged: completion.filesChanged,
+          fileBodies: deliveryBundle.files,
+        });
+        // CI / FakeCodingAgent paths still use fixture diffs — only enforce on live http.
+        if (toy.toy && deliveryModeHint === "http" && !(agent instanceof FakeCodingAgent)) {
+          await appendRunEvent(db, {
+            runId: run.id,
+            workspaceId: run.workspaceId,
+            kind: "error",
+            payload: {
+              message: `Stub/toy delivery refused: ${toy.reason}`,
+              code: "stub_delivery",
+            },
+          });
+          await markRunFailed(db, {
+            runId: run.id,
+            workerId,
+            errorCode: "stub_delivery",
+            errorMessage: (toy.reason ?? "stub_delivery").slice(0, 500),
+          });
+          await safeTaskTransition(db, task, "FAILED", workerId, log);
+          await maybeResolveTournamentAfterRun(db, run, workerId, log);
+          return "failed";
+        }
         log.info("delivery files prepared", {
           runId: run.id,
           count: deliveryBundle.files.length,
