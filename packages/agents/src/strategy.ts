@@ -28,8 +28,8 @@ export function strategyGuidance(strategy: ContenderStrategy): string {
     case "blitz":
       return [
         "Strategy: blitz.",
-        "Prioritize speed and low spend.",
-        "Ship a minimal correct change; avoid broad refactors and optional polish.",
+        "Ship a complete acceptance slice quickly with tests for the critical path.",
+        "Do not substitute typos, scaffold stubs, or docs-only placeholders for the feature.",
       ].join(" ");
     case "fortress":
       return [
@@ -41,7 +41,8 @@ export function strategyGuidance(strategy: ContenderStrategy): string {
     default:
       return [
         "Strategy: balanced.",
-        "Trade speed and thoroughness evenly under the spend cap.",
+        "Ship a user-visible product increment with tests and docs as needed under the spend cap.",
+        "Reject scaffold/typo-only diffs.",
       ].join(" ");
   }
 }

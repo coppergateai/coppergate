@@ -2,7 +2,7 @@
 /**
  * Kprompt dogfood: flip primary project into fully autonomous maintainer mode.
  *
- * Default envelope: $5/mo (5_000_000 micros). L2 + auto-merge + self-improve.
+ * Default envelope: $50/mo (DEFAULT_MONTHLY_BUDGET_MICROS). L2 + auto-merge + self-improve.
  *
  * Usage:
  *   DATABASE_URL=… pnpm --filter @coppergate/db exec node --import tsx \

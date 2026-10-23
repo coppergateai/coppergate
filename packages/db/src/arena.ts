@@ -32,7 +32,8 @@ import {
 export const MAX_TOURNAMENT_FANOUT = 3;
 
 /** Default spend exponent for efficiency payoff — GAME_THEORY.md */
-export const DEFAULT_PAYOFF_ALPHA = 0.5;
+/** Lower α reduces thrift bias so meaningful fitness can beat tiny cheap diffs. */
+export const DEFAULT_PAYOFF_ALPHA = 0.25;
 
 export const CONTENDER_STRATEGIES = ["balanced", "blitz", "fortress"] as const;
 export type ContenderStrategy = (typeof CONTENDER_STRATEGIES)[number];

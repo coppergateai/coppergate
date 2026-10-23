@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HeroArenaStory } from "./hero-arena-story";
 import { IconArrow } from "./icons";
+import { MarketingLottie } from "./marketing-lottie";
 import styles from "./marketing.module.css";
 
 type Props = {
@@ -14,7 +15,14 @@ export function HeroSection({ signedIn }: Props) {
     <section className={styles.hero} aria-labelledby="hero-title">
       <div className={styles.heroInner}>
         <div className={`${styles.heroCopy} cg-rise`}>
-          <p className={styles.eyebrow}>Budget in. Selection out.</p>
+          <div className={styles.eyebrowRow}>
+            <MarketingLottie
+              src="/lottie/arena-pulse.json"
+              className={styles.lottieEyebrow}
+              label="Arena pulse"
+            />
+            <p className={styles.eyebrow}>Budget in. Selection out.</p>
+          </div>
           <h1 id="hero-title" className={styles.headline}>
             Set a budget. Agents war.
             <br />

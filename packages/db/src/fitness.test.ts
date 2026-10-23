@@ -30,6 +30,8 @@ describe("rules critic (pure)", () => {
       hasDiffEvidence: true,
       blockingFailure: false,
       sonarPassed: true,
+      meaningfulDiff: true,
+      testsTouched: true,
     });
     const bad = scoreWithRulesCritic({
       ciPassed: false,
@@ -46,6 +48,20 @@ describe("rules critic (pure)", () => {
     assert.equal(bad.breakdown.sonar, 0);
     assert.ok("coverage" in good.breakdown);
     assert.ok("e2e" in good.breakdown);
+    assert.ok("meaningful" in good.breakdown);
+  });
+
+  it("disqualifies stub/toy deliveries", () => {
+    const toy = scoreWithRulesCritic({
+      ciPassed: true,
+      validationPassed: true,
+      hasPr: true,
+      hasDiffEvidence: true,
+      blockingFailure: false,
+      stubOrToy: true,
+    });
+    assert.equal(toy.score, 0);
+    assert.ok(toy.reasons.includes("stub_or_toy_disqualified"));
   });
 });
 

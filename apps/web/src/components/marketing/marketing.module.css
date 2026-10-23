@@ -412,7 +412,15 @@
   height: 1.5px;
   margin: 0 auto;
   background: var(--paper);
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.menuBtnOpen .menuBar:first-child {
+  transform: translateY(3.25px) rotate(45deg);
+}
+
+.menuBtnOpen .menuBar:last-child {
+  transform: translateY(-3.25px) rotate(-45deg);
 }
 
 .drawer {
@@ -466,8 +474,92 @@
 }
 
 @media (max-width: 959px) {
-  .navActions > .btnPrimary {
+  /* navCenter is display:none — without this, grid columns collapse and
+     navActions lands in the middle 1fr track (hamburger looks centered). */
+  .headerInner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .brandLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+
+  .navCenter {
     display: none;
+  }
+
+  .navActions {
+    flex-shrink: 0;
+    margin-left: auto;
+    gap: 0.45rem;
+  }
+
+  .navActions > .btnPrimary,
+  .navActions > .themeToggle {
+    display: none;
+  }
+
+  .brandImg {
+    height: 1.25rem;
+  }
+
+  .menuBtn {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .drawer {
+    padding-left: max(var(--gutter), env(safe-area-inset-left));
+    padding-right: max(var(--gutter), env(safe-area-inset-right));
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+    max-height: min(70vh, calc(100dvh - 4.5rem));
+    overflow-y: auto;
+  }
+
+  .announceInner {
+    gap: 0.65rem;
+  }
+
+  .announceText {
+    font-size: 0.75rem;
+  }
+
+  .ctaRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ctaRow .btnHeroPrimary,
+  .ctaRow .btnSecondary {
+    width: 100%;
+  }
+
+  .finalActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .finalActions .btnHeroPrimary,
+  .finalActions .btnSecondary {
+    width: 100%;
+  }
+
+  .finalInner {
+    padding: 1.5rem 1.15rem;
+  }
+
+  .lottieFinal {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .hero {
+    padding-top: 1.35rem;
   }
 }
 
@@ -504,6 +596,74 @@
 
 .heroCopy {
   max-width: 32rem;
+}
+
+.eyebrowRow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.85rem;
+}
+
+.eyebrowRow .eyebrow {
+  margin: 0;
+}
+
+.lottieSlot {
+  display: inline-block;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.lottieSlot canvas,
+.lottieSlot svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.lottieEyebrow {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.lottieSection {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.lottieFinal {
+  width: 5rem;
+  height: 5rem;
+}
+
+.lottieStatic {
+  border-radius: 50%;
+  border: 1.5px solid var(--copper-border);
+  background: radial-gradient(circle at 50% 50%, var(--copper-dim), transparent 70%);
+}
+
+.sectionEyebrowRow {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 0.75rem;
+}
+
+.sectionEyebrowRow .sectionEyebrow {
+  margin: 0;
+}
+
+.finalHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.finalHead .sectionEyebrowRow {
+  margin-bottom: 0;
 }
 
 .eyebrow {

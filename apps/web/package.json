@@ -23,6 +23,7 @@
     "@coppergate/scm": "workspace:*",
     "@coppergate/signals": "workspace:*",
     "@coppergate/telemetry": "workspace:*",
+    "@lottiefiles/dotlottie-react": "^0.20.0",
     "@next/third-parties": "^15.3.2",
     "geist": "^1.7.2",
     "next": "^15.3.2",

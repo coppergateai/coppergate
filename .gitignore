@@ -35,3 +35,12 @@ temp/
 
 # Phase 0 outreach outbox (regenerate via pnpm ops:outreach-pack)
 docs/ops/_generated/
+
+# Hosted Playwright e2e (auth cookies + local reports)
+e2e/.auth/*
+!e2e/.auth/.gitkeep
+e2e/.env
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/node_modules/

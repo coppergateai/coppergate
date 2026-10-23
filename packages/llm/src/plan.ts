@@ -38,52 +38,66 @@ export type BriefPlanInput = {
   acceptanceCriteria: string[];
 };
 
-const COMPLEXITY_MICROS = { S: 50_000, M: 150_000, L: 400_000 } as const;
+const COMPLEXITY_MICROS = { S: 500_000, M: 2_000_000, L: 5_000_000 } as const;
 
 export function generatePlanDraft(brief: BriefPlanInput): PlanMilestoneDraft[] {
   const title = brief.title.trim() || "Product";
   const criteria =
     brief.acceptanceCriteria.length > 0
       ? brief.acceptanceCriteria
-      : [`Deliver core flow for ${title}`];
+      : [`Deliver a user-visible capability for ${title}`];
 
   const m1Tasks: PlanTaskDraft[] = [
     {
       key: "t1",
-      title: "Scaffold project structure",
-      goal: `Set up Next.js TypeScript baseline for ${title}`,
-      scope: "App router layout, env stubs, health route; no business logic yet",
-      allowedPaths: ["app/**", "package.json", "tsconfig.json"],
+      title: `Ship next product increment — ${title}`.slice(0, 120),
+      goal: `Enable ${brief.targetUser || "users"} to complete: ${criteria[0]}`,
+      scope:
+        brief.scope ||
+        `Concrete product slice for ${title}; no scaffold or empty structure`,
+      allowedPaths: ["app/**", "src/**", "components/**", "pkg/**", "internal/**"],
       acceptanceCriteria: [
-        "App builds with `next build`",
-        "Health endpoint responds",
+        ...criteria.slice(0, 3),
+        "PR title describes the capability (not Scaffold / typo)",
       ],
-      estimateMicros: COMPLEXITY_MICROS.S,
-      estimateComplexity: "S",
+      estimateMicros: COMPLEXITY_MICROS.M,
+      estimateComplexity: "M",
       dependsOn: [],
       priority: 10,
     },
     {
       key: "t2",
-      title: "Implement primary user flow",
-      goal: `Enable ${brief.targetUser || "users"} to complete: ${criteria[0]}`,
-      scope: brief.scope || `Core MVP scope for ${title}`,
-      allowedPaths: ["app/**", "src/**", "components/**"],
-      acceptanceCriteria: criteria.slice(0, 3),
-      estimateMicros: COMPLEXITY_MICROS.M,
-      estimateComplexity: "M",
+      title: "Harden with tests and empty/error states",
+      goal: "Protect the increment with automated checks and resilient UX",
+      scope: "Tests for the happy path; loading/error UI where applicable",
+      allowedPaths: [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*_test.go",
+        "app/**",
+        "components/**",
+      ],
+      acceptanceCriteria: [
+        "At least one automated test covers the primary flow",
+        `Non-goals remain unimplemented: ${brief.nonGoals || "n/a"}`,
+      ],
+      estimateMicros: COMPLEXITY_MICROS.S,
+      estimateComplexity: "S",
       dependsOn: ["t1"],
       priority: 20,
     },
+  ];
+
+  const m2Tasks: PlanTaskDraft[] = [
     {
       key: "t3",
-      title: "Wire validation and empty states",
-      goal: "Make the happy path resilient with clear empty/error states",
-      scope: "Form validation, loading/error UI; exclude items in non-goals",
-      allowedPaths: ["app/**", "components/**"],
+      title: "Document the shipped capability",
+      goal: "User-facing docs / CHANGELOG match the shipped behavior",
+      scope: "Docs and release notes for the increment above",
+      allowedPaths: ["docs/**", "CHANGELOG*", "README.md", "content/**"],
       acceptanceCriteria: [
-        "Invalid input shows user-visible errors",
-        `Non-goals remain unimplemented: ${brief.nonGoals || "n/a"}`,
+        "Docs describe the shipped capability",
+        "No unrelated runtime behavior changes",
       ],
       estimateMicros: COMPLEXITY_MICROS.S,
       estimateComplexity: "S",
@@ -92,33 +106,16 @@ export function generatePlanDraft(brief: BriefPlanInput): PlanMilestoneDraft[] {
     },
   ];
 
-  const m2Tasks: PlanTaskDraft[] = [
-    {
-      key: "t4",
-      title: "Add smoke tests for core flow",
-      goal: "Protect the primary acceptance criteria with automated checks",
-      scope: "Unit or route-level tests for the happy path",
-      allowedPaths: ["**/*.test.ts", "**/*.test.tsx", "app/**"],
-      acceptanceCriteria: [
-        "At least one automated test covers the primary flow",
-        "Tests pass locally",
-      ],
-      estimateMicros: COMPLEXITY_MICROS.S,
-      estimateComplexity: "S",
-      dependsOn: ["t3"],
-      priority: 40,
-    },
-  ];
-
   return [
     {
-      title: `MVP — ${title}`,
-      description: brief.problem.slice(0, 400) || `First milestone for ${title}`,
+      title: `Ship — ${title}`,
+      description:
+        brief.problem.slice(0, 400) || `First product milestone for ${title}`,
       tasks: m1Tasks,
     },
     {
-      title: "Hardening",
-      description: "Tests and polish before review",
+      title: "Docs & release",
+      description: "Close the loop with documentation after the capability ships",
       tasks: m2Tasks,
     },
   ];
@@ -197,7 +194,7 @@ export async function generatePlanDraftAsync(
   try {
     const result = await chatCompletionJson(config, {
       system:
-        "You are Coppergate's planner. Return strict JSON: { milestones: [{ title, description, tasks: [{ key, title, goal, scope, allowedPaths, acceptanceCriteria, estimateComplexity (S|M|L), dependsOn, priority }] }] }. 1-2 milestones, 2-5 tasks total. Paths must be Next.js-friendly. No markdown.",
+        "You are Coppergate's planner. Return strict JSON: { milestones: [{ title, description, tasks: [{ key, title, goal, scope, allowedPaths, acceptanceCriteria, estimateComplexity (S|M|L), dependsOn, priority }] }] }. 1-2 milestones, 2-5 tasks total. Prefer M/L product increments with tests. Never emit Scaffold, empty structure, or typo tasks. No markdown.",
       user: JSON.stringify(brief),
     });
     const parsed = parseJsonObject(result.content);

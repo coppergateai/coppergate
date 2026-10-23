@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import {
   auditEvents,
@@ -24,11 +24,29 @@ export type ProjectSpendSummary = {
   projectId: string;
   workspaceId: string;
   capMicros: number;
+  /** Spend used for enforcement (workspace pool total when pooled). */
   spentMicros: number;
   reservedMicros: number;
   availableMicros: number;
   currency: string;
   budgetStatus: string;
+  /** true when a workspace-level (projectId null) budget is active. */
+  pooled?: boolean;
+  /** This project's own period spend (informational when pooled). */
+  projectSpentMicros?: number;
+};
+
+export type WorkspaceSpendSummary = {
+  workspaceId: string;
+  capMicros: number;
+  spentMicros: number;
+  reservedMicros: number;
+  availableMicros: number;
+  currency: string;
+  budgetStatus: string;
+  period: string;
+  periodStartedAt: Date | null;
+  budgetId: string;
 };
 
 type DbLike = Pick<Database, "insert" | "update" | "select">;
@@ -38,6 +56,109 @@ const SPENT_KINDS: UsageKind[] = [
   "sandbox_seconds",
   "adjustment",
 ];
+
+export async function setWorkspaceBudget(
+  db: Database,
+  input: {
+    workspaceId: string;
+    capMicros: number;
+    softAlertMicros?: number | null;
+    actor: string;
+    status?: "active" | "paused";
+    period?: "lifetime" | "monthly";
+    /** When true (default), pause all project-scoped budgets in the workspace. */
+    pauseProjectBudgets?: boolean;
+  },
+): Promise<Budget> {
+  if (!Number.isFinite(input.capMicros) || input.capMicros < 0) {
+    throw new BudgetError("invalid", "capMicros must be a non-negative number");
+  }
+
+  return db.transaction(async (tx) => {
+    const now = new Date();
+    const period = input.period ?? "monthly";
+    const [existing] = await tx
+      .select()
+      .from(budgets)
+      .where(
+        and(
+          eq(budgets.workspaceId, input.workspaceId),
+          isNull(budgets.projectId),
+        ),
+      )
+      .limit(1);
+
+    let budget: Budget | undefined;
+    if (existing) {
+      [budget] = await tx
+        .update(budgets)
+        .set({
+          capMicros: input.capMicros,
+          softAlertMicros:
+            input.softAlertMicros === undefined
+              ? existing.softAlertMicros
+              : input.softAlertMicros,
+          status: input.status ?? existing.status,
+          period,
+          periodStartedAt:
+            period === "monthly"
+              ? (existing.periodStartedAt ?? now)
+              : null,
+          updatedAt: now,
+        })
+        .where(eq(budgets.id, existing.id))
+        .returning();
+    } else {
+      [budget] = await tx
+        .insert(budgets)
+        .values({
+          id: crypto.randomUUID(),
+          workspaceId: input.workspaceId,
+          projectId: null,
+          capMicros: input.capMicros,
+          softAlertMicros: input.softAlertMicros ?? null,
+          currency: "USD",
+          status: input.status ?? "active",
+          period,
+          periodStartedAt: period === "monthly" ? now : null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning();
+    }
+
+    if (!budget) throw new Error("Failed to upsert workspace budget");
+
+    if (input.pauseProjectBudgets !== false) {
+      await tx
+        .update(budgets)
+        .set({ status: "paused", updatedAt: now })
+        .where(
+          and(
+            eq(budgets.workspaceId, input.workspaceId),
+            sql`${budgets.projectId} is not null`,
+          ),
+        );
+    }
+
+    await tx.insert(auditEvents).values({
+      id: crypto.randomUUID(),
+      workspaceId: input.workspaceId,
+      actor: input.actor,
+      action: "budget.set_workspace",
+      targetType: "workspace",
+      targetId: input.workspaceId,
+      meta: JSON.stringify({
+        capMicros: input.capMicros,
+        period,
+        pauseProjectBudgets: input.pauseProjectBudgets !== false,
+      }),
+      createdAt: now,
+    });
+
+    return budget;
+  });
+}
 
 export async function setProjectBudget(
   db: Database,
@@ -166,6 +287,42 @@ async function sumUsage(
   return Number(row?.total ?? 0);
 }
 
+async function sumWorkspaceUsage(
+  db: DbLike,
+  workspaceId: string,
+  kinds: UsageKind[],
+  since?: Date | null,
+): Promise<number> {
+  if (!kinds.length) return 0;
+  const [row] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${usageEvents.costMicros}), 0)`,
+    })
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.workspaceId, workspaceId),
+        inArray(usageEvents.kind, kinds),
+        since ? gte(usageEvents.createdAt, since) : undefined,
+      ),
+    );
+  return Number(row?.total ?? 0);
+}
+
+export async function getWorkspaceBudgetRow(
+  db: DbLike,
+  workspaceId: string,
+): Promise<Budget | null> {
+  const [row] = await db
+    .select()
+    .from(budgets)
+    .where(
+      and(eq(budgets.workspaceId, workspaceId), isNull(budgets.projectId)),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
 /** True when monthly period started ≥ ~30 days ago (or calendar month crossed). */
 export function shouldRollMonthlyPeriod(
   periodStartedAt: Date | null | undefined,
@@ -180,21 +337,19 @@ export function shouldRollMonthlyPeriod(
   );
 }
 
-/**
- * Roll monthly budget window: advance periodStartedAt and un-pause if soft-paused by prior period.
- * Does not delete ledger rows — spend is scoped by periodStartedAt in getProjectSpendSummary.
- */
-export async function rollMonthlyBudgetIfDue(
+async function rollBudgetRow(
   db: Database,
-  input: { workspaceId: string; projectId: string; actor: string },
-): Promise<{ rolled: boolean; budget: Budget | null }> {
-  const [budget] = await db
-    .select()
-    .from(budgets)
-    .where(eq(budgets.projectId, input.projectId))
-    .limit(1);
-  if (!budget || budget.period !== "monthly") {
-    return { rolled: false, budget: budget ?? null };
+  input: {
+    workspaceId: string;
+    budget: Budget;
+    actor: string;
+    targetType: "workspace" | "project";
+    targetId: string;
+  },
+): Promise<{ rolled: boolean; budget: Budget }> {
+  const { budget } = input;
+  if (budget.period !== "monthly") {
+    return { rolled: false, budget };
   }
   if (!shouldRollMonthlyPeriod(budget.periodStartedAt)) {
     return { rolled: false, budget };
@@ -214,8 +369,8 @@ export async function rollMonthlyBudgetIfDue(
     workspaceId: input.workspaceId,
     actor: input.actor,
     action: "budget.period_roll",
-    targetType: "project",
-    targetId: input.projectId,
+    targetType: input.targetType,
+    targetId: input.targetId,
     meta: JSON.stringify({
       previousPeriodStartedAt: budget.periodStartedAt?.toISOString() ?? null,
       periodStartedAt: now.toISOString(),
@@ -223,6 +378,79 @@ export async function rollMonthlyBudgetIfDue(
     createdAt: now,
   });
   return { rolled: true, budget: updated ?? budget };
+}
+
+/**
+ * Roll monthly budget window: workspace pool first, else project budget.
+ */
+export async function rollMonthlyBudgetIfDue(
+  db: Database,
+  input: { workspaceId: string; projectId: string; actor: string },
+): Promise<{ rolled: boolean; budget: Budget | null }> {
+  const wsBudget = await getWorkspaceBudgetRow(db, input.workspaceId);
+  if (wsBudget) {
+    return rollBudgetRow(db, {
+      workspaceId: input.workspaceId,
+      budget: wsBudget,
+      actor: input.actor,
+      targetType: "workspace",
+      targetId: input.workspaceId,
+    });
+  }
+
+  const [budget] = await db
+    .select()
+    .from(budgets)
+    .where(eq(budgets.projectId, input.projectId))
+    .limit(1);
+  if (!budget) {
+    return { rolled: false, budget: null };
+  }
+  return rollBudgetRow(db, {
+    workspaceId: input.workspaceId,
+    budget,
+    actor: input.actor,
+    targetType: "project",
+    targetId: input.projectId,
+  });
+}
+
+export async function getWorkspaceSpendSummary(
+  db: Database,
+  workspaceId: string,
+): Promise<WorkspaceSpendSummary | null> {
+  const budget = await getWorkspaceBudgetRow(db, workspaceId);
+  if (!budget) return null;
+
+  const since =
+    budget.period === "monthly" ? (budget.periodStartedAt ?? null) : null;
+  const spentMicros = await sumWorkspaceUsage(
+    db,
+    workspaceId,
+    SPENT_KINDS,
+    since,
+  );
+  const reserved =
+    (await sumWorkspaceUsage(db, workspaceId, ["estimate_reserve"], since)) -
+    (await sumWorkspaceUsage(db, workspaceId, ["estimate_release"], since));
+  const reservedMicros = Math.max(0, reserved);
+  const availableMicros = Math.max(
+    0,
+    budget.capMicros - spentMicros - reservedMicros,
+  );
+
+  return {
+    workspaceId,
+    capMicros: budget.capMicros,
+    spentMicros,
+    reservedMicros,
+    availableMicros,
+    currency: budget.currency,
+    budgetStatus: budget.status,
+    period: budget.period,
+    periodStartedAt: budget.periodStartedAt,
+    budgetId: budget.id,
+  };
 }
 
 export async function getProjectSpendSummary(
@@ -242,6 +470,35 @@ export async function getProjectSpendSummary(
     throw new BudgetError("not_found", "Project not found");
   }
 
+  const wsSummary = await getWorkspaceSpendSummary(db, workspaceId);
+  if (wsSummary) {
+    const since = wsSummary.periodStartedAt;
+    const projectSpentMicros = await sumUsage(
+      db,
+      projectId,
+      SPENT_KINDS,
+      since,
+    );
+    if (project.spentMicros !== projectSpentMicros) {
+      await db
+        .update(projects)
+        .set({ spentMicros: projectSpentMicros, updatedAt: new Date() })
+        .where(eq(projects.id, projectId));
+    }
+    return {
+      projectId,
+      workspaceId,
+      capMicros: wsSummary.capMicros,
+      spentMicros: wsSummary.spentMicros,
+      reservedMicros: wsSummary.reservedMicros,
+      availableMicros: wsSummary.availableMicros,
+      currency: wsSummary.currency,
+      budgetStatus: wsSummary.budgetStatus,
+      pooled: true,
+      projectSpentMicros,
+    };
+  }
+
   const [budget] = await db
     .select()
     .from(budgets)
@@ -258,7 +515,6 @@ export async function getProjectSpendSummary(
   const reservedMicros = Math.max(0, reserved);
   const availableMicros = Math.max(0, capMicros - spentMicros - reservedMicros);
 
-  // Keep denormalized spent cache aligned with ledger actuals
   if (project.spentMicros !== spentMicros) {
     await db
       .update(projects)
@@ -275,6 +531,8 @@ export async function getProjectSpendSummary(
     availableMicros,
     currency: budget?.currency ?? "USD",
     budgetStatus: budget?.status ?? "active",
+    pooled: false,
+    projectSpentMicros: spentMicros,
   };
 }
 
@@ -286,12 +544,19 @@ export async function assertSufficientBudget(
 ): Promise<ProjectSpendSummary> {
   const summary = await getProjectSpendSummary(db, workspaceId, projectId);
   if (summary.budgetStatus === "paused") {
-    throw new BudgetError("paused", "Project budget is paused");
+    throw new BudgetError(
+      "paused",
+      summary.pooled
+        ? "Workspace budget is paused"
+        : "Project budget is paused",
+    );
   }
   if (estimateMicros > 0 && summary.availableMicros < estimateMicros) {
     throw new BudgetError(
       "insufficient",
-      "Insufficient project budget for task estimate",
+      summary.pooled
+        ? "Insufficient workspace budget for task estimate"
+        : "Insufficient project budget for task estimate",
     );
   }
   return summary;

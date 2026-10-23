@@ -1,11 +1,10 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
 import type { AgentEvent, AgentRunInput, CodingAgent } from "./types.js";
-import { FakeCodingAgent, buildFakeCompletion } from "./fake.js";
+import { FakeCodingAgent } from "./fake.js";
 import {
   OpenAiCompatibleCodingAgent,
   type OpenAiCompatibleConfig,
 } from "./openai-compatible.js";
+import { harnessStubAllowed } from "./stub-detect.js";
 
 /**
  * ContenderHarness port (TASK113) — external coding runtimes as arena backends.
@@ -45,23 +44,40 @@ export class NativeOpenAiHarness implements ContenderHarness {
 }
 
 /**
- * OpenHands BYO harness (TASK114) — sandbox-backed MVP.
- * Writes a scoped fix into `sandboxWorkdir` when present, then emits a
- * FakeCodingAgent-compatible completion for the existing validation/delivery path.
- * Without a workdir, falls back to FakeCodingAgent (tournaments stay runnable).
+ * OpenHands / Aider harness — real runtime not wired in-process.
+ * Refuses stub scaffold writes unless ALLOW_HARNESS_STUB=1 (dev only).
  */
 export class OpenHandsSandboxHarness implements ContenderHarness {
   readonly kind = "openhands" as const;
   readonly capability =
-    "OpenHands BYO — sandbox workdir edits + compatible completion payload";
+    "OpenHands BYO — requires real runtime; stub disabled by default";
 
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
+    if (!harnessStubAllowed()) {
+      yield {
+        kind: "error",
+        message:
+          "OpenHands/Aider stub harness disabled. Configure workspace BYOK (native OpenAI-compatible) or set ALLOW_HARNESS_STUB=1 for local demos only.",
+        payload: {
+          code: "harness_stub_disabled",
+          harness: this.kind,
+          hint: "native_openai_byok",
+        },
+      };
+      return;
+    }
+
+    // Legacy stub path — only with explicit opt-in (tests / demos).
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    const { dirname, join } = await import("node:path");
+    const { buildFakeCompletion } = await import("./fake.js");
+
     const workdir = input.sandboxWorkdir?.trim();
     if (!workdir) {
       yield {
         kind: "progress",
         message:
-          "OpenHands harness — no sandbox workdir; FakeCodingAgent fallback",
+          "OpenHands harness stub — no sandbox workdir; FakeCodingAgent fallback",
         payload: { harness: this.kind, status: "no_sandbox" },
       };
       yield* new FakeCodingAgent().run(input);
@@ -70,7 +86,7 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
 
     yield {
       kind: "progress",
-      message: "OpenHands harness — applying fix in sandbox",
+      message: "OpenHands harness stub — applying fix in sandbox (ALLOW_HARNESS_STUB)",
       payload: {
         harness: this.kind,
         status: "sandbox",
@@ -82,34 +98,17 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
     const absPath = join(workdir, relPath);
     await mkdir(dirname(absPath), { recursive: true });
     const goalOneLine = input.goal.slice(0, 160).replace(/\n/g, " ");
-    const body = relPath.endsWith(".tsx") || relPath.endsWith(".jsx")
-      ? [
-          `/**`,
-          ` * Coppergate OpenHands sandbox fix`,
-          ` * run: ${input.runId}`,
-          ` * goal: ${goalOneLine}`,
-          ` */`,
-          `export default function Page() {`,
-          `  return (`,
-          `    <main data-coppergate-run="${input.runId}">`,
-          `      <h1>Signal fix</h1>`,
-          `      <p>${goalOneLine.replace(/"/g, "'")}</p>`,
-          `    </main>`,
-          `  );`,
-          `}`,
-          ``,
-        ].join("\n")
-      : [
-          `/**`,
-          ` * Coppergate OpenHands sandbox fix`,
-          ` * run: ${input.runId}`,
-          ` * goal: ${goalOneLine}`,
-          ` */`,
-          `export function coppergateSignalFix() {`,
-          `  return { runId: ${JSON.stringify(input.runId)}, ok: true };`,
-          `}`,
-          ``,
-        ].join("\n");
+    const body = [
+      `/**`,
+      ` * Coppergate OpenHands sandbox fix`,
+      ` * run: ${input.runId}`,
+      ` * goal: ${goalOneLine}`,
+      ` */`,
+      `export function coppergateSignalFix() {`,
+      `  return { runId: ${JSON.stringify(input.runId)}, ok: true };`,
+      `}`,
+      ``,
+    ].join("\n");
     await writeFile(absPath, body, "utf8");
 
     yield {
@@ -132,7 +131,6 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
 
     const completion = {
       ...buildFakeCompletion(input, costMicros),
-      // Do not touch README — delivery will skip README stubs.
       filesChanged: [relPath],
     };
 
@@ -155,6 +153,15 @@ export class CursorCloudHarnessStub implements ContenderHarness {
   private readonly fallback = new FakeCodingAgent();
 
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
+    if (!harnessStubAllowed()) {
+      yield {
+        kind: "error",
+        message:
+          "Cursor Cloud / Codex harness not available. Use workspace BYOK native OpenAI-compatible agent.",
+        payload: { code: "harness_stub_disabled", harness: this.kind },
+      };
+      return;
+    }
     yield {
       kind: "progress",
       message: "Cursor Cloud harness stub — using FakeCodingAgent fallback",

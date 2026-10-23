@@ -33,6 +33,12 @@ export type CriticSignals = {
   coveragePassed?: boolean | null;
   /** E2E suite (TASK095). */
   e2ePassed?: boolean | null;
+  /** Non-doc / non-stub meaningful change (LOC or multi-file). */
+  meaningfulDiff?: boolean | null;
+  /** Tests added/updated in the delivery. */
+  testsTouched?: boolean | null;
+  /** Scaffold / coppergateSignalFix / toy title patterns. */
+  stubOrToy?: boolean | null;
 };
 
 export type CriticScore = {
@@ -45,11 +51,12 @@ export type CriticScore = {
     sonar: number;
     coverage: number;
     e2e: number;
+    meaningful: number;
   };
   reasons: string[];
 };
 
-/** Rules-based critic (TASK050 + quality/e2e fitness gates). */
+/** Rules-based critic (TASK050 + quality/e2e + meaningfulness gates). */
 export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   const reasons: string[] = [];
   let ci = 0;
@@ -59,6 +66,25 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   let sonar = 0;
   let coverage = 0;
   let e2e = 0;
+  let meaningful = 0;
+
+  if (signals.stubOrToy === true) {
+    reasons.push("stub_or_toy_disqualified");
+    return {
+      score: 0,
+      breakdown: {
+        ci: 0,
+        validation: 0,
+        delivery: 0,
+        criticPenalty: -1,
+        sonar: 0,
+        coverage: 0,
+        e2e: 0,
+        meaningful: 0,
+      },
+      reasons,
+    };
+  }
 
   if (signals.blockingFailure) {
     criticPenalty -= 0.5;
@@ -121,19 +147,39 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   }
 
   if (signals.hasPr) {
-    delivery += 0.12;
+    delivery += 0.1;
     reasons.push("has_pr");
   }
   if (signals.hasDiffEvidence) {
-    delivery += 0.08;
+    delivery += 0.06;
     reasons.push("has_diff");
   } else {
     criticPenalty -= 0.12;
     reasons.push("missing_diff");
   }
 
+  if (signals.meaningfulDiff === true) {
+    meaningful += 0.14;
+    reasons.push("meaningful_diff");
+  } else if (signals.meaningfulDiff === false) {
+    criticPenalty -= 0.2;
+    reasons.push("trivial_diff");
+  }
+
+  if (signals.testsTouched === true) {
+    meaningful += 0.08;
+    reasons.push("tests_touched");
+  }
+
   const raw =
-    ci + validation + delivery + criticPenalty + sonar + coverage + e2e;
+    ci +
+    validation +
+    delivery +
+    criticPenalty +
+    sonar +
+    coverage +
+    e2e +
+    meaningful;
   const score = Math.min(1, Math.max(0, raw));
   return {
     score,
@@ -145,6 +191,7 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
       sonar,
       coverage,
       e2e,
+      meaningful,
     },
     reasons,
   };
@@ -164,6 +211,9 @@ export async function collectCriticSignals(
   let e2ePassed: boolean | null = null;
   let hasDiffEvidence = false;
   let blockingFailure = false;
+  let meaningfulDiff: boolean | null = null;
+  let testsTouched: boolean | null = null;
+  let stubOrToy: boolean | null = null;
 
   for (const art of artifacts) {
     if (art.kind === "validation_report" || art.kind === "ci_evidence") {
@@ -222,10 +272,72 @@ export async function collectCriticSignals(
     }
     if (art.kind === "diff_summary" || art.kind === "delivery_report") {
       hasDiffEvidence = true;
+      try {
+        const meta = art.meta ? JSON.parse(art.meta) : {};
+        const body =
+          typeof meta.inlineBody === "string"
+            ? JSON.parse(meta.inlineBody)
+            : meta;
+        const files: string[] = Array.isArray(body?.filesChanged)
+          ? body.filesChanged
+          : Array.isArray(body?.files)
+            ? body.files.map((f: { path?: string }) => f.path).filter(Boolean)
+            : [];
+        const additions =
+          typeof body?.additions === "number"
+            ? body.additions
+            : typeof body?.linesAdded === "number"
+              ? body.linesAdded
+              : null;
+        const blob = JSON.stringify(body ?? meta).toLowerCase();
+        if (
+          /coppergatesignalfix|data-coppergate-run|scaffold project structure|tiny readme typo/.test(
+            blob,
+          )
+        ) {
+          stubOrToy = true;
+        }
+        const nonDoc = files.filter(
+          (p) =>
+            typeof p === "string" &&
+            !/\.(md|txt|rst)$/i.test(p) &&
+            !/changelog/i.test(p),
+        );
+        const testFiles = files.filter((p) =>
+          /\.(test|spec)\.|_test\.|\/tests?\//i.test(p),
+        );
+        if (testFiles.length > 0) testsTouched = true;
+        if (nonDoc.length >= 2 || (additions != null && additions >= 40)) {
+          meaningfulDiff = true;
+        } else if (
+          files.length > 0 &&
+          nonDoc.length === 0 &&
+          (additions == null || additions < 20)
+        ) {
+          meaningfulDiff = false;
+        } else if (nonDoc.length === 1 && (additions == null || additions < 20)) {
+          meaningfulDiff = false;
+        }
+      } catch {
+        /* ignore */
+      }
     }
   }
 
   for (const ev of events) {
+    if (ev.kind === "error") {
+      try {
+        const payload = JSON.parse(ev.payload);
+        if (
+          payload?.code === "stub_delivery" ||
+          /stub|toy delivery/i.test(String(payload?.message ?? ""))
+        ) {
+          stubOrToy = true;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     if (ev.kind !== "evidence") continue;
     try {
       const payload = JSON.parse(ev.payload);
@@ -248,6 +360,9 @@ export async function collectCriticSignals(
     sonarPassed,
     coveragePassed,
     e2ePassed,
+    meaningfulDiff,
+    testsTouched,
+    stubOrToy,
   };
 }
 

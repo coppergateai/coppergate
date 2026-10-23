@@ -132,7 +132,7 @@ export function MarketingHeader({ signedIn }: Props) {
 
           <button
             type="button"
-            className={styles.menuBtn}
+            className={`${styles.menuBtn} ${menuOpen ? styles.menuBtnOpen : ""}`}
             aria-expanded={menuOpen}
             aria-controls={menuId}
             aria-label={menuOpen ? "Close menu" : "Open menu"}

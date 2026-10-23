@@ -92,7 +92,7 @@ try {
       projectId,
       actor,
       rawIdea:
-        "Dogfood: keep Coppergate arena healthy on the kprompt primary repo. First tasks must be tiny (docs/typo) and primary-only.",
+        "Dogfood: keep Coppergate arena healthy on the kprompt primary repo. First tasks must be product increments (not typo/scaffold) and primary-only.",
       content: {
         title: "Kprompt dogfood — first survivor PR",
         targetUser: "Kprompt operators",
