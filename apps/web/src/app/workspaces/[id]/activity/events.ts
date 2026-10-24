@@ -227,21 +227,29 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     title: "Arena started",
     category: "execution",
     outcome: "running",
+    summary: (_meta, count) =>
+      count > 1 ? `${count} projects started` : null,
   },
   "arena.started": {
     title: "Arena started",
     category: "execution",
     outcome: "running",
+    summary: (_meta, count) =>
+      count > 1 ? `${count} projects started` : null,
   },
   "arena.stop": {
     title: "Arena stopped",
     category: "execution",
     outcome: "completed",
+    summary: (_meta, count) =>
+      count > 1 ? `${count} projects stopped` : null,
   },
   "arena.stopped": {
     title: "Arena stopped",
     category: "execution",
     outcome: "completed",
+    summary: (_meta, count) =>
+      count > 1 ? `${count} projects stopped` : null,
   },
   "arena.ensure": {
     title: "Arena ensured",
@@ -252,11 +260,15 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     title: "Arena paused",
     category: "execution",
     outcome: "review",
+    summary: (_meta, count) =>
+      count > 1 ? `${count} projects paused` : null,
   },
   "arena.resume": {
     title: "Arena resumed",
     category: "execution",
     outcome: "running",
+    summary: (_meta, count) =>
+      count > 1 ? `${count} projects resumed` : null,
   },
   "arena.kill": {
     title: "Arena kill-switch",
@@ -695,14 +707,39 @@ function tournamentGroupKey(event: ActivityEvent): string | null {
   return null;
 }
 
+function isArenaControlAction(action: string): boolean {
+  return (
+    action === "arena.stop" ||
+    action === "arena.stopped" ||
+    action === "arena.pause" ||
+    action === "arena.start" ||
+    action === "arena.started" ||
+    action === "arena.resume"
+  );
+}
+
+function arenaControlSummary(children: ActivityChildEvent[]): string {
+  const counts = new Map<string, number>();
+  for (const child of children) {
+    const verb = technicalLabel(child.action);
+    counts.set(verb, (counts.get(verb) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([verb, n]) => `${n} ${verb}`)
+    .join(" · ");
+}
+
 function collapseKey(event: ActivityEvent): string {
-  // Eliminations / debit spam: collapse by action only so ×N is meaningful.
+  // Workspace-wide storms: collapse by action family so ×N is meaningful.
   if (
     event.action === "contender.eliminated" ||
     event.action === "contender.debit" ||
     event.action === "merge.blocked"
   ) {
     return event.action;
+  }
+  if (isArenaControlAction(event.action)) {
+    return "arena.control";
   }
   const projectId =
     typeof event.meta?.projectId === "string" ? event.meta.projectId : "";
@@ -825,11 +862,11 @@ export function groupActivityEvents(events: ActivityEvent[]): ActivityGroup[] {
     tournamentGroups.push(buildTournamentGroup(bucket));
   }
 
-  // Collapse consecutive identical actions in remainder (already newest-first)
+  // Collapse consecutive identical / arena-control storms (already newest-first)
   const collapsed: ActivityGroup[] = [];
   for (const event of remainder) {
     const prev = collapsed[collapsed.length - 1];
-    if (prev && prev.kind !== "execution" && prev.action === event.action) {
+    if (prev && prev.kind !== "execution") {
       const prevKey = collapseKey({
         id: prev.eventId,
         actor: prev.actor,
@@ -841,11 +878,37 @@ export function groupActivityEvents(events: ActivityEvent[]): ActivityGroup[] {
         createdAt: prev.createdAt,
       });
       if (prevKey === collapseKey(event)) {
-        prev.count += 1;
-        prev.kind = "collapse";
-        prev.technicalLabel = `${technicalLabel(prev.action)} ×${prev.count}`;
-        prev.summary = summaryFor(prev.action, prev.meta, prev.count);
+        if (prev.children.length === 0) {
+          prev.children.push(
+            annotate({
+              id: prev.eventId,
+              actor: prev.actor,
+              action: prev.action,
+              targetType: prev.targetType,
+              targetId: prev.targetId,
+              meta: prev.meta,
+              href: prev.href,
+              createdAt: prev.createdAt,
+            }),
+          );
+        }
         prev.children.push(annotate(event));
+        prev.count = prev.children.length;
+        prev.kind = "collapse";
+        if (prevKey === "arena.control") {
+          prev.title = "Arena control";
+          prev.action = "arena.control";
+          prev.technicalLabel = `control ×${prev.count}`;
+          prev.summary = arenaControlSummary(prev.children);
+          prev.outcome = prev.children.some((c) => c.outcome === "review")
+            ? "review"
+            : prev.children.some((c) => c.outcome === "running")
+              ? "running"
+              : "completed";
+        } else {
+          prev.technicalLabel = `${technicalLabel(prev.action)} ×${prev.count}`;
+          prev.summary = summaryFor(prev.action, prev.meta, prev.count);
+        }
         continue;
       }
     }
