@@ -21,10 +21,16 @@ Companion to product SECURITY posture. Pen-test sign-off lives in architecture D
 
 - [ ] Cross-tenant IDOR (signals, approvals, credentials)
 - [x] Webhook secret bypass / replay — workspace-derived HMAC secret (not global root)
-- [ ] Rate-limit evasion / provider flood
-- [x] SSRF via preview smoke / notify / LLM models proxy — `assertSafeServerFetchUrl`
-- [x] Agent/sandbox path traversal — `resolveContainedPath` on writes + delivery reads
-- [ ] Secret egress in harness logs
+- [x] SSRF via preview smoke / notify / LLM models proxy / MCP — DNS-resolved checks
+- [x] Agent/sandbox path traversal — contained path writes + delivery reads
+- [x] Profile tool gate — FILE writes require `edit` in profileTools
+- [x] Browser hardening — CSP / HSTS / frame-ancestors in middleware
+- [x] Public share link TTL — default 7d (`DELIVERY_SHARE_TTL_DAYS`)
+- [x] Public route rate limits — waitlist / funnel / health / OAuth start
+- [x] Secret egress in logs — telemetry logger redacts tokens/keys
+- [x] Docker sandbox mode — `SANDBOX_MODE=docker` (gVisor/runc, network none)
+- [ ] Distributed rate limiting (Redis) for multi-instance
+- [ ] Make `SANDBOX_MODE=docker` the production default once hosts have Docker
 
 ## Sign-off
 

@@ -9,9 +9,9 @@ import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
 
 export const metadata: Metadata = {
-  title: "Sign in",
+  title: "Try hosted",
   description:
-    "Sign in to Coppergate with GitHub or GitLab. Identity first — repository access comes later via SCM install.",
+    "Sign in to the Coppergate hosted arena with GitHub or GitLab. Identity first — repository access comes later via SCM install.",
   robots: { index: false, follow: false },
   alternates: { canonical: "/login" },
 };
@@ -30,11 +30,10 @@ export default async function LoginPage() {
       <main className={styles.authMain}>
         <div className={styles.authCard}>
           <BrandMark className={styles.authMark} size={52} />
-          <h1 className={styles.authTitle}>Sign in to Coppergate</h1>
+          <h1 className={styles.authTitle}>Try the hosted arena</h1>
           <p className={styles.authLede}>
-            Continue with GitHub or GitLab to open your workspaces. We only
-            request identity scopes — repository access comes later under your
-            control.
+            Sign in with GitHub or GitLab to open workspaces. We only request
+            identity scopes — repository access comes later under your control.
           </p>
           {githubReady ? (
             <a className={styles.authCta} href="/api/auth/github">

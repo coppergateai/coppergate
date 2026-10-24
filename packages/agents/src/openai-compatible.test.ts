@@ -150,6 +150,55 @@ describe("OpenAiCompatibleCodingAgent", () => {
     assert.ok(!events.some((e) => e.kind === "completion"));
   });
 
+  it("rejects FILE writes when profile tools omit edit", async () => {
+    const agent = new OpenAiCompatibleCodingAgent({
+      apiKey: "sk-test",
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: [
+                    "### FILE: app/page.tsx",
+                    "```",
+                    "export default function Page() { return null }",
+                    "```",
+                  ].join("\n"),
+                },
+              },
+            ],
+            usage: { total_tokens: 40 },
+          }),
+          { status: 200 },
+        ),
+    });
+
+    const events = [];
+    for await (const ev of agent.run({
+      runId: "r-read-only",
+      taskId: "t-read-only",
+      workspaceId: "w1",
+      projectId: "p1",
+      goal: "No writes",
+      scope: "app",
+      allowedPaths: ["app/**"],
+      acceptanceCriteria: ["none"],
+      baseSha: "abc",
+      toolAllowlist: ["read"],
+      spendCapMicros: 100_000,
+    })) {
+      events.push(ev);
+    }
+
+    assert.ok(
+      events.some(
+        (e) => e.kind === "error" && e.payload?.code === "tool_not_allowed",
+      ),
+    );
+    assert.ok(!events.some((e) => e.kind === "completion"));
+  });
+
   it("rejects FILE blocks outside allowedPaths", async () => {
     const agent = new OpenAiCompatibleCodingAgent({
       apiKey: "sk-test",

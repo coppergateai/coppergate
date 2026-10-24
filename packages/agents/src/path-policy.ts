@@ -65,3 +65,14 @@ export function resolveSafeWorkdirPath(
   if (!rel || rel.startsWith("..") || isAbsolute(rel)) return null;
   return abs;
 }
+
+/**
+ * Profile tool gate for FILE writes. Empty/undefined = no gate (legacy).
+ * When set, requires `edit` (or `*`).
+ */
+export function isProfileEditAllowed(
+  profileTools: string[] | undefined,
+): boolean {
+  if (!profileTools || profileTools.length === 0) return true;
+  return profileTools.includes("edit") || profileTools.includes("*");
+}

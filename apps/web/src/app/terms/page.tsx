@@ -7,7 +7,7 @@ import { SiteChrome } from "../site-chrome";
 export const metadata: Metadata = {
   title: "Terms",
   description:
-    "Terms of use for the Coppergate private beta — early access, arena policy, and acceptable use.",
+    "Terms of use for Coppergate — open-source software, hosted service, arena policy, and acceptable use.",
   alternates: { canonical: "/terms" },
   openGraph: { url: "/terms" },
 };
@@ -24,24 +24,27 @@ export default function TermsPage() {
       <article className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Legal</p>
         <h1 className={styles.pageTitle}>Terms</h1>
-        <p className={styles.pageLede}>Last updated: October 10, 2026</p>
+        <p className={styles.pageLede}>Last updated: October 24, 2026</p>
 
         <div className={styles.prose}>
           <section>
-            <h2>Private beta</h2>
+            <h2>Open source and hosted service</h2>
             <p>
-              Coppergate is offered as a private beta. Features may change,
-              break, or be withdrawn without notice. Access is invitation-based
-              and may be suspended at our discretion.
+              Coppergate software is available under the MIT license on GitHub.
+              These terms also cover the optional hosted Coppergate service we
+              operate. Features may evolve; the community self-host path remains
+              available under MIT. Hosted access may be rate-limited or
+              suspended for abuse or operational reasons.
             </p>
           </section>
 
           <section>
             <h2>Your account</h2>
             <p>
-              You must use a GitHub account you are authorized to connect. You
-              are responsible for activity under your account and for keeping
-              repository permissions appropriate for your organization.
+              You must use a GitHub or GitLab account you are authorized to
+              connect. You are responsible for activity under your account and
+              for keeping repository permissions appropriate for your
+              organization.
             </p>
           </section>
 
@@ -73,19 +76,21 @@ export default function TermsPage() {
           <section>
             <h2>Intellectual property</h2>
             <p>
-              We retain rights in the Coppergate product and brand. Subject to
-              your agreements with GitHub and your organization, you keep rights
-              in your repositories and the code you accept into them.
+              Open-source Coppergate code is licensed under MIT as published in
+              the repository. We retain rights in the Coppergate brand and the
+              hosted service. Subject to your agreements with your SCM provider
+              and your organization, you keep rights in your repositories and
+              the code you accept into them.
             </p>
           </section>
 
           <section>
             <h2>Disclaimer</h2>
             <p>
-              The beta is provided “as is” without warranties of any kind, to
-              the fullest extent permitted by law. We do not guarantee
-              uninterrupted availability, correctness of AI output, or fitness
-              for a particular purpose.
+              The software and hosted service are provided “as is” without
+              warranties of any kind, to the fullest extent permitted by law. We
+              do not guarantee uninterrupted availability, correctness of AI
+              output, or fitness for a particular purpose.
             </p>
           </section>
 
@@ -95,7 +100,7 @@ export default function TermsPage() {
               To the fullest extent permitted by law, Coppergate and its
               operators are not liable for indirect, incidental, special, or
               consequential damages, or for loss of data, profits, or business
-              arising from use of the beta.
+              arising from use of the software or hosted service.
             </p>
           </section>
 

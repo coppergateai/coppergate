@@ -63,6 +63,7 @@ export {
 export { parseFileBlocks } from "./openai-compatible.js";
 export {
   isPathAllowed,
+  isProfileEditAllowed,
   isSafeRelativePath,
   resolveSafeWorkdirPath,
 } from "./path-policy.js";
