@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { displayTaskTitle } from "@coppergate/db";
 import styles from "./project-detail.module.css";
 
 export type NextActionStep =
@@ -53,8 +54,9 @@ export function NextActionStrip({
     href = `${base}?tab=arena`;
     cta = "Open Arena";
   } else if (step === "review") {
-    title = reviewTaskTitle
-      ? `Review evidence · ${reviewTaskTitle}`
+    const plainReview = displayTaskTitle(reviewTaskTitle);
+    title = plainReview
+      ? `Review evidence · ${plainReview}`
       : "Review delivery evidence";
     detail =
       "Gates passed or blocked — Accept only when CI and policy make the PR trustworthy.";

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app";
+import { displayTaskTitle } from "@coppergate/db";
 import {
   acceptBlockedReason as computeAcceptBlocked,
   HARD_GATE_COPY,
@@ -490,7 +491,9 @@ export function TaskDetailPanel({
             ? " · git sandbox"
             : null}
       </p>
-      <h1 className={styles.title}>{task.title}</h1>
+      <h1 className={styles.title}>
+        {displayTaskTitle(task.title) || task.title}
+      </h1>
 
       <nav className={styles.stageNav} aria-label="Delivery review stages">
         {stages.map((s) => (

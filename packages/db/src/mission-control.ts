@@ -3,6 +3,7 @@ import type { Database } from "./client.js";
 import { listInboxApprovalsForWorkspace } from "./approvals.js";
 import { getWorkspaceSpendSummary } from "./budgets.js";
 import { listAuditEventsForWorkspace } from "./audit.js";
+import { displayTaskTitle } from "./display-title.js";
 import { getWorkspaceConcurrency } from "./plan-policy.js";
 import { listWorkspaceArenaSnapshot } from "./workspace-arena.js";
 import { agentRuns, projects, tasks } from "./schema.js";
@@ -39,6 +40,8 @@ export type MissionControlAttentionItem = {
   detail: string;
   href: string;
   priority: "high" | "normal";
+  /** Optional primary CTA label for the attention row. */
+  ctaLabel?: string;
 };
 
 export type MissionControlExecution = {
@@ -216,20 +219,24 @@ export async function getWorkspaceMissionControl(
   ).length;
 
   const attention: MissionControlAttentionItem[] = [];
+  const overConcurrency =
+    concurrency.inflight > concurrency.limits.maxConcurrentRuns;
 
-  if (concurrency.inflight > concurrency.limits.maxConcurrentRuns) {
+  if (overConcurrency) {
     attention.push({
       id: "concurrency-over",
       kind: "concurrency",
       title: "Over plan concurrency",
-      detail: `${concurrency.inflight} in flight · plan allows ${concurrency.limits.maxConcurrentRuns} — Pause Arena to drain queue`,
+      detail: `${concurrency.inflight} in flight · plan allows ${concurrency.limits.maxConcurrentRuns}. Pause Arena so the queue can drain — other alerts are secondary until then.`,
       href: `/workspaces/${workspaceId}/arena`,
       priority: "high",
+      ctaLabel: "Pause Arena",
     });
   }
 
   for (const a of pendingApprovals.slice(0, 6)) {
-    const label = a.title?.trim() || `${a.targetType} approval`;
+    const label =
+      displayTaskTitle(a.title?.trim()) || `${a.targetType} approval`;
     attention.push({
       id: `approval-${a.id}`,
       kind: "approval",
@@ -240,6 +247,7 @@ export async function getWorkspaceMissionControl(
       detail: `${a.projectName} · Pending decision`,
       href: `/workspaces/${workspaceId}/inbox?a=${encodeURIComponent(a.id)}`,
       priority: a.targetType === "task" ? "high" : "normal",
+      ctaLabel: "Open inbox",
     });
   }
 
@@ -271,98 +279,110 @@ export async function getWorkspaceMissionControl(
 
   for (const t of reviewTasks) {
     if (attention.some((x) => x.href.includes(t.id))) continue;
+    const title = displayTaskTitle(t.title);
     attention.push({
       id: `review-${t.id}`,
       kind: "review_required",
       title: t.prUrl
-        ? `Review delivery · ${t.title}`
-        : `Review required · ${t.title}`,
+        ? `Review delivery · ${title}`
+        : `Review required · ${title}`,
       detail: `${t.projectName} · Evidence ready for Accept`,
       href: `/workspaces/${workspaceId}/projects/${t.projectId}/tasks/${t.id}`,
       priority: "high",
+      ctaLabel: "Review evidence",
     });
   }
 
-  const failedLanes = arena.projects.filter(laneNeedsAttention).slice(0, 4);
-  for (const lane of failedLanes) {
-    const status = lane.lastRun?.status ?? "attention";
-    attention.push({
-      id: `arena-${lane.projectId}`,
-      kind: "arena_failed",
-      title: `Arena needs attention · ${lane.projectName}`,
-      detail: `Last run ${status} · Open Arena`,
-      href: `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(lane.projectId)}`,
-      priority: "high",
-    });
-  }
-
-  const replanFails = recentAudit
-    .filter((e) => e.action === "maintainer.replan_queue_failed")
-    .slice(0, 2);
-  for (const ev of replanFails) {
-    let projectId: string | null = null;
-    if (ev.meta) {
-      try {
-        const meta = JSON.parse(ev.meta) as { projectId?: string };
-        projectId = typeof meta.projectId === "string" ? meta.projectId : null;
-      } catch {
-        projectId = null;
-      }
+  // When over concurrency, arena/replan/merge noise is mostly a symptom —
+  // keep Mission Control focused on Pause + real human gates.
+  if (!overConcurrency) {
+    const failedLanes = arena.projects.filter(laneNeedsAttention).slice(0, 4);
+    for (const lane of failedLanes) {
+      const status = lane.lastRun?.status ?? "attention";
+      attention.push({
+        id: `arena-${lane.projectId}`,
+        kind: "arena_failed",
+        title: `Arena needs attention · ${lane.projectName}`,
+        detail: `Last run ${status} · Open Arena`,
+        href: `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(lane.projectId)}`,
+        priority: "high",
+        ctaLabel: "Open Arena",
+      });
     }
-    const href = projectId
-      ? `/workspaces/${workspaceId}/projects/${projectId}`
-      : `/workspaces/${workspaceId}/activity`;
-    attention.push({
-      id: `replan-${ev.id}`,
-      kind: "replan_failed",
-      title: "Replan queue failed",
-      detail: "Maintainer could not queue the next task",
-      href,
-      priority: "high",
-    });
-  }
 
-  const mergeBlocked = recentAudit
-    .filter((e) => e.action === "merge.blocked")
-    .slice(0, 3);
-  const seenMergeProjects = new Set<string>();
-  for (const ev of mergeBlocked) {
-    let projectId: string | null = null;
-    let message: string | null = null;
-    if (ev.meta) {
-      try {
-        const meta = JSON.parse(ev.meta) as {
-          projectId?: string;
-          message?: string;
-          cta?: string;
-        };
-        projectId = typeof meta.projectId === "string" ? meta.projectId : null;
-        message =
-          (typeof meta.message === "string" && meta.message) ||
-          (typeof meta.cta === "string" && meta.cta) ||
-          null;
-      } catch {
-        projectId = null;
+    const replanFails = recentAudit
+      .filter((e) => e.action === "maintainer.replan_queue_failed")
+      .slice(0, 2);
+    for (const ev of replanFails) {
+      let projectId: string | null = null;
+      if (ev.meta) {
+        try {
+          const meta = JSON.parse(ev.meta) as { projectId?: string };
+          projectId = typeof meta.projectId === "string" ? meta.projectId : null;
+        } catch {
+          projectId = null;
+        }
       }
+      const href = projectId
+        ? `/workspaces/${workspaceId}/projects/${projectId}`
+        : `/workspaces/${workspaceId}/activity`;
+      attention.push({
+        id: `replan-${ev.id}`,
+        kind: "replan_failed",
+        title: "Replan queue failed",
+        detail: "Maintainer could not queue the next task",
+        href,
+        priority: "high",
+      });
     }
-    const dedupeKey = projectId ?? ev.id;
-    if (seenMergeProjects.has(dedupeKey)) continue;
-    seenMergeProjects.add(dedupeKey);
-    attention.push({
-      id: `merge-blocked-${ev.id}`,
-      kind: "merge_blocked",
-      title: "Merge blocked",
-      detail: message
-        ? message.slice(0, 140)
-        : "GitHub branch protection requires review — clear after fixing rights",
-      href: projectId
-        ? `/workspaces/${workspaceId}/projects/${projectId}?tab=configuration`
-        : `/workspaces/${workspaceId}/activity`,
-      priority: "high",
-    });
+
+    const mergeBlocked = recentAudit
+      .filter((e) => e.action === "merge.blocked")
+      .slice(0, 3);
+    const seenMergeProjects = new Set<string>();
+    for (const ev of mergeBlocked) {
+      let projectId: string | null = null;
+      let message: string | null = null;
+      if (ev.meta) {
+        try {
+          const meta = JSON.parse(ev.meta) as {
+            projectId?: string;
+            message?: string;
+            cta?: string;
+          };
+          projectId =
+            typeof meta.projectId === "string" ? meta.projectId : null;
+          message =
+            (typeof meta.message === "string" && meta.message) ||
+            (typeof meta.cta === "string" && meta.cta) ||
+            null;
+        } catch {
+          projectId = null;
+        }
+      }
+      const dedupeKey = projectId ?? ev.id;
+      if (seenMergeProjects.has(dedupeKey)) continue;
+      seenMergeProjects.add(dedupeKey);
+      attention.push({
+        id: `merge-blocked-${ev.id}`,
+        kind: "merge_blocked",
+        title: "Merge blocked",
+        detail: message
+          ? message.slice(0, 140)
+          : "GitHub branch protection requires review — clear after fixing rights",
+        href: projectId
+          ? `/workspaces/${workspaceId}/projects/${projectId}?tab=configuration`
+          : `/workspaces/${workspaceId}/activity`,
+        priority: "high",
+        ctaLabel: "Fix merge rights",
+      });
+    }
   }
 
   attention.sort((a, b) => {
+    // Concurrency crisis always leads — one decision before triage noise.
+    if (a.kind === "concurrency" && b.kind !== "concurrency") return -1;
+    if (b.kind === "concurrency" && a.kind !== "concurrency") return 1;
     if (a.priority === b.priority) return 0;
     return a.priority === "high" ? -1 : 1;
   });
@@ -371,7 +391,8 @@ export async function getWorkspaceMissionControl(
   const seenExecTitles = new Set<string>();
   const executions: MissionControlExecution[] = [];
   for (const t of activeTasks) {
-    const dedupeKey = `${t.title}::${t.status}`;
+    const plainTitle = displayTaskTitle(t.title);
+    const dedupeKey = `${plainTitle}::${t.status}`;
     if (seenExecTitles.has(dedupeKey) && t.status === "QUEUED") {
       continue;
     }
@@ -380,7 +401,7 @@ export async function getWorkspaceMissionControl(
       projectId: t.projectId,
       projectName: t.projectName,
       taskId: t.id,
-      taskTitle: t.title,
+      taskTitle: plainTitle || t.title,
       phase: phaseForStatus(t.status),
       status: t.status,
       href: `/workspaces/${workspaceId}/projects/${t.projectId}/tasks/${t.id}`,
