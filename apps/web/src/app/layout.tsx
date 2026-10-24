@@ -5,6 +5,13 @@ import { Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { DeferredGoogleAnalytics } from "@/components/deferred-google-analytics";
 import { GA_MEASUREMENT_ID } from "@/lib/ga";
+import {
+  OG_IMAGE,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE,
+  TWITTER_IMAGE,
+} from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
@@ -30,30 +37,26 @@ const themeInitScript = `(function(){try{var t=localStorage.getItem("cg-theme");
 const siteUrl = getSiteUrl();
 const googleVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
 
-const title = "Coppergate — Set a budget. Agents war. Survivors ship.";
-const description =
-  "Set a monthly spend cap. Agents compete on your project — losers get eliminated, winners ship and improve. Coppergate turns selection pressure into agent cost efficiency.";
-
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: title,
-    template: "%s · Coppergate",
+    default: SITE_TITLE,
+    template: `%s · ${SITE_NAME}`,
   },
-  description,
-  applicationName: "Coppergate",
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
   keywords: [
     "autonomous agents",
     "multi-agent arena",
     "AI agents",
     "Survivor agents",
-    "GitHub",
     "AI coding",
     "agent orchestration",
+    "agent spend caps",
   ],
-  authors: [{ name: "Coppergate", url: siteUrl }],
-  creator: "Coppergate",
-  publisher: "Coppergate",
+  authors: [{ name: SITE_NAME, url: siteUrl }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   robots: {
     index: true,
     follow: true,
@@ -62,19 +65,19 @@ export const metadata: Metadata = {
       follow: true,
     },
   },
+  // Omit title/description here so child routes inherit page-level values.
+  // Keep images explicit — child `openGraph: { url }` must not drop share cards.
   openGraph: {
-    title,
-    description,
-    siteName: "Coppergate",
+    siteName: SITE_NAME,
     locale: "en_US",
     type: "website",
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title,
-    description,
     creator: "@coppergateai",
     site: "@coppergateai",
+    images: [TWITTER_IMAGE],
   },
   icons: {
     icon: [

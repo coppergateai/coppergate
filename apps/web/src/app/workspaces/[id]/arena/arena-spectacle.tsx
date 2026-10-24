@@ -410,8 +410,10 @@ export function ArenaSpectacle({
               {live ? "Live" : "Stopped"}
             </span>
           </div>
-          <h1 className={styles.brand}>{workspaceName}</h1>
-          <p className={styles.lede}>Autonomous engineering operations</p>
+          <h1 className={styles.brand}>Arena</h1>
+          <p className={styles.lede}>
+            Autonomous engineering operations for {workspaceName}
+          </p>
 
           <div className={styles.controls}>
             <span className={styles.syncMeta} aria-live="polite">

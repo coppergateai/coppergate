@@ -1,5 +1,6 @@
 import { JsonLdScript } from "@/components/seo/json-ld-script";
 import { LANDING_FAQS } from "@/lib/marketing/faqs";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
 
 export function JsonLd() {
@@ -11,7 +12,7 @@ export function JsonLd() {
       {
         "@type": "Organization",
         "@id": `${siteUrl}/#organization`,
-        name: "Coppergate",
+        name: SITE_NAME,
         url: siteUrl,
         email: "hello@coppergate.ai",
         logo: `${siteUrl}/icon-512.png`,
@@ -25,16 +26,15 @@ export function JsonLd() {
         "@type": "WebSite",
         "@id": `${siteUrl}/#website`,
         url: siteUrl,
-        name: "Coppergate",
-        description:
-          "Set a monthly spend cap. Agents compete on your project — losers get eliminated, winners ship and improve. Coppergate turns selection pressure into agent cost efficiency.",
+        name: SITE_NAME,
+        description: SITE_DESCRIPTION,
         publisher: { "@id": `${siteUrl}/#organization` },
         inLanguage: "en",
       },
       {
         "@type": "SoftwareApplication",
         "@id": `${siteUrl}/#app`,
-        name: "Coppergate",
+        name: SITE_NAME,
         applicationCategory: "DeveloperApplication",
         operatingSystem: "Web",
         url: siteUrl,

@@ -3,6 +3,7 @@ import {
   CORRELATION_HEADER,
   resolveCorrelationId,
 } from "@coppergate/telemetry";
+import { applySecurityHeaders } from "@/lib/security-headers";
 
 export function middleware(request: NextRequest) {
   const correlationId = resolveCorrelationId(
@@ -16,9 +17,12 @@ export function middleware(request: NextRequest) {
     request: { headers: requestHeaders },
   });
   response.headers.set(CORRELATION_HEADER, correlationId);
+  applySecurityHeaders(response.headers);
   return response;
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico|webmanifest)$).*)",
+  ],
 };

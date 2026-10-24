@@ -191,8 +191,10 @@ export function ProjectsHome({
             </div>
             <div className={styles.heroText}>
               <div className={styles.heroTitleRow}>
-                <h1 className={styles.heroTitle}>{workspace.name}</h1>
-                <span className={styles.heroSlug}>/{workspace.slug}</span>
+                <h1 className={styles.heroTitle}>Projects</h1>
+                <span className={styles.heroSlug}>
+                  {workspace.name} · /{workspace.slug}
+                </span>
               </div>
               <p className={styles.heroLede}>{workspace.blurb}</p>
               <div className={styles.badges} aria-label="Workspace stats">
@@ -441,7 +443,7 @@ export function ProjectsHome({
                   </h2>
                   <p className={styles.wizardLede}>
                     Connected repos below are unbound. Bind one to unlock budget,
-                    brief, and the Agents arena loop.
+                    brief, and the Arena loop.
                   </p>
                 </div>
                 {createSlot}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
 
@@ -14,6 +15,12 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <SiteChrome>
+      <DocsBreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Terms", path: "/terms" },
+        ]}
+      />
       <article className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Legal</p>
         <h1 className={styles.pageTitle}>Terms</h1>
