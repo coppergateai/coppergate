@@ -1,26 +1,26 @@
 .stage {
-  --canvas: #0d0e10;
-  --surface: #17191d;
-  --surface-raised: #1e2126;
-  --copper: #c58b64;
-  --active: #35a77a;
-  --waiting: #d4a24c;
-  --attention: #d4655a;
-  --idle: #6b7280;
-  --text: #e8eaed;
-  --text-mute: rgba(232, 234, 237, 0.55);
-  --line: rgba(197, 139, 100, 0.18);
-  --line-strong: rgba(197, 139, 100, 0.35);
+  --mc-canvas: #0d0e10;
+  --mc-surface: #17191d;
+  --mc-surface-raised: #1e2126;
+  --mc-copper: #c58b64;
+  --mc-active: #35a77a;
+  --mc-waiting: #d4a24c;
+  --mc-attention: #d4655a;
+  --mc-idle: #6b7280;
+  --mc-text: #e8eaed;
+  --mc-text-mute: rgba(232, 234, 237, 0.55);
+  --mc-line: rgba(197, 139, 100, 0.18);
+  --mc-line-strong: rgba(197, 139, 100, 0.35);
   position: relative;
   display: flex;
   align-items: flex-start;
   gap: 0;
   min-height: calc(100vh - 3.5rem);
-  color: var(--text);
+  color: var(--mc-text);
   background:
     radial-gradient(60% 40% at 20% 0%, rgba(53, 167, 122, 0.06) 0%, transparent 55%),
     radial-gradient(50% 35% at 90% 10%, rgba(197, 139, 100, 0.08) 0%, transparent 50%),
-    var(--canvas);
+    var(--mc-canvas);
 }
 
 .mainCol {
@@ -54,7 +54,7 @@
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .brand {
@@ -64,14 +64,14 @@
   font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1.05;
-  color: var(--text);
+  color: var(--mc-text);
 }
 
 .lede {
   margin: 0;
   font-size: 0.98rem;
   line-height: 1.4;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .controls {
@@ -84,7 +84,7 @@
 
 .syncMeta {
   font-size: 0.78rem;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .pill {
@@ -92,30 +92,30 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.28rem 0.65rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mc-line);
   border-radius: 3px;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-mute);
-  background: var(--surface);
+  color: var(--mc-text-mute);
+  background: var(--mc-surface);
 }
 
 .pillDot {
   width: 0.42rem;
   height: 0.42rem;
   border-radius: 50%;
-  background: var(--idle);
+  background: var(--mc-idle);
 }
 
 .pillLive {
-  color: var(--active);
+  color: var(--mc-active);
   border-color: rgba(53, 167, 122, 0.4);
 }
 
 .pillLive .pillDot {
-  background: var(--active);
+  background: var(--mc-active);
   box-shadow: 0 0 0 0 rgba(53, 167, 122, 0.5);
   animation: livePulse 1.8s ease-out infinite;
 }
@@ -140,7 +140,7 @@
 
 .btn {
   appearance: none;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mc-line);
   border-radius: 3px;
   padding: 0.5rem 0.95rem;
   font-family: inherit;
@@ -158,7 +158,7 @@
 
 .btnResume {
   color: #0d0e10;
-  background: var(--active);
+  background: var(--mc-active);
   border-color: rgba(53, 167, 122, 0.7);
 }
 
@@ -167,19 +167,19 @@
 }
 
 .btnPause {
-  color: var(--text);
-  background: var(--surface);
-  border-color: var(--line-strong);
+  color: #e8eaed;
+  background: #17191d;
+  border-color: rgba(197, 139, 100, 0.35);
 }
 
 .btnPause:hover:not(:disabled) {
-  border-color: var(--waiting);
-  color: var(--waiting);
+  border-color: #d4a24c;
+  color: #d4a24c;
 }
 
 .btnStop {
   color: #0d0e10;
-  background: var(--attention);
+  background: #d4655a;
   border-color: rgba(212, 101, 90, 0.7);
 }
 
@@ -212,9 +212,9 @@
 
 .metric {
   padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mc-line);
   border-radius: 4px;
-  background: var(--surface);
+  background: var(--mc-surface);
 }
 
 .metricValue {
@@ -231,23 +231,23 @@
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .metricRunning .metricValue {
-  color: var(--active);
+  color: var(--mc-active);
 }
 
 .metricWaiting .metricValue {
-  color: var(--waiting);
+  color: var(--mc-waiting);
 }
 
 .metricAttention .metricValue {
-  color: var(--attention);
+  color: var(--mc-attention);
 }
 
 .metricIdle .metricValue {
-  color: var(--idle);
+  color: var(--mc-idle);
 }
 
 .lanes {
@@ -257,26 +257,26 @@
 }
 
 .lane {
-  border: 1px solid var(--line);
+  border: 1px solid var(--mc-line);
   border-radius: 4px;
-  background: var(--surface);
+  background: var(--mc-surface);
   overflow: hidden;
 }
 
 .laneFocused {
-  border-color: var(--line-strong);
+  border-color: var(--mc-line-strong);
 }
 
 .laneTone_running {
-  border-left: 2px solid var(--active);
+  border-left: 2px solid var(--mc-active);
 }
 
 .laneTone_awaitingCi {
-  border-left: 2px solid var(--waiting);
+  border-left: 2px solid var(--mc-waiting);
 }
 
 .laneTone_needsAttention {
-  border-left: 2px solid var(--attention);
+  border-left: 2px solid var(--mc-attention);
 }
 
 .laneTone_idle {
@@ -330,7 +330,7 @@
 .laneRepo {
   margin: 0.3rem 0 0;
   font-size: 0.75rem;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -349,25 +349,25 @@
 }
 
 .badge_running {
-  color: var(--active);
+  color: var(--mc-active);
   border-color: rgba(53, 167, 122, 0.35);
   background: rgba(53, 167, 122, 0.1);
 }
 
 .badge_awaitingCi {
-  color: var(--waiting);
+  color: var(--mc-waiting);
   border-color: rgba(212, 162, 76, 0.35);
   background: rgba(212, 162, 76, 0.1);
 }
 
 .badge_needsAttention {
-  color: var(--attention);
+  color: var(--mc-attention);
   border-color: rgba(212, 101, 90, 0.35);
   background: rgba(212, 101, 90, 0.1);
 }
 
 .badge_idle {
-  color: var(--idle);
+  color: var(--mc-idle);
   border-color: rgba(107, 114, 128, 0.35);
   background: rgba(107, 114, 128, 0.1);
 }
@@ -384,45 +384,44 @@
   padding: 0.2rem 0.45rem;
   border-radius: 2px;
   font-size: 0.7rem;
-  border: 1px solid var(--line);
-  background: var(--canvas);
-  color: var(--text-mute);
+  border: 1px solid var(--mc-line);
+  background: var(--mc-canvas);
+  color: var(--mc-text-mute);
 }
 
 .chip_running {
-  color: var(--active);
+  color: var(--mc-active);
   border-color: rgba(53, 167, 122, 0.35);
 }
 
 .chip_awaitingCi {
-  color: var(--waiting);
+  color: var(--mc-waiting);
   border-color: rgba(212, 162, 76, 0.35);
 }
 
 .chip_needsAttention {
-  color: var(--attention);
+  color: var(--mc-attention);
   border-color: rgba(212, 101, 90, 0.35);
 }
 
 .hotEmpty {
   font-size: 0.75rem;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .expandHint {
   font-size: 0.72rem;
-  color: var(--copper);
+  color: var(--mc-copper);
   white-space: nowrap;
   justify-self: end;
 }
 
 .laneBody {
   padding: 0 1.05rem 1.05rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--mc-line);
 }
 
 .phases {
-  list-style: none;
   margin: 0.85rem 0 0.95rem;
   padding: 0;
   display: flex;
@@ -437,17 +436,17 @@
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--idle);
+  color: var(--mc-idle);
   border: 1px solid rgba(107, 114, 128, 0.25);
 }
 
 .phaseDone {
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
   border-color: rgba(53, 167, 122, 0.25);
 }
 
 .phaseActive {
-  color: var(--active);
+  color: var(--mc-active);
   border-color: rgba(53, 167, 122, 0.45);
   background: rgba(53, 167, 122, 0.1);
 }
@@ -465,8 +464,8 @@
   gap: 0.2rem;
   padding: 0.7rem 0.75rem;
   border-radius: 3px;
-  border: 1px solid var(--line);
-  background: var(--canvas);
+  border: 1px solid var(--mc-line);
+  background: var(--mc-canvas);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -475,11 +474,11 @@
 }
 
 .agent:hover {
-  background: var(--surface-raised);
+  background: var(--mc-surface-raised);
 }
 
 .agentSelected {
-  border-color: var(--copper);
+  border-color: var(--mc-copper);
   background: rgba(197, 139, 100, 0.08);
 }
 
@@ -526,19 +525,19 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .agent_running .agentState {
-  color: var(--active);
+  color: var(--mc-active);
 }
 
 .agent_awaitingCi .agentState {
-  color: var(--waiting);
+  color: var(--mc-waiting);
 }
 
 .agent_needsAttention .agentState {
-  color: var(--attention);
+  color: var(--mc-attention);
 }
 
 .agentRole {
@@ -552,14 +551,14 @@
   font-size: 0.65rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .agentActivity {
   margin: 0.25rem 0 0;
   font-size: 0.75rem;
   line-height: 1.3;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -570,7 +569,7 @@
 .empty,
 .loading {
   margin: 0;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
   font-size: 0.9rem;
 }
 
@@ -588,8 +587,8 @@
   max-height: calc(100vh - 3.5rem);
   overflow: auto;
   padding: 1.15rem 1.2rem 2rem;
-  border-left: 1px solid var(--line);
-  background: var(--surface);
+  border-left: 1px solid var(--mc-line);
+  background: var(--mc-surface);
   animation: inspectorIn 0.2s ease;
 }
 
@@ -615,7 +614,7 @@
     min-height: 0;
     max-height: none;
     border-left: 0;
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--mc-line);
   }
 
   .stageWithInspector .mainCol {
@@ -637,7 +636,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--copper);
+  color: var(--mc-copper);
 }
 
 .inspectorTitle {
@@ -651,15 +650,15 @@
 .inspectorRepo {
   margin: 0.25rem 0 0;
   font-size: 0.75rem;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .inspectorClose {
   appearance: none;
-  border: 1px solid var(--line);
+  border: 1px solid var(--mc-line);
   border-radius: 3px;
-  background: var(--canvas);
-  color: var(--text-mute);
+  background: var(--mc-canvas);
+  color: var(--mc-text-mute);
   font: inherit;
   font-size: 0.72rem;
   padding: 0.35rem 0.55rem;
@@ -667,14 +666,14 @@
 }
 
 .inspectorClose:hover {
-  color: var(--text);
-  border-color: var(--line-strong);
+  color: var(--mc-text);
+  border-color: var(--mc-line-strong);
 }
 
 .inspectorSection {
   margin-top: 1.15rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--mc-line);
 }
 
 .inspectorSectionTitle {
@@ -683,7 +682,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .inspectorTask {
@@ -696,7 +695,7 @@
 .inspectorMeta {
   margin: 0.4rem 0 0;
   font-size: 0.78rem;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
   line-height: 1.4;
 }
 
@@ -709,25 +708,25 @@
 
 .inspectorLink {
   font-size: 0.78rem;
-  color: var(--copper);
+  color: var(--mc-copper);
   text-decoration: none;
   border-bottom: 1px solid transparent;
 }
 
 .inspectorLink:hover {
-  border-bottom-color: var(--copper);
+  border-bottom-color: var(--mc-copper);
 }
 
 .inspectorError {
   margin: 0.55rem 0 0;
   font-size: 0.78rem;
-  color: var(--attention);
+  color: var(--mc-attention);
 }
 
 .inspectorEmpty {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 .eventList {
@@ -748,12 +747,12 @@
 }
 
 .eventTime {
-  color: var(--idle);
+  color: var(--mc-idle);
   font-variant-numeric: tabular-nums;
 }
 
 .eventText {
-  color: var(--text-mute);
+  color: var(--mc-text-mute);
 }
 
 @media (prefers-reduced-motion: reduce) {

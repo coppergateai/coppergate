@@ -17,9 +17,8 @@ const links = [
   { href: "/#how-it-works", label: "How it works" },
   { href: "/#evidence", label: "Evidence" },
   { href: "/#signals", label: "Integrations" },
-  { href: "/#controls", label: "Controls" },
-  { href: "/#projects", label: "Projects" },
-  { href: "/#faq", label: "FAQ" },
+  { href: "/docs/pricing", label: "Pricing" },
+  { href: "/docs", label: "Docs" },
 ] as const;
 
 export function MarketingHeader({ signedIn }: Props) {
@@ -91,13 +90,15 @@ export function MarketingHeader({ signedIn }: Props) {
         <div className={styles.navActions}>
           <ThemeToggle />
           <a
-            className={styles.githubLink}
+            className={styles.githubChip}
             href="https://github.com/coppergateai/coppergate"
             target="_blank"
             rel="noreferrer"
             aria-label="Coppergate on GitHub"
+            onClick={() => track("cta_github", { location: "nav" })}
           >
             <IconGithub />
+            <span>GitHub</span>
           </a>
 
           {signedIn ? (
@@ -117,16 +118,14 @@ export function MarketingHeader({ signedIn }: Props) {
               <Link className={styles.navGhost} href="/login">
                 Sign in
               </Link>
-              <a
+              <Link
                 className={styles.btnPrimary}
-                href="https://github.com/coppergateai/coppergate"
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => track("cta_github", { location: "nav" })}
+                href="/login"
+                onClick={() => track("cta_open_workspaces", { location: "nav" })}
               >
-                GitHub
+                Open workspaces
                 <IconArrow />
-              </a>
+              </Link>
             </>
           )}
 
@@ -180,15 +179,13 @@ export function MarketingHeader({ signedIn }: Props) {
                 <Link href="/login" onClick={closeMenu}>
                   Sign in
                 </Link>
-                <a
+                <Link
                   className={styles.drawerCta}
-                  href="https://github.com/coppergateai/coppergate"
-                  target="_blank"
-                  rel="noreferrer"
+                  href="/login"
                   onClick={closeMenu}
                 >
-                  GitHub
-                </a>
+                  Open workspaces
+                </Link>
               </>
             )}
           </nav>
