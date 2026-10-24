@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox";
+import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox/policy";
 import type { Database } from "./client.js";
 import { createEmailProvider, renderNotifyEmail } from "./email.js";
 import { redactPayload } from "./redact.js";

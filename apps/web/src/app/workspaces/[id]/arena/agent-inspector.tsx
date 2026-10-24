@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { displayTaskTitle } from "@coppergate/db";
+import { displayTaskTitle } from "@/lib/display-title";
 import styles from "./arena-mission.module.css";
 
 export type InspectorRun = {

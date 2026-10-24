@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { assertSafeServerFetchUrl } from "@coppergate/sandbox";
+import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox/policy";
 import type { Database } from "./client.js";
 import { recordAuditEvent } from "./briefs.js";
 import {
@@ -101,7 +101,8 @@ export async function upsertMcpConnection(
   const endpoint = input.endpointUrl.trim().replace(/\/+$/, "");
   try {
     // Self-hosted Sonar on private nets is allowed; metadata/link-local is not.
-    assertSafeServerFetchUrl(endpoint, { allowPrivate: true });
+    // DNS-resolved addresses are re-checked (rebinding defense).
+    await assertSafeServerFetchUrlResolved(endpoint, { allowPrivate: true });
   } catch {
     throw new Error(
       "endpointUrl must be a safe http(s) URL (metadata/link-local blocked)",

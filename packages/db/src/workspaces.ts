@@ -1,6 +1,6 @@
 import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
-import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox";
+import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox/policy";
 import type { Database } from "./client.js";
 import {
   agentProfiles,

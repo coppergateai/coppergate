@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { displayTaskTitle } from "@/lib/display-title";
+import { EmptyState } from "@/components/app/ui";
 import { gateStatusLabel, type GateStatus } from "@/lib/hard-gates";
 import styles from "./project-detail.module.css";
 
@@ -38,6 +40,28 @@ function statusHint(status: string, acceptReady: boolean | null): string {
   if (status === "ACCEPTED" || status === "DONE") return "Verified delivery";
   if (status === "WAITING_CI") return "Awaiting CI evidence";
   if (status === "FAILED") return "Failed — Retry or re-scope";
+  return status;
+}
+
+function statusTone(
+  status: string,
+  acceptReady: boolean | null,
+): "ok" | "warn" | "fail" | "mute" {
+  if (status === "ACCEPTED" || status === "DONE") return "ok";
+  if (status === "FAILED") return "fail";
+  if (status === "REVIEW_REQUIRED") return acceptReady ? "ok" : "warn";
+  if (status === "WAITING_CI" || status === "VALIDATING") return "warn";
+  return "mute";
+}
+
+function statusPillLabel(status: string, acceptReady: boolean | null): string {
+  if (status === "ACCEPTED" || status === "DONE") return "Verified";
+  if (status === "FAILED") return "Failed";
+  if (status === "REVIEW_REQUIRED") {
+    return acceptReady ? "Accept ready" : "Needs review";
+  }
+  if (status === "WAITING_CI") return "CI";
+  if (status === "VALIDATING") return "Validating";
   return status;
 }
 
@@ -127,43 +151,59 @@ export function EvidencePanel({
         </h2>
       </div>
       <p className={styles.sectionLede}>
-        Not just the PR — CI, validation, diff, findings, fitness, and policy.
-        Hard gates must clear before Accept; soft gates inform the decision.
+        CI, validation, diff, findings, and policy — hard gates must clear
+        before Accept.
       </p>
       {error ? <p className={styles.stackWarn}>{error}</p> : null}
 
       {deliveries.length === 0 ? (
-        <p className={styles.sectionLede}>
-          No deliveries yet. Import an issue from Overview, run Arena, then
-          return here when a PR is ready.{" "}
-          <Link href={`${base}?tab=overview`}>Start from issue</Link>
-        </p>
+        <EmptyState
+          title="No deliveries yet"
+          body="Start in Arena. When a PR is ready, evidence and gates land here for Accept."
+          action={
+            <Link href={`${base}?tab=arena`} className={styles.linkCta}>
+              Open Arena → Start
+            </Link>
+          }
+        />
       ) : (
         <ul className={styles.evidenceList}>
           {deliveries.map((d) => {
             const gates = gatesByTask[d.taskId] ?? [];
             const open = expandedId === d.taskId;
+            const tone = statusTone(d.status, d.acceptReady);
+            const title = displayTaskTitle(d.title) || d.title;
             return (
               <li key={d.taskId} className={styles.evidenceRow}>
-                <div style={{ flex: "1 1 14rem", minWidth: 0 }}>
-                  <button
-                    type="button"
-                    className={styles.evidenceTitle}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      textAlign: "left",
-                    }}
-                    onClick={() => void expand(d.taskId)}
-                  >
-                    {d.title}
-                  </button>
+                <div className={styles.evidenceMain}>
+                  <div className={styles.evidenceHead}>
+                    <span
+                      className={`${styles.evidencePill} ${
+                        tone === "ok"
+                          ? styles.evidencePillOk
+                          : tone === "fail"
+                            ? styles.evidencePillFail
+                            : tone === "warn"
+                              ? styles.evidencePillWarn
+                              : styles.evidencePillMute
+                      }`}
+                    >
+                      {statusPillLabel(d.status, d.acceptReady)}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.evidenceTitle}
+                      onClick={() => void expand(d.taskId)}
+                      aria-expanded={open}
+                    >
+                      {title}
+                    </button>
+                  </div>
                   <p className={styles.evidenceMeta}>
                     {statusHint(d.status, d.acceptReady)}
                     {d.prUrl ? " · PR attached" : ""}
                     {d.updatedAt ? ` · ${formatWhen(d.updatedAt)}` : ""}
+                    {!open ? " · Gates" : ""}
                   </p>
                   {open && gates.length > 0 ? (
                     <ul className={styles.gateList}>
@@ -188,6 +228,8 @@ export function EvidencePanel({
                         </li>
                       ))}
                     </ul>
+                  ) : open ? (
+                    <p className={styles.evidenceMeta}>No gate details yet.</p>
                   ) : null}
                 </div>
                 <div className={styles.evidenceActions}>
@@ -195,7 +237,7 @@ export function EvidencePanel({
                     href={`${base}/tasks/${d.taskId}`}
                     className={styles.ghostBtn}
                   >
-                    Delivery Review
+                    Review
                   </Link>
                   {d.prUrl ? (
                     <a

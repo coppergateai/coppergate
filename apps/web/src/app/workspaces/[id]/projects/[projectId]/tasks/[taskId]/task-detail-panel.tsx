@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app";
-import { displayTaskTitle } from "@coppergate/db";
+import { displayTaskTitle } from "@/lib/display-title";
 import {
   acceptBlockedReason as computeAcceptBlocked,
   HARD_GATE_COPY,

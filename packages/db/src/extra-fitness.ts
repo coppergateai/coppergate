@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
-import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox";
+import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox/policy";
 import type { Database } from "./client.js";
 import { createArtifact } from "./artifacts.js";
 import { appendRunEvent } from "./run-events.js";
