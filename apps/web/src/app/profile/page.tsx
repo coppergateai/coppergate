@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listWorkspacesForUser } from "@coppergate/db";
 import { AppChrome } from "@/components/app";
-import { LogoutButton } from "@/app/logout-button";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ProfileForm } from "./profile-form";
@@ -71,7 +70,6 @@ export default async function ProfilePage() {
               <Link href="/workspaces" className={styles.ghostBtn}>
                 Workspaces
               </Link>
-              <LogoutButton className={styles.dangerBtn}>Log out</LogoutButton>
             </div>
           </header>
 

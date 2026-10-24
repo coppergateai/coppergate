@@ -117,9 +117,8 @@ export function SignalsPanel({ workspaceId, isOwner, projects }: Props) {
         Signals
       </h2>
       <p className={styles.sectionLede}>
-        Wedge depth (D14): prioritize <strong>Sentry</strong> and{" "}
-        <strong>ci_failure</strong> webhooks (plus GitHub issue import on the
-        project). Other adapters expand only on customer pull — see docs/EXPAND_PULL.md.
+        Ingest alerts from Sentry, CI failures, and similar sources. Matching
+        rules can auto-arm Arena on a project with an approved brief.
       </p>
 
       <div className={styles.splitGrid}>
@@ -136,7 +135,7 @@ export function SignalsPanel({ workspaceId, isOwner, projects }: Props) {
             </button>
           </div>
           <p className={styles.muted}>
-            Depth first: sentry, ci_failure (also: sonar, jira, linear, fake, …)
+            Path segment = provider id (sentry, ci_failure, sonar, …)
           </p>
         </div>
 
@@ -286,7 +285,7 @@ export function SignalsPanel({ workspaceId, isOwner, projects }: Props) {
                 .finally(() => setPending(false));
             }}
           >
-            Enable wedge auto-arm (Sentry + CI-fail)
+            Enable Sentry + CI-fail auto-arm
           </button>
         </div>
       </div>
