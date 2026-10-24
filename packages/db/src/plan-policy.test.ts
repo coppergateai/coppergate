@@ -26,10 +26,15 @@ describe("plan policy", () => {
     assert.equal(PLAN_LIMITS.starter.maxConcurrentRuns, 1);
   });
 
+  it("Community and Pro share the raised concurrency cap", () => {
+    assert.equal(PLAN_LIMITS.community.maxConcurrentRuns, 20);
+    assert.equal(PLAN_LIMITS.pro.maxConcurrentRuns, 20);
+  });
+
   it("remainingConcurrencySlots never goes negative", () => {
-    assert.equal(remainingConcurrencySlots(0, 12), 12);
-    assert.equal(remainingConcurrencySlots(12, 12), 0);
-    assert.equal(remainingConcurrencySlots(20, 12), 0);
+    assert.equal(remainingConcurrencySlots(0, 20), 20);
+    assert.equal(remainingConcurrencySlots(20, 20), 0);
+    assert.equal(remainingConcurrencySlots(25, 20), 0);
   });
 
   it("clampFanoutToCapacity respects slots and available budget", () => {
@@ -45,7 +50,7 @@ describe("plan policy", () => {
     assert.equal(
       clampFanoutToCapacity({
         requested: 11,
-        concurrencySlots: 12,
+        concurrencySlots: 20,
         availableMicros: 5_000_000,
         perRunMicros: 2_000_000,
       }),
@@ -54,7 +59,7 @@ describe("plan policy", () => {
     assert.equal(
       clampFanoutToCapacity({
         requested: 11,
-        concurrencySlots: 12,
+        concurrencySlots: 20,
         availableMicros: 1_000_000,
         perRunMicros: 2_000_000,
       }),

@@ -36,7 +36,12 @@ export type RunCiFitness = {
   passed: boolean;
   /** Worker emitted fitness-pending (live http delivery). */
   awaitingLive: boolean;
-  /** Safe to Accept: not blocking; if awaiting live CI, must have passed evidence. */
+  /**
+   * CI gate cleared enough to leave WAITING_CI (green or vacuous no-CI evidence).
+   * Distinct from acceptReady — Accept still requires REVIEW_REQUIRED.
+   */
+  ciSatisfied: boolean;
+  /** Safe to Accept: not WAITING_CI; not blocking; if awaiting live CI, must have passed. */
   acceptReady: boolean;
 };
 
@@ -149,7 +154,8 @@ export async function ingestCiEvidence(
       .where(eq(agentRuns.id, run.id));
   }
 
-  if (fitness.acceptReady && run.status === "WAITING_CI") {
+  // Promote on ciSatisfied — acceptReady is intentionally false while WAITING_CI.
+  if (fitness.ciSatisfied && run.status === "WAITING_CI") {
     try {
       const { promoteRunFromWaitingCi } = await import("./run-events.js");
       const { applyTaskTransition } = await import("./task-transitions.js");
@@ -285,10 +291,20 @@ export async function getRunCiFitness(
   // Run status is source of truth — do not rely solely on fitness:pending events
   // (worker can crash after markRunWaitingCi before the evidence event is written).
   const awaitingLive = statusAwaitingCi || eventAwaitingLive;
+  // Green (or vacuous no-CI) evidence clears the gate even while still WAITING_CI.
+  const ciSatisfied = !blocking && passed;
+  // Accept stays fail-closed until promoted out of WAITING_CI.
   const acceptReady =
     !statusAwaitingCi && !blocking && (!awaitingLive || passed);
 
-  return { checks, blocking, passed, awaitingLive, acceptReady };
+  return {
+    checks,
+    blocking,
+    passed,
+    awaitingLive,
+    ciSatisfied,
+    acceptReady,
+  };
 }
 
 /** True if any latest CI check for the run blocks accept. */

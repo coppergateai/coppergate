@@ -315,7 +315,77 @@ describe("CI evidence ingestion", { skip: !url }, () => {
 
     const fitness = await getRunCiFitness(db, run.id);
     assert.equal(fitness.awaitingLive, true);
+    assert.equal(fitness.ciSatisfied, false);
     assert.equal(fitness.acceptReady, false);
+  });
+
+  it("green CI while WAITING_CI promotes to REVIEW_REQUIRED then accept-ready", async () => {
+    const stamp = Date.now();
+    const sha = `promoteci${stamp}`;
+    const plan = await generateProjectPlan(db, {
+      workspaceId,
+      projectId,
+      actor,
+      milestones: [
+        {
+          title: "M-promote",
+          description: "",
+          tasks: [
+            {
+              key: `promote-${stamp}`,
+              title: "Promote from WAITING_CI",
+              goal: "g",
+              scope: "s",
+              allowedPaths: [],
+              acceptanceCriteria: ["ok"],
+              estimateMicros: 1000,
+              estimateComplexity: "S",
+              dependsOn: [],
+              priority: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const taskId = plan.milestones[0]!.tasks[0]!.task.id;
+    const { run } = await enqueueAgentRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      idempotencyKey: `ci-promote-${stamp}`,
+    });
+    await db
+      .update(agentRuns)
+      .set({
+        headSha: sha,
+        status: "WAITING_CI",
+        finishedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(agentRuns.id, run.id));
+
+    const before = await getRunCiFitness(db, run.id);
+    assert.equal(before.acceptReady, false);
+    assert.equal(before.ciSatisfied, false);
+
+    const { run: afterIngest } = await ingestCiEvidence(db, {
+      workspaceId,
+      headSha: sha,
+      name: "ci",
+      status: "completed",
+      conclusion: "success",
+      passed: true,
+      blocksAccept: false,
+      checkRunId: 42,
+      detailsUrl: null,
+      repoFullName: "org-ci/app",
+    });
+    assert.equal(afterIngest?.status, "REVIEW_REQUIRED");
+
+    const after = await getRunCiFitness(db, afterIngest!.id);
+    assert.equal(after.ciSatisfied, true);
+    assert.equal(after.passed, true);
+    assert.equal(after.acceptReady, true);
   });
 
   it("fitness pending without green CI is not accept-ready", async () => {

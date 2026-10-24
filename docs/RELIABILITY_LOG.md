@@ -55,6 +55,11 @@ Date: 2026-10-24
 - **Duplicate FILE paths**: fail closed (`duplicate_file_path`) — refuse ambiguous last-write-wins completions
 - **Usage idempotency**: `appendUsageEvent(llm_tokens)` returns existing row for the same `runId` (no double-bill on resume)
 
+## Cycle 10
+- **WAITING_CI promote**: `ciSatisfied` (!blocking && passed) drives `WAITING_CI → REVIEW_REQUIRED`; `acceptReady` stays false until promoted (fixes dead promote path after Cycle 8)
+- **Vacuous no-CI**: CI refresh ingests synthetic `no_required_checks` after 5m grace when GitHub returns empty check-runs/statuses — frees slots + unblocks auto-accept on repos without CI
+- **Concurrency bump**: Community/Pro `maxConcurrentRuns` 12 → 20
+
 ## Tests
 - `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt, duplicate FILE, JSON retry
 - `delivery.test.ts` — fake idempotency, list fail-closed, 422 recovery, CAS conflict

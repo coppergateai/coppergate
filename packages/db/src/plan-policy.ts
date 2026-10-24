@@ -13,7 +13,7 @@ export type PlanLimits = {
 export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
   /** Self-host / unpaid — full catalog arena; no hosted preview. */
   community: {
-    maxConcurrentRuns: 12,
+    maxConcurrentRuns: 20,
     maxTournamentFanout: 11,
     previewEnabled: false,
     arenaEnabled: true,
@@ -26,7 +26,7 @@ export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
     arenaEnabled: false,
   },
   pro: {
-    maxConcurrentRuns: 12,
+    maxConcurrentRuns: 20,
     maxTournamentFanout: 11,
     previewEnabled: true,
     arenaEnabled: true,
