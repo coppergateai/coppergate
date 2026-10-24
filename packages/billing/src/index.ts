@@ -1,5 +1,7 @@
 export {
   HOSTED_PLANS,
+  PUBLIC_PAID_PRICING_ENABLED,
+  publicHostedPlans,
   planFromPriceId,
   type HostedPlanId,
   type PlanDefinition,

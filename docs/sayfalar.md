@@ -53,7 +53,7 @@ Web uygulamasındaki (`apps/web`) route’ların sayfa sayfa özeti. Auth gerekt
 - Explicit non-goals (HITL studio, unattended prod, training on private code, …)
 
 ### `/docs/pricing`
-- MIT self-host $0; opsiyonel Hosted Starter/Pro (`HOSTED_PLANS`)
+- MIT self-host $0 only — paid Starter/Pro ($99/$199) deferred (`PUBLIC_PAID_PRICING_ENABLED=false`)
 
 ### `/docs/recovery`
 - Issue → PR one-session path

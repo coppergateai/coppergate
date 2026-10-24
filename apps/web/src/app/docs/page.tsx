@@ -30,7 +30,7 @@ const items = [
   {
     href: "/docs/pricing",
     title: "Pricing",
-    detail: "Community $0 self-host · optional hosted Starter/Pro",
+    detail: "Community $0 self-host · paid plans deferred",
   },
   {
     href: "/docs/recovery",

@@ -10,7 +10,14 @@ export type PlanDefinition = {
   features: string[];
 };
 
-/** Public SKU copy — Stripe Price IDs come from env. */
+/**
+ * Paid public pricing is OFF.
+ * Do not surface Starter ($99) / Pro ($199) on marketing, docs, or Settings → Billing
+ * until product explicitly reopens paid plans. Keep SKUs here for Stripe ops only.
+ */
+export const PUBLIC_PAID_PRICING_ENABLED = false;
+
+/** Stripe SKU definitions — not for public UI while PUBLIC_PAID_PRICING_ENABLED is false. */
 export const HOSTED_PLANS: readonly PlanDefinition[] = [
   {
     id: "starter",
@@ -39,6 +46,11 @@ export const HOSTED_PLANS: readonly PlanDefinition[] = [
     ],
   },
 ] as const;
+
+/** Plans exposed to product UI / checkout catalog. Empty while paid pricing is deferred. */
+export function publicHostedPlans(): readonly PlanDefinition[] {
+  return PUBLIC_PAID_PRICING_ENABLED ? HOSTED_PLANS : [];
+}
 
 export function planFromPriceId(
   priceId: string | null | undefined,

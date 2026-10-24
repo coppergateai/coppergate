@@ -23,4 +23,4 @@ Budgets answer “how much can this path spend?” The kill-switch answers “st
 
 Efficiency ranking rewards qualifying work relative to spend. Burning tokens without clearing fitness gates does not win. Surviving with evidence under budget does.
 
-For hosted and self-host pricing context, see [Pricing](/docs/pricing). For failure modes when budgets trip mid-run, see [Recovery](/docs/recovery).
+For self-host pricing context, see [Pricing](/docs/pricing). For failure modes when budgets trip mid-run, see [Recovery](/docs/recovery).
