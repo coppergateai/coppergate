@@ -89,11 +89,16 @@ export function SiteHeader({ signedIn }: Props) {
           ) : (
             <>
               <Link className={`${styles.navLink} ${styles.navLinkDesktop}`} href="/login">
-                Sign in
-              </Link>
-              <Link className={styles.navCta} href="/login">
                 Try hosted
               </Link>
+              <a
+                className={styles.navCta}
+                href="https://github.com/coppergateai/coppergate"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Start on GitHub
+              </a>
             </>
           )}
 
@@ -128,16 +133,26 @@ export function SiteHeader({ signedIn }: Props) {
             </Link>
           ) : (
             <>
-              <Link href="/login" onClick={closeMenu}>
-                Sign in
-              </Link>
-              <Link
-                className={styles.navDrawerCta}
-                href="/login"
+              <a
+                href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+                target="_blank"
+                rel="noreferrer"
                 onClick={closeMenu}
               >
+                Self-host guide
+              </a>
+              <Link href="/login" onClick={closeMenu}>
                 Try hosted
               </Link>
+              <a
+                className={styles.navDrawerCta}
+                href="https://github.com/coppergateai/coppergate"
+                target="_blank"
+                rel="noreferrer"
+                onClick={closeMenu}
+              >
+                Start on GitHub
+              </a>
             </>
           )}
         </nav>

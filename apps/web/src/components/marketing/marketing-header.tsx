@@ -190,16 +190,16 @@ export function MarketingHeader({ signedIn: signedInProp }: Props) {
               <span>Theme</span>
               <ThemeToggle />
             </div>
-            <a
-              href="https://github.com/coppergateai/coppergate"
-              target="_blank"
-              rel="noreferrer"
-              onClick={closeMenu}
-            >
-              GitHub
-            </a>
             {signedIn ? (
               <>
+                <a
+                  href="https://github.com/coppergateai/coppergate"
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={closeMenu}
+                >
+                  GitHub
+                </a>
                 <LogoutButton />
                 <Link
                   className={styles.drawerCta}

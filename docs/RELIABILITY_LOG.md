@@ -50,12 +50,18 @@ Date: 2026-10-24
 - `decideTaskReview(accept)` rejects latest run still `WAITING_CI` and requires `acceptReady`
 - **Prompt isolation**: untrusted goal/scope/context wrapped in `<UNTRUSTED_DATA>`; size budgets; injection-phrase flag; system rules ignore data-plane directives
 
+## Cycle 9
+- **Malformed LLM JSON**: chat completion body parse failures retry with backoff (same bound as 429/5xx)
+- **Duplicate FILE paths**: fail closed (`duplicate_file_path`) — refuse ambiguous last-write-wins completions
+- **Usage idempotency**: `appendUsageEvent(llm_tokens)` returns existing row for the same `runId` (no double-bill on resume)
+
 ## Tests
-- `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt isolation (41 pass)
+- `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt, duplicate FILE, JSON retry
 - `delivery.test.ts` — fake idempotency, list fail-closed, 422 recovery, CAS conflict
 - `delivery-artifacts.test.ts` — checkpoint build/parse + legacy fail-closed
 - `runs.reaper-policy.test.ts` — reclaim parse + WAITING_CI timeout env
 - `ci-evidence.test.ts` — WAITING_CI status alone not accept-ready (needs `DATABASE_URL`)
+- `budgets.test.ts` — llm_tokens once-per-runId (needs `DATABASE_URL`)
 - DB claim/execute suites need `DATABASE_URL`
 
 ## Remaining risks
@@ -63,3 +69,4 @@ Date: 2026-10-24
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly
 - Failover doubles spend only on thrown provider failures; operators should size fallback model cost intentionally
 - Prompt isolation is defense-in-depth, not a guarantee against model compliance failures
+- llm_tokens dedupe is application-level (race of two concurrent inserts for same runId still possible without a unique index)
