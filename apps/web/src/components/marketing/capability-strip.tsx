@@ -41,14 +41,17 @@ const items = [
 
 export function CapabilityStrip() {
   return (
-    <section className={styles.caps} aria-label="Product pillars">
+    <section className={styles.caps} aria-labelledby="caps-title">
       <div className={styles.capsInner}>
+        <h2 id="caps-title" className={styles.srOnly}>
+          Product pillars
+        </h2>
         {items.map(({ title, body, href, link, Icon }) => (
           <article key={title} className={styles.capItem}>
             <span className={styles.capIcon}>
               <Icon />
             </span>
-            <h2 className={styles.capTitle}>{title}</h2>
+            <h3 className={styles.capTitle}>{title}</h3>
             <p className={styles.capBody}>{body}</p>
             <Link className={styles.capLink} href={href}>
               {link}

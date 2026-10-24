@@ -27,7 +27,7 @@ export default function PricingPage() {
           { name: "Pricing", path: "/docs/pricing" },
         ]}
       />
-      <main className={`${styles.contentPage} ${styles.contentWide}`}>
+      <div className={`${styles.contentPage} ${styles.contentWide}`}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
         </Link>
@@ -104,15 +104,16 @@ export default function PricingPage() {
 
         <div className={styles.pricingFootnote}>
           <p>
-            Hosted seats may open free during early stage. Paid SKUs are for when
-            you want us to run sandboxes and ops — the community path stays free.
+            Community self-host stays $0 forever. Hosted Starter and Pro are
+            optional when you want managed sandboxes and ops — not required to
+            use Coppergate.
           </p>
           <p>
             Questions?{" "}
             <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>
           </p>
         </div>
-      </main>
+      </div>
     </DocsShell>
   );
 }

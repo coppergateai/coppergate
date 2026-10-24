@@ -133,6 +133,7 @@ export async function POST(request: Request, context: RouteContext) {
               : null;
         if (gate && headSha) {
           await ingestSonarFitness(db, {
+            workspaceId,
             headSha,
             gateStatus: gate,
             projectKey:

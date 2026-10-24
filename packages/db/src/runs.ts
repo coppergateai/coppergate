@@ -20,6 +20,42 @@ export class RunError extends Error {
 
 export const DEFAULT_LEASE_MS = 30_000;
 
+/** Max times a RUNNING run may be reaped back to QUEUED before poison-fail. */
+export const MAX_LEASE_RECLAIMS = 3;
+
+/** Wall-clock backstop for RUNNING reclaim loops. */
+export const MAX_RUN_WALL_MS = 45 * 60_000;
+
+/**
+ * WAITING_CI without accept-ready CI fails closed after this age
+ * (uses finished_at set when entering WAITING_CI). Override: WAITING_CI_TIMEOUT_MS.
+ */
+export const DEFAULT_WAITING_CI_TIMEOUT_MS = 6 * 60 * 60_000;
+
+const RECLAIM_PREFIX = "reclaim:";
+
+/** Parse reclaim counter stored in error_message as `reclaim:N`. */
+export function parseReclaimCount(
+  errorCode: string | null | undefined,
+  errorMessage: string | null | undefined,
+): number {
+  if (errorCode !== "lease_reclaimed" || !errorMessage?.startsWith(RECLAIM_PREFIX)) {
+    return 0;
+  }
+  const n = Number(errorMessage.slice(RECLAIM_PREFIX.length));
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+export function resolveWaitingCiTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const raw = env.WAITING_CI_TIMEOUT_MS?.trim();
+  if (!raw) return DEFAULT_WAITING_CI_TIMEOUT_MS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 60_000) return DEFAULT_WAITING_CI_TIMEOUT_MS;
+  return Math.floor(n);
+}
+
 function mapRow(row: Record<string, unknown>): AgentRun {
   return {
     id: String(row.id),
@@ -295,7 +331,8 @@ export async function requestCancelRun(
   }
 
   const now = new Date();
-  if (run.status === "QUEUED") {
+  // QUEUED / WAITING_CI: no active worker lease — hard cancel immediately.
+  if (run.status === "QUEUED" || run.status === "WAITING_CI") {
     const [updated] = await db
       .update(agentRuns)
       .set({
@@ -305,14 +342,17 @@ export async function requestCancelRun(
         leaseOwner: null,
         leaseUntil: null,
         errorCode: "cancelled",
-        errorMessage: "Cancelled before start",
+        errorMessage:
+          run.status === "WAITING_CI"
+            ? "Cancelled while awaiting CI"
+            : "Cancelled before start",
         updatedAt: now,
       })
       .where(
         and(
           eq(agentRuns.id, run.id),
           eq(agentRuns.workspaceId, input.workspaceId),
-          eq(agentRuns.status, "QUEUED"),
+          sql`${agentRuns.status} in ('QUEUED', 'WAITING_CI')`,
         ),
       )
       .returning();
@@ -485,52 +525,131 @@ export async function renewRunLease(
   return updated;
 }
 
+export type ReapedFailedRun = {
+  id: string;
+  taskId: string;
+  workspaceId: string;
+  projectId: string;
+  estimatedCostMicros: number;
+  errorCode: string;
+};
+
 export type ReapStaleRunsResult = {
   /** Expired RUNNING leases returned to QUEUED. */
   requeued: number;
+  /** Expired RUNNING leases poison-failed (max reclaims / wall-clock). */
+  failedPoison: number;
   /** Expired VALIDATING leases failed closed (not re-queued mid-validation). */
   failedValidating: number;
-  /** Runs failed for VALIDATING lease expiry — caller should fail matching tasks. */
-  failedValidatingRuns: Array<{
-    id: string;
-    taskId: string;
-    workspaceId: string;
-    projectId: string;
-    estimatedCostMicros: number;
-  }>;
+  /** WAITING_CI past wall-clock without CI accept-ready. */
+  failedWaitingCi: number;
+  /** Runs failed by reaper — caller should fail matching tasks when still in-flight. */
+  failedRuns: ReapedFailedRun[];
+  /** @deprecated use failedRuns filtered by validating_lease_expired */
+  failedValidatingRuns: ReapedFailedRun[];
 };
+
+type FailedRow = {
+  id: string;
+  task_id: string;
+  workspace_id: string;
+  project_id: string;
+  estimated_cost_micros: number | null;
+  error_code: string | null;
+};
+
+function mapFailedRows(rows: FailedRow[]): ReapedFailedRun[] {
+  return rows.map((row) => ({
+    id: String(row.id),
+    taskId: String(row.task_id),
+    workspaceId: String(row.workspace_id),
+    projectId: String(row.project_id),
+    estimatedCostMicros: Number(row.estimated_cost_micros ?? 0),
+    errorCode: String(row.error_code ?? "unknown"),
+  }));
+}
+
+async function releaseFailedEstimates(
+  db: Database,
+  runs: ReapedFailedRun[],
+): Promise<void> {
+  for (const run of runs) {
+    if (run.estimatedCostMicros <= 0) continue;
+    await releaseEstimateForRun(db, {
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      taskId: run.taskId,
+      runId: run.id,
+      amountMicros: run.estimatedCostMicros,
+    }).catch(() => undefined);
+  }
+}
 
 /**
  * Reaper:
- * - expired RUNNING leases → QUEUED (clears owner) for reclaim
- * - expired VALIDATING leases → FAILED (fail closed; not safe to re-queue mid-validation)
- *
- * VALIDATING sticks forever without this path: claim only picks QUEUED / stale RUNNING.
+ * - expired RUNNING + reclaim budget / wall-clock OK → QUEUED (increment reclaim count)
+ * - expired RUNNING + poison (max reclaims or wall-clock) → FAILED
+ * - expired VALIDATING → FAILED (fail closed; not safe to re-queue mid-validation)
+ * - WAITING_CI older than timeout (finished_at) → FAILED (CI never accept-ready)
  */
 export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> {
-  const requeuedRows = await db.$client<{ id: string }[]>`
+  const wallCutoff = new Date(Date.now() - MAX_RUN_WALL_MS).toISOString();
+  const waitingCiCutoff = new Date(
+    Date.now() - resolveWaitingCiTimeoutMs(),
+  ).toISOString();
+
+  const poisonRows = await db.$client<FailedRow[]>`
     UPDATE agent_runs
     SET
-      status = 'QUEUED',
+      status = 'FAILED',
+      error_code = 'lease_expired_poison',
+      error_message = 'RUNNING lease expired after max reclaims or wall-clock budget',
       lease_owner = NULL,
       lease_until = NULL,
+      finished_at = now(),
       updated_at = now()
     WHERE status = 'RUNNING'
       AND lease_until IS NOT NULL
       AND lease_until < now()
       AND cancel_requested_at IS NULL
-    RETURNING id
+      AND (
+        (
+          error_code = 'lease_reclaimed'
+          AND error_message ~ '^reclaim:[0-9]+$'
+          AND substring(error_message from 9)::int >= ${MAX_LEASE_RECLAIMS}
+        )
+        OR (
+          started_at IS NOT NULL
+          AND started_at < ${wallCutoff}::timestamptz
+        )
+      )
+    RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
   `;
 
-  const failedRows = await db.$client<
-    {
-      id: string;
-      task_id: string;
-      workspace_id: string;
-      project_id: string;
-      estimated_cost_micros: number | null;
-    }[]
+  const requeuedRows = await db.$client<
+    { id: string; error_code: string | null; error_message: string | null }[]
   >`
+    UPDATE agent_runs
+    SET
+      status = 'QUEUED',
+      lease_owner = NULL,
+      lease_until = NULL,
+      error_code = 'lease_reclaimed',
+      error_message = CASE
+        WHEN error_code = 'lease_reclaimed'
+          AND error_message ~ '^reclaim:[0-9]+$'
+        THEN 'reclaim:' || (substring(error_message from 9)::int + 1)::text
+        ELSE 'reclaim:1'
+      END,
+      updated_at = now()
+    WHERE status = 'RUNNING'
+      AND lease_until IS NOT NULL
+      AND lease_until < now()
+      AND cancel_requested_at IS NULL
+    RETURNING id, error_code, error_message
+  `;
+
+  const failedValidatingRows = await db.$client<FailedRow[]>`
     UPDATE agent_runs
     SET
       status = 'FAILED',
@@ -544,31 +663,42 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
       AND lease_until IS NOT NULL
       AND lease_until < now()
       AND cancel_requested_at IS NULL
-    RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros
+    RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
   `;
 
-  const failedValidatingRuns = failedRows.map((row) => ({
-    id: String(row.id),
-    taskId: String(row.task_id),
-    workspaceId: String(row.workspace_id),
-    projectId: String(row.project_id),
-    estimatedCostMicros: Number(row.estimated_cost_micros ?? 0),
-  }));
+  const failedWaitingCiRows = await db.$client<FailedRow[]>`
+    UPDATE agent_runs
+    SET
+      status = 'FAILED',
+      error_code = 'waiting_ci_timeout',
+      error_message = 'WAITING_CI exceeded wall-clock without CI accept-ready',
+      lease_owner = NULL,
+      lease_until = NULL,
+      finished_at = now(),
+      updated_at = now()
+    WHERE status = 'WAITING_CI'
+      AND cancel_requested_at IS NULL
+      AND finished_at IS NOT NULL
+      AND finished_at < ${waitingCiCutoff}::timestamptz
+    RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
+  `;
 
-  for (const run of failedValidatingRuns) {
-    if (run.estimatedCostMicros <= 0) continue;
-    await releaseEstimateForRun(db, {
-      workspaceId: run.workspaceId,
-      projectId: run.projectId,
-      taskId: run.taskId,
-      runId: run.id,
-      amountMicros: run.estimatedCostMicros,
-    }).catch(() => undefined);
-  }
+  const failedPoison = mapFailedRows(poisonRows);
+  const failedValidatingRuns = mapFailedRows(failedValidatingRows);
+  const failedWaitingCi = mapFailedRows(failedWaitingCiRows);
+  const failedRuns = [
+    ...failedPoison,
+    ...failedValidatingRuns,
+    ...failedWaitingCi,
+  ];
+  await releaseFailedEstimates(db, failedRuns);
 
   return {
     requeued: requeuedRows.length,
+    failedPoison: failedPoison.length,
     failedValidating: failedValidatingRuns.length,
+    failedWaitingCi: failedWaitingCi.length,
+    failedRuns,
     failedValidatingRuns,
   };
 }

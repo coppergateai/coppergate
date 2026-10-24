@@ -27,7 +27,7 @@ export default async function LoginPage() {
 
   return (
     <SiteChrome>
-      <main className={styles.authMain}>
+      <div className={styles.authMain}>
         <div className={styles.authCard}>
           <BrandMark className={styles.authMark} size={52} />
           <h1 className={styles.authTitle}>Try the hosted arena</h1>
@@ -55,6 +55,14 @@ export default async function LoginPage() {
               credentials.
             </p>
           ) : null}
+          <a
+            className={styles.authSecondary}
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Prefer self-host? Read the guide →
+          </a>
           <p className={styles.authNote}>
             MIT · Self-host or try hosted · Kill-switch + spend caps
           </p>
@@ -62,7 +70,7 @@ export default async function LoginPage() {
             ← Back home
           </Link>
         </div>
-      </main>
+      </div>
     </SiteChrome>
   );
 }

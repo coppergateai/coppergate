@@ -7,7 +7,7 @@ export type FaqItem = {
 export const LANDING_FAQS: readonly FaqItem[] = [
   {
     q: "What does Coppergate do?",
-    a: "You give it an engineering task. Multiple AI agents compete to solve it. Coppergate verifies each attempt, prices spend, and prepares the strongest qualifying result as a pull request for your review.",
+    a: "For engineering teams: you give it a task, multiple AI agents compete to solve it, and Coppergate verifies each attempt, prices spend, and prepares the strongest qualifying result as a pull request for your review.",
   },
   {
     q: "How is this different from a coding chat agent?",
@@ -39,6 +39,6 @@ export const LANDING_FAQS: readonly FaqItem[] = [
   },
   {
     q: "Is Coppergate free / open source?",
-    a: "Yes. The full product is MIT-licensed on GitHub. Self-host with Docker Compose and BYOK at $0. A hosted instance is available to try; optional paid hosted plans may come later — the community path stays free.",
+    a: "Yes. The full product is MIT-licensed on GitHub. Self-host with Docker Compose and BYOK at $0. You can also try the hosted instance; optional paid hosted plans cover managed sandboxes when you want us to run ops — the community path stays free.",
   },
 ] as const;

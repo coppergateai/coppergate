@@ -40,11 +40,16 @@ export async function ingestSonarFitness(
       )
       .limit(1);
     run = row ?? null;
-  } else if (input.headSha) {
+  } else if (input.headSha && input.workspaceId) {
     const [row] = await db
       .select()
       .from(agentRuns)
-      .where(eq(agentRuns.headSha, input.headSha))
+      .where(
+        and(
+          eq(agentRuns.headSha, input.headSha),
+          eq(agentRuns.workspaceId, input.workspaceId),
+        ),
+      )
       .orderBy(desc(agentRuns.createdAt))
       .limit(1);
     run = row ?? null;

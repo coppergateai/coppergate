@@ -14,9 +14,8 @@ export function PilotProjectsSection() {
           Also building in the open.
         </h2>
         <p className={styles.sectionLede}>
-          Coppergate develops and maintains adjacent open-source pilots — same
-          shop, different surfaces. kprompt is actively developed and maintained
-          by Coppergate.
+          Same shop, different surfaces — adjacent open-source pilots we build
+          and maintain alongside Coppergate.
         </p>
 
         <ul className={styles.pilotGrid}>

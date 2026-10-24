@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { LogoutButton } from "@/app/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -11,6 +12,9 @@ import styles from "./marketing.module.css";
 type Props = {
   signedIn: boolean;
 };
+
+const SELF_HOST =
+  "https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md";
 
 const links = [
   { href: "/#arena", label: "Arena" },
@@ -23,6 +27,8 @@ const links = [
 ] as const;
 
 export function MarketingHeader({ signedIn }: Props) {
+  const pathname = usePathname();
+  const onLogin = pathname === "/login";
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
@@ -114,6 +120,17 @@ export function MarketingHeader({ signedIn }: Props) {
                 <IconArrow />
               </Link>
             </>
+          ) : onLogin ? (
+            <a
+              className={styles.btnPrimary}
+              href={SELF_HOST}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => track("cta_self_host", { location: "nav_login" })}
+            >
+              Self-host
+              <IconArrow />
+            </a>
           ) : (
             <>
               <Link className={styles.navGhost} href="/login">
@@ -175,6 +192,16 @@ export function MarketingHeader({ signedIn }: Props) {
                   Open workspaces
                 </Link>
               </>
+            ) : onLogin ? (
+              <a
+                className={styles.drawerCta}
+                href={SELF_HOST}
+                target="_blank"
+                rel="noreferrer"
+                onClick={closeMenu}
+              >
+                Self-host guide
+              </a>
             ) : (
               <>
                 <Link href="/login" onClick={closeMenu}>

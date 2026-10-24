@@ -25,9 +25,34 @@ export function WorkspacesHome({ workspaces, inviteRequired }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash === "#create-workspace") {
+        setCreateOpen(true);
+      }
+    };
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, []);
+
+  function closeCreate() {
+    setCreateOpen(false);
+    if (
+      typeof window !== "undefined" &&
+      window.location.hash === "#create-workspace"
+    ) {
+      history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+    }
+  }
+
+  useEffect(() => {
     if (!createOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setCreateOpen(false);
+      if (e.key === "Escape") closeCreate();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -272,7 +297,7 @@ export function WorkspacesHome({ workspaces, inviteRequired }: Props) {
         <div
           className={styles.modalScrim}
           role="presentation"
-          onClick={() => setCreateOpen(false)}
+          onClick={closeCreate}
         >
           <div
             className={styles.modal}
@@ -290,7 +315,7 @@ export function WorkspacesHome({ workspaces, inviteRequired }: Props) {
                 type="button"
                 className={styles.modalClose}
                 aria-label="Close"
-                onClick={() => setCreateOpen(false)}
+                onClick={closeCreate}
               >
                 ×
               </button>

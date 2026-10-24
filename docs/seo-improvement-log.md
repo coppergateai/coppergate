@@ -39,3 +39,20 @@ Do not invent rankings, traffic, or Search Console metrics here.
 - Confirm Google Search Console property + sitemap submission (`docs/seo.md`)
 - Hypothesis: after deploy, URL Inspection on `/` should show Coppergate title and FAQ eligibility
 - Content: improve thin pages before adding new keyword pages; no fabricated claims
+
+## 2026-10-24 — production deploy
+
+Deployed via `main` → Vercel production (`coppergate-hd68yukub`, Ready).
+
+### Post-deploy checks (live HTML)
+
+| Check | Result |
+| --- | --- |
+| Homepage first `<title>` | `Coppergate — Set a budget. Agents war. Survivors ship.` (was `GitHub`) |
+| SVG `<title>` pollution | Gone — single document title |
+| `robots.txt` Host | `www.coppergate.ai` (hostname only) |
+| Disallow `/workspaces` | Present |
+| `/llms.txt` | 200 |
+| `/blog` twitter:title | `Blog · Coppergate` (page-specific) |
+
+Note: homepage metadata can still stream after `</head>` under dynamic auth; with SVG titles removed the first title is correct. Child `og:image` inheritance still worth a follow-up if social debuggers miss the card.

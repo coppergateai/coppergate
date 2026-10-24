@@ -108,11 +108,12 @@ export function SettingsShell({
           <h1 className={styles.title}>Workspace settings</h1>
           <p className={styles.meta}>
             {workspaceName} · /{workspaceSlug} · {role}
+            <span className={styles.metaSep} aria-hidden>
+              ·
+            </span>
+            <span className={styles.metaActive}>{activeMeta.label}</span>
+            <span className={styles.metaBlurb}> — {activeMeta.blurb}</span>
           </p>
-        </div>
-        <div className={styles.shellHeadAside}>
-          <p className={styles.shellActiveLabel}>{activeMeta.label}</p>
-          <p className={styles.shellActiveBlurb}>{activeMeta.blurb}</p>
         </div>
       </header>
 

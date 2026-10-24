@@ -5,6 +5,8 @@ import { appendRunEvent, listRunEvents } from "./run-events.js";
 import { agentRuns, artifacts, type AgentRun } from "./schema.js";
 
 export type CiEvidenceInput = {
+  /** Required — headSha lookups must be tenant-scoped (no cross-workspace attach). */
+  workspaceId: string;
   headSha: string | null;
   name: string;
   status: string;
@@ -58,21 +60,26 @@ type CiArtifactBody = {
 };
 
 /**
- * Attach CI evidence to the latest run matching headSha.
+ * Attach CI evidence to the latest run matching headSha within a workspace.
  * Failing checks prevent auto ACCEPTED (task stays REVIEW_REQUIRED or → FAILED).
  */
 export async function ingestCiEvidence(
   db: Database,
   evidence: CiEvidenceInput,
 ): Promise<{ run: AgentRun | null; attached: boolean }> {
-  if (!evidence.headSha) {
+  if (!evidence.headSha || !evidence.workspaceId.trim()) {
     return { run: null, attached: false };
   }
 
   const [run] = await db
     .select()
     .from(agentRuns)
-    .where(eq(agentRuns.headSha, evidence.headSha))
+    .where(
+      and(
+        eq(agentRuns.headSha, evidence.headSha),
+        eq(agentRuns.workspaceId, evidence.workspaceId),
+      ),
+    )
     .orderBy(desc(agentRuns.createdAt))
     .limit(1);
 
@@ -140,6 +147,38 @@ export async function ingestCiEvidence(
         updatedAt: new Date(),
       })
       .where(eq(agentRuns.id, run.id));
+  }
+
+  if (fitness.acceptReady && run.status === "WAITING_CI") {
+    try {
+      const { promoteRunFromWaitingCi } = await import("./run-events.js");
+      const { applyTaskTransition } = await import("./task-transitions.js");
+      const { tasks } = await import("./schema.js");
+      const { eq: eqCol } = await import("drizzle-orm");
+      await promoteRunFromWaitingCi(db, run.id);
+      const [task] = await db
+        .select()
+        .from(tasks)
+        .where(eqCol(tasks.id, run.taskId))
+        .limit(1);
+      if (task?.status === "WAITING_CI") {
+        await applyTaskTransition(db, {
+          workspaceId: run.workspaceId,
+          taskId: run.taskId,
+          toStatus: "REVIEW_REQUIRED",
+          actor: "system:ci-evidence",
+          reason: "live CI accept-ready",
+        });
+      }
+      const [fresh] = await db
+        .select()
+        .from(agentRuns)
+        .where(eq(agentRuns.id, run.id))
+        .limit(1);
+      return { run: fresh ?? run, attached: true };
+    } catch {
+      /* best-effort */
+    }
   }
 
   return { run, attached: true };

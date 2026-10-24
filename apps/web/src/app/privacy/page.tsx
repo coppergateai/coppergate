@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
@@ -138,6 +139,18 @@ export default function PrivacyPage() {
               <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
             </p>
           </section>
+        </div>
+
+        <div className={styles.docsCtaRow}>
+          <Link className={styles.btnSecondary} href="/security">
+            Security
+          </Link>
+          <Link className={styles.btnSecondary} href="/terms">
+            Terms
+          </Link>
+          <Link className={styles.btnSecondary} href="/">
+            ← Home
+          </Link>
         </div>
       </article>
     </SiteChrome>

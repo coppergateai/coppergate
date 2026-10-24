@@ -120,6 +120,18 @@ export default function TermsPage() {
             </p>
           </section>
         </div>
+
+        <div className={styles.docsCtaRow}>
+          <Link className={styles.btnSecondary} href="/privacy">
+            Privacy
+          </Link>
+          <Link className={styles.btnSecondary} href="/security">
+            Security
+          </Link>
+          <Link className={styles.btnSecondary} href="/">
+            ← Home
+          </Link>
+        </div>
       </article>
     </SiteChrome>
   );

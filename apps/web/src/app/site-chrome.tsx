@@ -19,6 +19,9 @@ async function AuthAwareHeader() {
 export function SiteChrome({ children }: { children: ReactNode }) {
   return (
     <div className={styles.page}>
+      <a className={styles.skipLink} href="#main-content">
+        Skip to content
+      </a>
       <div className={styles.atmosphere} aria-hidden="true">
         <div className={styles.atmWash} />
         <div className={styles.atmGrid} />
@@ -29,7 +32,9 @@ export function SiteChrome({ children }: { children: ReactNode }) {
         <AuthAwareHeader />
       </Suspense>
 
-      <div className={styles.main}>{children}</div>
+      <main id="main-content" className={styles.main}>
+        {children}
+      </main>
 
       <MarketingFooter />
     </div>

@@ -28,6 +28,16 @@ export function storeTheme(theme: Theme) {
   }
 }
 
+export function systemTheme(): Theme {
+  try {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  } catch {
+    return "light";
+  }
+}
+
 export function resolveInitialTheme(): Theme {
-  return readStoredTheme() ?? "light";
+  return readStoredTheme() ?? systemTheme();
 }

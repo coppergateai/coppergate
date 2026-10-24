@@ -83,7 +83,6 @@ export async function listRunEvents(
     .orderBy(asc(agentRunEvents.seq));
 }
 
-/** Workspace-scoped event list (IDOR fail-closed). */
 export async function listRunEventsForWorkspace(
   db: Database,
   workspaceId: string,
@@ -115,7 +114,6 @@ export async function isRunCancelRequested(
   return !!row?.cancelRequestedAt;
 }
 
-/** Move claimed run into VALIDATING (still leased by worker). */
 export async function markRunValidating(
   db: Database,
   input: { runId: string; workerId: string },
@@ -144,10 +142,79 @@ export async function markRunValidating(
   return updated;
 }
 
-/**
- * Apply fake agent completion metadata and move run → REVIEW_REQUIRED.
- * Does NOT mark DONE (FR-04).
- */
+/** Live http: PR opened, awaiting CI. Keeps estimate reserve; clears lease. */
+export async function markRunWaitingCi(
+  db: Database,
+  input: {
+    runId: string;
+    workerId: string;
+    branchName: string;
+    headSha: string;
+    prNumber: number;
+    prUrl: string;
+    actualCostMicros: number;
+    previewUrl?: string | null;
+  },
+): Promise<AgentRun> {
+  const now = new Date();
+  const [updated] = await db
+    .update(agentRuns)
+    .set({
+      status: "WAITING_CI",
+      branchName: input.branchName,
+      headSha: input.headSha,
+      prNumber: input.prNumber,
+      prUrl: input.prUrl,
+      actualCostMicros: input.actualCostMicros,
+      previewUrl: input.previewUrl ?? null,
+      leaseOwner: null,
+      leaseUntil: null,
+      finishedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(agentRuns.id, input.runId),
+        eq(agentRuns.leaseOwner, input.workerId),
+        sql`${agentRuns.status} in ('RUNNING', 'VALIDATING')`,
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw new RunError(
+      "not_owner",
+      "Cannot enter WAITING_CI — not owner or not RUNNING/VALIDATING",
+    );
+  }
+  return updated;
+}
+
+/** Promote WAITING_CI → REVIEW_REQUIRED after CI acceptReady (no lease owner). */
+export async function promoteRunFromWaitingCi(
+  db: Database,
+  runId: string,
+): Promise<AgentRun> {
+  const now = new Date();
+  const [updated] = await db
+    .update(agentRuns)
+    .set({
+      status: "REVIEW_REQUIRED",
+      leaseOwner: null,
+      leaseUntil: null,
+      finishedAt: now,
+      updatedAt: now,
+    })
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, "WAITING_CI")))
+    .returning();
+
+  if (!updated) {
+    throw new RunError("conflict", "Cannot promote — run is not WAITING_CI");
+  }
+  await releaseRunEstimate(db, updated);
+  return updated;
+}
+
 export async function markRunAwaitingReview(
   db: Database,
   input: {
@@ -230,6 +297,46 @@ export async function markRunFailed(
     throw new RunError(
       "not_owner",
       "Cannot fail run — not owner or not RUNNING/VALIDATING",
+    );
+  }
+  await releaseRunEstimate(db, updated);
+  return updated;
+}
+
+/** Soft-cancel terminal: run → CANCELLED (not FAILED). */
+export async function markRunCancelled(
+  db: Database,
+  input: {
+    runId: string;
+    workerId: string;
+    errorMessage?: string;
+  },
+): Promise<AgentRun> {
+  const now = new Date();
+  const [updated] = await db
+    .update(agentRuns)
+    .set({
+      status: "CANCELLED",
+      errorCode: "cancelled",
+      errorMessage: input.errorMessage ?? "Run cancelled",
+      leaseOwner: null,
+      leaseUntil: null,
+      finishedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(agentRuns.id, input.runId),
+        eq(agentRuns.leaseOwner, input.workerId),
+        sql`${agentRuns.status} in ('RUNNING', 'VALIDATING')`,
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw new RunError(
+      "not_owner",
+      "Cannot cancel run — not owner or not RUNNING/VALIDATING",
     );
   }
   await releaseRunEstimate(db, updated);

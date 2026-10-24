@@ -26,8 +26,8 @@ export function EvidenceSection() {
             Every winner comes with evidence.
           </h2>
           <p className={styles.sectionLede}>
-            See what passed, what it cost, and why it was selected — then open
-            the Arena demo for the full race.
+            Merge decisions need signal, not vibes: CI, fitness, spend, and a
+            selection reason travel with the survivor path.
           </p>
         </header>
 

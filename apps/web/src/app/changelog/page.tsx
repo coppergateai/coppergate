@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
@@ -17,16 +18,17 @@ const entries = [
     title: "Marketing clarity pass",
     items: [
       "Hero messaging: who it’s for, issue → verified PR, honest stack ribbon",
-      "Pricing page: Community $0 vs optional hosted Starter/Pro",
-      "Security page aligned to open-source posture (no private-beta leftover)",
-      "Nav CTA: Try hosted for signed-out visitors",
+      "Pricing: Community $0 forever vs optional hosted Starter/Pro",
+      "FAQ two-column layout + CTAs; fitness/controls de-carded",
+      "Login: Self-host path when already on Try hosted; blog/security end CTAs",
+      "Recovery + signals copy: live delivery GitHub/GitLab; Bitbucket deferred",
     ],
   },
   {
     date: "2026-10-16",
     title: "Commercial wedge + hosted billing",
     items: [
-      "D14 lock: GitHub issue → verified PR is the paid-pilot KPI",
+      "D14 lock: GitHub issue → verified PR is the commercial wedge KPI",
       "Stripe Checkout / portal for Hosted Starter & Pro (Settings → Billing)",
       "Onboarding and recovery docs oriented to one-session first PR",
       "Wedge depth: Sentry + CI-fail auto-arm; expand-on-pull for the rest",
@@ -72,7 +74,7 @@ const entries = [
   },
   {
     date: "2026-10-10",
-    title: "Product core (private beta)",
+    title: "Product core foundations",
     items: [
       "Brief generate / approve before execution",
       "Plan + task graph with approval inbox",
@@ -116,16 +118,23 @@ export default function ChangelogPage() {
           ))}
         </div>
 
-        <p className={styles.changelogMore}>
+        <div className={styles.docsCtaRow}>
           <a
+            className={styles.btnHeroPrimary}
             href="https://github.com/coppergateai/coppergate"
             target="_blank"
             rel="noreferrer"
           >
             Star on GitHub
           </a>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
+          </Link>
+        </div>
+        <p className={styles.changelogMore}>
+          <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>
           {" · "}
-          <a href="mailto:hello@coppergate.ai">Contact</a>
+          <Link href="/docs">Docs</Link>
         </p>
       </article>
     </SiteChrome>

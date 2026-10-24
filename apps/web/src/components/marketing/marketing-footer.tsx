@@ -42,7 +42,7 @@ export function MarketingFooter() {
 
           <div className={styles.footerCols}>
             <nav className={styles.footerCol} aria-label="Product">
-              <h2>Product</h2>
+              <p className={styles.footerColTitle}>Product</p>
               <Link href="/#arena">Arena</Link>
               <Link href="/#how-it-works">How it works</Link>
               <Link href="/#evidence">Evidence</Link>
@@ -52,7 +52,7 @@ export function MarketingFooter() {
               <Link href="/#faq">FAQ</Link>
             </nav>
             <nav className={styles.footerCol} aria-label="Pilot projects">
-              <h2>Pilot projects</h2>
+              <p className={styles.footerColTitle}>Pilot projects</p>
               {PILOT_PROJECTS.map((p) => (
                 <a
                   key={p.id}
@@ -78,7 +78,7 @@ export function MarketingFooter() {
               <Link href="/#projects">All pilots →</Link>
             </nav>
             <nav className={styles.footerCol} aria-label="Resources">
-              <h2>Resources</h2>
+              <p className={styles.footerColTitle}>Resources</p>
               <Link href="/docs">Documentation</Link>
               <Link href="/docs/pricing">Pricing</Link>
               <Link href="/blog">Blog</Link>
@@ -113,7 +113,7 @@ export function MarketingFooter() {
               </a>
             </nav>
             <nav className={styles.footerCol} aria-label="Company">
-              <h2>Company</h2>
+              <p className={styles.footerColTitle}>Company</p>
               <Link href="/security">Security</Link>
               <Link href="/privacy">Privacy</Link>
               <Link href="/terms">Terms</Link>

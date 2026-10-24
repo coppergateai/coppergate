@@ -22,7 +22,7 @@ export default function SupportedStackPage() {
           { name: "Supported stack", path: "/docs/supported-stack" },
         ]}
       />
-      <main className={styles.contentPage}>
+      <div className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
         </Link>
@@ -78,7 +78,24 @@ export default function SupportedStackPage() {
             outside <code>nextjs_ts</code>.
           </p>
         </div>
-      </main>
+
+        <div className={styles.docsCtaRow}>
+          <a
+            className={styles.btnHeroPrimary}
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Self-host guide
+          </a>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
+          </Link>
+          <Link className={styles.btnSecondary} href="/docs/limitations">
+            Limitations
+          </Link>
+        </div>
+      </div>
     </DocsShell>
   );
 }

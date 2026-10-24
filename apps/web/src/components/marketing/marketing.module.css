@@ -56,6 +56,40 @@
   opacity: 0.07;
 }
 
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skipLink {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 100;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 0.15s ease;
+}
+
+.skipLink:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+}
+
 .main {
   position: relative;
   z-index: 1;
@@ -456,6 +490,8 @@
   border-top: 1px solid var(--line);
   background: var(--ink-soft);
   padding: 0.75rem var(--gutter) 1.25rem;
+  position: relative;
+  z-index: 2;
 }
 
 .drawer nav {
@@ -546,8 +582,10 @@
     padding-left: max(var(--gutter), env(safe-area-inset-left));
     padding-right: max(var(--gutter), env(safe-area-inset-right));
     padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
-    max-height: min(70vh, calc(100dvh - 4.5rem));
+    min-height: calc(100dvh - 4.5rem);
+    max-height: none;
     overflow-y: auto;
+    background: var(--atm-bottom, var(--ink-soft));
   }
 
   .announceInner {
@@ -1969,10 +2007,28 @@
 }
 
 .securityItem {
-  padding: 1.15rem 1.2rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+  padding: 1.05rem 0.15rem 1.05rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+@media (min-width: 800px) {
+  .securityItem {
+    padding: 0.25rem 1.1rem 0.25rem 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .securityItem:nth-child(3n) {
+    border-right: 0;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 799px) {
+  .securityItem + .securityItem {
+    border-top: 1px solid var(--line);
+  }
 }
 
 .securityItem h3 {
@@ -2000,19 +2056,54 @@
   border-top: 1px solid var(--line);
 }
 
+.faqLayout {
+  display: grid;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .faqLayout {
+    grid-template-columns: minmax(14rem, 22rem) minmax(0, 1fr);
+    gap: 3rem;
+  }
+}
+
+.faqIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.faqLede {
+  margin: 0.85rem 0 0;
+  max-width: 28rem;
+  color: var(--mute);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.faqCtas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.35rem;
+}
+
 .faqList {
   list-style: none;
-  margin: 2rem 0 0;
+  margin: 0;
   padding: 0;
-  max-width: 48rem;
   display: grid;
-  gap: 0.5rem;
+  gap: 0;
+  border-top: 1px solid var(--line);
 }
 
 .faqItem {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -2056,12 +2147,13 @@
 .finalInner {
   width: min(var(--max), 100%);
   margin: 0 auto;
-  padding: clamp(2rem, 5vw, 3.5rem);
-  border: 1px solid var(--line);
-  border-radius: 18px;
+  padding: clamp(2rem, 5vw, 3.5rem) 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
   background:
     radial-gradient(80% 80% at 85% 0%, var(--copper-dim), transparent 55%),
-    var(--surface);
+    transparent;
   text-align: left;
   box-sizing: border-box;
 }
@@ -2165,7 +2257,7 @@
   gap: 1.75rem;
 }
 
-.footerCol h2 {
+.footerColTitle {
   margin: 0 0 0.85rem;
   color: var(--mute-soft);
   font-size: 0.72rem;
@@ -2241,17 +2333,19 @@
   margin: 2rem 0 0;
   padding: 0;
   display: grid;
-  gap: 1.25rem;
+  gap: 0;
+  border-top: 1px solid var(--line);
 }
 
 .pilotCard {
   display: flex;
   gap: 1.15rem;
   align-items: flex-start;
-  padding: 1.35rem 1.4rem;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding: 1.35rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .pilotLogo {
@@ -2341,7 +2435,8 @@
 }
 
 .docsAside {
-  display: none;
+  display: block;
+  min-width: 0;
 }
 
 .docsMain {
@@ -2349,50 +2444,61 @@
 }
 
 .docsToc {
-  position: sticky;
-  top: 5.5rem;
-  padding: 0.85rem 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
+  position: relative;
+  top: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .docsTocTitle {
-  margin: 0 0 0.55rem;
-  color: var(--mute-soft);
-  font-size: 0.68rem;
-  font-weight: 650;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .docsTocList {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0.15rem;
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  flex-direction: row;
+  gap: 0.35rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  border-bottom: 1px solid var(--line);
 }
 
 .docsTocLink {
   display: block;
-  padding: 0.35rem 0.45rem;
-  border-radius: 6px;
+  padding: 0.55rem 0.65rem 0.65rem;
+  border-radius: 0;
   color: var(--mute);
-  font-size: 0.86rem;
+  font-size: 0.85rem;
+  font-weight: 550;
   text-decoration: none;
+  white-space: nowrap;
+  background: transparent;
+  box-shadow: inset 0 -2px 0 transparent;
 }
 
 .docsTocLink:hover {
   color: var(--paper);
-  background: var(--overlay);
+  background: transparent;
 }
 
 .docsTocLinkActive {
   color: var(--paper);
-  background: var(--copper-fill-soft);
-  box-shadow: inset 2px 0 0 var(--copper);
+  background: transparent;
+  box-shadow: inset 0 -2px 0 var(--copper);
 }
 
 @media (min-width: 900px) {
@@ -2402,8 +2508,55 @@
     align-items: start;
   }
 
-  .docsAside {
-    display: block;
+  .docsToc {
+    position: sticky;
+    top: 5.5rem;
+    padding: 0.35rem 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .docsTocTitle {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0 0 0.55rem;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    color: var(--mute-soft);
+    font-size: 0.68rem;
+    font-weight: 650;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .docsTocList {
+    flex-direction: column;
+    gap: 0.15rem;
+    overflow: visible;
+    border-bottom: 0;
+    padding: 0;
+  }
+
+  .docsTocLink {
+    padding: 0.35rem 0.45rem;
+    border-radius: 6px;
+    font-size: 0.86rem;
+    font-weight: 400;
+    white-space: normal;
+    background: transparent;
+  }
+
+  .docsTocLink:hover {
+    background: var(--overlay);
+  }
+
+  .docsTocLinkActive {
+    background: var(--copper-fill-soft);
+    box-shadow: inset 2px 0 0 var(--copper);
   }
 }
 
@@ -2517,6 +2670,19 @@
   font-size: 0.85em;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--paper);
+}
+
+.docsCtaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.docsCtaRow .btnHeroPrimary,
+.docsCtaRow .btnSecondary {
+  font-size: 0.875rem;
+  padding: 0.65rem 0.95rem;
 }
 
 .docsList {
@@ -2695,15 +2861,17 @@
 .changelogList {
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 0;
   margin-top: 2rem;
+  border-top: 1px solid var(--line);
 }
 
 .changelogEntry {
-  padding: 1.15rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
+  padding: 1.35rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .changelogDate {
@@ -2815,6 +2983,22 @@
 .authCta:hover {
   background: #fff;
   transform: translateY(-1px);
+}
+
+.authSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.85rem;
+  color: var(--mute);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.authSecondary:hover {
+  color: var(--paper);
 }
 
 .authNote {
@@ -4027,14 +4211,16 @@
   margin: 1.25rem 0 0;
   padding: 0;
   display: grid;
-  gap: 0.65rem;
+  gap: 0;
+  border-top: 1px solid var(--line);
 }
 
 .fitnessPlain li {
-  padding: 0.85rem 0.95rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--overlay-muted);
+  padding: 0.85rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   color: var(--mute);
   font-size: 0.92rem;
   line-height: 1.5;
@@ -4046,9 +4232,10 @@
 }
 
 .fitnessTech {
-  margin-top: 1rem;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  margin-top: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -4058,9 +4245,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.8rem 0.95rem;
+  padding: 0.85rem 0;
   border: none;
-  background: var(--overlay);
+  background: transparent;
   color: var(--paper);
   font: inherit;
   font-size: 0.88rem;
@@ -4069,15 +4256,15 @@
 }
 
 .fitnessTechBtn:hover {
-  background: var(--overlay-strong);
+  color: var(--copper-hot);
 }
 
 .fitnessTechBody {
-  padding: 0 0.95rem 1rem;
+  padding: 0 0 1rem;
   color: var(--mute);
   font-size: 0.88rem;
   line-height: 1.55;
-  border-top: 1px solid var(--line);
+  border-top: 0;
 }
 
 .fitnessTechBody p {
@@ -4119,11 +4306,29 @@
 }
 
 .workflowOutcome {
-  padding: 1rem 1.05rem;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: 0 1px 0 var(--line-soft);
+  padding: 0.85rem 0.15rem 0.85rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+@media (min-width: 800px) {
+  .workflowOutcome {
+    padding: 0.15rem 1.1rem 0.15rem 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .workflowOutcome:last-child {
+    border-right: 0;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 799px) {
+  .workflowOutcome + .workflowOutcome {
+    border-top: 1px solid var(--line);
+  }
 }
 
 .workflowOutcomeTop {
@@ -4133,6 +4338,7 @@
   gap: 0.65rem;
 }
 
+.workflowOutcome h3,
 .workflowOutcomeTop h3 {
   margin: 0;
   color: var(--paper);

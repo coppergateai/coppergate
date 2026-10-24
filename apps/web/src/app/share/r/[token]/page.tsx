@@ -15,7 +15,7 @@ export default async function PublicSharePage({ params }: PageProps) {
   try {
     const { report } = await getPublicDeliveryShare(db, token);
     return (
-      <main className={styles.contentPage}>
+      <div className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Shared delivery</p>
         <h1 className={styles.pageTitle}>Redacted report</h1>
         <p className={styles.pageLede}>
@@ -49,16 +49,16 @@ export default async function PublicSharePage({ params }: PageProps) {
           </a>
           .
         </p>
-      </main>
+      </div>
     );
   } catch (err) {
     const message =
       err instanceof ShareError ? err.message : "Share not available";
     return (
-      <main className={styles.contentPage}>
+      <div className={styles.contentPage}>
         <h1 className={styles.pageTitle}>Unavailable</h1>
         <p className={styles.pageLede}>{message}</p>
-      </main>
+      </div>
     );
   }
 }

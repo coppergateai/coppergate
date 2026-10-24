@@ -22,18 +22,23 @@ export default function LimitationsPage() {
           { name: "Limitations", path: "/docs/limitations" },
         ]}
       />
-      <main className={styles.contentPage}>
+      <div className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
         </Link>
         <p className={styles.pageEyebrow}>Docs</p>
         <h1 className={styles.pageTitle}>Limitations &amp; non-goals</h1>
+        <p className={styles.pageLede}>
+          Honest boundaries for the current release — so you can decide whether
+          Coppergate fits before you clone or try hosted.
+        </p>
         <div className={styles.prose}>
           <p>
             North star: autonomous Survivor arena with selection over
             supervision (efficiency contest, critic, elimination). The current
             release ships GitHub fitness (PR + CI) as the evidence wedge; armed
-            arenas run N≤2 efficiency contests today.
+            arenas run N≤2 efficiency contests today. Live delivery is GitHub
+            and GitLab; Bitbucket / Azure DevOps clients are deferred.
           </p>
 
           <section>
@@ -55,7 +60,10 @@ export default function LimitationsPage() {
                 Soft-deleted workspaces: credentials purged immediately; data
                 retained ~30 days
               </li>
-              <li>Real GitHub writes require App install + staging secrets</li>
+              <li>
+                Live PR/MR writes require GitHub App or GitLab project connect
+                (plus staging secrets where applicable)
+              </li>
             </ul>
           </section>
 
@@ -69,7 +77,7 @@ export default function LimitationsPage() {
                 execution
               </li>
               <li>
-                Multi-repo / marketplace / design-agent suites in this pilot
+                Multi-repo / marketplace / design-agent suites in this release
               </li>
               <li>Training on private customer code</li>
               <li>Arbitrary shell on the user&apos;s machine</li>
@@ -80,11 +88,29 @@ export default function LimitationsPage() {
             Policies: <Link href="/terms">Terms</Link>
             {" · "}
             <Link href="/privacy">Privacy</Link>
-            {" · "}
-            <Link href="/security">Security</Link>
           </p>
         </div>
-      </main>
+
+        <div className={styles.docsCtaRow}>
+          <a
+            className={styles.btnHeroPrimary}
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View on GitHub
+          </a>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
+          </Link>
+          <Link className={styles.btnSecondary} href="/docs/supported-stack">
+            Supported stack
+          </Link>
+          <Link className={styles.btnSecondary} href="/docs/pricing">
+            Pricing
+          </Link>
+        </div>
+      </div>
     </DocsShell>
   );
 }

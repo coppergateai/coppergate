@@ -30,6 +30,7 @@ export {
   createCodingAgent,
   type CreateCodingAgentOptions,
 } from "./create-agent.js";
+export { FailoverCodingAgent } from "./failover.js";
 export {
   CONTENDER_STRATEGIES,
   isContenderStrategy,

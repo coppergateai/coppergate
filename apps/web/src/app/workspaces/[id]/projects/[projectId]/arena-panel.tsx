@@ -104,16 +104,17 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
       aria-labelledby="arena-heading"
     >
       <h2 id="arena-heading" className={styles.sectionLabel}>
-        War arena
+        Arena
       </h2>
       <p className={styles.sectionLede}>
-        Start and Stop now run at the workspace level — open the arena to arm
-        every project pit, or watch this project&apos;s contenders live.
+        Contenders compete under budget; fitness and CI pick the survivor.
+        Start and Stop run at the workspace level — open Arena to arm every
+        project, or watch this project&apos;s agents live.
       </p>
 
       <p className={styles.sectionLede}>
         <Link href={arenaHref} className={styles.inlineLink}>
-          {isOwner ? "Workspace Start / Stop →" : "Open workspace arena →"}
+          {isOwner ? "Workspace Start / Stop →" : "Open workspace Arena →"}
         </Link>
       </p>
 
