@@ -76,3 +76,28 @@ export function isProfileEditAllowed(
   if (!profileTools || profileTools.length === 0) return true;
   return profileTools.includes("edit") || profileTools.includes("*");
 }
+
+const WRITE_TOOL_TOKENS = new Set([
+  "edit",
+  "write",
+  "write_file",
+  "put_file",
+  "*",
+]);
+
+/**
+ * Combined gate for FILE writes:
+ * - profileTools (when set) must include edit/*
+ * - toolAllowlist (when set) must include a write token
+ * Empty lists preserve legacy "no gate" behavior.
+ */
+export function isEditToolAllowed(input: {
+  toolAllowlist?: string[];
+  profileTools?: string[];
+}): boolean {
+  if (!isProfileEditAllowed(input.profileTools)) return false;
+  const tools = input.toolAllowlist ?? [];
+  if (tools.length === 0) return true;
+  return tools.some((t) => WRITE_TOOL_TOKENS.has(t.trim().toLowerCase()));
+}
+
