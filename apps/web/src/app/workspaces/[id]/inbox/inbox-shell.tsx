@@ -385,22 +385,34 @@ export function InboxShell({
         ))}
       </div>
 
+      {rows.length === 0 ? (
+        <section className={styles.emptyFull} aria-label="Empty inbox">
+          <p className={styles.emptyTitle}>{emptyCopy.title}</p>
+          <p className={styles.emptyBody}>{emptyCopy.body}</p>
+          {counts.pending === 0 && tab !== "recent" ? (
+            <p className={styles.emptyHint}>
+              Nothing pending usually means autonomous work is running or gates
+              are quiet — check Arena or Activity.
+            </p>
+          ) : null}
+          <div className={styles.emptyActions}>
+            <Link
+              href={`/workspaces/${workspaceId}/projects`}
+              className={styles.emptyCta}
+            >
+              Browse projects
+            </Link>
+            <Link
+              href={`/workspaces/${workspaceId}/arena`}
+              className={styles.emptyLink}
+            >
+              Open Arena
+            </Link>
+          </div>
+        </section>
+      ) : (
       <div className={styles.split}>
         <section className={styles.listPane} aria-label="Approvals list">
-          {rows.length === 0 ? (
-            <div className={styles.empty}>
-              <p className={styles.emptyTitle}>{emptyCopy.title}</p>
-              <p className={styles.emptyBody}>
-                {emptyCopy.body}{" "}
-                <Link
-                  href={`/workspaces/${workspaceId}/projects`}
-                  className={styles.emptyLink}
-                >
-                  Open projects
-                </Link>
-              </p>
-            </div>
-          ) : (
             <ul className={styles.list}>
               {rows.map((a) => {
                 const active = selected?.id === a.id;
@@ -455,7 +467,6 @@ export function InboxShell({
                 );
               })}
             </ul>
-          )}
         </section>
 
         <section className={styles.detailPane} aria-label="Approval detail">
@@ -610,6 +621,7 @@ export function InboxShell({
           )}
         </section>
       </div>
+      )}
     </main>
   );
 }

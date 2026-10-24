@@ -165,8 +165,7 @@ export function ProjectShell({
               { label: name },
             ]}
           />
-          <h1 className={styles.pageTitle}>Project</h1>
-          <span className={styles.pageName}>{name}</span>
+          <h1 className={styles.pageName}>{name}</h1>
           <div className={styles.chips}>{primaryChips}</div>
           <details className={styles.detailsMeta}>
             <summary>Details</summary>

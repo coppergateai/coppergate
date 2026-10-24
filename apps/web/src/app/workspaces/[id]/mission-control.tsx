@@ -95,33 +95,6 @@ function tagsFor(group: ActivityGroup): string[] {
   return tags.slice(0, 3);
 }
 
-function SparkBars({
-  tone,
-}: {
-  tone: "copper" | "ok";
-}) {
-  const heights = [40, 55, 35, 70, 48, 82, 60, 90];
-  return (
-    <div className={styles.spark} aria-hidden>
-      {heights.map((h, i) => (
-        <span
-          key={i}
-          className={`${styles.sparkBar} ${
-            tone === "ok"
-              ? i % 2 === 0
-                ? styles.sparkBarOk
-                : styles.sparkBarOkSoft
-              : i % 2 === 0
-                ? ""
-                : styles.sparkBarSoft
-          }`}
-          style={{ height: `${h}%` }}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function MissionControl({ data, recentEvents }: Props) {
   const { metrics, attention, executions } = data;
   const hasBudget = metrics.budgetCapMicros > 0;
@@ -176,7 +149,10 @@ export function MissionControl({ data, recentEvents }: Props) {
       </header>
 
       <div className={styles.metrics} aria-label="Workspace metrics">
-        <div className={styles.metric}>
+        <Link
+          href={`/workspaces/${data.workspaceId}/arena`}
+          className={styles.metric}
+        >
           <div className={styles.metricTop}>
             <p className={styles.metricLabel}>Active runs</p>
             <span className={styles.metricIcon} aria-hidden>
@@ -191,9 +167,11 @@ export function MissionControl({ data, recentEvents }: Props) {
               ? ` · ${metrics.arenaRunning} arena agents`
               : ""}
           </p>
-          <SparkBars tone="copper" />
-        </div>
-        <div className={styles.metric}>
+        </Link>
+        <Link
+          href={`/workspaces/${data.workspaceId}/inbox`}
+          className={styles.metric}
+        >
           <div className={styles.metricTop}>
             <p className={styles.metricLabel}>Needs attention</p>
             <span className={styles.metricIcon} aria-hidden>
@@ -208,8 +186,11 @@ export function MissionControl({ data, recentEvents }: Props) {
             {metrics.needsApproval === 1 ? "" : "s"} ·{" "}
             {metrics.arenaNeedsAttention} arena
           </p>
-        </div>
-        <div className={styles.metric}>
+        </Link>
+        <Link
+          href={`/workspaces/${data.workspaceId}/projects`}
+          className={styles.metric}
+        >
           <div className={styles.metricTop}>
             <p className={styles.metricLabel}>Verified PRs</p>
             <span className={styles.metricIcon} aria-hidden>
@@ -220,9 +201,11 @@ export function MissionControl({ data, recentEvents }: Props) {
             {pad2(metrics.verifiedPrsThisMonth)}
           </p>
           <p className={styles.metricMeta}>This month</p>
-          <SparkBars tone="ok" />
-        </div>
-        <div className={styles.metric}>
+        </Link>
+        <Link
+          href={`/workspaces/${data.workspaceId}/settings`}
+          className={styles.metric}
+        >
           <div className={styles.metricTop}>
             <p className={styles.metricLabel}>Budget</p>
             <span className={styles.metricIcon} aria-hidden>
@@ -234,13 +217,26 @@ export function MissionControl({ data, recentEvents }: Props) {
               ? formatUsd(metrics.budgetAvailableMicros, metrics.budgetCurrency)
               : "—"}
           </p>
-          <p className={styles.metricMeta}>
-            {hasBudget
-              ? `left · spent ${formatUsd(metrics.budgetSpentMicros, metrics.budgetCurrency)} · reserved ${formatUsd(metrics.budgetReservedMicros, metrics.budgetCurrency)} / ${formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}`
-              : "No envelope set"}
-            {budgetPaused ? " · Paused" : ""}
-          </p>
-        </div>
+          {hasBudget ? (
+            <div className={styles.metricMetaStack}>
+              <span>
+                Available · spent{" "}
+                {formatUsd(metrics.budgetSpentMicros, metrics.budgetCurrency)}
+              </span>
+              <span>
+                Reserved{" "}
+                {formatUsd(
+                  metrics.budgetReservedMicros,
+                  metrics.budgetCurrency,
+                )}{" "}
+                / {formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}
+              </span>
+              {budgetPaused ? <span>Paused</span> : null}
+            </div>
+          ) : (
+            <p className={styles.metricMeta}>No envelope set</p>
+          )}
+        </Link>
       </div>
 
       <div className={styles.grid}>
@@ -442,15 +438,6 @@ export function MissionControl({ data, recentEvents }: Props) {
             </div>
             <div className={styles.actions}>
               <Link
-                href={`/workspaces/${data.workspaceId}/projects`}
-                className={styles.action}
-              >
-                <span className={styles.actionIcon} aria-hidden>
-                  ▷
-                </span>
-                <span className={styles.actionLabel}>Run a task</span>
-              </Link>
-              <Link
                 href={`/workspaces/${data.workspaceId}/arena`}
                 className={styles.action}
               >
@@ -459,6 +446,29 @@ export function MissionControl({ data, recentEvents }: Props) {
                 </span>
                 <span className={styles.actionLabel}>Open Arena</span>
               </Link>
+              {metrics.needsApproval > 0 ? (
+                <Link
+                  href={`/workspaces/${data.workspaceId}/inbox`}
+                  className={styles.action}
+                >
+                  <span className={styles.actionIcon} aria-hidden>
+                    ▣
+                  </span>
+                  <span className={styles.actionLabel}>
+                    Review inbox ({metrics.needsApproval})
+                  </span>
+                </Link>
+              ) : (
+                <Link
+                  href={`/workspaces/${data.workspaceId}/projects`}
+                  className={styles.action}
+                >
+                  <span className={styles.actionIcon} aria-hidden>
+                    ▷
+                  </span>
+                  <span className={styles.actionLabel}>Run a task</span>
+                </Link>
+              )}
               <Link
                 href={`/workspaces/${data.workspaceId}/projects`}
                 className={styles.action}
