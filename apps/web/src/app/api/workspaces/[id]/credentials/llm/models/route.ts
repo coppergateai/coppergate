@@ -45,7 +45,10 @@ export async function POST(request: Request, context: RouteContext) {
     let modelsUrl: URL;
     try {
       // Loopback allowed for local Ollama / LM Studio; private LAN + metadata blocked.
-      const safeBase = assertSafeServerFetchUrl(base, { allowLoopback: true });
+      // DNS-resolved addresses are re-checked (rebinding defense).
+      const safeBase = await assertSafeServerFetchUrlResolved(base, {
+        allowLoopback: true,
+      });
       const baseHref = safeBase.href.endsWith("/")
         ? safeBase.href
         : `${safeBase.href}/`;
