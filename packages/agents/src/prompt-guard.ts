@@ -14,7 +14,8 @@ export function truncateUntrusted(
   value: string,
   maxChars: number = MAX_UNTRUSTED_FIELD_CHARS,
 ): string {
-  const trimmed = value.replace(/\u0000/g, "").trim();
+  // Strip NUL bytes without a control-character regex (eslint no-control-regex).
+  const trimmed = value.split("\0").join("").trim();
   if (trimmed.length <= maxChars) return trimmed;
   return `${trimmed.slice(0, maxChars)}\n…[truncated ${trimmed.length - maxChars} chars]`;
 }
