@@ -25,10 +25,11 @@ export async function generateMetadata({
   const { id } = await params;
   const access = await getWorkspaceForMember(db, id, user.id);
   const name = access?.workspace.name ?? "Workspace";
+  // Root layout already appends " · Coppergate" — do not include it here.
   return {
     title: {
-      default: `${name} · Coppergate`,
-      template: `%s · ${name} · Coppergate`,
+      default: name,
+      template: `%s · ${name}`,
     },
   };
 }

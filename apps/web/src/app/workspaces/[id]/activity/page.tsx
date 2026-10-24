@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
   getTaskForWorkspace,
@@ -11,6 +12,8 @@ import { db } from "@/lib/db";
 import { ActivityShell } from "./activity-shell";
 import type { ActivityEvent } from "./events";
 import { countEventsToday } from "./events";
+
+export const metadata: Metadata = { title: "Activity" };
 
 type PageProps = { params: Promise<{ id: string }> };
 
