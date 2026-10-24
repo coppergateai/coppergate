@@ -54,9 +54,9 @@ export default function DocsIndexPage() {
         <h1 className={styles.pageTitle}>Documentation</h1>
         <p className={styles.pageLede}>
           Coppergate is MIT-licensed. North star is the Survivor arena; the
-          practical wedge is <strong>GitHub issue → verified PR</strong> with
-          spend caps and a kill-switch. Start with self-host or try the hosted
-          app.
+          practical wedge is <strong>issue → verified PR</strong> (GitHub or
+          GitLab) with spend caps and a kill-switch. Start with self-host or try
+          the hosted app.
         </p>
 
         <ul className={styles.docsList}>

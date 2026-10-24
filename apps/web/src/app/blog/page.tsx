@@ -38,8 +38,8 @@ export default async function BlogIndexPage() {
         <p className={styles.pageEyebrow}>Blog</p>
         <h1 className={styles.pageTitle}>Blog</h1>
         <p className={styles.pageLede}>
-          Selection pressure, spend caps, and evidence — product notes in
-          English.
+          Notes on selection pressure, spend caps, and verified delivery — from
+          the Coppergate team.
         </p>
 
         <ul className={styles.docsList}>

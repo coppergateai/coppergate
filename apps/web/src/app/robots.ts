@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { ROBOTS_DISALLOW, robotsHost } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
 
 export default function robots(): MetadataRoute.Robots {
@@ -9,19 +10,11 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: [
-          "/api/",
-          "/workspaces/",
-          "/login",
-          "/profile",
-          "/share/",
-          "/ops/",
-          "/health",
-          "/ready",
-        ],
+        disallow: [...ROBOTS_DISALLOW],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
-    host: siteUrl,
+    // Hostname only (no scheme) — Yandex Host directive; Google ignores Host.
+    host: robotsHost(),
   };
 }

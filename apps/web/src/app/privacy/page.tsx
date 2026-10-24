@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
 
@@ -13,6 +14,12 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <SiteChrome>
+      <DocsBreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Privacy", path: "/privacy" },
+        ]}
+      />
       <article className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Legal</p>
         <h1 className={styles.pageTitle}>Privacy</h1>

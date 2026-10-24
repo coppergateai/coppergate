@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
 import { SiteChrome } from "../site-chrome";
 
@@ -11,6 +12,16 @@ export const metadata: Metadata = {
 };
 
 const entries = [
+  {
+    date: "2026-10-24",
+    title: "Marketing clarity pass",
+    items: [
+      "Hero messaging: who it’s for, issue → verified PR, honest stack ribbon",
+      "Pricing page: Community $0 vs optional hosted Starter/Pro",
+      "Security page aligned to open-source posture (no private-beta leftover)",
+      "Nav CTA: Try hosted for signed-out visitors",
+    ],
+  },
   {
     date: "2026-10-16",
     title: "Commercial wedge + hosted billing",
@@ -74,11 +85,18 @@ const entries = [
 export default function ChangelogPage() {
   return (
     <SiteChrome>
+      <DocsBreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Changelog", path: "/changelog" },
+        ]}
+      />
       <article className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Product</p>
         <h1 className={styles.pageTitle}>Changelog</h1>
         <p className={styles.pageLede}>
-          Release notes — what shipped recently
+          What shipped in the open — arena, signals, delivery, and the public
+          site.
         </p>
 
         <div className={styles.changelogList}>
