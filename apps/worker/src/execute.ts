@@ -699,16 +699,23 @@ export async function executeClaimedRun(
   });
 
   if (!report.passed) {
+    const failedChecks = report.checks
+      .filter((c) => !c.passed)
+      .map((c) => `${c.name}: ${(c.detail ?? "").slice(0, 200)}`)
+      .join(" | ");
+    const failMsg = [report.summary, failedChecks].filter(Boolean).join(" — ").slice(0, 500);
     await markRunFailed(db, {
       runId: run.id,
       workerId,
       errorCode: "validation_failed",
-      errorMessage: report.summary.slice(0, 500),
+      errorMessage: failMsg,
     });
     await safeTaskTransition(db, task, "FAILED", workerId, log, "VALIDATING");
     log.info("validation failed — auto-completion blocked", {
       runId: run.id,
       taskId: task.id,
+      summary: report.summary,
+      failedChecks: report.checks.filter((c) => !c.passed).slice(0, 4),
     });
     await maybeResolveTournamentAfterRun(db, run, workerId, log);
     return "validation_failed";
