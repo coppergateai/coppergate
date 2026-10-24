@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   isPathAllowed,
+  isEditToolAllowed,
   isProfileEditAllowed,
   isSafeRelativePath,
   resolveSafeWorkdirPath,
@@ -31,11 +32,28 @@ describe("path-policy", () => {
     assert.equal(resolveSafeWorkdirPath(workdir, "../escape.ts"), null);
   });
 
-  it("gates FILE edits on profile tool allowlist", () => {
+  it("gates FILE writes via profileTools", () => {
     assert.equal(isProfileEditAllowed(undefined), true);
     assert.equal(isProfileEditAllowed([]), true);
     assert.equal(isProfileEditAllowed(["read"]), false);
     assert.equal(isProfileEditAllowed(["read", "edit"]), true);
     assert.equal(isProfileEditAllowed(["*"]), true);
+  });
+
+  it("gates FILE writes via run toolAllowlist", () => {
+    assert.equal(isEditToolAllowed({}), true);
+    assert.equal(isEditToolAllowed({ toolAllowlist: [] }), true);
+    assert.equal(isEditToolAllowed({ toolAllowlist: ["read"] }), false);
+    assert.equal(
+      isEditToolAllowed({ toolAllowlist: ["read", "write_file"] }),
+      true,
+    );
+    assert.equal(
+      isEditToolAllowed({
+        toolAllowlist: ["write"],
+        profileTools: ["read"],
+      }),
+      false,
+    );
   });
 });

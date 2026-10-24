@@ -15,6 +15,11 @@ export type AgentRunInput = {
   acceptanceCriteria: string[];
   baseSha: string;
   toolAllowlist: string[];
+  /**
+   * Contender profile toolAllowlist. When non-empty, FILE writes require `edit`
+   * (or `*`). Empty/undefined preserves legacy behavior (no profile gate).
+   */
+  profileTools?: string[];
   spendCapMicros: number;
   /** Architecture / brief context (non-secret). */
   architectureContext?: string;

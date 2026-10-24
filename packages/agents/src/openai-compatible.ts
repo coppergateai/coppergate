@@ -3,8 +3,8 @@ import { dirname } from "node:path";
 import { AgentPolicyError } from "./fake.js";
 import { buildFakeCompletion } from "./fake.js";
 import {
+  isEditToolAllowed,
   isPathAllowed,
-  isProfileEditAllowed,
   isSafeRelativePath,
   resolveSafeWorkdirPath,
 } from "./path-policy.js";
@@ -167,14 +167,21 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       return;
     }
 
-    if (!isProfileEditAllowed(input.toolAllowlist)) {
+    if (
+      !isEditToolAllowed({
+        toolAllowlist: input.toolAllowlist,
+        profileTools: input.profileTools,
+      })
+    ) {
       yield {
         kind: "error",
-        message: "Profile tools do not allow FILE edits",
+        message:
+          "toolAllowlist / profileTools do not allow edit — refusing FILE writes",
         payload: {
           code: "tool_not_allowed",
-          required: "edit",
+          tool: "edit",
           toolAllowlist: input.toolAllowlist,
+          profileTools: input.profileTools ?? [],
         },
       };
       return;
