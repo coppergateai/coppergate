@@ -186,9 +186,39 @@ describe("agent run claim/lease", { skip: !url }, () => {
       .where(eq(agentRuns.id, claimed!.id));
 
     const reaped = await reapStaleRuns(db);
-    assert.ok(reaped >= 1);
+    assert.ok(reaped.requeued >= 1);
     const after = await getAgentRun(db, claimed!.id);
     assert.equal(after?.status, "QUEUED");
+    assert.equal(after?.leaseOwner, null);
+  });
+
+  it("fails stale VALIDATING runs instead of leaving them stuck", async () => {
+    const { run } = await enqueueAgentRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      idempotencyKey: `validating-reap-${Date.now()}`,
+      estimatedCostMicros: 10_000,
+    });
+    const claimed = await claimRunById(db, run.id, "validating-reaper", 60_000);
+    assert.ok(claimed);
+
+    await db
+      .update(agentRuns)
+      .set({
+        status: "VALIDATING",
+        leaseUntil: new Date(Date.now() - 1_000),
+      })
+      .where(eq(agentRuns.id, claimed!.id));
+
+    const reaped = await reapStaleRuns(db);
+    assert.ok(reaped.failedValidating >= 1);
+    assert.ok(
+      reaped.failedValidatingRuns.some((r) => r.id === claimed!.id),
+    );
+    const after = await getAgentRun(db, claimed!.id);
+    assert.equal(after?.status, "FAILED");
+    assert.equal(after?.errorCode, "validating_lease_expired");
     assert.equal(after?.leaseOwner, null);
   });
 

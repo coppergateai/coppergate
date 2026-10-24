@@ -20,9 +20,10 @@ Companion to product SECURITY posture. Pen-test sign-off lives in architecture D
 ## Pen-test checklist
 
 - [ ] Cross-tenant IDOR (signals, approvals, credentials)
-- [ ] Webhook secret bypass / replay
+- [x] Webhook secret bypass / replay — workspace-derived HMAC secret (not global root)
 - [ ] Rate-limit evasion / provider flood
-- [ ] SSRF via preview smoke / notify URLs
+- [x] SSRF via preview smoke / notify / LLM models proxy — `assertSafeServerFetchUrl`
+- [x] Agent/sandbox path traversal — `resolveContainedPath` on writes + delivery reads
 - [ ] Secret egress in harness logs
 
 ## Sign-off

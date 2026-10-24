@@ -61,3 +61,8 @@ export {
   isToyPrTitle,
 } from "./stub-detect.js";
 export { parseFileBlocks } from "./openai-compatible.js";
+export {
+  isPathAllowed,
+  isSafeRelativePath,
+  resolveSafeWorkdirPath,
+} from "./path-policy.js";

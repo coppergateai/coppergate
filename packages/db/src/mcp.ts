@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { assertSafeServerFetchUrl } from "@coppergate/sandbox";
 import type { Database } from "./client.js";
 import { recordAuditEvent } from "./briefs.js";
 import {
@@ -98,8 +99,13 @@ export async function upsertMcpConnection(
     throw new Error("unsupported MCP provider");
   }
   const endpoint = input.endpointUrl.trim().replace(/\/+$/, "");
-  if (!/^https?:\/\//i.test(endpoint)) {
-    throw new Error("endpointUrl must be http(s)");
+  try {
+    // Self-hosted Sonar on private nets is allowed; metadata/link-local is not.
+    assertSafeServerFetchUrl(endpoint, { allowPrivate: true });
+  } catch {
+    throw new Error(
+      "endpointUrl must be a safe http(s) URL (metadata/link-local blocked)",
+    );
   }
   const tools =
     input.toolAllowlist ??

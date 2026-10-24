@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { OpenAiCompatibleCodingAgent } from "./openai-compatible.js";
 import { createCodingAgent } from "./create-agent.js";
 import { FakeCodingAgent } from "./fake.js";
@@ -91,6 +94,158 @@ describe("OpenAiCompatibleCodingAgent", () => {
     const completion = events.find((e) => e.kind === "completion");
     assert.ok(completion);
     assert.ok(isFakeCompletionPayload(completion!.payload));
+  });
+
+  it("refuses FILE writes that escape sandbox workdir", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "cg-agent-"));
+    const agent = new OpenAiCompatibleCodingAgent({
+      apiKey: "sk-test",
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: [
+                    "### FILE: ../../etc/passwd",
+                    "```",
+                    "pwned",
+                    "```",
+                  ].join("\n"),
+                },
+              },
+            ],
+            usage: { total_tokens: 40 },
+          }),
+          { status: 200 },
+        ),
+    });
+
+    const events = [];
+    for await (const ev of agent.run({
+      runId: "r3",
+      taskId: "t3",
+      workspaceId: "w1",
+      projectId: "p1",
+      goal: "Escape",
+      scope: "Security",
+      allowedPaths: ["app/**"],
+      acceptanceCriteria: ["No"],
+      baseSha: "abc",
+      toolAllowlist: [],
+      spendCapMicros: 100_000,
+      sandboxWorkdir: workdir,
+    })) {
+      events.push(ev);
+    }
+
+    assert.ok(
+      events.some(
+        (e) =>
+          e.kind === "error" &&
+          (e.payload?.code === "path_not_allowed" ||
+            e.payload?.code === "path_escape"),
+      ),
+    );
+    assert.ok(!events.some((e) => e.kind === "completion"));
+  });
+
+  it("rejects FILE blocks outside allowedPaths", async () => {
+    const agent = new OpenAiCompatibleCodingAgent({
+      apiKey: "sk-test",
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: [
+                    "### FILE: secrets/key.txt",
+                    "```",
+                    "not-allowed content for product increment",
+                    "```",
+                  ].join("\n"),
+                },
+              },
+            ],
+            usage: { total_tokens: 40 },
+          }),
+          { status: 200 },
+        ),
+    });
+
+    const events = [];
+    for await (const ev of agent.run({
+      runId: "r3b",
+      taskId: "t3b",
+      workspaceId: "w1",
+      projectId: "p1",
+      goal: "Leak",
+      scope: "secrets",
+      allowedPaths: ["app/**"],
+      acceptanceCriteria: ["none"],
+      baseSha: "abc",
+      toolAllowlist: [],
+      spendCapMicros: 100_000,
+    })) {
+      events.push(ev);
+    }
+
+    assert.ok(
+      events.some(
+        (e) => e.kind === "error" && e.payload?.code === "path_not_allowed",
+      ),
+    );
+    assert.ok(!events.some((e) => e.kind === "completion"));
+  });
+
+  it("aborts in-flight chat when abortSignal fires", async () => {
+    const controller = new AbortController();
+    const agent = new OpenAiCompatibleCodingAgent({
+      apiKey: "sk-test",
+      maxRetries: 0,
+      fetchImpl: async (_url, init) => {
+        const signal = init?.signal;
+        return await new Promise<Response>((_resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+            return;
+          }
+          signal?.addEventListener(
+            "abort",
+            () =>
+              reject(
+                new DOMException("The operation was aborted.", "AbortError"),
+              ),
+            { once: true },
+          );
+          setTimeout(() => controller.abort(), 5);
+        });
+      },
+    });
+
+    const events = [];
+    for await (const ev of agent.run({
+      runId: "r4",
+      taskId: "t4",
+      workspaceId: "w1",
+      projectId: "p1",
+      goal: "Hang",
+      scope: "LLM",
+      allowedPaths: ["README.md"],
+      acceptanceCriteria: ["done"],
+      baseSha: "abc",
+      toolAllowlist: [],
+      spendCapMicros: 100_000,
+      abortSignal: controller.signal,
+    })) {
+      events.push(ev);
+    }
+
+    assert.ok(
+      events.some((e) => e.kind === "error" && e.payload?.code === "aborted"),
+    );
+    assert.ok(!events.some((e) => e.kind === "completion"));
   });
 });
 

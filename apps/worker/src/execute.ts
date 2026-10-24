@@ -39,6 +39,7 @@ import {
   persistDeliveryArtifacts,
   persistReviewFindings,
   renewRunLease,
+  RunError,
   setTaskPrUrl,
   withTemperamentGuidance,
   type AgentRun,
@@ -365,56 +366,87 @@ export async function executeClaimedRun(
     hasAuth: Boolean(deliveryResolved?.authToken && deliveryResolved?.cloneUrl),
   });
 
+  // Heartbeat keeps ownership during long LLM / validation work (default lease 30s).
+  const abortController = new AbortController();
+  let lostOwnership = false;
+  const heartbeatMs = Math.max(1_000, Math.floor(leaseMs / 3));
+  const heartbeat = setInterval(() => {
+    void renewRunLease(db, run.id, workerId, leaseMs).catch((err) => {
+      if (err instanceof RunError && err.code === "not_owner") {
+        lostOwnership = true;
+        abortController.abort();
+      }
+    });
+  }, heartbeatMs);
+
   try {
-    if (sandboxManager) {
-      try {
-        const repoUrl =
-          cloneMode === "git" && deliveryResolved?.cloneUrl
-            ? deliveryResolved.cloneUrl
-            : `coppergate://project/${run.projectId}`;
-        const baseSha =
-          deliveryResolved?.baseSha || run.baseSha || "unknown";
-        sandbox = await sandboxManager.create({
-          runId: run.id,
-          workspaceId: run.workspaceId,
-          repoUrl,
-          baseSha,
-          branchName: run.branchName ?? undefined,
-          cloneMode,
-          authToken:
-            cloneMode === "git" ? deliveryResolved?.authToken : null,
-        });
-        await attachSandboxToRun(db, {
-          runId: run.id,
-          workerId,
-          sandboxId: sandbox.id,
-        });
-        await appendRunEvent(db, {
-          runId: run.id,
-          workspaceId: run.workspaceId,
-          kind: "progress",
-          payload: {
-            message: "Sandbox ready",
+    try {
+      if (sandboxManager) {
+        try {
+          const repoUrl =
+            cloneMode === "git" && deliveryResolved?.cloneUrl
+              ? deliveryResolved.cloneUrl
+              : `coppergate://project/${run.projectId}`;
+          const baseSha =
+            deliveryResolved?.baseSha || run.baseSha || "unknown";
+          sandbox = await sandboxManager.create({
+            runId: run.id,
+            workspaceId: run.workspaceId,
+            repoUrl,
+            baseSha,
+            branchName: run.branchName ?? undefined,
+            cloneMode,
+            authToken:
+              cloneMode === "git" ? deliveryResolved?.authToken : null,
+          });
+          await attachSandboxToRun(db, {
+            runId: run.id,
+            workerId,
+            sandboxId: sandbox.id,
+          });
+          await appendRunEvent(db, {
+            runId: run.id,
+            workspaceId: run.workspaceId,
+            kind: "progress",
+            payload: {
+              message: "Sandbox ready",
+              sandboxId: sandbox.id,
+              runtime: sandbox.runtime,
+              sandboxMode: sandbox.cloneMode ?? cloneMode,
+              cloneMode: sandbox.cloneMode ?? cloneMode,
+            },
+          });
+          log.info("sandbox created", {
+            runId: run.id,
             sandboxId: sandbox.id,
             runtime: sandbox.runtime,
-            sandboxMode: sandbox.cloneMode ?? cloneMode,
             cloneMode: sandbox.cloneMode ?? cloneMode,
-          },
-        });
-        log.info("sandbox created", {
-          runId: run.id,
-          sandboxId: sandbox.id,
-          runtime: sandbox.runtime,
-          cloneMode: sandbox.cloneMode ?? cloneMode,
-        });
-      } catch (err) {
-        log.warn("sandbox create failed; continuing without sandbox", {
-          runId: run.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        sandbox = null;
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          // Live http delivery must not proceed with fake validation / empty sandbox.
+          if (deliveryModeHint === "http") {
+            log.error("sandbox create failed; failing closed for http delivery", {
+              runId: run.id,
+              error: message,
+            });
+            await markRunFailed(db, {
+              runId: run.id,
+              workerId,
+              errorCode: "sandbox_required",
+              errorMessage: message.slice(0, 500),
+            });
+            await safeTaskTransition(db, task, "FAILED", workerId, log);
+            await maybeResolveTournamentAfterRun(db, run, workerId, log);
+            return "failed";
+          }
+          log.warn("sandbox create failed; continuing without sandbox", {
+            runId: run.id,
+            error: message,
+          });
+          sandbox = null;
+        }
       }
-    }
 
     const isPrReview = task.githubPrNumber != null;
     let reviewContext: string | undefined;
@@ -467,10 +499,23 @@ export async function executeClaimedRun(
         sandboxWorkdir: isPrReview ? undefined : sandbox?.workdir,
         sandboxId: sandbox?.id,
         isCancelRequested: () => isRunCancelRequested(db, run.id),
+        abortSignal: abortController.signal,
         mode: isPrReview ? "pr_review" : "implement",
         reviewContext,
       })) {
-        await renewRunLease(db, run.id, workerId, leaseMs);
+        if (lostOwnership || abortController.signal.aborted) {
+          break;
+        }
+        try {
+          await renewRunLease(db, run.id, workerId, leaseMs);
+        } catch (err) {
+          if (err instanceof RunError && err.code === "not_owner") {
+            lostOwnership = true;
+            abortController.abort();
+            break;
+          }
+          throw err;
+        }
 
         await appendRunEvent(db, {
           runId: run.id,
@@ -497,8 +542,12 @@ export async function executeClaimedRun(
           }
         }
 
-        if (event.kind === "error" && event.payload?.code === "cancelled") {
-          sawCancel = true;
+        if (
+          event.kind === "error" &&
+          (event.payload?.code === "cancelled" ||
+            event.payload?.code === "aborted")
+        ) {
+          if (event.payload?.code === "cancelled") sawCancel = true;
           break;
         }
 
@@ -509,6 +558,13 @@ export async function executeClaimedRun(
           completion = event.payload;
           actualCost = event.payload.actualCostMicros || actualCost;
         }
+      }
+
+      if (lostOwnership) {
+        log.warn("lost run lease ownership; aborting without delivery", {
+          runId: run.id,
+        });
+        return "failed";
       }
 
       if (completion && !sawCancel && !isPrReview) {
@@ -561,6 +617,12 @@ export async function executeClaimedRun(
         });
       }
     } catch (err) {
+      if (lostOwnership) {
+        log.warn("agent error after lease loss; skipping fail mark", {
+          runId: run.id,
+        });
+        return "failed";
+      }
       const message = err instanceof Error ? err.message : String(err);
       await appendRunEvent(db, {
         runId: run.id,
@@ -573,7 +635,14 @@ export async function executeClaimedRun(
         workerId,
         errorCode: "agent_error",
         errorMessage: message.slice(0, 500),
+      }).catch((markErr) => {
+        if (markErr instanceof RunError && markErr.code === "not_owner") {
+          lostOwnership = true;
+          return;
+        }
+        throw markErr;
       });
+      if (lostOwnership) return "failed";
       await safeTaskTransition(db, task, "FAILED", workerId, log);
       void notifyWorkspace(db, {
         event: "run_failed",
@@ -584,6 +653,13 @@ export async function executeClaimedRun(
         message: `Run failed: ${message.slice(0, 200)}`,
       }).catch(() => undefined);
       await maybeResolveTournamentAfterRun(db, run, workerId, log);
+      return "failed";
+    }
+
+    if (lostOwnership) {
+      log.warn("lost run lease ownership; aborting without delivery", {
+        runId: run.id,
+      });
       return "failed";
     }
 
@@ -655,6 +731,14 @@ export async function executeClaimedRun(
     }
   }
 
+  if (lostOwnership) {
+    log.warn("lost run lease ownership after agent work; skipping delivery", {
+      runId: run.id,
+    });
+    return "failed";
+  }
+
+  try {
   if (!completion || !validationReport) {
     await markRunFailed(db, {
       runId: run.id,
@@ -1132,6 +1216,52 @@ export async function executeClaimedRun(
   await maybeResolveTournamentAfterRun(db, run, workerId, log);
 
   return "review_required";
+  } catch (err) {
+    if (lostOwnership) {
+      log.warn("delivery error after lease loss; skipping fail mark", {
+        runId: run.id,
+      });
+      return "failed";
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("delivery path failed closed", {
+      runId: run.id,
+      error: message,
+    });
+    await appendRunEvent(db, {
+      runId: run.id,
+      workspaceId: run.workspaceId,
+      kind: "error",
+      payload: { message: `Delivery failed: ${message.slice(0, 400)}` },
+    }).catch(() => undefined);
+    try {
+      await markRunFailed(db, {
+        runId: run.id,
+        workerId,
+        errorCode: "delivery_error",
+        errorMessage: message.slice(0, 500),
+      });
+    } catch (markErr) {
+      if (markErr instanceof RunError && markErr.code === "not_owner") {
+        return "failed";
+      }
+      throw markErr;
+    }
+    await safeTaskTransition(db, task, "FAILED", workerId, log, "VALIDATING");
+    void notifyWorkspace(db, {
+      event: "run_failed",
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      taskId: task.id,
+      runId: run.id,
+      message: `Delivery failed: ${message.slice(0, 200)}`,
+    }).catch(() => undefined);
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
+    return "failed";
+  }
+  } finally {
+    clearInterval(heartbeat);
+  }
 }
 
 async function attachSyntheticSignalFitness(

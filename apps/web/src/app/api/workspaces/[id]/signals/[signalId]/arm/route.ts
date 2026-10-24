@@ -1,6 +1,7 @@
 import { SignalError, armSignalEvent, dismissSignalEvent } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 import { requireUser } from "@/lib/auth";
+import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import { requireWorkspaceOwner } from "@/lib/workspace";
@@ -15,6 +16,7 @@ type RouteContext = {
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
+    requireCsrf(request);
     const user = await requireUser(request);
     const { id: workspaceId, signalId } = await context.params;
     await requireWorkspaceOwner(db, workspaceId, user.id);
@@ -52,6 +54,7 @@ export async function POST(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
+    requireCsrf(request);
     const user = await requireUser(request);
     const { id: workspaceId, signalId } = await context.params;
     await requireWorkspaceOwner(db, workspaceId, user.id);

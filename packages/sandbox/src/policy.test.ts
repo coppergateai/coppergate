@@ -6,8 +6,10 @@ import {
   assertEgressAllowed,
   assertNoDockerSocket,
   assertNotPrivileged,
+  assertSafeServerFetchUrl,
   isEgressAllowed,
   isLinkLocalOrMetadata,
+  isSafeServerFetchUrl,
 } from "./policy.js";
 import { buildDockerSandboxSpec } from "./docker-spec.js";
 
@@ -59,6 +61,30 @@ describe("sandbox policy", () => {
           mounts: ["/var/run/docker.sock:/var/run/docker.sock"],
         }),
       (err: unknown) => err instanceof SandboxPolicyError,
+    );
+  });
+
+  it("assertSafeServerFetchUrl blocks metadata and private hosts", () => {
+    assert.throws(
+      () => assertSafeServerFetchUrl(`http://${METADATA_IPV4}/latest`),
+      (err: unknown) =>
+        err instanceof SandboxPolicyError && err.code === "egress_denied",
+    );
+    assert.equal(isSafeServerFetchUrl("https://10.0.0.5/hook"), false);
+    assert.equal(isSafeServerFetchUrl("http://127.0.0.1:11434"), false);
+    assert.ok(
+      isSafeServerFetchUrl("http://127.0.0.1:11434/v1", {
+        allowLoopback: true,
+      }),
+    );
+    assert.ok(isSafeServerFetchUrl("https://hooks.slack.com/services/x"));
+    assert.throws(
+      () =>
+        assertSafeServerFetchUrl("http://example.com/hook", {
+          requireHttps: true,
+        }),
+      (err: unknown) =>
+        err instanceof SandboxPolicyError && err.code === "invalid",
     );
   });
 });

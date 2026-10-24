@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { assertSafeServerFetchUrl } from "@coppergate/sandbox";
 import type { Database } from "./client.js";
 import { createEmailProvider, renderNotifyEmail } from "./email.js";
 import { redactPayload } from "./redact.js";
@@ -154,11 +155,13 @@ export async function notifyWorkspace(
     const url = ws.notifyWebhookUrl.trim();
     const body = formatNotifyBody(url, input, safe);
     try {
+      assertSafeServerFetchUrl(url, { requireHttps: true });
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(5_000),
+        redirect: "manual",
       });
       webhook = res.ok;
       slack = webhook && isSlackIncomingWebhookUrl(url);
@@ -213,8 +216,14 @@ export async function updateWorkspaceNotifySettings(
   } = { updatedAt: new Date() };
   if (input.notifyWebhookUrl !== undefined) {
     const url = input.notifyWebhookUrl?.trim() || null;
-    if (url && !/^https:\/\//i.test(url)) {
-      throw new Error("notifyWebhookUrl must be https");
+    if (url) {
+      try {
+        assertSafeServerFetchUrl(url, { requireHttps: true });
+      } catch {
+        throw new Error(
+          "notifyWebhookUrl must be a public https URL (no private/metadata hosts)",
+        );
+      }
     }
     patch.notifyWebhookUrl = url;
   }

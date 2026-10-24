@@ -9,6 +9,7 @@ import {
 } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 import { requireUser } from "@/lib/auth";
+import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import { requireWorkspaceOwner } from "@/lib/workspace";
@@ -24,6 +25,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
+    requireCsrf(request);
     const user = await requireUser(request);
     const { id: workspaceId } = await context.params;
     await requireWorkspaceOwner(db, workspaceId, user.id);

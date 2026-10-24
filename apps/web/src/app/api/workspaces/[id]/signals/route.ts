@@ -5,8 +5,11 @@ import {
   upsertAutoArmRule,
 } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
+import { deriveWorkspaceSignalSecret } from "@coppergate/signals";
 import { requireUser } from "@/lib/auth";
+import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import {
   requireWorkspaceMember,
@@ -23,7 +26,7 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const user = await requireUser(request);
     const { id: workspaceId } = await context.params;
-    await requireWorkspaceMember(db, workspaceId, user.id);
+    const membership = await requireWorkspaceMember(db, workspaceId, user.id);
     const url = new URL(request.url);
     const status = url.searchParams.get("status") ?? undefined;
     const provider = url.searchParams.get("provider") ?? undefined;
@@ -33,7 +36,16 @@ export async function GET(request: Request, context: RouteContext) {
       limit: 100,
     });
     const rules = await listAutoArmRules(db, workspaceId);
-    return jsonOk({ events, rules }, { correlationId });
+    const root =
+      process.env.SIGNAL_WEBHOOK_SECRET ?? env.SIGNAL_WEBHOOK_SECRET ?? null;
+    const webhookSecret =
+      membership.role === "owner" && root
+        ? deriveWorkspaceSignalSecret(root, workspaceId)
+        : undefined;
+    return jsonOk(
+      { events, rules, ...(webhookSecret ? { webhookSecret } : {}) },
+      { correlationId },
+    );
   } catch (err) {
     return jsonError(err, correlationId);
   }
@@ -43,6 +55,7 @@ export async function GET(request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
+    requireCsrf(request);
     const user = await requireUser(request);
     const { id: workspaceId } = await context.params;
     await requireWorkspaceOwner(db, workspaceId, user.id);

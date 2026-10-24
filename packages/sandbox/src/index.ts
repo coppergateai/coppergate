@@ -17,9 +17,17 @@ export {
   assertEgressAllowed,
   assertNoDockerSocket,
   assertNotPrivileged,
+  assertSafeServerFetchUrl,
   isEgressAllowed,
   isLinkLocalOrMetadata,
+  isSafeServerFetchUrl,
+  type SafeFetchUrlOptions,
 } from "./policy.js";
+export {
+  SandboxPathError,
+  containedRelativePath,
+  resolveContainedPath,
+} from "./paths.js";
 export {
   buildDockerSandboxSpec,
   type DockerSandboxSpec,

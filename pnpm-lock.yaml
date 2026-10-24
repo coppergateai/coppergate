@@ -41,6 +41,9 @@ importers:
       '@coppergate/llm':
         specifier: workspace:*
         version: link:../../packages/llm
+      '@coppergate/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@coppergate/scm':
         specifier: workspace:*
         version: link:../../packages/scm
@@ -156,6 +159,10 @@ importers:
         version: 5.9.3
 
   packages/agents:
+    dependencies:
+      '@coppergate/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
     devDependencies:
       '@coppergate/eslint-config':
         specifier: workspace:*
@@ -264,6 +271,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@coppergate/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
       drizzle-orm:
         specifier: ^0.43.1
         version: 0.43.1(postgres@3.4.9)

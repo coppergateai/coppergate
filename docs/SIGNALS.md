@@ -11,7 +11,7 @@ Production Signal Adapters turn external tools into arena work. Spec: `coppergat
 | POST | `/api/workspaces/:id/signals/ingest` | owner — test envelope |
 | POST | `/api/workspaces/:id/signals/:signalId/arm` | owner — manual arm |
 | DELETE | `/api/workspaces/:id/signals/:signalId/arm` | owner — dismiss |
-| POST | `/api/workspaces/:id/signals/webhooks/:provider` | `X-Coppergate-Signal-Secret` |
+| POST | `/api/workspaces/:id/signals/webhooks/:provider` | `X-Coppergate-Signal-Secret` (workspace-derived) |
 
 Providers shipped:
 
@@ -42,8 +42,10 @@ Operator APIs:
 
 | Variable | Notes |
 |---|---|
-| `SIGNAL_WEBHOOK_SECRET` | Shared secret (≥8 chars) for webhook verify |
-| `SIGNAL_<PROVIDER>_SECRET` | Optional per-provider override |
+| `SIGNAL_WEBHOOK_SECRET` | Root secret (≥8 chars). Webhooks must send the **workspace-derived** value, not this root. |
+| `SIGNAL_<PROVIDER>_SECRET` | Optional per-provider root; also workspace-derived before verify |
+
+**Workspace webhook secret:** `HMAC-SHA256(root, "v1:signal-webhook:" + workspaceId)` hex digest. Owners can read it from `GET /api/workspaces/:id/signals` (`webhookSecret`). The root env value alone must not authorize ingest into an arbitrary workspace path.
 
 ## Auto-arm
 

@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { resolveContainedPath } from "@coppergate/sandbox";
 
 export type DeliveryFile = { path: string; content: string };
 
@@ -8,6 +8,7 @@ const README_NAMES = new Set(["readme.md", "readme.txt", "readme"]);
 /**
  * Prefer sandbox workdir contents for paths the agent reported.
  * Never invent README stubs or smoke pages — empty means no delivery.
+ * Paths are resolved inside workdir only (no traversal).
  */
 export async function buildDeliveryFiles(input: {
   workdir: string | null | undefined;
@@ -27,22 +28,24 @@ export async function buildDeliveryFiles(input: {
     if (README_NAMES.has(path.toLowerCase())) {
       if (!workdir) continue;
       try {
-        const content = await readFile(join(workdir, path), "utf8");
+        const abs = resolveContainedPath(workdir, path);
+        const content = await readFile(abs, "utf8");
         files.push({ path, content });
         fromSandbox += 1;
       } catch {
-        /* skip — do not stub-overwrite README */
+        /* skip — do not stub-overwrite README / refuse traversal */
       }
       continue;
     }
 
     if (!workdir) continue;
     try {
-      const content = await readFile(join(workdir, path), "utf8");
+      const abs = resolveContainedPath(workdir, path);
+      const content = await readFile(abs, "utf8");
       files.push({ path, content });
       fromSandbox += 1;
     } catch {
-      /* skip missing paths — never invent stub content */
+      /* skip missing paths or path escape — never invent stub content */
     }
   }
 

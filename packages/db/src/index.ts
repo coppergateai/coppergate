@@ -177,6 +177,7 @@ export {
 export { slugify, withSlugSuffix } from "./slug.js";
 export {
   createWorkspaceWithOwner,
+  getActiveWorkspaceById,
   getWorkspaceForMember,
   insertTestUser,
   isAutonomyLevel,
@@ -428,6 +429,7 @@ export {
   requestCancelRun,
   attachSandboxToRun,
   setTaskPrUrl,
+  type ReapStaleRunsResult,
 } from "./runs.js";
 export {
   appendRunEvent,
