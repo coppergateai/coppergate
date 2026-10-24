@@ -491,8 +491,11 @@ export {
 export {
   ShareError,
   createDeliveryShareToken,
+  deliveryShareTtlMs,
   getPublicDeliveryShare,
+  isDeliveryShareExpired,
   revokeDeliveryShareToken,
+  DEFAULT_DELIVERY_SHARE_TTL_MS,
 } from "./share-reports.js";
 export {
   countAcceptedPrsForWorkspace,

@@ -42,16 +42,31 @@ export default async function BlogIndexPage() {
           the Coppergate team.
         </p>
 
-        <ul className={styles.docsList}>
-          {posts.map((post) => (
-            <li key={post.slug} className={styles.docsItem}>
-              <Link href={`/blog/${post.slug}`}>{post.title}</Link>
-              <p>
-                {formatDate(post.date)} — {post.description}
-              </p>
-            </li>
-          ))}
-        </ul>
+        {posts.length === 0 ? (
+          <p className={styles.pageLede}>
+            No posts yet. Follow{" "}
+            <a
+              href="https://github.com/coppergateai/coppergate"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>{" "}
+            or the{" "}
+            <Link href="/changelog">changelog</Link> for product updates.
+          </p>
+        ) : (
+          <ul className={styles.docsList}>
+            {posts.map((post) => (
+              <li key={post.slug} className={styles.docsItem}>
+                <Link href={`/blog/${post.slug}`}>{post.title}</Link>
+                <p>
+                  {formatDate(post.date)} — {post.description}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </main>
     </SiteChrome>
   );

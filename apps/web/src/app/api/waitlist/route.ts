@@ -4,6 +4,7 @@ import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import { logger } from "@/lib/logger";
+import { checkRateLimit, clientIpFromRequest } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,16 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const correlationId = correlationIdFrom(request);
   try {
+    const ip = clientIpFromRequest(request);
+    const limited = checkRateLimit(`waitlist:${ip}`, {
+      limit: 10,
+      windowMs: 60_000,
+    });
+    if (!limited.ok) {
+      throw new ApiError("bad_request", "Too many requests", {
+        status: 429,
+      });
+    }
     requireCsrf(request);
     const body = (await request.json().catch(() => null)) as {
       email?: unknown;
