@@ -82,7 +82,7 @@ Worker env notes:
 
 | Variable | Default | Notes |
 |---|---|---|
-| `SANDBOX_MODE` | `local` | Set `off` to skip LocalSandboxManager |
+| `SANDBOX_MODE` | `local` | `local` (host), `docker` (gVisor/runc), or `off` |
 | `CONTENDER_HARNESS` | _(unset)_ | `openhands` for sandbox-backed BYO harness |
 | `GITHUB_DELIVERY_MODE` | `fake` | `http` for real GitHub/GitLab PRs/MRs |
 
