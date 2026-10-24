@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -40,6 +41,21 @@ type PageProps = {
   params: Promise<{ id: string; projectId: string }>;
   searchParams: Promise<{ tab?: string }>;
 };
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string; projectId: string }>;
+}): Promise<Metadata> {
+  const user = await currentUser();
+  if (!user) return { title: "Project" };
+  const { id, projectId } = await params;
+  const access = await getWorkspaceForMember(db, id, user.id);
+  if (!access) return { title: "Project" };
+  const bound = await getProjectForWorkspace(db, id, projectId);
+  return { title: bound?.project.name ?? "Project" };
+}
+
 
 export default async function ProjectDetailPage({
   params,

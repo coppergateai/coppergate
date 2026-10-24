@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
   getInstallationForWorkspace,
@@ -9,6 +10,8 @@ import {
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ProjectsHome } from "./projects-home";
+
+export const metadata: Metadata = { title: "Projects" };
 
 type PageProps = { params: Promise<{ id: string }> };
 

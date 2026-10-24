@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
   getWorkspaceForMember,
@@ -8,6 +9,8 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { ActivityEvent } from "./activity/events";
 import { MissionControl } from "./mission-control";
+
+export const metadata: Metadata = { title: "Mission Control" };
 
 type PageProps = { params: Promise<{ id: string }> };
 

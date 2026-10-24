@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -9,6 +10,8 @@ import { currentUser } from "@/lib/auth";
 import { serializeApproval } from "@/lib/approval";
 import { db } from "@/lib/db";
 import { InboxShell, type InboxTab } from "./inbox-shell";
+
+export const metadata: Metadata = { title: "Inbox" };
 
 type PageProps = {
   params: Promise<{ id: string }>;

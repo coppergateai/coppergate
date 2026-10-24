@@ -296,14 +296,20 @@ export function ActivityShell({
               <p className={styles.metricMeta}>Arena contenders</p>
             </div>
             <div className={styles.metric}>
-              <p className={styles.metricLabel}>Needs review</p>
+              <p className={styles.metricLabel}>Needs attention</p>
               <p className={styles.metricValue}>
                 {String(metrics.needsReview).padStart(2, "0")}
               </p>
               <p className={styles.metricMeta}>
-                <Link href={`/workspaces/${workspaceId}/inbox`}>
-                  Open inbox
-                </Link>
+                {metrics.needsReview > 0 ? (
+                  <Link href={`/workspaces/${workspaceId}/arena`}>
+                    Open Arena
+                  </Link>
+                ) : (
+                  <Link href={`/workspaces/${workspaceId}/inbox`}>
+                    Open inbox
+                  </Link>
+                )}
               </p>
             </div>
           </div>

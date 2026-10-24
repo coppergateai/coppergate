@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getWorkspaceForMember } from "@coppergate/db";
@@ -5,6 +6,8 @@ import { SkeletonStack } from "@/components/app/ui";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ArenaSpectacle } from "./arena-spectacle";
+
+export const metadata: Metadata = { title: "Arena" };
 
 type PageProps = {
   params: Promise<{ id: string }>;
