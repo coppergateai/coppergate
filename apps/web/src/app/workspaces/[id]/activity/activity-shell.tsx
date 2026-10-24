@@ -90,7 +90,15 @@ function tagsFor(group: ActivityGroup): string[] {
   if (tech && tech.length > 2 && !titleLower.includes(tech.toLowerCase())) {
     tags.push(tech);
   }
-  if (group.targetType && group.targetId) {
+  const projectName =
+    typeof group.meta?.projectName === "string"
+      ? group.meta.projectName
+      : typeof group.meta?.repoFullName === "string"
+        ? group.meta.repoFullName.split("/").pop()
+        : null;
+  if (projectName) {
+    tags.push(projectName);
+  } else if (group.targetType && group.targetId) {
     tags.push(`${group.targetType} ${shortId(group.targetId)}`);
   } else if (typeof group.meta?.projectId === "string") {
     tags.push(`project ${shortId(group.meta.projectId)}`);

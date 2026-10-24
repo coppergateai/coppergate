@@ -79,35 +79,42 @@ export function PlanPanel({
   }
 
   const arenaHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
+  const doneStatuses = new Set(["ACCEPTED", "DONE", "CANCELLED", "EXPIRED"]);
+  const openMilestoneId =
+    plan?.milestones.find((m) =>
+      m.tasks.some((t) => !doneStatuses.has(t.status)),
+    )?.id ?? plan?.milestones[0]?.id;
 
   return (
     <section id="plan" className={styles.section} aria-labelledby="plan-heading">
-      <h2 id="plan-heading" className={styles.sectionLabel}>
-        Delivery plan
-      </h2>
+      <div className={styles.sectionHead}>
+        <h2 id="plan-heading" className={styles.sectionLabel}>
+          Delivery plan
+        </h2>
+        {isOwner && plan ? (
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            disabled={pending || !hasApprovedBrief}
+            onClick={() => void generate()}
+          >
+            {pending ? "Generating…" : "Regenerate"}
+          </button>
+        ) : null}
+      </div>
       <p className={styles.sectionLede}>
-        Autonomously generated from Start — propose, build, review, merge. No
-        manual brief or plan entry required.
+        Autonomously generated from Start — propose, build, review, merge.
       </p>
 
       {!plan ? (
         <p className={styles.muted}>
           Open{" "}
-          <Link href={arenaHref}>Arena</Link>{" "}
+          <Link href={arenaHref} className={styles.inlineLink}>
+            Arena
+          </Link>{" "}
           and press Start. Coppergate invents the vision, queues the next
           improvement, and ships through PR merge.
         </p>
-      ) : null}
-
-      {isOwner && plan ? (
-        <button
-          type="button"
-          className={styles.primaryBtn}
-          disabled={pending || !hasApprovedBrief}
-          onClick={() => void generate()}
-        >
-          {pending ? "Generating…" : "Regenerate plan"}
-        </button>
       ) : null}
 
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -119,11 +126,11 @@ export function PlanPanel({
             {plan.milestones.reduce((n, m) => n + m.tasks.length, 0)} tasks ·{" "}
             {plan.dependencyCount} dependencies
           </p>
-          {plan.milestones.map((m, index) => (
+          {plan.milestones.map((m) => (
             <details
               key={m.id}
               className={styles.milestoneDetails}
-              open={index === 0}
+              open={m.id === openMilestoneId}
             >
               <summary className={styles.milestoneSummary}>
                 <span className={styles.subTitle}>
