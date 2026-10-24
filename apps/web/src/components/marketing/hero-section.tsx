@@ -20,9 +20,9 @@ export function HeroSection({ signedIn }: Props) {
           </div>
 
           <h1 id="hero-title" className={styles.headline}>
-            Set a budget. Agents war.{" "}
+            Set a budget. Agents war.
             <br />
-            <span className={styles.headlineAccent}>Survivors ship.</span>
+            <span className={styles.headlineAccent}> Survivors ship.</span>
           </h1>
 
           <p className={styles.lede}>

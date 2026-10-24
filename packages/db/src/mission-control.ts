@@ -27,7 +27,8 @@ export type MissionControlAttentionKind =
   | "budget_reserved"
   | "review_required"
   | "arena_failed"
-  | "replan_failed";
+  | "replan_failed"
+  | "merge_blocked";
 
 export type MissionControlAttentionItem = {
   id: string;
@@ -302,6 +303,46 @@ export async function getWorkspaceMissionControl(
       title: "Replan queue failed",
       detail: "Maintainer could not queue the next task",
       href,
+      priority: "high",
+    });
+  }
+
+  const mergeBlocked = recentAudit
+    .filter((e) => e.action === "merge.blocked")
+    .slice(0, 3);
+  const seenMergeProjects = new Set<string>();
+  for (const ev of mergeBlocked) {
+    let projectId: string | null = null;
+    let message: string | null = null;
+    if (ev.meta) {
+      try {
+        const meta = JSON.parse(ev.meta) as {
+          projectId?: string;
+          message?: string;
+          cta?: string;
+        };
+        projectId = typeof meta.projectId === "string" ? meta.projectId : null;
+        message =
+          (typeof meta.message === "string" && meta.message) ||
+          (typeof meta.cta === "string" && meta.cta) ||
+          null;
+      } catch {
+        projectId = null;
+      }
+    }
+    const dedupeKey = projectId ?? ev.id;
+    if (seenMergeProjects.has(dedupeKey)) continue;
+    seenMergeProjects.add(dedupeKey);
+    attention.push({
+      id: `merge-blocked-${ev.id}`,
+      kind: "merge_blocked",
+      title: "Merge blocked",
+      detail: message
+        ? message.slice(0, 140)
+        : "GitHub branch protection requires review — clear after fixing rights",
+      href: projectId
+        ? `/workspaces/${workspaceId}/projects/${projectId}?tab=configuration`
+        : `/workspaces/${workspaceId}/activity`,
       priority: "high",
     });
   }

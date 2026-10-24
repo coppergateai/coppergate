@@ -10,6 +10,7 @@ import {
   listMaintainerProjects,
   markAutoMerged,
   parseMaintainerPolicy,
+  reconcileStaleEstimateReserves,
   recordAuditEvent,
   tickMaintainerProject,
   type Database,
@@ -256,11 +257,39 @@ export async function runMaintainerSchedulerTick(
     }
   }
 
+  // Release estimate holds no longer backed by active runs (prevents envelope starvation).
+  const workspaceIds = [...new Set(projects.map((p) => p.workspaceId))];
+  let reservesReleasedUsd = 0;
+  for (const workspaceId of workspaceIds) {
+    try {
+      const reconciled = await reconcileStaleEstimateReserves(db, {
+        workspaceId,
+        dryRun: false,
+      });
+      if (reconciled.releasedMicros > 0) {
+        reservesReleasedUsd += reconciled.releasedMicros / 1_000_000;
+        log.info("stale estimate reserves reconciled", {
+          workspaceId,
+          tasks: reconciled.rows.length,
+          releasedUsd: Number(
+            (reconciled.releasedMicros / 1_000_000).toFixed(4),
+          ),
+        });
+      }
+    } catch (err) {
+      log.warn("stale reserve reconcile skipped", {
+        workspaceId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   log.info("maintainer scheduler tick", {
     projects: projects.length,
     autoAccepted,
     merged,
     releases,
+    reservesReleasedUsd: Number(reservesReleasedUsd.toFixed(4)),
   });
 
   return {
