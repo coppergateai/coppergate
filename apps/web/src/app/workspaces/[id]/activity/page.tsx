@@ -69,6 +69,11 @@ function hrefFor(
     }
     return `/workspaces/${workspaceId}/activity`;
   }
+  if (action === "merge.blocked" || action === "merge.blocked_cleared") {
+    return projectId
+      ? `/workspaces/${workspaceId}/projects/${projectId}?tab=configuration`
+      : `/workspaces/${workspaceId}/activity`;
+  }
   return null;
 }
 
@@ -155,10 +160,12 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
   const recentReplanFail = events.some(
     (e) => e.action === "maintainer.replan_queue_failed",
   );
+  const recentMergeBlocked = events.some((e) => e.action === "merge.blocked");
   const systemHealthy =
     needsReview === 0 &&
     mission.metrics.budgetStatus !== "paused" &&
-    !recentReplanFail;
+    !recentReplanFail &&
+    !recentMergeBlocked;
 
   return (
     <ActivityShell
@@ -174,9 +181,11 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
           ? "System healthy"
           : mission.metrics.budgetStatus === "paused"
             ? "Budget paused"
-            : recentReplanFail
-              ? "Replan failing"
-              : "Needs attention",
+            : recentMergeBlocked
+              ? "Merge blocked"
+              : recentReplanFail
+                ? "Replan failing"
+                : "Needs attention",
       }}
     />
   );

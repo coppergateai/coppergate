@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
   getWorkspaceForMember,
@@ -13,6 +14,24 @@ type LayoutProps = {
   children: React.ReactNode;
   params: Promise<{ id: string }>;
 };
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const user = await currentUser();
+  if (!user) return { title: "Workspace · Coppergate" };
+  const { id } = await params;
+  const access = await getWorkspaceForMember(db, id, user.id);
+  const name = access?.workspace.name ?? "Workspace";
+  return {
+    title: {
+      default: `${name} · Coppergate`,
+      template: `%s · ${name} · Coppergate`,
+    },
+  };
+}
 
 export default async function WorkspaceIdLayout({
   children,
