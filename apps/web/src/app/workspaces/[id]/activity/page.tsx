@@ -5,9 +5,11 @@ import {
   getWorkspaceForMember,
   getWorkspaceMissionControl,
   listAuditEventsForWorkspace,
+  listProjectsForWorkspace,
   listWorkspaceArenaSnapshot,
 } from "@coppergate/db";
 import { activityHref } from "@/lib/activity-href";
+import { withProjectName } from "@/lib/activity-meta";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ActivityShell } from "./activity-shell";
@@ -54,11 +56,16 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
   const access = await getWorkspaceForMember(db, id, user.id);
   if (!access) notFound();
 
-  const [rows, mission, arena] = await Promise.all([
+  const [rows, mission, arena, projectRows] = await Promise.all([
     listAuditEventsForWorkspace(db, id, { limit: 100 }),
     getWorkspaceMissionControl(db, id, access.workspace.name),
     listWorkspaceArenaSnapshot(db, id),
+    listProjectsForWorkspace(db, id),
   ]);
+
+  const projectNameById = new Map(
+    projectRows.map(({ project }) => [project.id, project.name]),
+  );
 
   const parsed = rows.map((r) => ({
     row: r,
@@ -87,6 +94,7 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
         meta = { ...(meta ?? {}), projectId: resolved };
       }
     }
+    meta = withProjectName(meta, projectNameById);
     return {
       id: r.id,
       actor: r.actor,

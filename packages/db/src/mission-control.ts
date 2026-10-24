@@ -299,12 +299,24 @@ export async function getWorkspaceMissionControl(
   if (!overConcurrency) {
     const failedLanes = arena.projects.filter(laneNeedsAttention).slice(0, 4);
     for (const lane of failedLanes) {
-      const status = lane.lastRun?.status ?? "attention";
+      const arenaLive = isLiveArenaStatus(lane.arenaStatus);
+      const hotCount = lane.contenders.filter(
+        (c) =>
+          classifyContenderRuntime(c.latestRun, c.budgetMicrosRemaining, {
+            arenaLive,
+            contenderStatus: c.status,
+          }) === "needsAttention",
+      ).length;
+      // Prefer agent count — lastRun can be RUNNING while a peer contender failed.
+      const detail =
+        hotCount > 0
+          ? `${hotCount} agent${hotCount === 1 ? "" : "s"} need attention · Open Arena`
+          : `Last run ${lane.lastRun?.status ?? "attention"} · Open Arena`;
       attention.push({
         id: `arena-${lane.projectId}`,
         kind: "arena_failed",
         title: `Arena needs attention · ${lane.projectName}`,
-        detail: `Last run ${status} · Open Arena`,
+        detail,
         href: `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(lane.projectId)}`,
         priority: "high",
         ctaLabel: "Open Arena",
