@@ -80,16 +80,8 @@ function glyphFor(group: ActivityGroup): string {
 }
 
 function tagsFor(group: ActivityGroup): string[] {
-  if (group.count > 1) {
-    return [`${group.count} projects`];
-  }
+  if (group.count > 1) return [`${group.count} events`];
   const tags: string[] = [];
-  // Prefer target over short verb tags that just echo the title ("stop", "pause").
-  const tech = group.technicalLabel.split(" ×")[0] ?? "";
-  const titleLower = group.title.toLowerCase();
-  if (tech && tech.length > 2 && !titleLower.includes(tech.toLowerCase())) {
-    tags.push(tech);
-  }
   const projectName =
     typeof group.meta?.projectName === "string"
       ? group.meta.projectName
@@ -102,7 +94,19 @@ function tagsFor(group: ActivityGroup): string[] {
     tags.push(`${group.targetType} ${shortId(group.targetId)}`);
   } else if (typeof group.meta?.projectId === "string") {
     tags.push(`project ${shortId(group.meta.projectId)}`);
-  } else {
+  }
+  // Prefer project over short verb tags that just echo the title ("stop", "pause").
+  const tech = group.technicalLabel.split(" ×")[0] ?? "";
+  const titleLower = group.title.toLowerCase();
+  if (
+    tech &&
+    tags.length < 2 &&
+    tech.length > 2 &&
+    !titleLower.includes(tech.toLowerCase())
+  ) {
+    tags.push(tech);
+  }
+  if (tags.length === 0) {
     const actor = actorLabel(group.actor);
     if (actor && !actor.startsWith("Actor ·")) tags.push(actor);
   }
