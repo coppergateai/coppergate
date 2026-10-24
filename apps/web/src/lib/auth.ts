@@ -49,7 +49,13 @@ export async function sessionTokenFromCookies(): Promise<string | undefined> {
 }
 
 export async function currentUser(): Promise<User | null> {
-  return resolveSessionUser(db, await sessionTokenFromCookies());
+  try {
+    return await resolveSessionUser(db, await sessionTokenFromCookies());
+  } catch {
+    // Marketing + shell pages call this for CTA state. A transient DB outage
+    // must not take down the public homepage — treat as signed-out.
+    return null;
+  }
 }
 
 export async function requireUser(request?: Request): Promise<User> {
