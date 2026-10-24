@@ -96,6 +96,13 @@ type Props = {
   isOwner: boolean;
 };
 
+function formatUsdFromMicros(micros: number): string {
+  const dollars = micros / 1_000_000;
+  if (!Number.isFinite(dollars) || dollars === 0) return "$0";
+  if (dollars < 0.01) return `$${dollars.toFixed(4)}`;
+  return `$${dollars.toFixed(2)}`;
+}
+
 function parseInlineBody(meta: Record<string, unknown>): unknown {
   const raw = meta.inlineBody;
   if (typeof raw !== "string") return null;
@@ -447,18 +454,26 @@ export function TaskDetailPanel({
   const policyFailed = evidenceGates.some(
     (g) => g.id === "policy" && g.status === "failed",
   );
-  const acceptReady =
+  const hardIncomplete = evidenceGates.some(
+    (g) => g.hard && (g.status === "pending" || g.status === "failed"),
+  );
+  const acceptReadyRaw =
     evidenceAcceptReady != null
       ? evidenceAcceptReady
       : ciFitness.acceptReady && !validationFailed && !policyFailed;
+  // Prefer visible gate rows over a stale API acceptReady flag.
+  const acceptReady = acceptReadyRaw && !hardIncomplete;
   const acceptBlockedReason = computeAcceptBlocked({
     acceptReady,
-    ciBlocking: ciFitness.blocking,
-    ciAwaitingLive: ciFitness.awaitingLive,
-    ciPassed: ciFitness.passed,
+    ciBlocking: ciFitness.blocking || hardIncomplete,
+    ciAwaitingLive: ciFitness.awaitingLive || hardIncomplete,
+    ciPassed: ciFitness.passed && !hardIncomplete,
     validationFailed,
     policyFailed,
   });
+  const gateBannerTitle = acceptReady
+    ? HARD_GATE_COPY.allHardPassed
+    : (acceptBlockedReason ?? "Gates incomplete — Accept disabled");
 
   const stages = [
     { id: "scope", label: "Scope", n: "01" },
@@ -467,6 +482,16 @@ export function TaskDetailPanel({
     { id: "review", label: "Review", n: "04" },
     { id: "delivery", label: "Delivery", n: "05" },
   ] as const;
+  const activeStageId =
+    task.status === "REVIEW_REQUIRED" || task.status === "ACCEPTED"
+      ? "review"
+      : task.status === "VALIDATING" || task.status === "WAITING_CI"
+        ? "verification"
+        : task.status === "RUNNING" || task.status === "QUEUED"
+          ? "execution"
+          : task.status === "DONE"
+            ? "delivery"
+            : "scope";
 
   return (
     <div className={styles.root}>
@@ -482,7 +507,7 @@ export function TaskDetailPanel({
           </>
         ) : null}
         {" · "}
-        {(costMicros / 100).toFixed(2)}¢
+        {formatUsdFromMicros(costMicros)}
         {agentMeta.provider ? ` · ${agentMeta.provider}` : null}
         {agentMeta.model ? ` · ${agentMeta.model}` : null}
         {agentMeta.sandboxMode === "sim"
@@ -497,7 +522,14 @@ export function TaskDetailPanel({
 
       <nav className={styles.stageNav} aria-label="Delivery review stages">
         {stages.map((s) => (
-          <a key={s.id} href={`#${s.id}`} className={styles.stageChip}>
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            className={`${styles.stageChip} ${
+              s.id === activeStageId ? styles.stageChipActive : ""
+            }`}
+            aria-current={s.id === activeStageId ? "step" : undefined}
+          >
             <span className={styles.stageNum}>{s.n}</span>
             {s.label}
           </a>
@@ -505,14 +537,16 @@ export function TaskDetailPanel({
       </nav>
 
       {task.status === "REVIEW_REQUIRED" || evidenceGates.length > 0 ? (
-        <div className={styles.gateBanner}>
-          <p className={styles.gateBannerTitle}>
-            {acceptReady
-              ? HARD_GATE_COPY.allHardPassed
-              : (acceptBlockedReason ?? "Gates incomplete")}
-          </p>
+        <div
+          className={`${styles.gateBanner} ${
+            acceptReady ? "" : styles.gateBannerWarn
+          }`}
+        >
+          <p className={styles.gateBannerTitle}>{gateBannerTitle}</p>
           <p className={styles.gateBannerMeta}>
-            {HARD_GATE_COPY.humanStillRequired}
+            {acceptReady
+              ? HARD_GATE_COPY.humanStillRequired
+              : "Accept stays closed until hard gates clear."}
           </p>
           {evidenceGates.length > 0 ? (
             <ul className={styles.gateGrid}>
@@ -670,7 +704,7 @@ export function TaskDetailPanel({
         <section id="verification" className={styles.section}>
           <h2 className={styles.sectionTitle}>03 · Verification</h2>
           <p className={styles.sectionLede}>
-            Cost {(costMicros / 100).toFixed(2)}¢
+            Cost {formatUsdFromMicros(costMicros)}
             {diffSummary ? ` · ${diffSummary.files.length} file(s)` : null}
             {" · CI "}
             {ciFitness.blocking
@@ -730,7 +764,7 @@ export function TaskDetailPanel({
                 #{deliveryReport.prNumber}
               </a>
               {" · "}
-              {(deliveryReport.actualCostMicros / 100).toFixed(2)}¢ · validation{" "}
+              {formatUsdFromMicros(deliveryReport.actualCostMicros)} · validation{" "}
               {deliveryReport.validationPassed ? "passed" : "failed"} ·{" "}
               {deliveryReport.branchName}
               {deliveryReport.previewUrl ? (
@@ -825,7 +859,7 @@ export function TaskDetailPanel({
         <h2 className={styles.sectionTitle}>02 · Execution · Runs & cost</h2>
         <p className={styles.sectionLede}>
           Selected run cost:{" "}
-          {costMicros ? `${(costMicros / 100).toFixed(2)}¢` : "—"}
+          {costMicros ? formatUsdFromMicros(costMicros) : "—"}
           {agentMeta.provider ? ` · agent ${agentMeta.provider}` : null}
         </p>
         {runs.length === 0 ? (
@@ -848,7 +882,7 @@ export function TaskDetailPanel({
                 >
                   Attempt {r.attempt} · {r.status}
                   {r.actualCostMicros
-                    ? ` · ${(r.actualCostMicros / 100).toFixed(2)}¢`
+                    ? ` · ${formatUsdFromMicros(r.actualCostMicros)}`
                     : ""}
                 </button>
               </li>

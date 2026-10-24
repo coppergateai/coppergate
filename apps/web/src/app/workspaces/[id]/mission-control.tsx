@@ -146,6 +146,45 @@ export function MissionControl({ data, recentEvents }: Props) {
     return "All systems operational. No items need your review.";
   })();
 
+  const arenaItems = attention.filter((a) => a.kind === "arena_failed");
+  const replanItems = attention.filter((a) => a.kind === "replan_failed");
+  const otherAttention = attention.filter(
+    (a) => a.kind !== "arena_failed" && a.kind !== "replan_failed",
+  );
+  const attentionRows: typeof attention = [];
+  if (arenaItems.length > 1) {
+    attentionRows.push({
+      id: "arena-digest",
+      kind: "arena_failed",
+      title: `Arena needs attention · ${arenaItems.length} projects`,
+      detail: arenaItems
+        .map((a) => a.title.replace(/^Arena needs attention ·\s*/i, ""))
+        .slice(0, 4)
+        .join(" · "),
+      href: `/workspaces/${data.workspaceId}/arena`,
+      ctaLabel: "Open Arena",
+      priority: "high",
+    });
+  } else {
+    attentionRows.push(...arenaItems);
+  }
+  if (replanItems.length > 1) {
+    attentionRows.push({
+      id: "replan-digest",
+      kind: "replan_failed",
+      title: `Replan queue failed · ${replanItems.length} projects`,
+      detail: "Maintainer could not queue the next task.",
+      href:
+        replanItems[0]?.href ??
+        `/workspaces/${data.workspaceId}/projects`,
+      ctaLabel: replanItems[0]?.ctaLabel ?? "Open project",
+      priority: "high",
+    });
+  } else {
+    attentionRows.push(...replanItems);
+  }
+  attentionRows.push(...otherAttention);
+
   return (
     <main className={styles.main}>
       <header className={styles.head}>
@@ -244,10 +283,10 @@ export function MissionControl({ data, recentEvents }: Props) {
                 Needs your attention
               </h2>
               <p className={styles.sectionMeta}>
-                {attention.length} pending
+                {attentionRows.length} pending
               </p>
             </div>
-            {attention.length === 0 ? (
+            {attentionRows.length === 0 ? (
               <div className={styles.emptyCatch}>
                 <span className={styles.emptyIcon} aria-hidden>
                   ✓
@@ -263,7 +302,7 @@ export function MissionControl({ data, recentEvents }: Props) {
               </div>
             ) : (
               <ul className={styles.list}>
-                {attention.map((item) => {
+                {attentionRows.map((item) => {
                   const isCrisis = item.kind === "concurrency";
                   return (
                     <li key={item.id}>

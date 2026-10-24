@@ -199,9 +199,11 @@ export default async function ProjectDetailPage({
         ? "Python tip: scope the first task to one module + pytest."
         : row.project.stack === "node"
           ? "Node tip: one route or script change is enough for the smoke path."
-          : row.project.stack !== "nextjs_ts"
-            ? "Best-effort agent on this stack — keep the first task a concrete product slice."
-            : null;
+          : row.project.stack === "html"
+            ? "HTML tip: ship one visible page or docs slice — keep the first PR tiny."
+            : row.project.stack !== "nextjs_ts"
+              ? "Keep the first task a concrete product slice on this stack."
+              : null;
 
   return (
     <Suspense fallback={<ProjectPageSkeleton />}>
@@ -226,9 +228,6 @@ export default async function ProjectDetailPage({
         initialTab={parseProjectTab(sp.tab)}
         overview={
           <>
-            {stackHint ? (
-              <p className={styles.stackHint}>{stackHint}</p>
-            ) : null}
             <div className={styles.overviewPrimary}>
               <NextActionStrip
                 workspaceId={workspaceId}
@@ -236,6 +235,7 @@ export default async function ProjectDetailPage({
                 step={nextStep}
                 reviewTaskId={reviewTask?.id}
                 reviewTaskTitle={reviewTask?.title}
+                stackHint={stackHint}
               />
               <BudgetPanel
                 workspaceId={workspaceId}
@@ -253,7 +253,10 @@ export default async function ProjectDetailPage({
                 isOwner={isOwner}
               />
             </div>
-            <details className={styles.overviewFold} open>
+            <details
+              className={styles.overviewFold}
+              open={nextStep === "budget"}
+            >
               <summary className={styles.overviewFoldSummary}>
                 Spend detail
               </summary>
@@ -277,7 +280,7 @@ export default async function ProjectDetailPage({
             </details>
             <details
               className={styles.overviewFold}
-              open={!!initialBrief}
+              open={nextStep === "issue" || nextStep === "done"}
             >
               <summary className={styles.overviewFoldSummary}>
                 Vision &amp; PRs
@@ -287,6 +290,7 @@ export default async function ProjectDetailPage({
                 projectId={projectId}
                 initialBrief={initialBrief}
                 isOwner={isOwner}
+                showArenaCta={nextStep !== "arena"}
               />
               <PullsPanel
                 workspaceId={workspaceId}

@@ -166,6 +166,13 @@
   line-height: 1.45;
 }
 
+.nextActionHint {
+  margin: 0.45rem 0 0;
+  color: var(--mute-soft);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .overviewPrimary {
   display: flex;
   flex-direction: column;

@@ -342,6 +342,16 @@
   color: var(--paper);
 }
 
+.stageChipActive {
+  border-color: var(--copper-border-strong, var(--copper-border));
+  background: var(--copper-fill-soft);
+  color: var(--paper);
+}
+
+.stageChipActive .stageNum {
+  color: var(--copper-hot, var(--copper));
+}
+
 .stageNum {
   font-variant-numeric: tabular-nums;
   color: var(--mute-soft);
@@ -353,6 +363,11 @@
   border: 1px solid var(--copper-border);
   border-radius: var(--radius-sm);
   background: var(--copper-fill-soft);
+}
+
+.gateBannerWarn {
+  border-color: rgba(232, 168, 72, 0.45);
+  background: rgba(232, 168, 72, 0.08);
 }
 
 .gateBannerTitle {
@@ -402,4 +417,107 @@
 .gateWait {
   font-weight: 650;
   color: var(--warn);
+}
+
+.muted {
+  margin: 0 0 0.85rem;
+  color: var(--mute);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.muted strong {
+  color: var(--paper);
+  font-weight: 650;
+}
+
+.inlineLink {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--copper-hot, var(--copper));
+  text-decoration: none;
+}
+
+.inlineLink:hover {
+  text-decoration: underline;
+}
+
+.tournament {
+  margin-top: 1.75rem;
+}
+
+.tournamentWhy {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--mute);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.tournamentWhy strong {
+  color: var(--paper);
+}
+
+.tournamentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.tournamentItem {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.9rem;
+  background: var(--surface);
+}
+
+.tournamentItemWin {
+  border-color: var(--copper-border);
+  background: var(--copper-fill-soft);
+}
+
+.tournamentTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.tournamentMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 0.9rem;
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+
+.tournamentPill {
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--mute-strong);
+}
+
+.tournamentPillWin {
+  border-color: rgba(110, 180, 120, 0.4);
+  background: rgba(110, 180, 120, 0.1);
+  color: var(--success-bright, var(--success));
+}
+
+.tournamentPillBad {
+  border-color: rgba(212, 101, 90, 0.35);
+  background: rgba(212, 101, 90, 0.08);
+  color: var(--danger);
 }
