@@ -181,10 +181,14 @@ export {
   insertTestUser,
   isAutonomyLevel,
   listWorkspacesForUser,
+  listWorkspacesForUserWithStats,
   updateWorkspaceForOwner,
+  workspaceListBlurb,
   type CreateWorkspaceInput,
   type UpdateWorkspaceInput,
+  type WorkspaceListStats,
   type WorkspaceWithRole,
+  type WorkspaceWithRoleAndStats,
 } from "./workspaces.js";
 export {
   DeletionError,

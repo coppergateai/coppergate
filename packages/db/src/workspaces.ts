@@ -1,8 +1,11 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import type { Database } from "./client.js";
 import {
+  agentProfiles,
+  agentRuns,
   memberships,
+  projects,
   users,
   workspaces,
   type AutonomyLevel,
@@ -16,6 +19,15 @@ export type WorkspaceWithRole = {
   workspace: Workspace;
   role: MembershipRole;
 };
+
+export type WorkspaceListStats = {
+  projectCount: number;
+  agentCount: number;
+  runCount: number;
+  memberCount: number;
+};
+
+export type WorkspaceWithRoleAndStats = WorkspaceWithRole & WorkspaceListStats;
 
 export type CreateWorkspaceInput = {
   name: string;
@@ -127,6 +139,83 @@ export async function listWorkspacesForUser(
     workspace: row.workspace,
     role: row.role as MembershipRole,
   }));
+}
+
+/**
+ * Membership-scoped workspace list with per-workspace counts for the home UI.
+ * Aggregations only cover workspaces the user belongs to (IDOR-safe).
+ */
+export async function listWorkspacesForUserWithStats(
+  db: Database,
+  userId: string,
+): Promise<WorkspaceWithRoleAndStats[]> {
+  const base = await listWorkspacesForUser(db, userId);
+  if (base.length === 0) return [];
+
+  const ids = base.map((row) => row.workspace.id);
+
+  const [projectRows, agentRows, runRows, memberRows] = await Promise.all([
+    db
+      .select({
+        workspaceId: projects.workspaceId,
+        n: count(),
+      })
+      .from(projects)
+      .where(inArray(projects.workspaceId, ids))
+      .groupBy(projects.workspaceId),
+    db
+      .select({
+        workspaceId: agentProfiles.workspaceId,
+        n: count(),
+      })
+      .from(agentProfiles)
+      .where(
+        and(inArray(agentProfiles.workspaceId, ids), isNotNull(agentProfiles.workspaceId)),
+      )
+      .groupBy(agentProfiles.workspaceId),
+    db
+      .select({
+        workspaceId: agentRuns.workspaceId,
+        n: count(),
+      })
+      .from(agentRuns)
+      .where(inArray(agentRuns.workspaceId, ids))
+      .groupBy(agentRuns.workspaceId),
+    db
+      .select({
+        workspaceId: memberships.workspaceId,
+        n: count(),
+      })
+      .from(memberships)
+      .where(inArray(memberships.workspaceId, ids))
+      .groupBy(memberships.workspaceId),
+  ]);
+
+  const toMap = (rows: { workspaceId: string | null; n: number }[]) => {
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      if (row.workspaceId) map.set(row.workspaceId, Number(row.n));
+    }
+    return map;
+  };
+
+  const projectsByWs = toMap(projectRows);
+  const agentsByWs = toMap(agentRows);
+  const runsByWs = toMap(runRows);
+  const membersByWs = toMap(memberRows);
+
+  return base.map((row) => ({
+    ...row,
+    projectCount: projectsByWs.get(row.workspace.id) ?? 0,
+    agentCount: agentsByWs.get(row.workspace.id) ?? 0,
+    runCount: runsByWs.get(row.workspace.id) ?? 0,
+    memberCount: membersByWs.get(row.workspace.id) ?? 0,
+  }));
+}
+
+/** Derived card blurb when workspaces have no description column. */
+export function workspaceListBlurb(slug: string): string {
+  return `Workspace · /${slug}`;
 }
 
 /**
