@@ -34,10 +34,6 @@ function formatStamp(now = new Date()): string {
   });
 }
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
 /** Map task/run status to a 4-step pipeline index (0–3). */
 function executionStep(status: string): number {
   switch (status) {
@@ -173,90 +169,60 @@ export function MissionControl({ data, recentEvents }: Props) {
         </div>
       </header>
 
-      <div className={styles.metrics} aria-label="Workspace metrics">
-        <Link
-          href={`/workspaces/${data.workspaceId}/arena`}
-          className={styles.metric}
-        >
-          <div className={styles.metricTop}>
-            <p className={styles.metricLabel}>Active runs</p>
-            <span className={styles.metricIcon} aria-hidden>
-              ▶
-            </span>
-          </div>
-          <p className={styles.metricValue}>{pad2(metrics.activeRuns)}</p>
-          <p className={styles.metricMeta}>
-            {metrics.activeRunProjects}{" "}
-            {metrics.activeRunProjects === 1 ? "project" : "projects"}
-            {metrics.arenaRunning > 0
-              ? ` · ${metrics.arenaRunning} arena agents`
-              : ""}
-          </p>
-        </Link>
-        <Link href={attentionHref} className={styles.metric}>
-          <div className={styles.metricTop}>
-            <p className={styles.metricLabel}>Needs attention</p>
-            <span className={styles.metricIcon} aria-hidden>
-              ◇
-            </span>
-          </div>
-          <p className={styles.metricValue}>{pad2(attentionTotal)}</p>
-          <p className={styles.metricMeta}>
-            {humanGates} inbox · {evidenceGates} evidence ·{" "}
+      <div className={styles.summaryStrip} aria-label="Workspace metrics">
+        <p className={styles.summaryItem}>
+          <Link
+            href={`/workspaces/${data.workspaceId}/arena`}
+            className={styles.summaryLink}
+          >
+            <strong>{metrics.activeRuns}</strong> active runs
+          </Link>
+        </p>
+        <p className={styles.summaryItem}>
+          <Link href={attentionHref} className={styles.summaryLink}>
+            <strong>{attentionTotal}</strong> need attention
+          </Link>
+          <span className={styles.summaryMute}>
+            · {humanGates} inbox · {evidenceGates} evidence ·{" "}
             {metrics.arenaNeedsAttention} arena
-            {concurrencyItem ? " · pause first" : ""}
-          </p>
-        </Link>
-        <Link
-          href={`/workspaces/${data.workspaceId}/projects`}
-          className={styles.metric}
-        >
-          <div className={styles.metricTop}>
-            <p className={styles.metricLabel}>Verified PRs</p>
-            <span className={styles.metricIcon} aria-hidden>
-              ✓
-            </span>
-          </div>
-          <p className={styles.metricValue}>
-            {pad2(metrics.verifiedPrsThisMonth)}
-          </p>
-          <p className={styles.metricMeta}>This month</p>
-        </Link>
-        <Link
-          href={`/workspaces/${data.workspaceId}/settings`}
-          className={styles.metric}
-        >
-          <div className={styles.metricTop}>
-            <p className={styles.metricLabel}>Budget</p>
-            <span className={styles.metricIcon} aria-hidden>
-              $
-            </span>
-          </div>
-          <p className={styles.metricValue}>
-            {hasBudget
-              ? formatUsd(metrics.budgetAvailableMicros, metrics.budgetCurrency)
-              : "—"}
-          </p>
+          </span>
+        </p>
+        <p className={styles.summaryItem}>
+          <Link
+            href={`/workspaces/${data.workspaceId}/projects`}
+            className={styles.summaryLink}
+          >
+            <strong>{metrics.verifiedPrsThisMonth}</strong> verified PRs
+          </Link>
+          <span className={styles.summaryMute}> this month</span>
+        </p>
+        <p className={styles.summaryItem}>
+          <Link
+            href={`/workspaces/${data.workspaceId}/settings?tab=billing`}
+            className={styles.summaryLink}
+          >
+            <strong>
+              {hasBudget
+                ? formatUsd(
+                    metrics.budgetAvailableMicros,
+                    metrics.budgetCurrency,
+                  )
+                : "—"}
+            </strong>{" "}
+            available
+          </Link>
           {hasBudget ? (
-            <div className={styles.metricMetaStack}>
-              <span>
-                Available · spent{" "}
-                {formatUsd(metrics.budgetSpentMicros, metrics.budgetCurrency)}
-              </span>
-              <span>
-                Reserved{" "}
-                {formatUsd(
-                  metrics.budgetReservedMicros,
-                  metrics.budgetCurrency,
-                )}{" "}
-                / {formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}
-              </span>
-              {budgetPaused ? <span>Paused</span> : null}
-            </div>
-          ) : (
-            <p className={styles.metricMeta}>No envelope set</p>
-          )}
-        </Link>
+            <span className={styles.summaryMute}>
+              · reserved{" "}
+              {formatUsd(
+                metrics.budgetReservedMicros,
+                metrics.budgetCurrency,
+              )}{" "}
+              / {formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}
+              {budgetPaused ? " · paused" : ""}
+            </span>
+          ) : null}
+        </p>
       </div>
 
       <div className={styles.grid}>

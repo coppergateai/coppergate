@@ -230,5 +230,36 @@
 
 ### Remaining opportunities
 
-- Inbox empty → Evidence when Accept-ready exists.
+- ~~Inbox empty → Evidence when Accept-ready exists.~~ → Cycle 9
 - Hosted Playwright Accept + Retry paths.
+
+---
+
+## 2026-10-24 — Cycle 9 (Inbox ≠ Evidence; Delivery import-first)
+
+### Discovered
+
+| Problem | Evidence | Class |
+|---------|----------|--------|
+| Empty Inbox hid Accept work waiting on Evidence | inbox empty hint → Arena only | Improve |
+| Delivery empty pushed Arena over Import wedge | delivery-board EmptyState | Simplify |
+
+### Decisions
+
+1. Empty Inbox surfaces Evidence Accept when `needsEvidenceAccept > 0`.
+2. Delivery empty CTA = Import issue (Arena secondary via Overview lede).
+
+### Implemented
+
+- `inbox/page.tsx` + `inbox-shell.tsx` evidenceCount/href empty CTA.
+- `delivery-board.tsx` empty state aligned with Evidence/Issues copy.
+
+### Validation
+
+- Web `tsc --noEmit` clean.
+- Hosted `pnpm e2e:check` passed (session valid).
+
+### Remaining opportunities
+
+- Hosted Playwright: Evidence Accept + Retry happy paths (not in e2e:check yet).
+- Demote Arena chrome when concurrency crisis (older log item).

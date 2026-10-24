@@ -565,7 +565,9 @@
   }
 
   .navActions > .btnPrimary,
-  .navActions > .themeToggle {
+  .navActions > .themeToggle,
+  .navActions > .githubChip,
+  .navActions > .navGhost {
     display: none;
   }
 

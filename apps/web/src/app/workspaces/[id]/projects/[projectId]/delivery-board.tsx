@@ -109,14 +109,14 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
 
       {tasks.length === 0 ? (
         <EmptyState
-          title="Waiting for the autonomous loop"
-          body="Press Start in Arena. Coppergate detects the next feature or fix, runs the tournament, opens a PR, and merges when CI is green."
+          title="No deliveries yet"
+          body="Primary path: Import → queue a GitHub issue on Overview, then review Evidence before Accept. Arena Start can invent work under the same spend envelope."
           action={
             <Link
-              href={`/workspaces/${workspaceId}/projects/${projectId}?tab=arena`}
+              href={`/workspaces/${workspaceId}/projects/${projectId}?tab=overview#issues`}
               className={styles.linkCta}
             >
-              Open Arena → Start
+              Import issue →
             </Link>
           }
         />
