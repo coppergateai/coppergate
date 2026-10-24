@@ -287,6 +287,47 @@ a.metric:hover {
   background: var(--overlay);
 }
 
+.attentionCrisis {
+  margin: 0 -0.35rem;
+  padding: 0.85rem 0.7rem;
+  border: 1px solid var(--copper-border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--copper-fill-soft);
+}
+
+.attentionCrisis:first-child {
+  padding-top: 0.85rem;
+}
+
+.attentionCrisis:hover {
+  background: var(--copper-fill-soft);
+  filter: brightness(1.03);
+}
+
+.attentionTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+}
+
+.attentionCta,
+.attentionCtaPrimary {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--copper-hot);
+}
+
+.attentionCtaPrimary {
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 999px;
+  padding: 0.22rem 0.65rem;
+}
+
 .rowTitle {
   margin: 0;
   font-size: 0.9rem;
@@ -630,6 +671,21 @@ a.timelineBody:hover {
 .action:hover {
   border-color: var(--copper-border);
   background: var(--copper-fill-soft);
+}
+
+.actionPrimary {
+  border-color: var(--copper-border);
+  background: var(--copper-fill-soft);
+}
+
+.actionPrimary .actionIcon {
+  border-color: var(--copper-border);
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.actionPrimary:hover {
+  filter: brightness(1.04);
 }
 
 .actionIcon {
