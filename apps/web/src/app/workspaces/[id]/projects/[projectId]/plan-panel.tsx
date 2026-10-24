@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { displayTaskTitle } from "@coppergate/db";
+import { displayTaskTitle } from "@/lib/display-title";
 import styles from "./project-detail.module.css";
 
 type PlanTask = {

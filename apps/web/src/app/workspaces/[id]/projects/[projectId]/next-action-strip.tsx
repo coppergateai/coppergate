@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { displayTaskTitle } from "@coppergate/db";
+import { displayTaskTitle } from "@/lib/display-title";
 import styles from "./project-detail.module.css";
 
 export type NextActionStep =
