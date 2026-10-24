@@ -1,5 +1,6 @@
 import {
   ArenaPreviewSection,
+  CapabilityStrip,
   EvidenceSection,
   FaqBlock,
   FinalCta,
@@ -8,6 +9,7 @@ import {
   PilotProjectsSection,
   SecuritySection,
   SignalAdaptersSection,
+  StackRibbon,
   SurvivorWorkflow,
 } from "@/components/marketing";
 import { currentUser } from "@/lib/auth";
@@ -23,6 +25,8 @@ export default async function HomePage() {
       <LandingFunnelBeacon />
       <JsonLd />
       <HeroSection signedIn={Boolean(user)} />
+      <StackRibbon />
+      <CapabilityStrip />
       <ArenaPreviewSection />
       <SurvivorWorkflow />
       <EvidenceSection />

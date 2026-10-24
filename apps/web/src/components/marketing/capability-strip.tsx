@@ -1,5 +1,7 @@
+import Link from "next/link";
 import {
   IconArena,
+  IconArrow,
   IconControl,
   IconEvidence,
   IconGithubNative,
@@ -8,24 +10,32 @@ import styles from "./marketing.module.css";
 
 const items = [
   {
-    title: "Compete",
-    body: "Multiple agents attempt one engineering task in parallel.",
+    title: "Agent teams",
+    body: "Specialized roles — engineer, reviewer, security, docs — work the same objective under arena selection.",
+    href: "/#arena",
+    link: "See agent roles",
     Icon: IconArena,
   },
   {
-    title: "Verify",
-    body: "CI, tests, and policy gates qualify what can win.",
+    title: "Budgets & policies",
+    body: "Spend caps, path policies, and kill-switch keep autonomy inside limits you define.",
+    href: "/#controls",
+    link: "See controls",
+    Icon: IconControl,
+  },
+  {
+    title: "Verifiable work",
+    body: "Logs, tests, artifacts, and pull requests travel with every survivor path — evidence before merge.",
+    href: "/#evidence",
+    link: "See evidence",
     Icon: IconEvidence,
   },
   {
-    title: "Select",
-    body: "Efficiency ranks validated work — spend is priced in.",
+    title: "Your infrastructure",
+    body: "Self-host or cloud. Bring your own LLM keys. GitHub and GitLab delivery stays in your repos.",
+    href: "/docs/supported-stack",
+    link: "See stack",
     Icon: IconGithubNative,
-  },
-  {
-    title: "Control",
-    body: "Budgets, policies, and kill-switch stay in your hands.",
-    Icon: IconControl,
   },
 ] as const;
 
@@ -33,14 +43,18 @@ export function CapabilityStrip() {
   return (
     <section className={styles.caps} aria-label="Product pillars">
       <div className={styles.capsInner}>
-        {items.map(({ title, body, Icon }) => (
-          <div key={title} className={styles.capItem}>
+        {items.map(({ title, body, href, link, Icon }) => (
+          <article key={title} className={styles.capItem}>
             <span className={styles.capIcon}>
               <Icon />
             </span>
             <h2 className={styles.capTitle}>{title}</h2>
             <p className={styles.capBody}>{body}</p>
-          </div>
+            <Link className={styles.capLink} href={href}>
+              {link}
+              <IconArrow />
+            </Link>
+          </article>
         ))}
       </div>
     </section>

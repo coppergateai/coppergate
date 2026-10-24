@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SkeletonStack } from "@/components/app/ui";
-import styles from "./arena-spectacle.module.css";
+import styles from "./arena-mission.module.css";
 
 type ContenderRun = {
   id: string;
@@ -202,6 +202,33 @@ function phaseIndex(status: string | null | undefined): number {
 }
 
 const PHASES = ["Queued", "Running", "Validating", "Review"] as const;
+
+const TONE = {
+  running: {
+    lane: styles.laneTone_running,
+    badge: styles.badge_running,
+    chip: styles.chip_running,
+    agent: styles.agent_running,
+  },
+  awaitingCi: {
+    lane: styles.laneTone_awaitingCi,
+    badge: styles.badge_awaitingCi,
+    chip: styles.chip_awaitingCi,
+    agent: styles.agent_awaitingCi,
+  },
+  needsAttention: {
+    lane: styles.laneTone_needsAttention,
+    badge: styles.badge_needsAttention,
+    chip: styles.chip_needsAttention,
+    agent: styles.agent_needsAttention,
+  },
+  idle: {
+    lane: styles.laneTone_idle,
+    badge: styles.badge_idle,
+    chip: "",
+    agent: styles.agent_idle,
+  },
+} as const;
 
 function eventSummary(event: RunEvent): string {
   const payload = event.payload;
@@ -527,7 +554,7 @@ export function ArenaSpectacle({
                   role="listitem"
                   className={`${styles.lane} ${
                     focused ? styles.laneFocused : ""
-                  } ${styles[`laneTone_${laneRuntime}`] ?? ""}`}
+                  } ${TONE[laneRuntime].lane}`}
                 >
                   <button
                     type="button"
@@ -539,9 +566,7 @@ export function ArenaSpectacle({
                       <div className={styles.laneTitleRow}>
                         <h2 className={styles.laneName}>{lane.projectName}</h2>
                         <span
-                          className={`${styles.statusBadge} ${
-                            styles[`badge_${laneRuntime}`]
-                          }`}
+                          className={`${styles.statusBadge} ${TONE[laneRuntime].badge}`}
                         >
                           {projectStatusLabel(lane)}
                         </span>
@@ -561,9 +586,7 @@ export function ArenaSpectacle({
                           hotAgents.map(({ c, state }) => (
                             <span
                               key={c.id}
-                              className={`${styles.hotChip} ${
-                                styles[`chip_${state}`]
-                              }`}
+                              className={`${styles.hotChip} ${TONE[state].chip}`}
                             >
                               {titleCase(c.profileKey)}
                               {state === "running" ? " · Running" : ""}
@@ -583,18 +606,18 @@ export function ArenaSpectacle({
 
                   {isExpanded ? (
                     <div className={styles.laneBody}>
-                      <ol className={styles.phases} aria-label="Execution phase">
+                      <div className={styles.phases} aria-label="Execution phase">
                         {PHASES.map((phase, i) => (
-                          <li
+                          <span
                             key={phase}
                             className={`${styles.phase} ${
                               i === activePhase ? styles.phaseActive : ""
                             } ${i < activePhase ? styles.phaseDone : ""}`}
                           >
                             {phase}
-                          </li>
+                          </span>
                         ))}
-                      </ol>
+                      </div>
                       <div className={styles.agents}>
                         {lane.contenders.length === 0 ? (
                           <p className={styles.emptyAgents}>
@@ -610,9 +633,7 @@ export function ArenaSpectacle({
                               <button
                                 key={c.id}
                                 type="button"
-                                className={`${styles.agent} ${
-                                  styles[`agent_${state}`]
-                                } ${
+                                className={`${styles.agent} ${TONE[state].agent} ${
                                   state === "running" ? styles.agentPulse : ""
                                 } ${selectedHere ? styles.agentSelected : ""}`}
                                 onClick={() =>
@@ -673,9 +694,7 @@ export function ArenaSpectacle({
           </div>
 
           <span
-            className={`${styles.statusBadge} ${
-              styles[`badge_${selectedAgent.state}`]
-            }`}
+            className={`${styles.statusBadge} ${TONE[selectedAgent.state].badge}`}
           >
             {runtimeLabel(selectedAgent.state)}
           </span>
