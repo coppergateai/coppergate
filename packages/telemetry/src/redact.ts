@@ -10,9 +10,9 @@ const SENSITIVE_KEY =
 const PATTERNS: RegExp[] = [
   /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/g,
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/gi,
-  /\bglpat-[A-Za-z0-9_\-]{20,}\b/g, // GitLab PAT
+  /\bglpat-[A-Za-z0-9_-]{20,}\b/g, // GitLab PAT
   /\bsk-[A-Za-z0-9]{20,}\b/g,
-  /\bBearer\s+[A-Za-z0-9._\-+=/]{8,}/gi,
+  /\bBearer\s+[A-Za-z0-9._+=/-]{8,}/gi,
   /\b(xox[baprs]-[A-Za-z0-9-]{10,})\b/g,
   /\bAKIA[0-9A-Z]{16}\b/g,
   /\b-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
