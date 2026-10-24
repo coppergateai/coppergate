@@ -306,3 +306,100 @@
   font-size: 0.8rem;
   line-height: 1.45;
 }
+
+.kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute-soft);
+}
+
+.stageNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.85rem 0 1.15rem;
+}
+
+.stageChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--mute);
+  text-decoration: none;
+  background: var(--surface);
+}
+
+.stageChip:hover {
+  border-color: var(--copper-border);
+  color: var(--paper);
+}
+
+.stageNum {
+  font-variant-numeric: tabular-nums;
+  color: var(--mute-soft);
+}
+
+.gateBanner {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--copper-border);
+  border-radius: var(--radius-sm);
+  background: var(--copper-fill-soft);
+}
+
+.gateBannerTitle {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+}
+
+.gateBannerMeta {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+
+.gateGrid {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.gateRow {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+  gap: 0.1rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.gateRowDetail {
+  grid-column: 2;
+  color: var(--mute-soft);
+}
+
+.gateOk {
+  font-weight: 650;
+  color: var(--success);
+}
+
+.gateBad {
+  font-weight: 650;
+  color: var(--danger);
+}
+
+.gateWait {
+  font-weight: 650;
+  color: var(--warn);
+}

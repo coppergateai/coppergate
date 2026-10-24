@@ -162,26 +162,6 @@ export default async function ProjectDetailPage({
   else if (!hasQueuedOrBeyond) nextStep = "arena";
   else if (!hasAcceptedPr) nextStep = hasQueuedOrBeyond ? "arena" : "issue";
 
-  const evidenceDeliveries = boardTasks
-    .filter((t) =>
-      ["REVIEW_REQUIRED", "WAITING_CI", "ACCEPTED", "DONE", "IN_REVIEW"].includes(
-        t.status,
-      ),
-    )
-    .slice(0, 12)
-    .map((t) => {
-      const full = plan?.milestones
-        .flatMap(({ tasks }) => tasks.map(({ task }) => task))
-        .find((task) => task.id === t.id);
-      return {
-        taskId: t.id,
-        title: t.title,
-        status: t.status,
-        prUrl: full?.prUrl ?? null,
-        updatedAt: "",
-      };
-    });
-
   const stackHint =
     row.project.stack === "go"
       ? "Go tip: keep the first task to one package and a small test."
@@ -288,11 +268,7 @@ export default async function ProjectDetailPage({
           />
         }
         evidence={
-          <EvidencePanel
-            workspaceId={workspaceId}
-            projectId={projectId}
-            deliveries={evidenceDeliveries}
-          />
+          <EvidencePanel workspaceId={workspaceId} projectId={projectId} />
         }
         configuration={
           <>

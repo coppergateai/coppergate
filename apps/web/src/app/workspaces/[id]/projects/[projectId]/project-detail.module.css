@@ -879,6 +879,41 @@ html[data-theme="light"] .primaryBtn:hover:not(:disabled) {
   gap: 0.45rem;
 }
 
+.gateList {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.gateItem {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.15rem 0.65rem;
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+
+.gateItem span:last-child {
+  grid-column: 2;
+}
+
+.gatePass {
+  font-weight: 650;
+  color: var(--success);
+}
+
+.gateFail {
+  font-weight: 650;
+  color: var(--danger);
+}
+
+.gatePending {
+  font-weight: 650;
+  color: var(--warn);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .section,
   .path {

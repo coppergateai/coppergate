@@ -94,20 +94,19 @@ Sekmeler (`?tab=`):
 | **overview** | Next action (Issue→PR), budget, cost, Issues, brief, Pulls |
 | **delivery** | Plan (milestones/tasks), Delivery board |
 | **arena** | Arena panel (Start–Stop loop) |
-| **evidence** | Delivery listesi → task Evidence / Accept (v1 stub) |
+| **evidence** | Evidence Center — gate checklist + Delivery Review deep-link |
 | **configuration** | Maintainer, multi-repo, policy presets, merge (`?tab=more` alias) |
 
 Header: repo, stack, autonomy, budget, pending approvals, last run status.
 
 Ürün kavramları: [PRODUCT_CONCEPTS.md](./PRODUCT_CONCEPTS.md).
 
-### `/workspaces/[id]/projects/[projectId]/tasks/[taskId]` — Task detay
-- Task meta (goal, scope, status, attempts, PR)
-- Owner aksiyonları: Cancel, Retry, Accept → Done (CI/evidence gate)
-- Delivery for review: diff summary, CI checks, delivery report, review findings
-- Share redacted report (public token)
-- Runs & cost, event log, artifacts
-- Tournament panel (contender contest)
+### `/workspaces/[id]/projects/[projectId]/tasks/[taskId]` — Delivery Review
+- Beş aşama: Scope → Execution → Verification → Review → Delivery
+- Gate banner (hard CI/validation/policy + soft review/fitness)
+- Accept → Done yalnızca hard gate’ler açıkken; paylaşılan hard-gate copy
+- Diff / CI / delivery report / findings / share
+- Arena decision panel (efficiency contest + rationale)
 
 ### `/workspaces/[id]/arena` — Workspace Arena
 - Tüm projelerde canlı / stopped arena snapshot

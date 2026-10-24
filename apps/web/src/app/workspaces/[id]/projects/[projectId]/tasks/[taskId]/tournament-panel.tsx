@@ -85,18 +85,18 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
   return (
     <section style={{ marginTop: "2rem" }}>
       <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.35rem" }}>
-        Efficiency contest
+        Arena decision · Efficiency contest
       </h2>
-      <p style={{ margin: "0 0 0.85rem", color: "#737373", fontSize: "0.875rem" }}>
-        Selection pressure active · Status{" "}
-        <strong style={{ color: "#E5E5E5" }}>{tournament.status}</strong>
+      <p style={{ margin: "0 0 0.85rem", color: "var(--mute)", fontSize: "0.875rem" }}>
+        Hard gates first (CI / validation), then rank by efficiency. Status{" "}
+        <strong style={{ color: "var(--paper)" }}>{tournament.status}</strong>
         {" · "}N={tournament.n}
         {tournament.winnerRunId ? " · winner selected" : null}
       </p>
 
       {winner && tournament.status === "RESOLVED" ? (
         <p style={whyWon}>
-          Why this won: efficiency{" "}
+          Decision rationale: efficiency{" "}
           <strong>
             {winner.efficiencyScore == null
               ? "—"

@@ -500,6 +500,16 @@ export {
   type WorkspaceMissionControl,
 } from "./mission-control.js";
 export {
+  getRunEvidenceBundle,
+  getTaskEvidenceBundle,
+  listProjectEvidenceDeliveries,
+  type EvidenceArtifactView,
+  type EvidenceGate,
+  type EvidenceGateStatus,
+  type RunEvidenceBundle,
+  type TaskEvidenceBundle,
+} from "./evidence.js";
+export {
   persistReviewFindings,
   scoreWithRulesReviewer,
   type ReviewFinding,
