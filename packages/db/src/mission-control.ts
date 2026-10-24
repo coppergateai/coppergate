@@ -3,6 +3,7 @@ import type { Database } from "./client.js";
 import { listInboxApprovalsForWorkspace } from "./approvals.js";
 import { getWorkspaceSpendSummary } from "./budgets.js";
 import { listAuditEventsForWorkspace } from "./audit.js";
+import { getWorkspaceConcurrency } from "./plan-policy.js";
 import { listWorkspaceArenaSnapshot } from "./workspace-arena.js";
 import { agentRuns, projects, tasks } from "./schema.js";
 
@@ -28,7 +29,8 @@ export type MissionControlAttentionKind =
   | "review_required"
   | "arena_failed"
   | "replan_failed"
-  | "merge_blocked";
+  | "merge_blocked"
+  | "concurrency";
 
 export type MissionControlAttentionItem = {
   id: string;
@@ -138,6 +140,7 @@ export async function getWorkspaceMissionControl(
     activeTasks,
     arena,
     recentAudit,
+    concurrency,
   ] = await Promise.all([
     getWorkspaceSpendSummary(db, workspaceId),
     listInboxApprovalsForWorkspace(db, workspaceId, { status: "pending" }),
@@ -203,6 +206,7 @@ export async function getWorkspaceMissionControl(
       .limit(12),
     listWorkspaceArenaSnapshot(db, workspaceId),
     listAuditEventsForWorkspace(db, workspaceId, { limit: 40 }),
+    getWorkspaceConcurrency(db, workspaceId),
   ]);
 
   const activeRuns = activeRunRows.reduce((s, r) => s + Number(r.n), 0);
@@ -212,6 +216,17 @@ export async function getWorkspaceMissionControl(
   ).length;
 
   const attention: MissionControlAttentionItem[] = [];
+
+  if (concurrency.inflight > concurrency.limits.maxConcurrentRuns) {
+    attention.push({
+      id: "concurrency-over",
+      kind: "concurrency",
+      title: "Over plan concurrency",
+      detail: `${concurrency.inflight} in flight · plan allows ${concurrency.limits.maxConcurrentRuns} — Pause Arena to drain queue`,
+      href: `/workspaces/${workspaceId}/arena`,
+      priority: "high",
+    });
+  }
 
   for (const a of pendingApprovals.slice(0, 6)) {
     const label = a.title?.trim() || `${a.targetType} approval`;

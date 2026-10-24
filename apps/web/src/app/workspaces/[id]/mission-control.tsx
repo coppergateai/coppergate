@@ -188,7 +188,7 @@ export function MissionControl({ data, recentEvents }: Props) {
             {metrics.activeRunProjects}{" "}
             {metrics.activeRunProjects === 1 ? "project" : "projects"}
             {metrics.arenaRunning > 0
-              ? ` · ${metrics.arenaRunning} arena running`
+              ? ` · ${metrics.arenaRunning} arena agents`
               : ""}
           </p>
           <SparkBars tone="copper" />

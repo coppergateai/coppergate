@@ -2,12 +2,15 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import {
   assertSufficientBudget,
   BudgetError,
+  getProjectSpendSummary,
   releaseEstimateForRun,
   reserveEstimateForTask,
 } from "./budgets.js";
 import type { Database } from "./client.js";
 import {
+  clampFanoutToCapacity,
   clampTournamentFanout,
+  getWorkspaceConcurrency,
   resolveWorkspacePlanLimits,
 } from "./plan-policy.js";
 import { enqueueAgentRun } from "./runs.js";
@@ -679,16 +682,38 @@ export async function startTournamentFanout(
   const { plan } = await resolveWorkspacePlanLimits(db, input.workspaceId);
   const requested = input.n ?? arena.defaultContenderN;
   const planCapped = clampTournamentFanout(requested, plan);
-  const n = Math.min(
-    MAX_TOURNAMENT_FANOUT,
-    Math.max(1, planCapped),
-    eligible.length,
+  const concurrency = await getWorkspaceConcurrency(db, input.workspaceId);
+  if (concurrency.slots < 1) {
+    throw new ArenaError(
+      "insufficient",
+      `${concurrency.plan} plan allows ${concurrency.limits.maxConcurrentRuns} concurrent run(s); ${concurrency.inflight} in flight — wait or pause Arena`,
+    );
+  }
+  const spend = await getProjectSpendSummary(
+    db,
+    input.workspaceId,
+    task.projectId,
   );
+  const perRun = task.estimateMicros ?? 0;
+  const capacityCapped = clampFanoutToCapacity({
+    requested: Math.min(MAX_TOURNAMENT_FANOUT, planCapped, eligible.length),
+    concurrencySlots: concurrency.slots,
+    availableMicros: spend.availableMicros,
+    perRunMicros: perRun,
+  });
+  const n = capacityCapped;
   if (n < 1) {
-    throw new ArenaError("eliminated", "no active contenders with budget");
+    if (eligible.length < 1) {
+      throw new ArenaError("eliminated", "no active contenders with budget");
+    }
+    throw new ArenaError(
+      "insufficient",
+      perRun > spend.availableMicros
+        ? "Insufficient workspace budget for even one contender estimate"
+        : "No concurrency slots available for tournament fan-out",
+    );
   }
 
-  const perRun = task.estimateMicros ?? 0;
   const totalReserve = perRun * n;
   try {
     await assertSufficientBudget(
@@ -770,6 +795,10 @@ export async function startTournamentFanout(
       n,
       runIds: runs.map((r) => r.id),
       maxFanout: MAX_TOURNAMENT_FANOUT,
+      concurrencySlots: concurrency.slots,
+      inflight: concurrency.inflight,
+      availableMicros: spend.availableMicros,
+      perRunMicros: perRun,
     }),
   });
 

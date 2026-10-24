@@ -2,8 +2,10 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   PLAN_LIMITS,
+  clampFanoutToCapacity,
   clampTournamentFanout,
   limitsForPlan,
+  remainingConcurrencySlots,
 } from "./plan-policy.js";
 
 describe("plan policy", () => {
@@ -22,5 +24,50 @@ describe("plan policy", () => {
     assert.equal(clampTournamentFanout(11, "pro"), 11);
     assert.equal(clampTournamentFanout(99, "community"), 11);
     assert.equal(PLAN_LIMITS.starter.maxConcurrentRuns, 1);
+  });
+
+  it("remainingConcurrencySlots never goes negative", () => {
+    assert.equal(remainingConcurrencySlots(0, 12), 12);
+    assert.equal(remainingConcurrencySlots(12, 12), 0);
+    assert.equal(remainingConcurrencySlots(20, 12), 0);
+  });
+
+  it("clampFanoutToCapacity respects slots and available budget", () => {
+    assert.equal(
+      clampFanoutToCapacity({
+        requested: 11,
+        concurrencySlots: 3,
+        availableMicros: 100_000_000,
+        perRunMicros: 2_000_000,
+      }),
+      3,
+    );
+    assert.equal(
+      clampFanoutToCapacity({
+        requested: 11,
+        concurrencySlots: 12,
+        availableMicros: 5_000_000,
+        perRunMicros: 2_000_000,
+      }),
+      2,
+    );
+    assert.equal(
+      clampFanoutToCapacity({
+        requested: 11,
+        concurrencySlots: 12,
+        availableMicros: 1_000_000,
+        perRunMicros: 2_000_000,
+      }),
+      0,
+    );
+    assert.equal(
+      clampFanoutToCapacity({
+        requested: 5,
+        concurrencySlots: 5,
+        availableMicros: 10_000_000,
+        perRunMicros: 0,
+      }),
+      5,
+    );
   });
 });
