@@ -1,9 +1,18 @@
 import Link from "next/link";
 import type { WorkspaceMissionControl } from "@coppergate/db";
+import {
+  type ActivityEvent,
+  type ActivityGroup,
+  actorLabel,
+  formatRelative,
+  groupActivityEvents,
+  shortId,
+} from "./activity/events";
 import styles from "./mission-control.module.css";
 
 type Props = {
   data: WorkspaceMissionControl;
+  recentEvents: ActivityEvent[];
 };
 
 function formatUsd(micros: number, currency: string): string {
@@ -14,60 +23,200 @@ function formatUsd(micros: number, currency: string): string {
   return `${symbol}${Math.round(dollars)}`;
 }
 
-export function MissionControl({ data }: Props) {
+function formatStamp(now = new Date()): string {
+  return now.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Map task/run status to a 4-step pipeline index (0–3). */
+function executionStep(status: string): number {
+  switch (status) {
+    case "QUEUED":
+    case "ARMED":
+      return 0;
+    case "RUNNING":
+    case "Arena":
+      return 1;
+    case "VALIDATING":
+    case "WAITING_CI":
+      return 2;
+    case "IN_REVIEW":
+    case "REVIEW_REQUIRED":
+      return 3;
+    default:
+      return 1;
+  }
+}
+
+function statusBadgeLabel(status: string, phase: string): string {
+  if (status === "VALIDATING" || status === "WAITING_CI") return "Validation";
+  if (status === "QUEUED") return "Queued";
+  if (status === "RUNNING") return "Running";
+  if (status === "REVIEW_REQUIRED" || status === "IN_REVIEW") return "Review";
+  return phase;
+}
+
+function timelineGlyph(group: ActivityGroup): string {
+  if (group.outcome === "failed") return "!";
+  if (group.action.includes("tournament") || group.action.includes("meta_tournament")) {
+    return "◆";
+  }
+  if (group.category === "agent") return "●";
+  if (group.category === "decision") return "▸";
+  return "○";
+}
+
+function nodeClass(group: ActivityGroup): string {
+  if (group.outcome === "failed") return styles.timelineNodeFail ?? "";
+  if (group.outcome === "completed") return styles.timelineNodeDone ?? "";
+  if (group.outcome === "running" || group.outcome === "queued") {
+    return styles.timelineNodeRun ?? "";
+  }
+  return "";
+}
+
+function tagsFor(group: ActivityGroup): string[] {
+  const tags = [actorLabel(group.actor), group.technicalLabel];
+  if (group.targetType && group.targetId) {
+    tags.push(`${group.targetType} ${shortId(group.targetId)}`);
+  } else if (typeof group.meta?.projectId === "string") {
+    tags.push(`project ${shortId(group.meta.projectId)}`);
+  }
+  return tags.slice(0, 3);
+}
+
+function SparkBars({
+  tone,
+}: {
+  tone: "copper" | "ok";
+}) {
+  const heights = [40, 55, 35, 70, 48, 82, 60, 90];
+  return (
+    <div className={styles.spark} aria-hidden>
+      {heights.map((h, i) => (
+        <span
+          key={i}
+          className={`${styles.sparkBar} ${
+            tone === "ok"
+              ? i % 2 === 0
+                ? styles.sparkBarOk
+                : styles.sparkBarOkSoft
+              : i % 2 === 0
+                ? ""
+                : styles.sparkBarSoft
+          }`}
+          style={{ height: `${h}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function MissionControl({ data, recentEvents }: Props) {
   const { metrics, attention, executions } = data;
   const hasBudget = metrics.budgetCapMicros > 0;
-  const operational =
-    metrics.needsApproval > 0 ||
-    metrics.activeRuns > 0 ||
-    metrics.budgetStatus === "paused";
+  const needsAttention = attention.length > 0;
+  const budgetPaused = metrics.budgetStatus === "paused";
+  const recent = groupActivityEvents(recentEvents).slice(0, 8);
+
+  const statusLine = (() => {
+    if (budgetPaused) {
+      return "Budget envelope paused — executions are frozen until you raise the cap.";
+    }
+    if (needsAttention) {
+      return `All systems operational, ${attention.length} item${attention.length === 1 ? "" : "s"} need your review.`;
+    }
+    return "All systems operational. No items need your review.";
+  })();
 
   return (
     <main className={styles.main}>
       <header className={styles.head}>
-        <p className={styles.eyebrow}>Workspace / Overview</p>
-        <h1 className={styles.title}>Mission Control</h1>
-        <p className={styles.lede}>
-          Your AI engineering operations — decide next, then verify deliveries.
-        </p>
-        <span className={styles.opsChip}>
-          <span
-            className={`${styles.opsDot} ${operational ? styles.opsDotWarn : ""}`}
-            aria-hidden
-          />
-          {operational ? "Needs attention" : "Operational"}
-        </span>
+        <div className={styles.headLeft}>
+          <p className={styles.eyebrow}>Workspace / {data.workspaceName}</p>
+          <h1 className={styles.title}>Mission Control</h1>
+          <p className={styles.lede}>
+            Your AI engineering operations — decide next, then verify
+            deliveries.
+          </p>
+          <div className={styles.statusRow}>
+            <span
+              className={`${styles.opsChip} ${needsAttention || budgetPaused ? styles.opsChipWarn : ""}`}
+            >
+              <span className={styles.opsDot} aria-hidden />
+              {needsAttention || budgetPaused ? "Needs attention" : "Operational"}
+            </span>
+            <p className={styles.statusText}>{statusLine}</p>
+          </div>
+        </div>
+        <div className={styles.headRight}>
+          <p className={styles.stamp}>{formatStamp()}</p>
+          <Link
+            href={`/workspaces/${data.workspaceId}/arena`}
+            className={styles.arenaCta}
+          >
+            Open Arena →
+          </Link>
+        </div>
       </header>
 
       <div className={styles.metrics} aria-label="Workspace metrics">
         <div className={styles.metric}>
-          <p className={styles.metricLabel}>Active runs</p>
-          <p className={styles.metricValue}>
-            {String(metrics.activeRuns).padStart(2, "0")}
-          </p>
+          <div className={styles.metricTop}>
+            <p className={styles.metricLabel}>Active runs</p>
+            <span className={styles.metricIcon} aria-hidden>
+              ▶
+            </span>
+          </div>
+          <p className={styles.metricValue}>{pad2(metrics.activeRuns)}</p>
           <p className={styles.metricMeta}>
             {metrics.activeRunProjects}{" "}
             {metrics.activeRunProjects === 1 ? "project" : "projects"}
           </p>
+          <SparkBars tone="copper" />
         </div>
         <div className={styles.metric}>
-          <p className={styles.metricLabel}>Needs approval</p>
-          <p className={styles.metricValue}>
-            {String(metrics.needsApproval).padStart(2, "0")}
-          </p>
+          <div className={styles.metricTop}>
+            <p className={styles.metricLabel}>Needs approval</p>
+            <span className={styles.metricIcon} aria-hidden>
+              ◇
+            </span>
+          </div>
+          <p className={styles.metricValue}>{pad2(metrics.needsApproval)}</p>
           <p className={styles.metricMeta}>
             {metrics.highPriorityApprovals} high priority
           </p>
         </div>
         <div className={styles.metric}>
-          <p className={styles.metricLabel}>Verified PRs</p>
+          <div className={styles.metricTop}>
+            <p className={styles.metricLabel}>Verified PRs</p>
+            <span className={styles.metricIcon} aria-hidden>
+              ✓
+            </span>
+          </div>
           <p className={styles.metricValue}>
-            {String(metrics.verifiedPrsThisMonth).padStart(2, "0")}
+            {pad2(metrics.verifiedPrsThisMonth)}
           </p>
           <p className={styles.metricMeta}>This month</p>
+          <SparkBars tone="ok" />
         </div>
         <div className={styles.metric}>
-          <p className={styles.metricLabel}>Budget used</p>
+          <div className={styles.metricTop}>
+            <p className={styles.metricLabel}>Budget used</p>
+            <span className={styles.metricIcon} aria-hidden>
+              $
+            </span>
+          </div>
           <p className={styles.metricValue}>
             {hasBudget
               ? formatUsd(metrics.budgetSpentMicros, metrics.budgetCurrency)
@@ -77,86 +226,248 @@ export function MissionControl({ data }: Props) {
             {hasBudget
               ? `of ${formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}`
               : "No envelope set"}
-            {metrics.budgetStatus === "paused" ? " · Paused" : ""}
+            {budgetPaused ? " · Paused" : ""}
           </p>
         </div>
       </div>
 
-      <div className={styles.columns}>
-        <section aria-labelledby="attention-heading">
-          <h2 id="attention-heading" className={styles.sectionTitle}>
-            Needs your attention
-          </h2>
-          <p className={styles.sectionMeta}>
-            {attention.length} pending
-          </p>
-          {attention.length === 0 ? (
-            <div className={styles.empty}>
-              <p className={styles.emptyTitle}>Clear queue</p>
-              <p className={styles.emptyBody}>
-                No approvals or blockers.{" "}
-                <Link href={`/workspaces/${data.workspaceId}/projects`}>
-                  Open projects
-                </Link>{" "}
-                to start the next verified delivery.
+      <div className={styles.grid}>
+        <div className={styles.stack}>
+          <section
+            className={styles.panel}
+            aria-labelledby="attention-heading"
+          >
+            <div className={styles.panelHead}>
+              <h2 id="attention-heading" className={styles.sectionTitle}>
+                Needs your attention
+              </h2>
+              <p className={styles.sectionMeta}>
+                {attention.length} pending
               </p>
             </div>
-          ) : (
-            <ul className={styles.list}>
-              {attention.map((item) => (
-                <li key={item.id}>
-                  <Link href={item.href} className={styles.row}>
-                    <p className={styles.rowTitle}>
-                      {item.title}
-                      {item.priority === "high" ? (
-                        <span className={styles.priority}>High</span>
-                      ) : null}
-                    </p>
-                    <p className={styles.rowDetail}>{item.detail}</p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            {attention.length === 0 ? (
+              <div className={styles.emptyCatch}>
+                <span className={styles.emptyIcon} aria-hidden>
+                  ✓
+                </span>
+                <p className={styles.emptyTitle}>You&apos;re all caught up</p>
+                <p className={styles.emptyBody}>
+                  No approvals or blockers.{" "}
+                  <Link href={`/workspaces/${data.workspaceId}/projects`}>
+                    Open projects
+                  </Link>{" "}
+                  to start the next verified delivery.
+                </p>
+              </div>
+            ) : (
+              <ul className={styles.list}>
+                {attention.map((item) => (
+                  <li key={item.id}>
+                    <Link href={item.href} className={styles.attentionRow}>
+                      <p className={styles.rowTitle}>
+                        {item.title}
+                        {item.priority === "high" ? (
+                          <span className={styles.priority}>High</span>
+                        ) : null}
+                      </p>
+                      <p className={styles.rowDetail}>{item.detail}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-        <section aria-labelledby="exec-heading">
-          <h2 id="exec-heading" className={styles.sectionTitle}>
-            Active executions
-          </h2>
-          <p className={styles.sectionMeta}>
-            In-flight tasks and arena lanes
-          </p>
-          {executions.length === 0 ? (
-            <div className={styles.empty}>
-              <p className={styles.emptyTitle}>No active executions</p>
-              <p className={styles.emptyBody}>
-                Import an issue or open{" "}
-                <Link href={`/workspaces/${data.workspaceId}/arena`}>
-                  Arena
-                </Link>{" "}
-                when you are ready to run agents.
+          <section className={styles.panel} aria-labelledby="activity-heading">
+            <div className={styles.panelHead}>
+              <h2 id="activity-heading" className={styles.sectionTitle}>
+                Recent activity
+              </h2>
+              <Link
+                href={`/workspaces/${data.workspaceId}/activity`}
+                className={styles.sectionLink}
+              >
+                View all
+              </Link>
+            </div>
+            {recent.length === 0 ? (
+              <div className={styles.emptyCatch}>
+                <p className={styles.emptyTitle}>No activity yet</p>
+                <p className={styles.emptyBody}>
+                  Agent executions, decisions, and signals will appear here.
+                </p>
+              </div>
+            ) : (
+              <ul className={styles.timeline}>
+                {recent.map((g) => {
+                  const body = (
+                    <>
+                      <div className={styles.timelineTop}>
+                        <p className={styles.timelineTitle}>
+                          {g.title}
+                          {g.count > 1 && g.kind === "collapse"
+                            ? ` ×${g.count}`
+                            : ""}
+                        </p>
+                        <span className={styles.timelineTime}>
+                          {formatRelative(g.createdAt)}
+                        </span>
+                      </div>
+                      {g.summary ? (
+                        <p className={styles.timelineSummary}>{g.summary}</p>
+                      ) : null}
+                      <div className={styles.tags}>
+                        {tagsFor(g).map((t) => (
+                          <span key={t} className={styles.tag}>
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  );
+                  return (
+                    <li key={g.key} className={styles.timelineItem}>
+                      <div className={styles.timelineRail}>
+                        <span
+                          className={`${styles.timelineNode} ${nodeClass(g)}`}
+                          aria-hidden
+                        >
+                          {timelineGlyph(g)}
+                        </span>
+                      </div>
+                      {g.href ? (
+                        <Link href={g.href} className={styles.timelineBody}>
+                          {body}
+                        </Link>
+                      ) : (
+                        <div className={styles.timelineBody}>{body}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <aside className={styles.stack}>
+          <section className={styles.panel} aria-labelledby="exec-heading">
+            <div className={styles.panelHead}>
+              <h2 id="exec-heading" className={styles.sectionTitle}>
+                Active executions
+              </h2>
+              <p className={styles.sectionMeta}>
+                {executions.length} in flight
               </p>
             </div>
-          ) : (
-            <ul className={styles.list}>
-              {executions.map((ex) => (
-                <li key={`${ex.projectId}-${ex.taskId ?? ex.status}`}>
-                  <Link href={ex.href} className={styles.row}>
-                    <div className={styles.execHead}>
-                      <p className={styles.execProject}>{ex.projectName}</p>
-                      <p className={styles.execPhase}>{ex.phase}</p>
-                    </div>
-                    <p className={styles.rowTitle}>
-                      {ex.taskTitle ?? "Execution"}
-                    </p>
-                    <p className={styles.rowDetail}>{ex.status}</p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            {executions.length === 0 ? (
+              <div className={styles.emptyCatch}>
+                <p className={styles.emptyTitle}>No active executions</p>
+                <p className={styles.emptyBody}>
+                  Import an issue or open{" "}
+                  <Link href={`/workspaces/${data.workspaceId}/arena`}>
+                    Arena
+                  </Link>{" "}
+                  when you are ready to run agents.
+                </p>
+              </div>
+            ) : (
+              <ul className={styles.execList}>
+                {executions.map((ex) => {
+                  const step = executionStep(ex.status);
+                  const badge = statusBadgeLabel(ex.status, ex.phase);
+                  const active =
+                    ex.status === "RUNNING" ||
+                    ex.status === "VALIDATING" ||
+                    ex.status === "WAITING_CI";
+                  return (
+                    <li key={`${ex.projectId}-${ex.taskId ?? ex.status}`}>
+                      <Link href={ex.href} className={styles.execCard}>
+                        <div className={styles.execHead}>
+                          <p className={styles.execProject}>{ex.projectName}</p>
+                          <span
+                            className={`${styles.execBadge} ${
+                              active
+                                ? styles.execBadgeActive
+                                : styles.execBadgeQueued
+                            }`}
+                          >
+                            {badge}
+                          </span>
+                        </div>
+                        <p className={styles.execTitle}>
+                          {ex.taskTitle ?? "Execution"}
+                        </p>
+                        <div className={styles.steps} aria-hidden>
+                          {[0, 1, 2, 3].map((i) => (
+                            <span
+                              key={i}
+                              className={`${styles.step} ${
+                                i < step
+                                  ? styles.stepDone
+                                  : i === step
+                                    ? styles.stepCurrent
+                                    : ""
+                              }`}
+                            >
+                              <span className={styles.stepDot} />
+                            </span>
+                          ))}
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section className={styles.panel} aria-labelledby="actions-heading">
+            <div className={styles.panelHead}>
+              <h2 id="actions-heading" className={styles.sectionTitle}>
+                Quick actions
+              </h2>
+            </div>
+            <div className={styles.actions}>
+              <Link
+                href={`/workspaces/${data.workspaceId}/projects`}
+                className={styles.action}
+              >
+                <span className={styles.actionIcon} aria-hidden>
+                  ▷
+                </span>
+                <span className={styles.actionLabel}>Run a task</span>
+              </Link>
+              <Link
+                href={`/workspaces/${data.workspaceId}/arena`}
+                className={styles.action}
+              >
+                <span className={styles.actionIcon} aria-hidden>
+                  ◆
+                </span>
+                <span className={styles.actionLabel}>Open Arena</span>
+              </Link>
+              <Link
+                href={`/workspaces/${data.workspaceId}/projects`}
+                className={styles.action}
+              >
+                <span className={styles.actionIcon} aria-hidden>
+                  ▤
+                </span>
+                <span className={styles.actionLabel}>View projects</span>
+              </Link>
+              <Link
+                href={`/workspaces/${data.workspaceId}/settings`}
+                className={styles.action}
+              >
+                <span className={styles.actionIcon} aria-hidden>
+                  ⚙
+                </span>
+                <span className={styles.actionLabel}>Workspace settings</span>
+              </Link>
+            </div>
+          </section>
+        </aside>
       </div>
     </main>
   );
