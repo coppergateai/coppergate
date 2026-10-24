@@ -18,8 +18,9 @@ describe("plan policy", () => {
 
   it("Starter clamps fan-out; Community/Pro keep arena width", () => {
     assert.equal(clampTournamentFanout(3, "starter"), 1);
-    assert.equal(clampTournamentFanout(3, "community"), 3);
-    assert.equal(clampTournamentFanout(3, "pro"), 3);
+    assert.equal(clampTournamentFanout(11, "community"), 11);
+    assert.equal(clampTournamentFanout(11, "pro"), 11);
+    assert.equal(clampTournamentFanout(99, "community"), 11);
     assert.equal(PLAN_LIMITS.starter.maxConcurrentRuns, 1);
   });
 });

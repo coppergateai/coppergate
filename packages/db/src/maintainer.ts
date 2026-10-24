@@ -25,6 +25,7 @@ import {
 import {
   applySpawnProfilesToArena,
   BOUNDED_KEYS,
+  FULL_ARENA_PROFILE_KEYS,
 } from "./profiles.js";
 import {
   agentProfiles,
@@ -706,14 +707,25 @@ export async function startProjectArena(
 
   // Arm + resume BEFORE vision replan. If backlog boots while PAUSED,
   // min_human is skipped and a zombie Inbox approval is created.
+  const rosterN = FULL_ARENA_PROFILE_KEYS.length;
   let { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
     minHuman: true,
-    defaultContenderN: 2,
-    contenderCount: 2,
+    defaultContenderN: rosterN,
+    contenderCount: rosterN,
   });
+  try {
+    await applySpawnProfilesToArena(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor: input.actor,
+      profileKeys: FULL_ARENA_PROFILE_KEYS,
+    });
+  } catch {
+    // spawn best-effort — tick continues
+  }
 
   if (!arena.minHuman) {
     arena = await setArenaMinHuman(db, {
@@ -891,13 +903,14 @@ export async function stopProjectArena(
     projectId: input.projectId,
   });
   if (!arena) {
+    const rosterN = FULL_ARENA_PROFILE_KEYS.length;
     const ensured = await ensureArenaForProject(db, {
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       actor: input.actor,
       minHuman: true,
-      defaultContenderN: 2,
-      contenderCount: 2,
+      defaultContenderN: rosterN,
+      contenderCount: rosterN,
     });
     arena = ensured.arena;
   }
@@ -1981,13 +1994,13 @@ export async function runVisionReplan(
       .where(eq(milestones.id, m.milestone.id));
   }
 
-  // Arm proposer/engineer contenders for the autonomous backlog cycle
+  // Arm full bounded roster for the autonomous backlog cycle
   try {
     await applySpawnProfilesToArena(db, {
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       actor: input.actor,
-      profileKeys: ["proposer", "engineer"],
+      profileKeys: FULL_ARENA_PROFILE_KEYS,
     });
   } catch {
     // arena may not exist yet — tick/enable creates it

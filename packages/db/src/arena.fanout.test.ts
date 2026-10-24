@@ -64,7 +64,7 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
     await setProjectBudget(db, {
       workspaceId,
       projectId,
-      capMicros: 1_000_000,
+      capMicros: 5_000_000,
       actor,
     });
 
@@ -147,7 +147,7 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
   });
 
   it("spawns N=MAX ContenderRuns, clamps n>MAX, unique branches", async () => {
-    assert.equal(MAX_TOURNAMENT_FANOUT, 3);
+    assert.equal(MAX_TOURNAMENT_FANOUT, 11);
 
     const first = await startTournamentFanout(db, {
       workspaceId,

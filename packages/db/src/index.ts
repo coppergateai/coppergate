@@ -542,6 +542,7 @@ export {
 export {
   BOUNDED_KEYS,
   DEFAULT_SPAWN_MATRIX,
+  FULL_ARENA_PROFILE_KEYS,
   ProfileError,
   SYSTEM_PROFILE_SEEDS,
   applySpawnProfilesToArena,
