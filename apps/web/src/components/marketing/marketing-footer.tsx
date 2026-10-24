@@ -80,6 +80,7 @@ export function MarketingFooter() {
             <nav className={styles.footerCol} aria-label="Resources">
               <h2>Resources</h2>
               <Link href="/docs">Documentation</Link>
+              <Link href="/blog">Blog</Link>
               <a
                 href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
                 target="_blank"

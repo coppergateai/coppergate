@@ -1,17 +1,28 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { HOSTED_PLANS } from "@coppergate/billing";
-import styles from "@/components/marketing/marketing.module.css";
+import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
+import styles from "@/components/marketing/marketing.module.css";
 
-export const metadata = {
-  title: "Pricing · Coppergate Docs",
+export const metadata: Metadata = {
+  title: "Pricing",
   description:
     "MIT self-host is free. Optional hosted plans may come later — community path stays open source.",
+  alternates: { canonical: "/docs/pricing" },
+  openGraph: { url: "/docs/pricing" },
 };
 
 export default function PricingPage() {
   return (
     <DocsShell>
+      <DocsBreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Docs", path: "/docs" },
+          { name: "Pricing", path: "/docs/pricing" },
+        ]}
+      />
       <main className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs

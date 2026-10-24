@@ -1,16 +1,27 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import styles from "@/components/marketing/marketing.module.css";
+import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
+import styles from "@/components/marketing/marketing.module.css";
 
-export const metadata = {
-  title: "Supported stack · Coppergate Docs",
+export const metadata: Metadata = {
+  title: "Supported stack",
   description:
     "SCM delivery, Signal Adapters, and fitness evidence for the Coppergate Survivor arena.",
+  alternates: { canonical: "/docs/supported-stack" },
+  openGraph: { url: "/docs/supported-stack" },
 };
 
 export default function SupportedStackPage() {
   return (
     <DocsShell>
+      <DocsBreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Docs", path: "/docs" },
+          { name: "Supported stack", path: "/docs/supported-stack" },
+        ]}
+      />
       <main className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs

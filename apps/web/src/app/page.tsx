@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   ArenaPreviewSection,
   CapabilityStrip,
@@ -16,6 +17,11 @@ import { currentUser } from "@/lib/auth";
 import { JsonLd } from "./json-ld";
 import { LandingFunnelBeacon } from "./landing-funnel";
 import { SiteChrome } from "./site-chrome";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: { url: "/" },
+};
 
 export default async function HomePage() {
   const user = await currentUser();

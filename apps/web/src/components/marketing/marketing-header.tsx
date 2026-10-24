@@ -19,6 +19,7 @@ const links = [
   { href: "/#signals", label: "Integrations" },
   { href: "/docs/pricing", label: "Pricing" },
   { href: "/docs", label: "Docs" },
+  { href: "/blog", label: "Blog" },
 ] as const;
 
 export function MarketingHeader({ signedIn }: Props) {

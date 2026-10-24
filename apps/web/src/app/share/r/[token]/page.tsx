@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { getPublicDeliveryShare, ShareError } from "@coppergate/db";
 import { db } from "@/lib/db";
 import styles from "@/components/marketing/marketing.module.css";
 
 type PageProps = { params: Promise<{ token: string }> };
+
+export const metadata: Metadata = {
+  title: "Shared delivery",
+  robots: { index: false, follow: false },
+};
 
 export default async function PublicSharePage({ params }: PageProps) {
   const { token } = await params;

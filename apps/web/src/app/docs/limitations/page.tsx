@@ -1,16 +1,27 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import styles from "@/components/marketing/marketing.module.css";
+import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
+import styles from "@/components/marketing/marketing.module.css";
 
-export const metadata = {
-  title: "Limitations · Coppergate Docs",
+export const metadata: Metadata = {
+  title: "Limitations",
   description:
     "Current-release limitations for the Coppergate Survivor arena — wedge vs north star.",
+  alternates: { canonical: "/docs/limitations" },
+  openGraph: { url: "/docs/limitations" },
 };
 
 export default function LimitationsPage() {
   return (
     <DocsShell>
+      <DocsBreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Docs", path: "/docs" },
+          { name: "Limitations", path: "/docs/limitations" },
+        ]}
+      />
       <main className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs

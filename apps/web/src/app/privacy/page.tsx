@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   description:
     "How Coppergate handles early-access emails, GitHub authentication, and product data during private beta.",
   alternates: { canonical: "/privacy" },
+  openGraph: { url: "/privacy" },
 };
 
 export default function PrivacyPage() {
