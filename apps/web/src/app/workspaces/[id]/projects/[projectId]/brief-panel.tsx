@@ -22,6 +22,8 @@ type Props = {
   projectId: string;
   initialBrief: Brief | null;
   isOwner: boolean;
+  /** Hide when Overview already leads with an Arena next-action CTA. */
+  showArenaCta?: boolean;
 };
 
 /**
@@ -33,6 +35,7 @@ export function BriefPanel({
   projectId,
   initialBrief,
   isOwner,
+  showArenaCta = true,
 }: Props) {
   const arenaHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
   const brief = initialBrief;
@@ -100,7 +103,7 @@ export function BriefPanel({
               </ul>
             </div>
           ) : null}
-          {isOwner ? (
+          {isOwner && showArenaCta ? (
             <Link href={arenaHref} className={styles.linkCta}>
               Arena → Start / Stop
             </Link>

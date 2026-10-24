@@ -15,6 +15,8 @@ type Props = {
   step: NextActionStep;
   reviewTaskId?: string | null;
   reviewTaskTitle?: string | null;
+  /** Quiet stack tip — shown under the next-action lede, not above the strip. */
+  stackHint?: string | null;
 };
 
 const PIPELINE: Array<{
@@ -40,6 +42,7 @@ export function NextActionStrip({
   projectId,
   step,
   reviewTaskTitle,
+  stackHint,
 }: Props) {
   const base = `/workspaces/${workspaceId}/projects/${projectId}`;
   const active = stepIndex(step);
@@ -117,6 +120,9 @@ export function NextActionStrip({
           </h2>
           <p className={styles.nextActionTitle}>{title}</p>
           <p className={styles.sectionLede}>{detail}</p>
+          {stackHint ? (
+            <p className={styles.nextActionHint}>{stackHint}</p>
+          ) : null}
         </div>
         {href ? (
           <Link href={href} className={styles.primaryBtn}>
