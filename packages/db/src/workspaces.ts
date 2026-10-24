@@ -1,6 +1,6 @@
 import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
-import { assertSafeServerFetchUrl } from "@coppergate/sandbox";
+import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox";
 import type { Database } from "./client.js";
 import {
   agentProfiles,
@@ -318,7 +318,7 @@ export async function updateWorkspaceForOwner(
     const url = input.notifyWebhookUrl?.trim() || null;
     if (url) {
       try {
-        assertSafeServerFetchUrl(url, { requireHttps: true });
+        await assertSafeServerFetchUrlResolved(url, { requireHttps: true });
       } catch {
         throw new Error(
           "notifyWebhookUrl must be a public https URL (no private/metadata hosts)",
