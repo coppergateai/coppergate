@@ -21,7 +21,7 @@ export const SETTINGS_TABS = [
   {
     id: "billing",
     label: "Billing",
-    blurb: "Hosted Starter & Pro",
+    blurb: "Usage & plan status",
     group: "Spend",
   },
   {

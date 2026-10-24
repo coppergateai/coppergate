@@ -52,8 +52,8 @@ export default function RecoveryPage() {
           </ol>
           <p>
             Accept stays closed while CI is pending or failed. See{" "}
-            <Link href="/docs/pricing">pricing</Link> for optional hosted
-            Starter/Pro — community self-host stays free.
+            <Link href="/docs/pricing">pricing</Link> — community self-host
+            stays free; paid hosted plans are not offered right now.
           </p>
 
           <h2 id="ci">Accept disabled (CI pending / failed)</h2>

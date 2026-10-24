@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HOSTED_PLANS } from "@coppergate/billing";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
 import styles from "@/components/marketing/marketing.module.css";
@@ -8,7 +7,7 @@ import styles from "@/components/marketing/marketing.module.css";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "MIT self-host is free. Optional hosted Starter and Pro when you want managed sandboxes — community path stays open source.",
+    "Coppergate is MIT open source. Self-host with your own keys at $0 — paid hosted plans are not offered right now.",
   alternates: { canonical: "/docs/pricing" },
   openGraph: { url: "/docs/pricing" },
 };
@@ -32,11 +31,11 @@ export default function PricingPage() {
           ← Docs
         </Link>
         <p className={styles.pageEyebrow}>Pricing</p>
-        <h1 className={styles.pageTitle}>Start free. Pay only if we run ops.</h1>
+        <h1 className={styles.pageTitle}>Free to self-host. No paid plans yet.</h1>
         <p className={styles.pageLede}>
           Coppergate is open source (MIT). Self-host with your own keys at $0.
-          Optional hosted plans exist when you want managed sandboxes — not as a
-          requirement to use the product.
+          Paid hosted tiers are not available right now — when they return, this
+          page will say so clearly.
         </p>
 
         <div className={styles.pricingGrid}>
@@ -78,35 +77,13 @@ export default function PricingPage() {
               </a>
             </div>
           </article>
-
-          {HOSTED_PLANS.map((plan) => (
-            <article key={plan.id} className={styles.pricingCard}>
-              <p className={styles.pricingEyebrow}>Hosted · optional</p>
-              <h2 className={styles.pricingName}>{plan.name}</h2>
-              <p className={styles.pricingPrice}>
-                <span className={styles.pricingAmount}>${plan.monthlyUsd}</span>
-                <span className={styles.pricingPeriod}>/mo + usage</span>
-              </p>
-              <p className={styles.pricingBlurb}>{plan.blurb}</p>
-              <ul className={styles.pricingFeatures}>
-                {plan.features.map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-              <div className={styles.pricingActions}>
-                <Link className={styles.btnSecondary} href="/login">
-                  Try hosted
-                </Link>
-              </div>
-            </article>
-          ))}
         </div>
 
         <div className={styles.pricingFootnote}>
           <p>
-            Community self-host stays $0 forever. Hosted Starter and Pro are
-            optional when you want managed sandboxes and ops — not required to
-            use Coppergate.
+            Community self-host stays $0 forever. Optional paid hosted plans are
+            deferred — do not expect Starter/Pro checkout until we reopen
+            pricing.
           </p>
           <p>
             Questions?{" "}

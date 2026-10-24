@@ -41,7 +41,7 @@ Target: 5–10 technical solo founders; **≥3 paid pilots** (deposit or monthly
 
 | Priority | Work |
 |---|---|
-| P0 | Stripe Starter/Pro checkout + customer portal ([pricing](/docs/pricing), [STRIPE_PRODUCTION.md](./STRIPE_PRODUCTION.md)) |
+| P0 | ~~Stripe Starter/Pro checkout~~ — **deferred** (see Pricing below; [STRIPE_PRODUCTION.md](./STRIPE_PRODUCTION.md) ops-only) |
 | P0 | Onboarding: connect → budget → import issue → PR in one session |
 | P0 | Self-serve recovery ([/docs/recovery](/docs/recovery)) |
 | P1 | Deepen Issue + Sentry/CI-fail only |
@@ -51,14 +51,19 @@ Target: 5–10 technical solo founders; **≥3 paid pilots** (deposit or monthly
 
 Retention habit → content distribution (IH/HN) → expand **only on pull** → Phase X harden for Team plan.
 
-## Pricing (locked for pilots)
+## Pricing (deferred — do not re-surface)
 
-| Plan | Price | Includes |
+**Decision (2026-10-24):** Public paid pricing is off. Do not add Starter/Pro
+($99 / $199) cards, CTAs, or checkout to marketing, docs, or Settings until
+product explicitly reopens paid plans (`PUBLIC_PAID_PRICING_ENABLED` in
+`@coppergate/billing`).
+
+| Plan | Price | Status |
 |---|---|---|
-| Community | $0 | MIT self-host, BYOK, user-managed sandboxes |
-| Starter | **$99/mo** + usage | Hosted sandboxes, modest concurrency |
-| Pro | **$199/mo** + usage | Higher concurrency, previews, multi-project |
-| Team | later | SSO, audit retention, shared budgets |
+| Community | $0 | Public — MIT self-host, BYOK |
+| Starter | $99/mo + usage | Deferred — Stripe SKU kept internal only |
+| Pro | $199/mo + usage | Deferred — Stripe SKU kept internal only |
+| Team | later | Not offered |
 
 Exact Stripe Price IDs live in env (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`). Validate with `pnpm ops:stripe-env`.
 

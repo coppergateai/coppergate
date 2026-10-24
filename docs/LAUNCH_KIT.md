@@ -25,7 +25,7 @@ Line: **“I armed an arena. Contenders fought. The survivor opened a tested PR.
 
 ## One-session TTFV (product)
 
-Onboarding title **Path to first PR**: budget → Import→queue issue → worker PR → Accept on green CI. Recovery: [/docs/recovery](/docs/recovery). Pricing: [/docs/pricing](/docs/pricing) ($99 / $199).
+Onboarding title **Path to first PR**: budget → Import→queue issue → worker PR → Accept on green CI. Recovery: [/docs/recovery](/docs/recovery). Pricing: [/docs/pricing](/docs/pricing) (Community $0; paid plans deferred).
 
 ## Assets
 

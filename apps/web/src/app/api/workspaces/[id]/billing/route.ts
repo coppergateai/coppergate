@@ -2,7 +2,8 @@ import {
   createStripeClient,
   createBillingPortalSession,
   createCheckoutSession,
-  HOSTED_PLANS,
+  PUBLIC_PAID_PRICING_ENABLED,
+  publicHostedPlans,
   limitsForPlan,
   reportUsageSummaryToStripe,
   type HostedPlanId,
@@ -72,7 +73,8 @@ export async function GET(request: Request, context: RouteContext) {
                 sub.status === "past_due" || sub.status === "unpaid",
             }
           : null,
-        plans: HOSTED_PLANS,
+        plans: publicHostedPlans(),
+        paidPricingEnabled: PUBLIC_PAID_PRICING_ENABLED,
       },
       { correlationId },
     );
@@ -121,6 +123,13 @@ export async function POST(request: Request, context: RouteContext) {
         workspaceId,
       });
       return jsonOk({ url: session.url }, { correlationId });
+    }
+
+    if (!PUBLIC_PAID_PRICING_ENABLED) {
+      throw new ApiError(
+        "bad_request",
+        "Paid hosted plans are not available right now",
+      );
     }
 
     const plan = body.plan === "pro" ? "pro" : body.plan === "starter" ? "starter" : null;

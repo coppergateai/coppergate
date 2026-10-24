@@ -14,7 +14,7 @@ Contact: hello@coppergate.ai
 - [Documentation](https://www.coppergate.ai/docs): Docs index
 - [Supported stack](https://www.coppergate.ai/docs/supported-stack): SCM, signals, fitness surface
 - [Limitations](https://www.coppergate.ai/docs/limitations): Current-release limits and non-goals
-- [Pricing](https://www.coppergate.ai/docs/pricing): MIT self-host and hosted options
+- [Pricing](https://www.coppergate.ai/docs/pricing): MIT self-host at $0; paid plans deferred
 - [Recovery](https://www.coppergate.ai/docs/recovery): Self-serve recovery when runs fail
 - [Security](https://www.coppergate.ai/security): Identity, gates, spend caps, kill-switch
 - [Blog](https://www.coppergate.ai/blog): Product notes on arenas, budgets, fitness

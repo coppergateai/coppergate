@@ -15,10 +15,17 @@ export const metadata: Metadata = {
 const entries = [
   {
     date: "2026-10-24",
+    title: "Paid pricing deferred",
+    items: [
+      "Public pricing: Community $0 only — Starter/Pro ($99/$199) removed from UI",
+      "Settings → Billing no longer offers paid checkout while pricing is off",
+    ],
+  },
+  {
+    date: "2026-10-24",
     title: "Marketing clarity pass",
     items: [
       "Hero messaging: who it’s for, issue → verified PR, honest stack ribbon",
-      "Pricing: Community $0 forever vs optional hosted Starter/Pro",
       "FAQ two-column layout + CTAs; fitness/controls de-carded",
       "Login: Self-host path when already on Try hosted; blog/security end CTAs",
       "Recovery + signals copy: live delivery GitHub/GitLab; Bitbucket deferred",

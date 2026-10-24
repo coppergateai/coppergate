@@ -1,6 +1,6 @@
 # Stripe production runbook (Phase 0 → Phase 1)
 
-Locks hosted **Starter $99/mo** and **Pro $199/mo** (+ usage metadata). Price IDs live in env; copy in `@coppergate/billing` `HOSTED_PLANS`.
+Internal Stripe SKUs remain **Starter $99/mo** and **Pro $199/mo** (+ usage metadata) in `@coppergate/billing` `HOSTED_PLANS`. **Public paid pricing is deferred** (`PUBLIC_PAID_PRICING_ENABLED=false`) — do not expose checkout or $99/$199 UI until product reopens pricing. Price IDs live in env.
 
 Local smoke: [`scripts/manual-billing-smoke.md`](../scripts/manual-billing-smoke.md).  
 Env check: `pnpm ops:stripe-env`.

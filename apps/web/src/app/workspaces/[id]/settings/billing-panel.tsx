@@ -35,6 +35,7 @@ type BillingState = {
     paymentFailed?: boolean;
   } | null;
   plans: Plan[];
+  paidPricingEnabled?: boolean;
 };
 
 type Props = {
@@ -212,7 +213,9 @@ export function BillingPanel({ workspaceId, isOwner, checkoutFlag }: Props) {
                     {state.limits.maxConcurrentRuns === 1 ? "" : "s"}, fan-out{" "}
                     {state.limits.maxTournamentFanout}
                     {state.limits.previewEnabled ? ", previews on" : ", no preview"}
-                    {!isPaid ? (
+                    {!isPaid &&
+                    state.paidPricingEnabled &&
+                    state.plans.length > 0 ? (
                       <>
                         {" "}
                         ·{" "}
@@ -294,7 +297,15 @@ export function BillingPanel({ workspaceId, isOwner, checkoutFlag }: Props) {
               ) : null}
             </div>
 
-            {!state.configured ? (
+            {state.paidPricingEnabled === false || state.plans.length === 0 ? (
+              <p className={styles.note}>
+                Paid hosted plans (Starter / Pro) are not offered right now.
+                Community / self-host stays free. Usage above is for spend
+                visibility only.
+              </p>
+            ) : null}
+
+            {!state.configured && state.paidPricingEnabled ? (
               <p className={styles.note}>
                 Operators: set{" "}
                 <code>STRIPE_SECRET_KEY</code>,{" "}
@@ -305,7 +316,10 @@ export function BillingPanel({ workspaceId, isOwner, checkoutFlag }: Props) {
               </p>
             ) : null}
 
-            {isOwner && state.configured ? (
+            {isOwner &&
+            state.configured &&
+            state.paidPricingEnabled &&
+            state.plans.length > 0 ? (
               <div className={styles.billingPlanGrid}>
                 {state.plans.map((plan) => {
                   const current = effective === plan.id;
@@ -365,7 +379,7 @@ export function BillingPanel({ workspaceId, isOwner, checkoutFlag }: Props) {
                   );
                 })}
               </div>
-            ) : !isOwner ? (
+            ) : !isOwner && state.paidPricingEnabled ? (
               <p className={styles.note}>Only owners can change billing.</p>
             ) : null}
           </>
