@@ -10,7 +10,10 @@ primary_region = "iad"
 [env]
   NODE_ENV = "production"
   GITHUB_DELIVERY_MODE = "http"
+  # Fly Machines have no Docker daemon — local sandbox + break-glass ack.
+  # Use SANDBOX_MODE=docker on hosts with Docker + (preferably) gVisor/runsc.
   SANDBOX_MODE = "local"
+  ALLOW_LOCAL_SANDBOX = "1"
   # Prefer workspace BYOK / OPENAI_API_KEY. OpenHands scaffold stub is disabled.
   # CONTENDER_HARNESS = "native_openai"
   APP_URL = "https://www.coppergate.ai"
