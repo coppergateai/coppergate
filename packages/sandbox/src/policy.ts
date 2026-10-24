@@ -153,9 +153,37 @@ export type SafeFetchUrlOptions = {
   requireHttps?: boolean;
 };
 
+function isIpv4Literal(host: string): boolean {
+  return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(host);
+}
+
+function isResolvedAddressBlocked(
+  address: string,
+  options: SafeFetchUrlOptions,
+): boolean {
+  const h = normalizeHost(address);
+  if (isLinkLocalOrMetadata(h) && !isLoopbackHost(h)) return true;
+  if (isLoopbackHost(h) && !options.allowLoopback) return true;
+  if (!isLoopbackHost(h) && isPrivateIpv4(h) && !options.allowPrivate) {
+    return true;
+  }
+  if (
+    (h.startsWith("fc") ||
+      h.startsWith("fd") ||
+      h === "::" ||
+      h.startsWith("fe80:")) &&
+    !options.allowPrivate &&
+    !options.allowLoopback
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Validate a URL before server-side fetch to reduce SSRF to metadata /
- * link-local / private networks. Does not resolve DNS rebinding.
+ * link-local / private networks. Use
+ * {@link assertSafeServerFetchUrlResolved} against DNS rebinding.
  */
 export function assertSafeServerFetchUrl(
   rawUrl: string,
@@ -229,4 +257,56 @@ export function isSafeServerFetchUrl(
   } catch {
     return false;
   }
+}
+
+export type DnsLookupFn = (
+  hostname: string,
+) => Promise<Array<{ address: string; family: number }>>;
+
+/**
+ * Hostname check + DNS resolution of all A/AAAA records. Rejects if any
+ * resolved address is private/metadata/loopback (per options).
+ */
+export async function assertSafeServerFetchUrlResolved(
+  rawUrl: string,
+  options: SafeFetchUrlOptions & { lookup?: DnsLookupFn } = {},
+): Promise<URL> {
+  const url = assertSafeServerFetchUrl(rawUrl, options);
+  const host = normalizeHost(url.hostname);
+
+  if (isIpv4Literal(host) || host.includes(":")) {
+    if (isResolvedAddressBlocked(host, options)) {
+      throw new SandboxPolicyError(
+        "egress_denied",
+        `Resolved address ${host} is blocked`,
+      );
+    }
+    return url;
+  }
+
+  const lookup =
+    options.lookup ??
+    (async (hostname: string) => {
+      const dns = await import("node:dns/promises");
+      return dns.lookup(hostname, { all: true, verbatim: true });
+    });
+
+  let records: Array<{ address: string; family: number }>;
+  try {
+    records = await lookup(host);
+  } catch {
+    throw new SandboxPolicyError("invalid", "DNS lookup failed for URL host");
+  }
+  if (!records.length) {
+    throw new SandboxPolicyError("invalid", "DNS lookup returned no addresses");
+  }
+  for (const rec of records) {
+    if (isResolvedAddressBlocked(rec.address, options)) {
+      throw new SandboxPolicyError(
+        "egress_denied",
+        `Resolved address ${rec.address} is blocked`,
+      );
+    }
+  }
+  return url;
 }

@@ -8,16 +8,14 @@ type Props = {
 };
 
 export function HeroSection({ signedIn }: Props) {
-  const primaryHref = signedIn ? "/workspaces" : "/login";
+  const hostedHref = signedIn ? "/workspaces" : "/login";
+  const hostedLabel = signedIn ? "Open workspaces" : "Try hosted";
 
   return (
     <section className={styles.hero} aria-labelledby="hero-title">
       <div className={styles.heroInner}>
         <div className={`${styles.heroCopy} cg-rise`}>
-          <div className={styles.heroBadgeRow}>
-            <span className={styles.openSourceBadge}>Open source</span>
-            <span className={styles.heroBadgeMeta}>MIT · Free to self-host</span>
-          </div>
+          <p className={styles.heroBrand}>Coppergate</p>
 
           <h1 id="hero-title" className={styles.headline}>
             Set a budget. Agents war.
@@ -26,9 +24,9 @@ export function HeroSection({ signedIn }: Props) {
           </h1>
 
           <p className={styles.lede}>
-            Coppergate runs autonomous engineering agents inside a spend cap —
-            from proposal to verified pull request. Contenders compete; fitness
-            and evidence decide; you review what ships.
+            For engineering teams who want agents that ship pull requests — not
+            chat transcripts. Contenders compete inside a spend cap; fitness and
+            evidence decide; you review what survives.
           </p>
 
           <div className={styles.ctaRow}>
@@ -41,15 +39,15 @@ export function HeroSection({ signedIn }: Props) {
               Start on GitHub
               <IconArrow />
             </a>
-            <Link className={styles.btnSecondary} href={primaryHref}>
-              Open workspaces
+            <Link className={styles.btnSecondary} href={hostedHref}>
+              {hostedLabel}
             </Link>
           </div>
 
           <ul className={styles.trustList}>
-            <li>Self-host or cloud</li>
+            <li>Self-host or hosted</li>
             <li>Bring your own LLM</li>
-            <li>Production ready</li>
+            <li>Issue → verified PR</li>
           </ul>
         </div>
 

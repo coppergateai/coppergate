@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
-import { assertSafeServerFetchUrl } from "@coppergate/sandbox";
+import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox";
 import type { Database } from "./client.js";
 import { createArtifact } from "./artifacts.js";
 import { appendRunEvent } from "./run-events.js";
@@ -292,7 +292,9 @@ export async function ingestPreviewSmokeFitness(
   let status: number | null = null;
   let error: string | null = null;
   try {
-    assertSafeServerFetchUrl(input.previewUrl, { requireHttps: true });
+    await assertSafeServerFetchUrlResolved(input.previewUrl, {
+      requireHttps: true,
+    });
     const res = await fetch(input.previewUrl, {
       method: "GET",
       redirect: "manual",

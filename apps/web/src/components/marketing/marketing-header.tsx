@@ -124,7 +124,7 @@ export function MarketingHeader({ signedIn }: Props) {
                 href="/login"
                 onClick={() => track("cta_open_workspaces", { location: "nav" })}
               >
-                Open workspaces
+                Try hosted
                 <IconArrow />
               </Link>
             </>
@@ -185,7 +185,7 @@ export function MarketingHeader({ signedIn }: Props) {
                   href="/login"
                   onClick={closeMenu}
                 >
-                  Open workspaces
+                  Try hosted
                 </Link>
               </>
             )}

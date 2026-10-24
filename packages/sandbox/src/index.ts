@@ -18,9 +18,11 @@ export {
   assertNoDockerSocket,
   assertNotPrivileged,
   assertSafeServerFetchUrl,
+  assertSafeServerFetchUrlResolved,
   isEgressAllowed,
   isLinkLocalOrMetadata,
   isSafeServerFetchUrl,
+  type DnsLookupFn,
   type SafeFetchUrlOptions,
 } from "./policy.js";
 export {
@@ -33,3 +35,5 @@ export {
   type DockerSandboxSpec,
 } from "./docker-spec.js";
 export { LocalSandboxManager } from "./local.js";
+export { DockerSandboxManager } from "./docker.js";
+export { assertSandboxCommandArgs } from "./command-policy.js";

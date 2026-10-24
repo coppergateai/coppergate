@@ -1,7 +1,7 @@
 import { ApiError } from "@coppergate/errors";
 import {
   SandboxPolicyError,
-  assertSafeServerFetchUrl,
+  assertSafeServerFetchUrlResolved,
 } from "@coppergate/sandbox";
 import { requireUser } from "@/lib/auth";
 import { requireCsrf } from "@/lib/csrf";

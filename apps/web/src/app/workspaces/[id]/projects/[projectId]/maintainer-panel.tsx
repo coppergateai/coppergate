@@ -127,7 +127,7 @@ export function MaintainerPanel({
         Autonomous maintainer
       </h2>
       <p className={styles.sectionLede}>
-        Start on Agents invents vision and backlog — no plan entry. While the
+        Start in Arena invents vision and backlog — no plan entry. While the
         monthly budget allows, the worker keeps inventing the next cycle in the
         background. Cap hit → hard pause until the next period. Intervene via
         budget or Stop. Canonical micro-envelope: $5/mo.

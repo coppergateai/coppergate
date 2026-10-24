@@ -10,6 +10,11 @@ export {
   type Logger,
 } from "./logger.js";
 export {
+  redactLogFields,
+  redactLogString,
+  redactLogValue,
+} from "./redact.js";
+export {
   FUNNEL_STAGES,
   trackFunnelEvent,
   type FunnelEventInput,

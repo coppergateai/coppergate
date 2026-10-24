@@ -122,6 +122,13 @@ export function WorkspacesHome({ workspaces, inviteRequired }: Props) {
             ))}
           </div>
           <div className={styles.toolbarRight}>
+            <button
+              type="button"
+              className={styles.textLink}
+              onClick={() => setCreateOpen(true)}
+            >
+              Create another
+            </button>
             <span className={styles.sortLabel}>Last updated</span>
             <div className={styles.viewToggle} role="group" aria-label="View mode">
               <button
@@ -217,47 +224,49 @@ export function WorkspacesHome({ workspaces, inviteRequired }: Props) {
         <p className={styles.noMatches}>No workspaces match this filter.</p>
       ) : null}
 
-      <section className={styles.getStarted} aria-labelledby="get-started-heading">
-        <div className={styles.getStartedText}>
-          <h2 id="get-started-heading" className={styles.getStartedTitle}>
-            Create a new workspace
-          </h2>
-          <p className={styles.getStartedLede}>
-            Group repositories, configure agents, and keep runs under one
-            budget envelope.
-          </p>
-          <div className={styles.getStartedActions}>
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={() => setCreateOpen(true)}
-            >
-              <span aria-hidden>+</span> New workspace
-            </button>
-            <Link href="/docs" className={styles.secondaryBtn}>
-              <DocIcon />
-              View documentation
-            </Link>
+      {empty ? (
+        <section className={styles.getStarted} aria-labelledby="get-started-heading">
+          <div className={styles.getStartedText}>
+            <h2 id="get-started-heading" className={styles.getStartedTitle}>
+              Create a new workspace
+            </h2>
+            <p className={styles.getStartedLede}>
+              Group repositories, configure agents, and keep runs under one
+              budget envelope.
+            </p>
+            <div className={styles.getStartedActions}>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => setCreateOpen(true)}
+              >
+                <span aria-hidden>+</span> New workspace
+              </button>
+              <Link href="/docs" className={styles.secondaryBtn}>
+                <DocIcon />
+                View documentation
+              </Link>
+            </div>
           </div>
-        </div>
-        <div className={styles.getStartedArt} aria-hidden>
-          <div className={styles.artTile}>
-            <BrandMark size={36} />
+          <div className={styles.getStartedArt} aria-hidden>
+            <div className={styles.artTile}>
+              <BrandMark size={36} />
+            </div>
+            <span className={styles.artNode} style={{ top: "12%", left: "8%" }}>
+              <TerminalMini />
+            </span>
+            <span className={styles.artNode} style={{ top: "18%", right: "10%" }}>
+              <GitMini />
+            </span>
+            <span className={styles.artNode} style={{ bottom: "16%", left: "18%" }}>
+              <DocMini />
+            </span>
+            <span className={styles.artNode} style={{ bottom: "12%", right: "14%" }}>
+              <CubeMini />
+            </span>
           </div>
-          <span className={styles.artNode} style={{ top: "12%", left: "8%" }}>
-            <TerminalMini />
-          </span>
-          <span className={styles.artNode} style={{ top: "18%", right: "10%" }}>
-            <GitMini />
-          </span>
-          <span className={styles.artNode} style={{ bottom: "16%", left: "18%" }}>
-            <DocMini />
-          </span>
-          <span className={styles.artNode} style={{ bottom: "12%", right: "14%" }}>
-            <CubeMini />
-          </span>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {createOpen ? (
         <div

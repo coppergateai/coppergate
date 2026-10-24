@@ -89,11 +89,12 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
       aria-labelledby="issues-heading"
     >
       <h2 id="issues-heading" className={styles.sectionLabel}>
-        GitHub issues → tasks
+        Path to first PR · GitHub issues
       </h2>
       <p className={styles.sectionLede}>
-        Optional: pull a specific open issue into the board. The autonomous
-        loop on Agents does not need this — Start invents work under budget.
+        Primary path: Import → queue a small issue, then review cost, diff, and
+        CI before Accept. Arena Start can invent work later under the same
+        spend envelope.
         {repo ? ` · ${repo}` : null}
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -101,7 +102,7 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
         {issues.length === 0 ? (
           <li className={styles.muted}>
             {repo
-              ? `No open issues on ${repo}. Autonomous Start does not need them.`
+              ? `No open issues on ${repo}. Open a small scoped issue on GitHub, or use Arena Start under budget.`
               : "Connect GitHub under Workspace settings → Connections to list issues."}
           </li>
         ) : (

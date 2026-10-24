@@ -3,12 +3,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
-import {
-  assertEgressAllowed,
-  DEFAULT_LIMITS,
-  METADATA_IPV4,
-  SandboxPolicyError,
-} from "./policy.js";
+import { assertSandboxCommandArgs } from "./command-policy.js";
+import { DEFAULT_LIMITS, SandboxPolicyError } from "./policy.js";
 import type {
   CreateSandboxInput,
   ExecResult,
@@ -177,18 +173,7 @@ export class LocalSandboxManager implements SandboxManager {
       throw new SandboxPolicyError("invalid", "command required");
     }
 
-    for (const arg of command) {
-      if (arg.includes(METADATA_IPV4) || /169\.254\.\d+\.\d+/.test(arg)) {
-        throw new SandboxPolicyError(
-          "egress_denied",
-          "Cannot reach cloud metadata IP from sandbox",
-        );
-      }
-      const urlHost = arg.match(/^https?:\/\/([^/:]+)/i)?.[1];
-      if (urlHost) {
-        assertEgressAllowed(urlHost);
-      }
-    }
+    assertSandboxCommandArgs(command);
 
     const timeoutMs = options?.timeoutMs ?? DEFAULT_LIMITS.wallClockMs;
     return runCommand(command, active.workdir, timeoutMs);

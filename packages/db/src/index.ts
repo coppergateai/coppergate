@@ -175,6 +175,7 @@ export {
   type UpsertScmUserInput,
 } from "./users.js";
 export { slugify, withSlugSuffix } from "./slug.js";
+export { displayTaskTitle } from "./display-title.js";
 export {
   createWorkspaceWithOwner,
   getActiveWorkspaceById,
