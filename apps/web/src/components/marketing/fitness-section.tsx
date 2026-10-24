@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { ARENA_ALPHA } from "./arena-demo-data";
 import styles from "./marketing.module.css";
@@ -76,6 +77,18 @@ export function FitnessSection() {
               </p>
             </div>
           ) : null}
+        </div>
+
+        <div className={styles.sectionCtas}>
+          <a className={styles.btnSecondary} href="#evidence">
+            See evidence
+          </a>
+          <Link className={styles.btnSecondary} href="/docs/limitations">
+            Limitations
+          </Link>
+          <a className={styles.inlineDocLink} href="#get-started">
+            Get started →
+          </a>
         </div>
       </div>
     </section>

@@ -59,32 +59,26 @@ export function AnalyticsPanel({ workspaceId, isOwner }: Props) {
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
       {data ? (
-        <div className={styles.statGrid}>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Total spend</p>
-            <p className={styles.statValue}>{usd(data.totalSpendMicros)}</p>
-          </div>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Median accepted PR</p>
-            <p className={styles.statValue}>
-              {usd(data.medianAcceptedPrCostMicros)}
-            </p>
-          </div>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Accepted PRs</p>
-            <p className={styles.statValue}>{data.acceptedPrCount}</p>
-          </div>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Failed run spend</p>
-            <p className={styles.statValue}>
-              {usd(data.failedRunSpendMicros)}
-            </p>
-            <p className={styles.statHint}>{data.failedRunCount} failed runs</p>
-          </div>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Runs</p>
-            <p className={styles.statValue}>{data.runCount}</p>
-          </div>
+        <div className={styles.summaryStrip} aria-label="30-day analytics">
+          <p className={styles.summaryItem}>
+            <strong>{usd(data.totalSpendMicros)}</strong> spend
+          </p>
+          <p className={styles.summaryItem}>
+            <strong>{data.acceptedPrCount}</strong> accepted PRs
+          </p>
+          <p className={styles.summaryItem}>
+            <strong>{usd(data.medianAcceptedPrCostMicros)}</strong> median / PR
+          </p>
+          <p className={styles.summaryItem}>
+            <strong>{data.runCount}</strong> runs
+          </p>
+          <p className={styles.summaryItem}>
+            <strong>{usd(data.failedRunSpendMicros)}</strong> failed-run spend
+            <span className={styles.summaryMute}>
+              {" "}
+              · {data.failedRunCount} failed
+            </span>
+          </p>
         </div>
       ) : (
         <p className={styles.note}>Loading…</p>

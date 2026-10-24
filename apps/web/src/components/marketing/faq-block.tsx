@@ -24,6 +24,14 @@ export function FaqBlock() {
             <div className={styles.faqCtas}>
               <a
                 className={styles.btnHeroPrimary}
+                href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Self-host guide
+              </a>
+              <a
+                className={styles.btnSecondary}
                 href="https://github.com/coppergateai/coppergate"
                 target="_blank"
                 rel="noreferrer"

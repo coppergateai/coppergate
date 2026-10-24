@@ -93,15 +93,20 @@ export default async function BlogIndexPage() {
         <div className={styles.docsCtaRow}>
           <a
             className={styles.btnHeroPrimary}
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Self-host guide
+          </a>
+          <a
+            className={styles.btnSecondary}
             href="https://github.com/coppergateai/coppergate"
             target="_blank"
             rel="noreferrer"
           >
             View on GitHub
           </a>
-          <Link className={styles.btnSecondary} href="/changelog">
-            Changelog
-          </Link>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted
           </Link>
