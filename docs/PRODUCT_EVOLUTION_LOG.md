@@ -196,5 +196,39 @@
 
 ### Remaining opportunities
 
-- Hosted Playwright: Evidence Accept + Retry + MC attention count.
+- ~~Hosted Playwright / Accept funnel deep-links~~ → Cycle 8 (hrefs)
 - Inbox empty state could deep-link Evidence when Accept-ready exists.
+
+---
+
+## 2026-10-24 — Cycle 8 (one Accept surface)
+
+### Discovered ([Discover product friction](90b29efd-968e-45b5-8607-e63b176964ee))
+
+| Problem | Class |
+|---------|--------|
+| Next action / import still deep-linked to task detail | Core |
+| REVIEW_REQUIRED double-counted on Delivery + Evidence | Simplify |
+| MC promised “gates clear” without acceptReady | Improve |
+
+(Cycle 7 already fixed the MC metric/href for Evidence.)
+
+### Decisions
+
+1. Review CTAs → `?tab=evidence`; import → Delivery unless already REVIEW_REQUIRED.
+2. Delivery badge excludes REVIEW_REQUIRED; board gets a Review column.
+3. MC review rows load `getTaskEvidenceBundle` for honest Accept vs gates-blocked copy.
+
+### Implemented
+
+- `next-action-strip.tsx`, `issues-panel.tsx`, `page.tsx`, `delivery-board.tsx`
+- `mission-control.ts` acceptReady-aware attention copy
+
+### Validation
+
+- Rebuild `@coppergate/db`; web tsc.
+
+### Remaining opportunities
+
+- Inbox empty → Evidence when Accept-ready exists.
+- Hosted Playwright Accept + Retry paths.

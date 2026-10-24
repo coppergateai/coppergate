@@ -35,7 +35,12 @@ const COLUMNS: { key: string; label: string; match: (s: string) => boolean }[] =
       key: "active",
       label: "Running",
       match: (s) =>
-        s === "RUNNING" || s === "VALIDATING" || s === "REVIEW_REQUIRED",
+        s === "RUNNING" || s === "VALIDATING" || s === "WAITING_CI",
+    },
+    {
+      key: "review",
+      label: "Review",
+      match: (s) => s === "REVIEW_REQUIRED" || s === "IN_REVIEW",
     },
     {
       key: "done",
@@ -126,21 +131,25 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
                   <span className={styles.boardCount}> {items.length}</span>
                 </div>
                 <ul className={styles.taskList}>
-                  {items.map((t) => (
-                    <li key={t.id} className={styles.boardCard}>
-                      <Link
-                        href={`/workspaces/${workspaceId}/projects/${projectId}/tasks/${t.id}`}
-                      >
-                        <div className={styles.boardCardTitle}>{t.title}</div>
-                        <div className={styles.boardCardMeta} title={t.status}>
-                          {t.milestoneTitle} · {statusLabel(t.status)}
-                          {t.estimateMicros != null
-                            ? ` · $${(t.estimateMicros / 1_000_000).toFixed(2)}`
-                            : ""}
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
+                  {items.map((t) => {
+                    const href =
+                      t.status === "REVIEW_REQUIRED"
+                        ? `/workspaces/${workspaceId}/projects/${projectId}?tab=evidence`
+                        : `/workspaces/${workspaceId}/projects/${projectId}/tasks/${t.id}`;
+                    return (
+                      <li key={t.id} className={styles.boardCard}>
+                        <Link href={href}>
+                          <div className={styles.boardCardTitle}>{t.title}</div>
+                          <div className={styles.boardCardMeta} title={t.status}>
+                            {t.milestoneTitle} · {statusLabel(t.status)}
+                            {t.estimateMicros != null
+                              ? ` · $${(t.estimateMicros / 1_000_000).toFixed(2)}`
+                              : ""}
+                          </div>
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             );

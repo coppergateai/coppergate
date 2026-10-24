@@ -39,7 +39,6 @@ export function NextActionStrip({
   workspaceId,
   projectId,
   step,
-  reviewTaskId,
   reviewTaskTitle,
 }: Props) {
   const base = `/workspaces/${workspaceId}/projects/${projectId}`;
@@ -72,14 +71,12 @@ export function NextActionStrip({
   } else if (step === "review") {
     const plainReview = displayTaskTitle(reviewTaskTitle);
     title = plainReview
-      ? `Review evidence · ${plainReview}`
-      : "Review delivery evidence";
+      ? `Accept in Evidence · ${plainReview}`
+      : "Accept in Evidence Center";
     detail =
-      "Gates passed or blocked — Accept only when CI and policy make the PR trustworthy.";
-    href = reviewTaskId
-      ? `${base}/tasks/${reviewTaskId}`
-      : `${base}?tab=evidence`;
-    cta = "Review evidence";
+      "One-click Accept when gates clear — open Evidence, not the task page.";
+    href = `${base}?tab=evidence`;
+    cta = "Open Evidence";
   } else {
     href = `${base}?tab=delivery`;
   }
