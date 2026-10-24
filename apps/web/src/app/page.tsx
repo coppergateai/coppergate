@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import {
   ArenaPreviewSection,
   CapabilityStrip,
@@ -23,14 +24,24 @@ export const metadata: Metadata = {
   openGraph: { url: "/" },
 };
 
-export default async function HomePage() {
+async function HeroAuth() {
   const user = await currentUser();
+  return <HeroSection signedIn={Boolean(user)} />;
+}
 
+async function FinalCtaAuth() {
+  const user = await currentUser();
+  return <FinalCta signedInLogin={user?.login ?? null} />;
+}
+
+export default function HomePage() {
   return (
     <SiteChrome>
       <LandingFunnelBeacon />
       <JsonLd />
-      <HeroSection signedIn={Boolean(user)} />
+      <Suspense fallback={<HeroSection signedIn={false} />}>
+        <HeroAuth />
+      </Suspense>
       <StackRibbon />
       <CapabilityStrip />
       <ArenaPreviewSection />
@@ -41,7 +52,9 @@ export default async function HomePage() {
       <SecuritySection />
       <PilotProjectsSection />
       <FaqBlock />
-      <FinalCta signedInLogin={user?.login ?? null} />
+      <Suspense fallback={<FinalCta signedInLogin={null} />}>
+        <FinalCtaAuth />
+      </Suspense>
     </SiteChrome>
   );
 }
