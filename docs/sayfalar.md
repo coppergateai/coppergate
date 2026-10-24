@@ -7,9 +7,10 @@ Web uygulamasındaki (`apps/web`) route’ların sayfa sayfa özeti. Auth gerekt
 ## Genel / pazarlama
 
 ### `/` — Landing
-- Hero, Arena preview, Survivor workflow, evidence / fitness / signal adapters / security bölümleri
-- Pilot projeler, FAQ, final CTA
-- Giriş durumuna göre CTA değişir; funnel beacon + JSON-LD
+- Hero (motto: Set a budget… Survivors ship) + Mission Control Arena mock
+- Stack ribbon, capability grid (agent teams / budgets / evidence / infra)
+- Arena preview, Survivor workflow, evidence / fitness / signals / security
+- Pilot projeler, FAQ, final CTA; funnel beacon + JSON-LD
 
 ### `/login` — Giriş
 - GitHub / GitLab OAuth butonları (yapılandırılmışsa)
@@ -108,11 +109,13 @@ Header: repo, stack, autonomy, budget, pending approvals, last run status.
 - Diff / CI / delivery report / findings / share
 - Arena decision panel (efficiency contest + rationale)
 
-### `/workspaces/[id]/arena` — Workspace Arena
-- Tüm projelerde canlı / stopped arena snapshot
-- Contender lane’ler (strategy, temperament, budget, last run)
-- Owner: arena start/stop (kill-switch)
-- `?focus=` ile proje odaklama
+### `/workspaces/[id]/arena` — Workspace Arena (Mission Control)
+- Canlı operasyon özeti: Running / Awaiting CI / Needs attention / Idle
+- Proje satırları özet; expand ile agent grid + execution phase
+- Semantic agent state (role / mode / runtime ayrı); yalnızca Running’de pulse
+- Sağ panel Agent Inspector: görev, maliyet, PR, recent run events
+- Owner kontrolleri: Resume all / Pause all (soft) / Stop all (hard kill)
+- `?focus=` ile proje odaklama + expand
 
 ### `/workspaces/[id]/inbox` — Inbox
 - Pending / brief / task / recent sekmeleri
