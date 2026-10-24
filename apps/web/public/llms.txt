@@ -1,0 +1,32 @@
+# Coppergate
+
+> Set a budget. Agents war. Survivors ship. Coppergate runs autonomous engineering agents inside a spend cap — contenders compete, fitness and evidence decide, you review what ships.
+
+Coppergate is an open-source (MIT) multi-agent arena for engineering work. Selection pressure (fitness relative to spend) ranks qualifying paths; weak agents lose budget and exit; survivors are prepared as pull/merge requests for human review.
+
+Website: https://www.coppergate.ai
+Repository: https://github.com/coppergateai/coppergate
+Contact: hello@coppergate.ai
+
+## Primary pages
+
+- [Home](https://www.coppergate.ai/): Product overview, arena thesis, FAQ
+- [Documentation](https://www.coppergate.ai/docs): Docs index
+- [Supported stack](https://www.coppergate.ai/docs/supported-stack): SCM, signals, fitness surface
+- [Limitations](https://www.coppergate.ai/docs/limitations): Current-release limits and non-goals
+- [Pricing](https://www.coppergate.ai/docs/pricing): MIT self-host and hosted options
+- [Recovery](https://www.coppergate.ai/docs/recovery): Self-serve recovery when runs fail
+- [Security](https://www.coppergate.ai/security): Identity, gates, spend caps, kill-switch
+- [Blog](https://www.coppergate.ai/blog): Product notes on arenas, budgets, fitness
+- [Changelog](https://www.coppergate.ai/changelog): Release notes
+- [Privacy](https://www.coppergate.ai/privacy): Privacy policy
+- [Terms](https://www.coppergate.ai/terms): Terms of use
+
+## Self-host
+
+- [SELF_HOST.md](https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md)
+
+## Optional
+
+- Sitemap: https://www.coppergate.ai/sitemap.xml
+- Robots: https://www.coppergate.ai/robots.txt
