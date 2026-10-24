@@ -130,6 +130,7 @@ describe("FailoverCodingAgent", () => {
     const secondary: CodingAgent = {
       async *run() {
         secondaryHits += 1;
+        yield* [];
       },
     };
 
