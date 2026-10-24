@@ -14,10 +14,10 @@ import {
 } from "@coppergate/db";
 import { SkeletonStack } from "@/components/app/ui";
 import { currentUser } from "@/lib/auth";
-import { OnboardingGuide } from "@/components/onboarding-guide";
 import { db } from "@/lib/db";
 import { ArenaPanel } from "./arena-panel";
 import { CostExplorerStrip } from "./cost-explorer";
+import { EvidencePanel } from "./evidence-panel";
 import { IssuesPanel } from "./issues-panel";
 import { PullsPanel } from "./pulls-panel";
 import { MergePanel } from "./merge-panel";
@@ -26,6 +26,10 @@ import { BriefPanel } from "./brief-panel";
 import { BudgetPanel } from "./budget-panel";
 import { DeliveryBoard } from "./delivery-board";
 import { MultiRepoPanel } from "./multi-repo-panel";
+import {
+  NextActionStrip,
+  type NextActionStep,
+} from "./next-action-strip";
 import { PlanPanel } from "./plan-panel";
 import { PolicyPresetsPanel } from "./policy-presets";
 import { ProjectShell } from "./project-shell";
@@ -133,11 +137,7 @@ export default async function ProjectDetailPage({
       })),
     ) ?? [];
 
-  /** Guide until budget + first autonomous cycle has shipped. */
-  const showGuide = !hasBudget || !hasQueuedOrBeyond || !hasAcceptedPr;
-
   const isOwner = access.role === "owner";
-  const basePath = `/workspaces/${workspaceId}/projects/${projectId}`;
   const pendingAll = await listPendingApprovalsForWorkspace(db, workspaceId);
   const pendingApprovals = pendingAll.filter(
     (a) => a.projectId === projectId,
@@ -148,6 +148,39 @@ export default async function ProjectDetailPage({
         t.status,
       ),
     )?.status ?? null;
+
+  const reviewTask = boardTasks.find((t) => t.status === "REVIEW_REQUIRED");
+  const hasIssueLinked =
+    plan?.milestones.some(({ tasks }) =>
+      tasks.some(({ task }) => task.githubIssueNumber != null),
+    ) ?? false;
+
+  let nextStep: NextActionStep = "done";
+  if (!hasBudget) nextStep = "budget";
+  else if (reviewTask) nextStep = "review";
+  else if (!hasQueuedOrBeyond && !hasIssueLinked) nextStep = "issue";
+  else if (!hasQueuedOrBeyond) nextStep = "arena";
+  else if (!hasAcceptedPr) nextStep = hasQueuedOrBeyond ? "arena" : "issue";
+
+  const evidenceDeliveries = boardTasks
+    .filter((t) =>
+      ["REVIEW_REQUIRED", "WAITING_CI", "ACCEPTED", "DONE", "IN_REVIEW"].includes(
+        t.status,
+      ),
+    )
+    .slice(0, 12)
+    .map((t) => {
+      const full = plan?.milestones
+        .flatMap(({ tasks }) => tasks.map(({ task }) => task))
+        .find((task) => task.id === t.id);
+      return {
+        taskId: t.id,
+        title: t.title,
+        status: t.status,
+        prUrl: full?.prUrl ?? null,
+        updatedAt: "",
+      };
+    });
 
   const stackHint =
     row.project.stack === "go"
@@ -185,49 +218,13 @@ export default async function ProjectDetailPage({
             {stackHint ? (
               <p className={styles.stackHint}>{stackHint}</p>
             ) : null}
-            {showGuide ? (
-              <div className={styles.path}>
-                <OnboardingGuide
-                  compact
-                  title="Autonomous ship loop"
-                  steps={[
-                    {
-                      id: "budget",
-                      title: "Set an active workspace envelope",
-                      detail:
-                        "One monthly pool for all projects. Start at $100; the loop pauses when the envelope is spent.",
-                      href: hasBudget
-                        ? undefined
-                        : `${basePath}?tab=overview#budget`,
-                      ctaLabel: "Go to budget",
-                      done: hasBudget,
-                    },
-                    {
-                      id: "start",
-                      title: "Agents → Start",
-                      detail:
-                        "No idea or brief to write. Start invents vision, queues work, and keeps shipping under budget.",
-                      href: hasQueuedOrBeyond
-                        ? undefined
-                        : `${basePath}?tab=arena`,
-                      ctaLabel: "Open Agents",
-                      done: hasQueuedOrBeyond || hasAcceptedPr,
-                    },
-                    {
-                      id: "watch",
-                      title: "Watch Delivery / merges",
-                      detail:
-                        "Contenders open PRs; maintainer auto-accepts winners when CI is green. Stop freezes the loop.",
-                      href: hasQueuedOrBeyond
-                        ? `${basePath}?tab=delivery`
-                        : undefined,
-                      ctaLabel: "Open delivery",
-                      done: hasAcceptedPr,
-                    },
-                  ]}
-                />
-              </div>
-            ) : null}
+            <NextActionStrip
+              workspaceId={workspaceId}
+              projectId={projectId}
+              step={nextStep}
+              reviewTaskId={reviewTask?.id}
+              reviewTaskTitle={reviewTask?.title}
+            />
             <BudgetPanel
               workspaceId={workspaceId}
               projectId={projectId}
@@ -247,15 +244,17 @@ export default async function ProjectDetailPage({
               workspaceId={workspaceId}
               projectId={projectId}
             />
+            <div id="issues">
+              <IssuesPanel
+                workspaceId={workspaceId}
+                projectId={projectId}
+                isOwner={isOwner}
+              />
+            </div>
             <BriefPanel
               workspaceId={workspaceId}
               projectId={projectId}
               initialBrief={initialBrief}
-              isOwner={isOwner}
-            />
-            <IssuesPanel
-              workspaceId={workspaceId}
-              projectId={projectId}
               isOwner={isOwner}
             />
             <PullsPanel
@@ -288,7 +287,14 @@ export default async function ProjectDetailPage({
             isOwner={isOwner}
           />
         }
-        more={
+        evidence={
+          <EvidencePanel
+            workspaceId={workspaceId}
+            projectId={projectId}
+            deliveries={evidenceDeliveries}
+          />
+        }
+        configuration={
           <>
             <MaintainerPanel
               workspaceId={workspaceId}

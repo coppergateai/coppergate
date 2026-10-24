@@ -41,6 +41,7 @@ export default async function WorkspacesPage() {
       agentCount,
       runCount,
       memberCount,
+      pendingApprovalCount,
     }) => ({
       id: workspace.id,
       name: workspace.name,
@@ -54,6 +55,7 @@ export default async function WorkspacesPage() {
       agentCount,
       runCount,
       memberCount,
+      pendingApprovalCount,
     }),
   );
 

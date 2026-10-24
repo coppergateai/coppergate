@@ -400,6 +400,10 @@
   line-height: 1;
 }
 
+.statValueWarn {
+  color: var(--warn);
+}
+
 .statLabel {
   font-size: 0.68rem;
   font-weight: 550;

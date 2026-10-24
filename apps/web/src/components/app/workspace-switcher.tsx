@@ -72,7 +72,7 @@ export function WorkspaceSwitcher({ workspaces, onNavigate }: Props) {
             {filtered.map((ws) => (
               <li key={ws.id}>
                 <Link
-                  href={`/workspaces/${ws.id}/projects`}
+                  href={`/workspaces/${ws.id}`}
                   className={
                     ws.id === nav.workspaceId
                       ? `${styles.switcherItem} ${styles.switcherItemActive}`

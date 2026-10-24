@@ -116,7 +116,7 @@ export function AppSidebar({
             {workspaces.map((ws) => (
               <Link
                 key={ws.id}
-                href={`/workspaces/${ws.id}/projects`}
+                href={`/workspaces/${ws.id}`}
                 className={`${styles.navItem} ${
                   pathname.startsWith(`/workspaces/${ws.id}`)
                     ? styles.navItemActive
@@ -132,6 +132,17 @@ export function AppSidebar({
         ) : (
           <>
             <p className={styles.sectionLabel}>Workspace</p>
+            <Link
+              href={`/workspaces/${workspaceId}`}
+              className={`${styles.navItem} ${
+                pathname === `/workspaces/${workspaceId}`
+                  ? styles.navItemActive
+                  : ""
+              }`}
+              onClick={onClose}
+            >
+              <span className={styles.navItemLabel}>Overview</span>
+            </Link>
             <Link
               href={`/workspaces/${workspaceId}/projects`}
               className={`${styles.navItem} ${
@@ -189,7 +200,7 @@ export function AppSidebar({
               }`}
               onClick={onClose}
             >
-              <span className={styles.navItemLabel}>Workspace settings</span>
+              <span className={styles.navItemLabel}>Settings</span>
             </Link>
 
             {nav && nav.projects.length > 0 ? (

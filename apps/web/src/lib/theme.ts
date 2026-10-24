@@ -29,5 +29,5 @@ export function storeTheme(theme: Theme) {
 }
 
 export function resolveInitialTheme(): Theme {
-  return readStoredTheme() ?? "dark";
+  return readStoredTheme() ?? "light";
 }

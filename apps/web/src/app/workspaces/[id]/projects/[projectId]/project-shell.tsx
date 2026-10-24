@@ -29,7 +29,8 @@ type Props = {
   overview: ReactNode;
   delivery: ReactNode;
   arena: ReactNode;
-  more: ReactNode;
+  evidence: ReactNode;
+  configuration: ReactNode;
 };
 
 function tabFromHash(hash: string): ProjectTab | null {
@@ -37,7 +38,10 @@ function tabFromHash(hash: string): ProjectTab | null {
   if (id === "budget" || id === "brief" || id === "issues") return "overview";
   if (id === "plan" || id === "board") return "delivery";
   if (id === "arena") return "arena";
-  if (id === "merge" || id === "policy" || id === "repos") return "more";
+  if (id === "evidence") return "evidence";
+  if (id === "merge" || id === "policy" || id === "repos" || id === "more") {
+    return "configuration";
+  }
   return null;
 }
 
@@ -47,6 +51,18 @@ function formatCap(micros: number, currency: string): string {
   if (dollars < 0.01) return `${dollars.toFixed(4)} ${currency}`;
   return `${dollars.toFixed(2)} ${currency}`;
 }
+
+const TABS: Array<{
+  id: ProjectTab;
+  label: string;
+  countKey?: "tasks";
+}> = [
+  { id: "overview", label: "Overview" },
+  { id: "delivery", label: "Delivery", countKey: "tasks" },
+  { id: "arena", label: "Arena" },
+  { id: "evidence", label: "Evidence" },
+  { id: "configuration", label: "Configuration" },
+];
 
 export function ProjectShell({
   workspaceId,
@@ -69,7 +85,8 @@ export function ProjectShell({
   overview,
   delivery,
   arena,
-  more,
+  evidence,
+  configuration,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<ProjectTab>(initialTab);
@@ -102,9 +119,11 @@ export function ProjectShell({
       ? delivery
       : tab === "arena"
         ? arena
-        : tab === "more"
-          ? more
-          : overview;
+        : tab === "evidence"
+          ? evidence
+          : tab === "configuration"
+            ? configuration
+            : overview;
 
   const primaryChips = (
     <>
@@ -169,30 +188,27 @@ export function ProjectShell({
       </header>
 
       <div className={styles.tabs} role="tablist" aria-label="Project sections">
-        {(
-          [
-            ["overview", "Overview", null],
-            ["delivery", "Delivery", taskCount > 0 ? taskCount : null],
-            ["arena", "Agents", null],
-            ["more", "More", null],
-          ] as const
-        ).map(([id, label, count]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            className={
-              tab === id ? `${styles.tab} ${styles.tabActive}` : styles.tab
-            }
-            onClick={() => selectTab(id)}
-          >
-            {label}
-            {count != null ? (
-              <span className={styles.tabCount}>{count}</span>
-            ) : null}
-          </button>
-        ))}
+        {TABS.map(({ id, label, countKey }) => {
+          const count =
+            countKey === "tasks" && taskCount > 0 ? taskCount : null;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              className={
+                tab === id ? `${styles.tab} ${styles.tabActive}` : styles.tab
+              }
+              onClick={() => selectTab(id)}
+            >
+              {label}
+              {count != null ? (
+                <span className={styles.tabCount}>{count}</span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
       <div className={styles.tabPane} role="tabpanel">

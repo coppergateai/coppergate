@@ -78,6 +78,12 @@ export function CommandPalette({ workspaces = [] }: Props) {
     if (workspaceId) {
       base.push(
         {
+          id: "overview",
+          label: "Overview",
+          href: `/workspaces/${workspaceId}`,
+          group: "Workspace",
+        },
+        {
           id: "projects",
           label: "Projects",
           href: `/workspaces/${workspaceId}/projects`,
@@ -131,7 +137,7 @@ export function CommandPalette({ workspaces = [] }: Props) {
       base.push({
         id: `ws-${ws.id}`,
         label: ws.name,
-        href: `/workspaces/${ws.id}/projects`,
+        href: `/workspaces/${ws.id}`,
         group: "Workspaces",
       });
     }

@@ -58,6 +58,7 @@ describe("listWorkspacesForUserWithStats", { skip: !url }, () => {
     assert.equal(row.memberCount, 1);
     assert.equal(row.agentCount, 0);
     assert.equal(row.runCount, 0);
+    assert.equal(row.pendingApprovalCount, 0);
     assert.equal(row.role, "owner");
 
     const strangerList = await listWorkspacesForUserWithStats(db, strangerId);
