@@ -2,7 +2,6 @@ import type { ComponentType } from "react";
 import {
   LogoAsana,
   LogoAzure,
-  LogoBitbucket,
   LogoBuildkite,
   LogoCircleCi,
   LogoClickUp,
@@ -45,19 +44,16 @@ const workflows = [
   {
     source: "Sentry",
     path: "Error detected → Arena → Verified fix PR",
-    status: "Available",
     note: "Inbound webhook arms a bounded fixer tournament when configured.",
   },
   {
     source: "Jira",
     path: "Engineering issue → Arena → Candidate implementation",
-    status: "Available",
     note: "Issue webhooks map to tasks; delivery is still PR/MR review.",
   },
   {
     source: "GitHub CI",
     path: "Failed workflow → Arena → Proposed repair",
-    status: "Available",
     note: "CI failure adapters can arm repair contests against the failing SHA.",
   },
 ] as const;
@@ -98,17 +94,15 @@ const categories: Category[] = [
     ],
   },
   {
-    label: "CI & SCM",
-    durationSec: 46,
+    label: "CI & SCM (live delivery: GitHub · GitLab)",
+    durationSec: 40,
     reverse: true,
     items: [
-      { name: "GitHub", kind: "Actions", Logo: LogoGithub },
-      { name: "GitLab", kind: "CI", Logo: LogoGitlab },
-      { name: "CircleCI", kind: "CI", Logo: LogoCircleCi },
-      { name: "Buildkite", kind: "CI", Logo: LogoBuildkite },
-      { name: "Jenkins", kind: "CI", Logo: LogoJenkins },
-      { name: "Bitbucket", kind: "Pipelines", Logo: LogoBitbucket },
-      { name: "Azure DevOps", kind: "Repos", Logo: LogoAzure },
+      { name: "GitHub", kind: "Actions + PR", Logo: LogoGithub },
+      { name: "GitLab", kind: "CI + MR", Logo: LogoGitlab },
+      { name: "CircleCI", kind: "CI signal", Logo: LogoCircleCi },
+      { name: "Buildkite", kind: "CI signal", Logo: LogoBuildkite },
+      { name: "Jenkins", kind: "CI signal", Logo: LogoJenkins },
     ],
   },
   {
@@ -158,17 +152,15 @@ export function SignalAdaptersSection() {
           From signal to verified PR.
         </h2>
         <p className={styles.sectionLede}>
-          Webhooks from tools you already run can arm a bounded Arena. Delivery
-          is still a reviewable PR or MR — not an unattended merge.
+          Webhooks from tools you already run can arm a bounded Arena. Live PR/MR
+          delivery is GitHub and GitLab today — always reviewable, never an
+          unattended merge.
         </p>
 
         <ul className={styles.workflowOutcomes}>
           {workflows.map((w) => (
             <li key={w.source} className={styles.workflowOutcome}>
-              <div className={styles.workflowOutcomeTop}>
-                <h3>{w.source}</h3>
-                <span className={styles.statusQuiet}>{w.status}</span>
-              </div>
+              <h3>{w.source}</h3>
               <p className={styles.workflowPath}>{w.path}</p>
               <p className={styles.workflowNote}>{w.note}</p>
             </li>
@@ -178,13 +170,15 @@ export function SignalAdaptersSection() {
 
       <div className={styles.integrationRows}>
         <p className={styles.integrationRowsCaption}>
-          Adapter surface in the current release — enable per workspace when configured.
+          Signal adapters in the current release — enable per workspace when
+          configured. Bitbucket / Azure DevOps delivery clients exist but are
+          deferred.
         </p>
         {categories.map((cat) => {
           const loop = loopItems(cat.items);
           return (
             <div key={cat.label} className={styles.integrationRow}>
-              <h3 className={styles.integrationCat}>{cat.label}</h3>
+              <p className={styles.integrationCat}>{cat.label}</p>
               <div
                 className={`${styles.integrationTrack} ${
                   cat.reverse ? styles.integrationTrackReverse : ""

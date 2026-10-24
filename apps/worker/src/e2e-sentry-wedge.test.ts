@@ -199,6 +199,7 @@ describe("e2e sentry wedge (D14)", { skip: !url }, () => {
     assert.ok(afterRun?.headSha);
 
     await ingestCiEvidence(db, {
+      workspaceId,
       headSha: afterRun!.headSha,
       name: "test",
       status: "completed",
@@ -206,6 +207,8 @@ describe("e2e sentry wedge (D14)", { skip: !url }, () => {
       passed: true,
       blocksAccept: false,
       checkRunId: 99,
+      detailsUrl: null,
+      repoFullName: null,
     });
 
     const arts = await listArtifactsForRun(db, workspaceId, run.id);

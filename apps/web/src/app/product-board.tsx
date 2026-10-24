@@ -116,8 +116,8 @@ export function ProductBoard() {
         </div>
 
         <p className={styles.productCta}>
-          <Link className={styles.productCtaLink} href="/#early-access">
-            Request access →
+          <Link className={styles.productCtaLink} href="/login">
+            Try hosted →
           </Link>
         </p>
       </div>

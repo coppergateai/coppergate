@@ -53,7 +53,7 @@ export default function DocsIndexPage() {
           { name: "Docs", path: "/docs" },
         ]}
       />
-      <main className={styles.contentPage}>
+      <div className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Open source</p>
         <h1 className={styles.pageTitle}>Documentation</h1>
         <p className={styles.pageLede}>
@@ -98,7 +98,7 @@ export default function DocsIndexPage() {
           Questions?{" "}
           <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>
         </p>
-      </main>
+      </div>
     </DocsShell>
   );
 }

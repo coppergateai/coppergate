@@ -159,10 +159,10 @@ export function EvidencePanel({
       {deliveries.length === 0 ? (
         <EmptyState
           title="No deliveries yet"
-          body="Start in Arena. When a PR is ready, evidence and gates land here for Accept."
+          body="Primary path: Import → queue an issue, then review gates here before Accept. Arena Start can invent work under the same spend envelope."
           action={
-            <Link href={`${base}?tab=arena`} className={styles.linkCta}>
-              Open Arena → Start
+            <Link href={`${base}?tab=overview#issues`} className={styles.linkCta}>
+              Import issue →
             </Link>
           }
         />
@@ -235,9 +235,17 @@ export function EvidencePanel({
                 <div className={styles.evidenceActions}>
                   <Link
                     href={`${base}/tasks/${d.taskId}`}
-                    className={styles.ghostBtn}
+                    className={
+                      d.status === "REVIEW_REQUIRED" && d.acceptReady
+                        ? styles.primaryBtn
+                        : styles.ghostBtn
+                    }
                   >
-                    Review
+                    {d.status === "REVIEW_REQUIRED" && d.acceptReady
+                      ? "Accept delivery"
+                      : d.status === "REVIEW_REQUIRED"
+                        ? "Review gates"
+                        : "Review"}
                   </Link>
                   {d.prUrl ? (
                     <a

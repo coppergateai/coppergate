@@ -22,7 +22,7 @@ export default function RecoveryPage() {
           { name: "Recovery", path: "/docs/recovery" },
         ]}
       />
-      <main className={styles.contentPage}>
+      <div className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
         </Link>
@@ -30,13 +30,16 @@ export default function RecoveryPage() {
         <h1 className={styles.pageTitle}>Self-serve recovery</h1>
         <div className={styles.prose}>
           <p>
-            Pilots should recover without an operator. Every failure keeps logs
-            and cost events; retry never silently duplicates side effects.
+            Recover without an operator. Every failure keeps logs and cost
+            events; retry never silently duplicates side effects — whether you
+            self-host or use the hosted instance.
           </p>
 
-          <h2>One-session path (issue → PR)</h2>
+          <h2>One-session path (issue → PR/MR)</h2>
           <ol>
-            <li>Connect GitHub App + bind a low-risk repo.</li>
+            <li>
+              Connect GitHub App or GitLab project + bind a low-risk repo.
+            </li>
             <li>Set an active spend cap (Settings / project budget).</li>
             <li>
               Approve a brief if prompted, then Project →{" "}
@@ -49,15 +52,16 @@ export default function RecoveryPage() {
           </ol>
           <p>
             Accept stays closed while CI is pending or failed. See{" "}
-            <Link href="/docs/pricing">pricing</Link> for hosted Starter/Pro.
+            <Link href="/docs/pricing">pricing</Link> for optional hosted
+            Starter/Pro — community self-host stays free.
           </p>
 
           <h2 id="ci">Accept disabled (CI pending / failed)</h2>
           <ul>
             <li>
-              <strong>Pending:</strong> wait for GitHub Actions / check runs on
-              the PR head. Refresh the task — evidence appears under Delivery
-              for review.
+              <strong>Pending:</strong> wait for GitHub Actions / GitLab
+              pipelines or check runs on the PR/MR head. Refresh the task —
+              evidence appears under Delivery for review.
             </li>
             <li>
               <strong>Failed:</strong> fix the check on the branch, push, or
@@ -130,7 +134,7 @@ export default function RecoveryPage() {
             repo <code>docs/OPS_RUNBOOK.md</code>.
           </p>
         </div>
-      </main>
+      </div>
     </DocsShell>
   );
 }

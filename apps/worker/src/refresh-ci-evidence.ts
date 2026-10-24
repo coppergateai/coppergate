@@ -1,7 +1,7 @@
 /**
  * Recover missed GitHub check_run / status webhooks so auto-accept can proceed.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   getInstallationForWorkspace,
   getProjectForWorkspace,
@@ -34,7 +34,7 @@ export async function refreshPendingCiEvidence(
         and(
           eq(tasks.projectId, project.id),
           eq(tasks.workspaceId, project.workspaceId),
-          eq(tasks.status, "REVIEW_REQUIRED"),
+          inArray(tasks.status, ["REVIEW_REQUIRED", "WAITING_CI"]),
         ),
       )
       .limit(20);
@@ -89,6 +89,7 @@ export async function refreshPendingCiEvidence(
             continue;
           }
           const result = await ingestCiEvidence(db, {
+            workspaceId: project.workspaceId,
             headSha: ev.headSha ?? candidate.headSha,
             name: ev.name,
             status: ev.status,

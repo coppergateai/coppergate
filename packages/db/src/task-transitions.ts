@@ -529,43 +529,39 @@ export async function retryFailedTask(
     reason: `retry attempt ${nextAttempt}`,
   });
 
-  await reserveEstimateForTask(db, {
+  const bumped = await enqueueQueuedTask(db, {
     workspaceId: input.workspaceId,
-    projectId: result.task.projectId,
-    taskId: result.task.id,
-    estimateMicros: result.task.estimateMicros ?? 0,
+    task: result.task,
+    actor: input.actor,
+    reason: `retry attempt ${nextAttempt}`,
   });
 
-  const { run } = await enqueueAgentRun(db, {
-    workspaceId: input.workspaceId,
-    projectId: result.task.projectId,
-    taskId: result.task.id,
-    idempotencyKey: `task:${result.task.id}:attempt:${nextAttempt}`,
-    estimatedCostMicros: result.task.estimateMicros ?? 0,
-    spendCapMicros: result.task.estimateMicros ?? 0,
-    attempt: nextAttempt,
-  });
-
-  const [bumped] = await db
-    .update(tasks)
-    .set({ attemptCount: nextAttempt, updatedAt: new Date() })
-    .where(eq(tasks.id, result.task.id))
-    .returning();
+  const runs = await listRunsForTask(db, input.workspaceId, bumped.id);
+  const run =
+    runs.find(
+      (r) => r.idempotencyKey === `task:${bumped.id}:attempt:${nextAttempt}`,
+    ) ?? runs[0];
+  if (!run) {
+    throw new TaskTransitionError(
+      "policy",
+      "Retry queued but no agent run was created",
+    );
+  }
 
   await recordAuditEvent(db, {
     workspaceId: input.workspaceId,
     actor: input.actor,
     action: "task.retry",
     targetType: "task",
-    targetId: result.task.id,
-    meta: { runId: run.id, attempt: nextAttempt },
+    targetId: bumped.id,
+    meta: { runId: run.id, attempt: bumped.attemptCount },
   });
 
   return {
-    task: bumped ?? result.task,
+    task: bumped,
     transition: result.transition,
     runId: run.id,
-    attempt: nextAttempt,
+    attempt: bumped.attemptCount,
   };
 }
 

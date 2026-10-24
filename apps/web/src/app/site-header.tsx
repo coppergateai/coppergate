@@ -66,7 +66,7 @@ export function SiteHeader({ signedIn }: Props) {
               height={32}
             />
           </Link>
-          <span className={styles.navBadge}>Private beta</span>
+          <span className={styles.navBadge}>Open source</span>
         </div>
 
         <nav className={styles.navLinks} aria-label="Primary">
@@ -91,8 +91,8 @@ export function SiteHeader({ signedIn }: Props) {
               <Link className={`${styles.navLink} ${styles.navLinkDesktop}`} href="/login">
                 Sign in
               </Link>
-              <Link className={styles.navCta} href="/#early-access">
-                Request access
+              <Link className={styles.navCta} href="/login">
+                Try hosted
               </Link>
             </>
           )}
@@ -133,10 +133,10 @@ export function SiteHeader({ signedIn }: Props) {
               </Link>
               <Link
                 className={styles.navDrawerCta}
-                href="/#early-access"
+                href="/login"
                 onClick={closeMenu}
               >
-                Request access
+                Try hosted
               </Link>
             </>
           )}

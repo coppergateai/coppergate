@@ -110,25 +110,25 @@ function buildTicker(
   tick: number,
 ): string {
   if (!running) {
-    return "Pit sealed — Start opens the gates";
+    return "Arena idle — Start arms contenders under the spend envelope";
   }
   const lines: string[] = [
-    "Contenders contest the objective",
-    "Fitness gate decides who survives",
-    "Only CI-green ships leave the pit",
+    "Contenders race the same objective",
+    "Fitness + CI decide who ships",
+    "Only CI-green survivors leave the gate",
   ];
   const active = contenders.filter((c) => c.status === "ACTIVE");
   for (const c of active.slice(0, 3)) {
     lines.push(
-      `${c.profileKey.toUpperCase()} holds the line (${c.strategy})`,
+      `${c.profileKey.toUpperCase()} running (${c.strategy})`,
     );
   }
   if (metrics) {
     if (metrics.autoAccepts > 0) {
-      lines.push(`AUTO-ACCEPT ×${metrics.autoAccepts}`);
+      lines.push(`Auto-accept ×${metrics.autoAccepts}`);
     }
     if (metrics.merges > 0) {
-      lines.push(`BREACH COMPLETE ×${metrics.merges}`);
+      lines.push(`Shipped ×${metrics.merges}`);
     }
     if (metrics.winningProfileKeys?.length) {
       lines.push(
@@ -359,22 +359,22 @@ export function ArenaPitch({
   const ships = metrics?.merges ?? 0;
   const friction = metrics?.humanTouches ?? 0;
   const ticker = flashSurvivor
-    ? "SURVIVOR — BREACH LANDED"
+    ? "Survivor shipped — fitness gate cleared"
     : buildTicker(running, roster, metrics, tickerIdx);
 
   const statusLabel =
     arenaStatus === "PAUSED"
-      ? "sealed"
+      ? "paused"
       : arenaStatus === "RUNNING" || arenaStatus === "ARMED"
         ? "live"
         : arenaStatus.toLowerCase();
 
   return (
-    <div className={styles.wrap} aria-label="War arena view">
+    <div className={styles.wrap} aria-label="Arena view">
       <div className={styles.scorebar}>
         <div className={styles.side}>
-          <span className={styles.sideLabel}>Faction · Contenders</span>
-          <span className={styles.sideName}>Coppergate</span>
+          <span className={styles.sideLabel}>Ships</span>
+          <span className={styles.sideName}>Verified merges</span>
         </div>
         <div className={styles.scoreCluster}>
           <div className={styles.score}>
@@ -387,8 +387,8 @@ export function ArenaPitch({
           </div>
         </div>
         <div className={`${styles.side} ${styles.sideAway}`}>
-          <span className={styles.sideLabel}>Faction · Friction</span>
-          <span className={styles.sideName}>Human touch</span>
+          <span className={styles.sideLabel}>Reviews</span>
+          <span className={styles.sideName}>Human touches</span>
         </div>
       </div>
 
@@ -401,7 +401,7 @@ export function ArenaPitch({
               disabled={pending}
               onClick={onStop}
             >
-              Seal pit
+              Pause Arena
             </button>
           ) : (
             <button
@@ -410,7 +410,7 @@ export function ArenaPitch({
               disabled={pending}
               onClick={onStart}
             >
-              Open gates
+              Start Arena
             </button>
           )}
         </div>
@@ -480,10 +480,10 @@ export function ArenaPitch({
         </svg>
 
         <span className={`${styles.zoneLabel} ${styles.zonePropose}`}>
-          Scout
+          Propose
         </span>
-        <span className={`${styles.zoneLabel} ${styles.zoneBuild}`}>Forge</span>
-        <span className={`${styles.zoneLabel} ${styles.zoneShip}`}>Breach</span>
+        <span className={`${styles.zoneLabel} ${styles.zoneBuild}`}>Build</span>
+        <span className={`${styles.zoneLabel} ${styles.zoneShip}`}>Ship</span>
 
         {agents.map((a) => (
           <div
@@ -494,7 +494,7 @@ export function ArenaPitch({
               a.out ? styles.agentOut : "",
             ].join(" ")}
             style={{ left: `${a.x}%`, top: `${a.y}%` }}
-            title={`${a.label} · ${a.team === "home" ? "contender" : "friction"}`}
+            title={`${a.label} · ${a.team === "home" ? "contender" : "review"}`}
           >
             {labeledId === a.id ? (
               <span className={styles.agentLabel}>{a.label}</span>
@@ -523,13 +523,13 @@ export function ArenaPitch({
           <span className={`${styles.dot} ${styles.dotHome}`} /> Contenders
         </span>
         <span className={styles.legendItem}>
-          <span className={`${styles.dot} ${styles.dotAway}`} /> Friction
+          <span className={`${styles.dot} ${styles.dotAway}`} /> Review pressure
         </span>
         <span className={styles.legendItem}>
           <span className={`${styles.dot} ${styles.dotFocus}`} /> Objective
         </span>
         <span className={styles.legendItem}>
-          Ships / human touches
+          Ships / human reviews
         </span>
       </div>
     </div>

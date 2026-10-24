@@ -28,7 +28,7 @@ GitHub PR + CI remains the fitness surface. Quality/runtime signals (Sentry, Son
 
 - [x] Repo connected + GitHub App install
 - [x] Spend cap set; arena funded
-- [x] Brief approved (required before issue import)
+- [x] Brief approved (existing_repo auto-seeds a minimal approved brief on first Import → queue; new_product still requires explicit approve)
 - [x] Import open issue via product APIs (`importGithubIssueAsTask` / Issues **Import → queue**) — [issue #4](https://github.com/coppergateai/coppergate-staging-smoke/issues/4) (2026-10-17)
 - [x] Task queued → worker claims (`GITHUB_DELIVERY_MODE=http`, OpenHands)
 - [x] Live PR opens with `Closes #N` — [PR #5](https://github.com/coppergateai/coppergate-staging-smoke/pull/5)

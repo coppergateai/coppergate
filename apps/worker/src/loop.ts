@@ -255,25 +255,33 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
     while (!(options.shouldStop?.() ?? false)) {
       try {
         const reaped = await reapStaleRuns(db);
-        if (reaped.requeued > 0 || reaped.failedValidating > 0) {
+        if (
+          reaped.requeued > 0 ||
+          reaped.failedValidating > 0 ||
+          reaped.failedPoison > 0 ||
+          reaped.failedWaitingCi > 0
+        ) {
           log.info("reaped stale runs", {
             requeued: reaped.requeued,
             failedValidating: reaped.failedValidating,
+            failedPoison: reaped.failedPoison,
+            failedWaitingCi: reaped.failedWaitingCi,
           });
         }
-        for (const stale of reaped.failedValidatingRuns) {
+        for (const stale of reaped.failedRuns) {
           try {
             await applyTaskTransition(db, {
               workspaceId: stale.workspaceId,
               taskId: stale.taskId,
               toStatus: "FAILED",
               actor: `worker:${workerId}`,
-              reason: "validating lease expired",
+              reason: stale.errorCode,
             });
           } catch (err) {
-            log.warn("task FAILED after validating lease expiry skipped", {
+            log.warn("task FAILED after lease reaper skipped", {
               taskId: stale.taskId,
               runId: stale.id,
+              errorCode: stale.errorCode,
               error: err instanceof Error ? err.message : String(err),
             });
           }

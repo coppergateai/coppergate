@@ -68,7 +68,7 @@ export function SiteFooter() {
         <div className={styles.footerBottom}>
           <p className={styles.footerCopy}>© {year} Coppergate</p>
           <p className={styles.footerMeta}>
-            Private beta · Currently onboarding design partners
+            MIT · Open source · Free to self-host
           </p>
         </div>
       </div>

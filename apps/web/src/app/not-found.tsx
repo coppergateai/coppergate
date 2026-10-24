@@ -5,7 +5,7 @@ import { SiteChrome } from "./site-chrome";
 export default function NotFound() {
   return (
     <SiteChrome>
-      <main className={styles.notFound}>
+      <div className={styles.notFound}>
         <div>
           <p className={styles.notFoundCode}>404</p>
           <h1 className={styles.notFoundTitle}>This path is closed.</h1>
@@ -22,7 +22,7 @@ export default function NotFound() {
             </Link>
           </div>
         </div>
-      </main>
+      </div>
     </SiteChrome>
   );
 }

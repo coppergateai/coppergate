@@ -52,7 +52,7 @@ export default function HomePage() {
       <SecuritySection />
       <PilotProjectsSection />
       <FaqBlock />
-      <Suspense fallback={<FinalCta signedInLogin={null} />}>
+      <Suspense fallback={null}>
         <FinalCtaAuth />
       </Suspense>
     </SiteChrome>

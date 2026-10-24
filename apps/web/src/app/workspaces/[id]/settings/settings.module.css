@@ -408,6 +408,20 @@
   line-height: 1.45;
 }
 
+.metaSep {
+  margin: 0 0.35rem;
+  color: var(--mute-soft);
+}
+
+.metaActive {
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.metaBlurb {
+  color: var(--mute-soft);
+}
+
 @media (min-width: 720px) {
   .splitGrid {
     grid-template-columns: 1fr 1fr;

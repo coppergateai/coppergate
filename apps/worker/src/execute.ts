@@ -30,8 +30,10 @@ import {
   isRunCancelRequested,
   loadSkillsForPrompt,
   markRunAwaitingReview,
+  markRunCancelled,
   markRunFailed,
   markRunValidating,
+  markRunWaitingCi,
   maybeScoreAndResolveTournament,
   notifyWorkspace,
   parseJsonArray,
@@ -246,6 +248,49 @@ export async function executeClaimedRun(
   let strategy = "balanced";
   let strategyContext: string | undefined;
   let promptGuidance: string | undefined;
+  let profileTools: string[] | undefined;
+  const resolveProfile = async (profileKey: string | null | undefined) => {
+    const key = profileKey?.trim();
+    if (!key) return;
+    try {
+      const profile = await getEffectiveAgentProfile(
+        db,
+        run.workspaceId,
+        key,
+      );
+      if (!profile) return;
+      if (profile.promptGuidance?.trim()) {
+        promptGuidance = withTemperamentGuidance(
+          profile.promptGuidance.trim(),
+          profile.temperament,
+        );
+      }
+      try {
+        const tools = parseJsonArray(profile.toolAllowlistJson);
+        if (tools.length > 0) profileTools = tools;
+      } catch {
+        /* ignore */
+      }
+      try {
+        const keys = parseSkillKeysJson(profile.skillKeysJson);
+        const skillsBlock = await loadSkillsForPrompt(
+          db,
+          run.workspaceId,
+          keys,
+        );
+        if (skillsBlock) {
+          strategyContext = [strategyContext, skillsBlock]
+            .filter(Boolean)
+            .join("\n\n");
+        }
+      } catch {
+        /* skills optional */
+      }
+    } catch {
+      /* profile optional */
+    }
+  };
+
   if (run.contenderId) {
     const contender = await getContenderById(db, {
       workspaceId: run.workspaceId,
@@ -255,42 +300,11 @@ export async function executeClaimedRun(
       strategy = contender.strategy;
       strategyContext = strategyGuidance(contender.strategy);
     }
-    const profileKey =
-      contender?.profileKey?.trim() || run.agentProfileKey?.trim();
-    if (profileKey) {
-      try {
-        const profile = await getEffectiveAgentProfile(
-          db,
-          run.workspaceId,
-          profileKey,
-        );
-        if (profile?.promptGuidance?.trim()) {
-          promptGuidance = withTemperamentGuidance(
-            profile.promptGuidance.trim(),
-            profile.temperament,
-          );
-        }
-        if (profile) {
-          try {
-            const keys = parseSkillKeysJson(profile.skillKeysJson);
-            const skillsBlock = await loadSkillsForPrompt(
-              db,
-              run.workspaceId,
-              keys,
-            );
-            if (skillsBlock) {
-              strategyContext = [strategyContext, skillsBlock]
-                .filter(Boolean)
-                .join("\n\n");
-            }
-          } catch {
-            /* skills optional */
-          }
-        }
-      } catch {
-        /* profile optional */
-      }
-    }
+    await resolveProfile(
+      contender?.profileKey?.trim() || run.agentProfileKey?.trim(),
+    );
+  } else {
+    await resolveProfile(run.agentProfileKey);
   }
   // Vision / task acceptance always travel with architecture context
   strategyContext = mergeArchitectureContext(
@@ -515,6 +529,7 @@ export async function executeClaimedRun(
         acceptanceCriteria: parseJsonArray(task.acceptanceCriteria),
         baseSha: run.baseSha,
         toolAllowlist: parseJsonArray(run.toolAllowlist),
+        profileTools,
         spendCapMicros: run.spendCapMicros,
         strategy,
         promptGuidance,
@@ -687,14 +702,20 @@ export async function executeClaimedRun(
     }
 
     if (sawCancel || !completion) {
-      await markRunFailed(db, {
-        runId: run.id,
-        workerId,
-        errorCode: sawCancel ? "cancelled" : "incomplete",
-        errorMessage: sawCancel
-          ? "Run cancelled"
-          : "Agent finished without completion payload",
-      });
+      if (sawCancel) {
+        await markRunCancelled(db, {
+          runId: run.id,
+          workerId,
+          errorMessage: "Run cancelled",
+        });
+      } else {
+        await markRunFailed(db, {
+          runId: run.id,
+          workerId,
+          errorCode: "incomplete",
+          errorMessage: "Agent finished without completion payload",
+        });
+      }
       await safeTaskTransition(
         db,
         task,
@@ -1138,28 +1159,43 @@ export async function executeClaimedRun(
     }),
   });
 
+  const awaitLiveCi = deliveryMode === "http";
   await applyTaskTransition(db, {
     workspaceId: run.workspaceId,
     taskId: task.id,
-    toStatus: "REVIEW_REQUIRED",
+    toStatus: awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED",
     actor: `worker:${workerId}`,
-    reason: "validation passed — human review required",
+    reason: awaitLiveCi
+      ? "PR delivered — awaiting live CI"
+      : "validation passed — human review required",
   }).catch((err: unknown) => {
-    log.warn("task REVIEW_REQUIRED transition skipped", {
+    log.warn("task post-delivery transition skipped", {
       error: err instanceof Error ? err.message : String(err),
+      toStatus: awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED",
     });
   });
 
-  const awaiting = await markRunAwaitingReview(db, {
-    runId: run.id,
-    workerId,
-    branchName: delivery.branchName,
-    headSha: delivery.headSha,
-    prNumber: delivery.prNumber,
-    prUrl: delivery.prUrl,
-    actualCostMicros: actualCost,
-    previewUrl,
-  });
+  const awaiting = awaitLiveCi
+    ? await markRunWaitingCi(db, {
+        runId: run.id,
+        workerId,
+        branchName: delivery.branchName,
+        headSha: delivery.headSha,
+        prNumber: delivery.prNumber,
+        prUrl: delivery.prUrl,
+        actualCostMicros: actualCost,
+        previewUrl,
+      })
+    : await markRunAwaitingReview(db, {
+        runId: run.id,
+        workerId,
+        branchName: delivery.branchName,
+        headSha: delivery.headSha,
+        prNumber: delivery.prNumber,
+        prUrl: delivery.prUrl,
+        actualCostMicros: actualCost,
+        previewUrl,
+      });
 
   // TASK042 — independent reviewer findings (never auto-merges).
   await persistReviewFindings(db, {
@@ -1171,15 +1207,17 @@ export async function executeClaimedRun(
     });
   });
 
-  void notifyWorkspace(db, {
-    event: "review_ready",
-    workspaceId: run.workspaceId,
-    projectId: run.projectId,
-    taskId: task.id,
-    runId: run.id,
-    message: `Run ready for review: ${task.title}`,
-    meta: { prUrl: delivery.prUrl, previewUrl },
-  }).catch(() => undefined);
+  if (!awaitLiveCi) {
+    void notifyWorkspace(db, {
+      event: "review_ready",
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      taskId: task.id,
+      runId: run.id,
+      message: `Run ready for review: ${task.title}`,
+      meta: { prUrl: delivery.prUrl, previewUrl },
+    }).catch(() => undefined);
+  }
 
   if (actualCost > 0) {
     await appendUsageEvent(db, {
@@ -1328,6 +1366,7 @@ async function attachSyntheticSignalFitness(
       signal.provider === "jenkins"
     ) {
       const result = await ingestCiEvidence(db, {
+        workspaceId: input.workspaceId,
         headSha: input.headSha,
         name: "coppergate-fake-ci",
         status: "completed",

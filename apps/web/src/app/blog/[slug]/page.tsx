@@ -102,6 +102,22 @@ export default async function BlogPostPage({ params }: PageProps) {
           className={styles.prose}
           dangerouslySetInnerHTML={{ __html: post.html }}
         />
+        <div className={styles.docsCtaRow}>
+          <a
+            className={styles.btnHeroPrimary}
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View on GitHub
+          </a>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
+          </Link>
+          <Link className={styles.btnSecondary} href="/docs">
+            Docs
+          </Link>
+        </div>
       </article>
     </SiteChrome>
   );

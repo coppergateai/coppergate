@@ -45,8 +45,9 @@ export function SurvivorWorkflow() {
             From task to verified PR.
           </h2>
           <p className={styles.sectionLede}>
-            Four steps. Selection over supervision — fitness and evidence gate
-            what promotes; you keep the kill-switch and merge control.
+            Four steps for engineering teams: bind a repo, run a bounded
+            competition, verify with evidence, then review the survivor PR.
+            You keep the kill-switch and merge control.
           </p>
         </header>
 

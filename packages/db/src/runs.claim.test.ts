@@ -222,6 +222,71 @@ describe("agent run claim/lease", { skip: !url }, () => {
     assert.equal(after?.leaseOwner, null);
   });
 
+  it("poison-fails RUNNING after max reclaims", async () => {
+    const { run } = await enqueueAgentRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      idempotencyKey: `poison-reap-${Date.now()}`,
+      estimatedCostMicros: 5_000,
+    });
+    const claimed = await claimRunById(db, run.id, "poison-worker", 60_000);
+    assert.ok(claimed);
+
+    await db
+      .update(agentRuns)
+      .set({
+        status: "RUNNING",
+        leaseUntil: new Date(Date.now() - 1_000),
+        errorCode: "lease_reclaimed",
+        errorMessage: "reclaim:3",
+        startedAt: new Date(),
+      })
+      .where(eq(agentRuns.id, claimed!.id));
+
+    const reaped = await reapStaleRuns(db);
+    assert.ok(reaped.failedPoison >= 1);
+    assert.ok(reaped.failedRuns.some((r) => r.id === claimed!.id));
+    const after = await getAgentRun(db, claimed!.id);
+    assert.equal(after?.status, "FAILED");
+    assert.equal(after?.errorCode, "lease_expired_poison");
+  });
+
+  it("fails stalled WAITING_CI past finished_at timeout", async () => {
+    const prev = process.env.WAITING_CI_TIMEOUT_MS;
+    process.env.WAITING_CI_TIMEOUT_MS = "60000";
+    try {
+      const { run } = await enqueueAgentRun(db, {
+        workspaceId,
+        projectId,
+        taskId,
+        idempotencyKey: `waiting-ci-reap-${Date.now()}`,
+        estimatedCostMicros: 5_000,
+      });
+      const claimed = await claimRunById(db, run.id, "waiting-ci-worker", 60_000);
+      assert.ok(claimed);
+
+      await db
+        .update(agentRuns)
+        .set({
+          status: "WAITING_CI",
+          leaseOwner: null,
+          leaseUntil: null,
+          finishedAt: new Date(Date.now() - 120_000),
+        })
+        .where(eq(agentRuns.id, claimed!.id));
+
+      const reaped = await reapStaleRuns(db);
+      assert.ok(reaped.failedWaitingCi >= 1);
+      const after = await getAgentRun(db, claimed!.id);
+      assert.equal(after?.status, "FAILED");
+      assert.equal(after?.errorCode, "waiting_ci_timeout");
+    } finally {
+      if (prev === undefined) delete process.env.WAITING_CI_TIMEOUT_MS;
+      else process.env.WAITING_CI_TIMEOUT_MS = prev;
+    }
+  });
+
   it("approveTask enqueues a run", async () => {
     // Fresh task without prior enqueue from this path
     const plan = await generateProjectPlan(db, {

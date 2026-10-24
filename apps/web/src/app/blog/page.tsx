@@ -34,7 +34,7 @@ export default async function BlogIndexPage() {
           { name: "Blog", path: "/blog" },
         ]}
       />
-      <main className={styles.contentPage}>
+      <div className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Blog</p>
         <h1 className={styles.pageTitle}>Blog</h1>
         <p className={styles.pageLede}>
@@ -67,7 +67,24 @@ export default async function BlogIndexPage() {
             ))}
           </ul>
         )}
-      </main>
+
+        <div className={styles.docsCtaRow}>
+          <a
+            className={styles.btnHeroPrimary}
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View on GitHub
+          </a>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
+          </Link>
+          <Link className={styles.btnSecondary} href="/changelog">
+            Changelog
+          </Link>
+        </div>
+      </div>
     </SiteChrome>
   );
 }

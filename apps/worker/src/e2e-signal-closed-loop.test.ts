@@ -231,6 +231,7 @@ async function runClosedLoop(
     assert.equal(fitness.attached, true);
   } else {
     const fitness = await ingestCiEvidence(db, {
+      workspaceId: input.workspaceId,
       headSha: afterRun!.headSha,
       name: "test",
       status: "completed",

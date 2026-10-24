@@ -1,10 +1,15 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "./client.js";
-import { recordAuditEvent } from "./briefs.js";
+import {
+  approveBrief,
+  createBriefDraft,
+  getLatestBriefForProject,
+  recordAuditEvent,
+} from "./briefs.js";
 import {
   milestones,
-  productBriefs,
   projects,
+  repositoryConnections,
   tasks,
   type Task,
 } from "./schema.js";
@@ -16,6 +21,92 @@ export class IssueImportError extends Error {
     this.name = "IssueImportError";
     this.code = code;
   }
+}
+
+/**
+ * Existing-repo wedge: Import → queue must not stall on brief ceremony.
+ * Seeds a minimal approved vision when none exists (same pattern as maintainer boot).
+ */
+async function ensureBriefForIssueImport(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+    projectName: string;
+    mode: string;
+  },
+): Promise<string> {
+  const latest = await getLatestBriefForProject(
+    db,
+    input.workspaceId,
+    input.projectId,
+  );
+  if (latest?.status === "approved") return latest.id;
+
+  const [project] = await db
+    .select({ currentBriefId: projects.currentBriefId })
+    .from(projects)
+    .where(
+      and(
+        eq(projects.id, input.projectId),
+        eq(projects.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (project?.currentBriefId) return project.currentBriefId;
+
+  if (latest) return latest.id;
+
+  // new_product keeps the explicit brief path; only auto-seed for existing_repo.
+  if (input.mode !== "existing_repo") {
+    throw new IssueImportError(
+      "invalid",
+      "Approve a product brief before importing issues",
+    );
+  }
+
+  let repoLabel = input.projectName;
+  const [repo] = await db
+    .select({ fullName: repositoryConnections.baseRepoFullName })
+    .from(repositoryConnections)
+    .where(
+      and(
+        eq(repositoryConnections.projectId, input.projectId),
+        eq(repositoryConnections.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (repo?.fullName) repoLabel = repo.fullName;
+
+  const draft = await createBriefDraft(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    actor: input.actor,
+    rawIdea: `Issue → verified PR loop for ${repoLabel}`,
+    content: {
+      title: `${input.projectName} — issue delivery`,
+      targetUser: "Repository maintainers",
+      problem: `Ship scoped GitHub issues on ${repoLabel} as verified PRs under a spend cap.`,
+      scope:
+        "Import open issues, run contenders in Arena, accept when CI and policy pass.",
+      nonGoals:
+        "Unbounded refactors, multi-repo ships without policy, skipping human Accept on irreversible merges.",
+      acceptanceCriteria: [
+        "Imported issue becomes a task with clear acceptance criteria",
+        "Survivor PR opens with an issue link",
+        "Accept only when hard gates (CI/policy) pass",
+      ],
+      clarifyingAnswers: [],
+    },
+  });
+  const approved = await approveBrief(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    briefId: draft.id,
+    actor: input.actor,
+  });
+  return approved.id;
 }
 
 /**
@@ -65,22 +156,13 @@ export async function importGithubIssueAsTask(
     );
   }
 
-  let briefId = project.currentBriefId;
-  if (!briefId) {
-    const [brief] = await db
-      .select()
-      .from(productBriefs)
-      .where(eq(productBriefs.projectId, input.projectId))
-      .orderBy(desc(productBriefs.revision))
-      .limit(1);
-    briefId = brief?.id ?? null;
-  }
-  if (!briefId) {
-    throw new IssueImportError(
-      "invalid",
-      "project needs an approved brief before importing issues",
-    );
-  }
+  const briefId = await ensureBriefForIssueImport(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    actor: input.actor,
+    projectName: project.name,
+    mode: project.mode,
+  });
 
   let [milestone] = await db
     .select()

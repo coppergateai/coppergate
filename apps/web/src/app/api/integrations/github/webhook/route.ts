@@ -34,6 +34,32 @@ import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/** Attach CI evidence only to runs in workspaces that own the repo (tenant-scoped). */
+async function ingestCiEvidenceScoped(
+  evidence: ReturnType<typeof mapCheckRunPayload>,
+): Promise<{ attached: boolean; runId: string | null }> {
+  if (!evidence.repoFullName) {
+    return { attached: false, runId: null };
+  }
+  const targets = await findWorkspacesForRepo(db, evidence.repoFullName);
+  const seen = new Set<string>();
+  let attached = false;
+  let runId: string | null = null;
+  for (const t of targets) {
+    if (seen.has(t.workspaceId)) continue;
+    seen.add(t.workspaceId);
+    const ingested = await ingestCiEvidence(db, {
+      ...evidence,
+      workspaceId: t.workspaceId,
+    });
+    if (ingested.attached) {
+      attached = true;
+      runId = ingested.run?.id ?? runId;
+    }
+  }
+  return { attached, runId };
+}
+
 /**
  * GitHub App webhook ingress — signature required; delivery_id is idempotent.
  */
@@ -118,9 +144,9 @@ export async function POST(request: Request) {
     } else if (headers.event === "check_run") {
       const stub = handleCheckRunEventStub(parsed as CheckRunWebhookPayload);
       const evidence = mapCheckRunPayload(parsed as CheckRunWebhookPayload);
-      const ingested = await ingestCiEvidence(db, evidence);
+      const ingested = await ingestCiEvidenceScoped(evidence);
       note = ingested.attached
-        ? `${stub.note}; attached to run ${ingested.run?.id}`
+        ? `${stub.note}; attached to run ${ingested.runId}`
         : stub.note;
 
       // TASK088 — CI failure → Signal → optional fix arena (when no matching run).
@@ -163,9 +189,9 @@ export async function POST(request: Request) {
       }
     } else if (headers.event === "check_suite") {
       const evidence = mapCheckSuitePayload(parsed as CheckSuitePayload);
-      const ingested = await ingestCiEvidence(db, evidence);
+      const ingested = await ingestCiEvidenceScoped(evidence);
       note = ingested.attached
-        ? `check_suite attached to run ${ingested.run?.id}`
+        ? `check_suite attached to run ${ingested.runId}`
         : `check_suite.${action ?? "unknown"} (no matching run)`;
     } else if (headers.event === "status") {
       const evidence = mapCommitStatusPayload(
@@ -177,9 +203,9 @@ export async function POST(request: Request) {
           repository?: { full_name?: string };
         },
       );
-      const ingested = await ingestCiEvidence(db, evidence);
+      const ingested = await ingestCiEvidenceScoped(evidence);
       note = ingested.attached
-        ? `status attached to run ${ingested.run?.id}`
+        ? `status attached to run ${ingested.runId}`
         : `status.${evidence.conclusion ?? evidence.status} (no matching run)`;
     } else if (
       headers.event === "code_scanning_alert" ||

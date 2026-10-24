@@ -148,6 +148,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
 
   it("attaches green checks and leaves accept unblocked", async () => {
     const { attached, run } = await ingestCiEvidence(db, {
+      workspaceId,
       headSha,
       name: "build",
       status: "completed",
@@ -167,6 +168,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
 
   it("failing checks block ACCEPTED auto-path", async () => {
     await ingestCiEvidence(db, {
+      workspaceId,
       headSha,
       name: "test",
       status: "completed",
@@ -231,6 +233,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
       .where(eq(agentRuns.id, run.id));
 
     await ingestCiEvidence(db, {
+      workspaceId,
       headSha: sha,
       name: "lint",
       status: "completed",
@@ -244,6 +247,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     assert.equal(await runHasBlockingCi(db, run.id), true);
 
     await ingestCiEvidence(db, {
+      workspaceId,
       headSha: sha,
       name: "lint",
       status: "completed",
@@ -323,6 +327,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     assert.equal(fitness.acceptReady, false);
 
     await ingestCiEvidence(db, {
+      workspaceId,
       headSha: pendingSha,
       name: "ci",
       status: "completed",
@@ -336,5 +341,59 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     const ready = await getRunCiFitness(db, run.id);
     assert.equal(ready.passed, true);
     assert.equal(ready.acceptReady, true);
+  });
+
+  it("refuses empty workspaceId (fail closed)", async () => {
+    const { attached } = await ingestCiEvidence(db, {
+      workspaceId: "   ",
+      headSha,
+      name: "build",
+      status: "completed",
+      conclusion: "success",
+      passed: true,
+      blocksAccept: false,
+      checkRunId: 1001,
+      detailsUrl: null,
+      repoFullName: "org-ci/app",
+    });
+    assert.equal(attached, false);
+  });
+
+  it("does not cross-attach CI evidence by shared headSha", async () => {
+    const stamp = Date.now();
+    const sharedSha = `sharedsha${stamp}`;
+    const attacker = await insertTestUser(db, {
+      login: `ci-atk-${stamp}`,
+      githubUserId: `gh-ci-atk-${stamp}`,
+    });
+    const attackerWs = (
+      await createWorkspaceWithOwner(db, {
+        name: "Attacker CI WS",
+        ownerUserId: attacker.id,
+      })
+    ).workspace.id;
+
+    await db
+      .update(agentRuns)
+      .set({ headSha: sharedSha, updatedAt: new Date() })
+      .where(eq(agentRuns.id, runId));
+
+    const before = await listRunEvents(db, runId);
+    const { attached } = await ingestCiEvidence(db, {
+      workspaceId: attackerWs,
+      headSha: sharedSha,
+      name: "evil",
+      status: "completed",
+      conclusion: "failure",
+      passed: false,
+      blocksAccept: true,
+      checkRunId: 666,
+      detailsUrl: null,
+      repoFullName: "evil/repo",
+    });
+    assert.equal(attached, false);
+    const after = await listRunEvents(db, runId);
+    assert.equal(after.length, before.length);
+    assert.equal(await runHasBlockingCi(db, runId), false);
   });
 });

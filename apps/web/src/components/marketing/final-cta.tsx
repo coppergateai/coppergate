@@ -66,7 +66,15 @@ export function FinalCta({ signedInLogin = null }: Props) {
         <p id="early-access" className={styles.finalNote}>
           {signedIn
             ? `Signed in as @${signedInLogin}. Open workspaces above to continue.`
-            : "Questions? hello@coppergate.ai — community support, not a sales funnel."}
+            : (
+              <>
+                Questions? hello@coppergate.ai — community support, not a sales
+                funnel.{" "}
+                <Link href="/docs/pricing">Pricing</Link>
+                {" · "}
+                <Link href="/docs/limitations">Limitations</Link>
+              </>
+            )}
         </p>
       </div>
     </section>

@@ -287,27 +287,12 @@ export function ProjectsHome({
             Projects
             <span className={styles.pageTabCount}>{projects.length}</span>
           </span>
-          <span
-            className={`${styles.pageTab} ${styles.pageTabDisabled}`}
-            aria-disabled="true"
-            title="Coming soon"
-          >
-            <ChartIcon />
-            Insights
-          </span>
           <Link
             href={`/workspaces/${workspaceId}/arena`}
             className={styles.pageTab}
           >
             <BotIcon />
-            Agents
-          </Link>
-          <Link
-            href={`/workspaces/${workspaceId}/arena`}
-            className={styles.pageTab}
-          >
-            <PlayIcon />
-            Runs
+            Arena
           </Link>
           <Link
             href={`/workspaces/${workspaceId}/settings`}
@@ -319,65 +304,39 @@ export function ProjectsHome({
         </nav>
 
         {!empty || unboundCount > 0 ? (
-          <section className={styles.stats} aria-label="Project summary">
-            <article className={styles.statCard}>
-              <div className={styles.statCardTop}>
-                <span className={styles.statLabel}>Total projects</span>
-                <CubeIcon />
-              </div>
-              <p className={styles.statValue}>{projects.length}</p>
-            </article>
-            <article className={styles.statCard}>
-              <div className={styles.statCardTop}>
-                <span className={styles.statLabel}>Brief ready</span>
-                <span
-                  className={`${styles.statDot} ${styles.statDotReady}`}
-                  aria-hidden
-                />
-              </div>
-              <p className={styles.statValue}>{readyCount}</p>
-            </article>
-            <article className={styles.statCard}>
-              <div className={styles.statCardTop}>
-                <span className={styles.statLabel}>Setup</span>
+          <section className={styles.summaryStrip} aria-label="Project summary">
+            <p className={styles.summaryItem}>
+              <strong>{projects.length}</strong> projects
+            </p>
+            <p className={styles.summaryItem}>
+              <span
+                className={`${styles.statDot} ${styles.statDotReady}`}
+                aria-hidden
+              />
+              <strong>{readyCount}</strong> ready
+            </p>
+            {setupCount > 0 ? (
+              <p className={styles.summaryItem}>
                 <span
                   className={`${styles.statDot} ${styles.statDotSetup}`}
                   aria-hidden
                 />
-              </div>
-              <p className={styles.statValue}>{setupCount}</p>
-            </article>
-            <article className={styles.statCard}>
-              <div className={styles.statCardTop}>
-                <span className={styles.statLabel}>Unbound</span>
+                <strong>{setupCount}</strong> setup
+              </p>
+            ) : null}
+            {unboundCount > 0 ? (
+              <p className={styles.summaryItem}>
                 <span
                   className={`${styles.statDot} ${styles.statDotUnbound}`}
                   aria-hidden
                 />
-              </div>
-              <p className={styles.statValue}>{unboundCount}</p>
-            </article>
+                <strong>{unboundCount}</strong> unbound
+              </p>
+            ) : null}
             {showKpis ? (
-              <article className={`${styles.statCard} ${styles.statCardWide}`}>
-                <div className={styles.statCardTop}>
-                  <span className={styles.statLabel}>Merges · last 30 days</span>
-                </div>
-                <p className={styles.statValue}>{rollup.totals.merges}</p>
-                <div className={styles.spark} aria-hidden>
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const h =
-                      20 +
-                      ((rollup.totals.merges * (i + 3) * 17) % 60);
-                    return (
-                      <span
-                        key={i}
-                        className={styles.sparkBar}
-                        style={{ height: `${h}%` }}
-                      />
-                    );
-                  })}
-                </div>
-              </article>
+              <p className={styles.summaryItem}>
+                <strong>{rollup.totals.merges}</strong> merges · 30d
+              </p>
             ) : null}
           </section>
         ) : null}
@@ -829,19 +788,6 @@ function CubeIcon() {
         stroke="currentColor"
         strokeWidth="1.3"
         strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ChartIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M2.5 13h11M4 11V7.5M8 11V4.5M12 11V6"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
       />
     </svg>
   );

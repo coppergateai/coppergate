@@ -118,7 +118,7 @@ export function EarlyAccessForm({ signedInLogin }: Props) {
         type="submit"
         disabled={status === "loading" || status === "ok"}
       >
-        {status === "loading" ? "Joining…" : "Request access"}
+        {status === "loading" ? "Joining…" : "Notify me"}
       </button>
       {message ? (
         <p

@@ -280,6 +280,26 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
     }
   }
 
+  private async getBranchHeadSha(
+    owner: string,
+    repo: string,
+    branch: string,
+  ): Promise<string | null> {
+    const res = await this.fetchImpl(
+      `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`,
+      { headers: this.headers() },
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new GithubDeliveryError(
+        "http",
+        `getBranchHeadSha failed (${res.status})`,
+      );
+    }
+    const body = (await res.json()) as { object?: { sha?: string } };
+    return body.object?.sha ?? null;
+  }
+
   private async putFile(
     owner: string,
     repo: string,
@@ -287,9 +307,20 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
     defaultBranch: string,
     file: FileChange,
     message: string,
-    _expectedHead: string,
+    expectedHead: string,
   ): Promise<string> {
     assertSafeBranch(branch, defaultBranch);
+
+    // Compare-and-swap: refuse to write if another worker moved the branch tip.
+    if (expectedHead && expectedHead !== "unknown") {
+      const tip = await this.getBranchHeadSha(owner, repo, branch);
+      if (tip && tip !== expectedHead) {
+        throw new GithubDeliveryError(
+          "conflict",
+          `branch head moved: expected ${expectedHead.slice(0, 12)} got ${tip.slice(0, 12)}`,
+        );
+      }
+    }
 
     const content =
       file.encoding === "base64"
@@ -322,6 +353,12 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
         }),
       },
     );
+    if (res.status === 409) {
+      throw new GithubDeliveryError(
+        "conflict",
+        `putFile conflict (409) for ${file.path} — branch or blob changed`,
+      );
+    }
     if (!res.ok) {
       throw new GithubDeliveryError(
         "http",
@@ -329,7 +366,7 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
       );
     }
     const body = (await res.json()) as { commit?: { sha?: string } };
-    return body.commit?.sha ?? _expectedHead;
+    return body.commit?.sha ?? expectedHead;
   }
 
   private async createPr(

@@ -6,7 +6,10 @@ import styles from "./marketing.module.css";
 
 const DotLottieReact = dynamic(
   () =>
-    import("@lottiefiles/dotlottie-react").then((mod) => mod.DotLottieReact),
+    import("@lottiefiles/dotlottie-react").then((mod) => {
+      mod.setWasmUrl("/vendor/dotlottie-player.wasm");
+      return mod.DotLottieReact;
+    }),
   { ssr: false, loading: () => <span className={styles.lottieSlot} aria-hidden="true" /> },
 );
 

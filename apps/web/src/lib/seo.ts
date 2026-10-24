@@ -7,7 +7,7 @@ export const SITE_TITLE =
   "Coppergate — Set a budget. Agents war. Survivors ship.";
 
 export const SITE_DESCRIPTION =
-  "Open-source Survivor arena for engineering teams: agents compete inside a spend cap from task to verified pull request. Fitness and evidence decide; you review what ships.";
+  "MIT open-source Survivor arena for engineering teams: agents compete inside a spend cap from issue to verified GitHub/GitLab PR. Self-host free or try hosted — fitness and evidence decide; you review what ships.";
 
 export const OG_IMAGE = {
   url: "/opengraph-image",

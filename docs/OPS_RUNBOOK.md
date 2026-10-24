@@ -3,7 +3,7 @@
 ## Worker crash mid-run
 
 1. Leases expire after `leaseMs` (default 30s). Workers renew via heartbeat (~`leaseMs/3`) during agent/validation work.
-2. `reapStaleRuns`: expired **RUNNING** → `QUEUED` (reclaim); expired **VALIDATING** → `FAILED` (`validating_lease_expired`) and the worker fails the matching task. VALIDATING is not silently re-queued.
+2. `reapStaleRuns`: expired **RUNNING** → `QUEUED` with `reclaim:N` (max 3) then `FAILED` (`lease_expired_poison`) or wall-clock >45m; expired **VALIDATING** → `FAILED` (`validating_lease_expired`); **WAITING_CI** past timeout (default 6h, `WAITING_CI_TIMEOUT_MS`) → `FAILED` (`waiting_ci_timeout`). Worker fails matching tasks for reaper failures.
 3. User can **Cancel** then **Retry** from task detail without operator help.
 4. Check worker logs for `claimed run` / `run processed` / `lost run lease ownership` / `worker loop iteration failed`.
 5. If a run is stuck RUNNING with a fresh lease, cancel it (sets `cancel_requested_at`); the worker cooperatively stops (LLM fetch is also aborted via `AbortSignal`).
@@ -13,6 +13,7 @@
 - Validation failures → run `FAILED` + `validation_report` artifact; task `FAILED`; user retries with a new attempt/idempotency key.
 - CI failure evidence → `ci_failed` blocks accept; user requests changes or rejects.
 - Budget paused / insufficient → enqueue and worker execute fail closed; resume spend in settings.
+- LLM provider outages: set `LLM_FALLBACK_API_KEY` (+ optional `LLM_FALLBACK_BASE_URL` / `LLM_FALLBACK_MODEL`) for one automatic failover on thrown 429/5xx/network failures only.
 
 ## Credential / deletion
 

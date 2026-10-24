@@ -1,11 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AgentEvent, AgentRunInput, CodingAgent } from "./types.js";
+import { createCodingAgent } from "./create-agent.js";
 import { FakeCodingAgent } from "./fake.js";
-import {
-  OpenAiCompatibleCodingAgent,
-  type OpenAiCompatibleConfig,
-} from "./openai-compatible.js";
+import type { OpenAiCompatibleConfig } from "./openai-compatible.js";
 import { resolveSafeWorkdirPath } from "./path-policy.js";
 import { harnessStubAllowed } from "./stub-detect.js";
 
@@ -195,7 +193,12 @@ export function createContenderHarness(
         throw new Error("native_openai harness requires openai.apiKey");
       }
       return new NativeOpenAiHarness(
-        new OpenAiCompatibleCodingAgent(opts.openai),
+        createCodingAgent({
+          apiKey: opts.openai.apiKey,
+          baseUrl: opts.openai.baseUrl,
+          model: opts.openai.model,
+          fetchImpl: opts.openai.fetchImpl,
+        }),
       );
     case "openhands":
     case "aider":

@@ -411,6 +411,9 @@ export {
 } from "./workspace-arena.js";
 export {
   DEFAULT_LEASE_MS,
+  DEFAULT_WAITING_CI_TIMEOUT_MS,
+  MAX_LEASE_RECLAIMS,
+  MAX_RUN_WALL_MS,
   RunError,
   claimNextRun,
   claimRunById,
@@ -424,12 +427,15 @@ export {
   getTaskForWorkspace,
   isRunLeaseStale,
   listRunsForTask,
+  parseReclaimCount,
   reapStaleRuns,
   releaseRunClaim,
   renewRunLease,
   requestCancelRun,
+  resolveWaitingCiTimeoutMs,
   attachSandboxToRun,
   setTaskPrUrl,
+  type ReapedFailedRun,
   type ReapStaleRunsResult,
 } from "./runs.js";
 export {
@@ -438,8 +444,11 @@ export {
   listRunEvents,
   listRunEventsForWorkspace,
   markRunAwaitingReview,
+  markRunCancelled,
   markRunFailed,
   markRunValidating,
+  markRunWaitingCi,
+  promoteRunFromWaitingCi,
 } from "./run-events.js";
 export {
   containsSecretMaterial,

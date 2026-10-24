@@ -113,7 +113,7 @@ export function HeroMissionMock() {
           <header className={styles.top}>
             <div>
               <p className={styles.crumb}>Workspaces / kprompt / Arena</p>
-              <h3 className={styles.title}>Arena</h3>
+              <p className={styles.title}>Arena</p>
             </div>
             <div className={styles.actions}>
               <span className={styles.btnGhost}>Pause all</span>

@@ -203,6 +203,7 @@ describe("maintainer autonomous accept (winner-gated)", { skip: !url }, () => {
       .where(eq(tasks.id, taskId));
 
     await ingestCiEvidence(db, {
+      workspaceId,
       headSha,
       name: "go-test",
       status: "completed",

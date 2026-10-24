@@ -26,11 +26,16 @@ async function resolveRun(
       .limit(1);
     return row ?? null;
   }
-  if (input.headSha) {
+  if (input.headSha && input.workspaceId) {
     const [row] = await db
       .select()
       .from(agentRuns)
-      .where(eq(agentRuns.headSha, input.headSha))
+      .where(
+        and(
+          eq(agentRuns.headSha, input.headSha),
+          eq(agentRuns.workspaceId, input.workspaceId),
+        ),
+      )
       .orderBy(desc(agentRuns.createdAt))
       .limit(1);
     return row ?? null;

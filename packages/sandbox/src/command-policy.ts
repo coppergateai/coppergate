@@ -4,6 +4,10 @@ import {
   assertEgressAllowed,
 } from "./policy.js";
 
+/** Cloud metadata / IMDS hostnames (matched anywhere in argv). */
+const METADATA_HOST_RE =
+  /metadata\.google\.internal|metadata\.goog(?:le)?(?:\.|$)|instance-data\.ec2\.internal|kubernetes\.default(?:\.svc)?/i;
+
 /** Block metadata / private / non-allowlisted hosts in command argv. */
 export function assertSandboxCommandArgs(command: readonly string[]): void {
   for (const arg of command) {
@@ -12,6 +16,12 @@ export function assertSandboxCommandArgs(command: readonly string[]): void {
       throw new SandboxPolicyError(
         "egress_denied",
         "Cannot reach cloud metadata IP from sandbox",
+      );
+    }
+    if (METADATA_HOST_RE.test(arg)) {
+      throw new SandboxPolicyError(
+        "egress_denied",
+        "Cannot reach cloud metadata / cluster DNS host from sandbox",
       );
     }
     const ipv4s = arg.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) ?? [];
@@ -30,9 +40,10 @@ export function assertSandboxCommandArgs(command: readonly string[]): void {
         );
       }
     }
-    const urlHost = arg.match(/^https?:\/\/([^/:]+)/i)?.[1];
-    if (urlHost) {
-      assertEgressAllowed(urlHost);
+    // Any http(s) URL in the arg (not only leading) — covers shell -c wrappers.
+    for (const match of arg.matchAll(/https?:\/\/\[?([^\]/\s"'`]+)/gi)) {
+      const host = match[1]?.split(":")[0]?.trim();
+      if (host) assertEgressAllowed(host);
     }
   }
 }

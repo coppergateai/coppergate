@@ -37,9 +37,9 @@ export function ArenaPreviewSection() {
             Contenders compete. One survivor ships.
           </h2>
           <p className={styles.sectionLede}>
-            A bounded tournament around one engineering task. Contenders
-            attempt the work; Coppergate verifies results, prices spend, and
-            promotes the strongest qualifying path.
+            One task. Multiple contenders. Coppergate verifies results, prices
+            spend, and promotes the strongest qualifying path — so “spend more”
+            is not an automatic win.
           </p>
           <p className={styles.demoNotice}>
             <span className={styles.demoNoticeMark}>
