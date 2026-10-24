@@ -51,9 +51,11 @@ export function WorkspaceCard({ workspace, layout }: Props) {
               <PersonIcon />
               {formatRole(workspace.role)}
             </span>
-            <span className={styles.metaPill}>
-              {others} {others === 1 ? "member" : "members"}
-            </span>
+            {others > 0 ? (
+              <span className={styles.metaPill}>
+                {others} {others === 1 ? "member" : "members"}
+              </span>
+            ) : null}
             <span className={styles.metaPill}>
               <CalendarIcon />
               Updated {workspace.updatedAt}
@@ -85,7 +87,7 @@ export function WorkspaceCard({ workspace, layout }: Props) {
             <span className={styles.statValue}>{workspace.runCount}</span>
             <span className={styles.statLabel}>
               {workspace.runCount > 0 || workspace.agentCount > 0
-                ? "Healthy"
+                ? "Runs"
                 : "Setup"}
             </span>
           </div>

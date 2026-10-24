@@ -49,11 +49,11 @@ export function CostExplorerStrip({ workspaceId, projectId }: Props) {
         Cost explorer (7d)
       </h2>
       <p className={styles.sectionLede}>
-        Coppergate budget units: {usd(data.spentMicros)} in the last{" "}
-        {data.windowDays} days
+        Ledger spend (tokens + sandbox): {usd(data.spentMicros)} in the last{" "}
+        {data.windowDays} days — excludes estimate reservations
         {data.topTasks.length
           ? ` · top ${data.topTasks.length} task${data.topTasks.length === 1 ? "" : "s"}`
-          : " · no task-attributed usage yet"}
+          : " · no task-attributed spend yet"}
         . Provider/BYOK invoices are billed separately.
       </p>
       {data.topTasks.length > 0 ? (

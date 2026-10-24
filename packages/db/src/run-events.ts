@@ -1,5 +1,6 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
+import { releaseEstimateForRun } from "./budgets.js";
 import { redactPayload, redactString } from "./redact.js";
 import {
   agentRunEvents,
@@ -8,6 +9,18 @@ import {
   type AgentRunEvent,
 } from "./schema.js";
 import { RunError } from "./runs.js";
+
+async function releaseRunEstimate(db: Database, run: AgentRun): Promise<void> {
+  const amount = run.estimatedCostMicros ?? 0;
+  if (amount <= 0) return;
+  await releaseEstimateForRun(db, {
+    workspaceId: run.workspaceId,
+    projectId: run.projectId,
+    taskId: run.taskId,
+    runId: run.id,
+    amountMicros: amount,
+  });
+}
 
 export async function appendRunEvent(
   db: Database,
@@ -179,6 +192,7 @@ export async function markRunAwaitingReview(
       "Cannot complete run — not owner or not RUNNING/VALIDATING",
     );
   }
+  await releaseRunEstimate(db, updated);
   return updated;
 }
 
@@ -218,5 +232,6 @@ export async function markRunFailed(
       "Cannot fail run — not owner or not RUNNING/VALIDATING",
     );
   }
+  await releaseRunEstimate(db, updated);
   return updated;
 }

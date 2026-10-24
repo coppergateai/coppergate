@@ -327,7 +327,7 @@ export function ProjectsHome({
             </article>
             <article className={styles.statCard}>
               <div className={styles.statCardTop}>
-                <span className={styles.statLabel}>Ready</span>
+                <span className={styles.statLabel}>Brief ready</span>
                 <span
                   className={`${styles.statDot} ${styles.statDotReady}`}
                   aria-hidden
@@ -507,7 +507,7 @@ export function ProjectsHome({
                 {(
                   [
                     ["all", "All", projects.length],
-                    ["ready", "Ready", readyCount],
+                    ["ready", "Brief ready", readyCount],
                     ["setup", "Setup", setupCount],
                     ["unbound", "Unbound", unboundCount],
                   ] as const
@@ -619,7 +619,7 @@ export function ProjectsHome({
                           className={styles.rowState}
                         >
                           {project.ready ? (
-                            <span className={styles.stateReady}>Ready</span>
+                            <span className={styles.stateReady}>Brief ready</span>
                           ) : (
                             <span className={styles.stateSetup}>Setup</span>
                           )}
@@ -696,7 +696,7 @@ export function ProjectsHome({
                       <div className={styles.cardTop}>
                         <span className={styles.rowId}>{project.stack}</span>
                         {project.ready ? (
-                          <span className={styles.stateReady}>Ready</span>
+                          <span className={styles.stateReady}>Brief ready</span>
                         ) : (
                           <span className={styles.stateSetup}>Setup</span>
                         )}

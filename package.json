@@ -23,6 +23,7 @@
     "ops:pilot-go-no-go": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/pilot-go-no-go.mjs",
     "ops:outreach-pack": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/export-outreach-pack.mjs",
     "ops:retention": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/retention-snapshot.mjs",
+    "ops:reconcile-reserves": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/reconcile-stale-reserves.mjs",
     "e2e:install": "pnpm install --filter @coppergate/e2e-hosted && pnpm --filter @coppergate/e2e-hosted exec playwright install chromium",
     "e2e:login": "pnpm --filter @coppergate/e2e-hosted login",
     "e2e:discover": "pnpm --filter @coppergate/e2e-hosted discover",

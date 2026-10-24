@@ -1,7 +1,11 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { recordAuditEvent } from "./briefs.js";
-import { assertSufficientBudget, reserveEstimateForTask } from "./budgets.js";
+import {
+  assertSufficientBudget,
+  releaseEstimateForRun,
+  reserveEstimateForTask,
+} from "./budgets.js";
 import { agentRuns, tasks, type AgentRun } from "./schema.js";
 
 export class RunError extends Error {
@@ -315,6 +319,13 @@ export async function requestCancelRun(
     if (!updated) {
       throw new RunError("conflict", "Run status changed; retry cancel");
     }
+    await releaseEstimateForRun(db, {
+      workspaceId: updated.workspaceId,
+      projectId: updated.projectId,
+      taskId: updated.taskId,
+      runId: updated.id,
+      amountMicros: updated.estimatedCostMicros ?? 0,
+    });
     await recordAuditEvent(db, {
       workspaceId: input.workspaceId,
       actor: input.actor,
