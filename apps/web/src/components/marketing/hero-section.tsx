@@ -36,7 +36,7 @@ export function HeroSection() {
           </div>
 
           <ul className={styles.trustList}>
-            <li>Self-host or hosted</li>
+            <li>MIT · Community $0</li>
             <li>Bring your own LLM</li>
             <li>Issue → verified PR</li>
           </ul>

@@ -585,6 +585,21 @@ export async function appendUsageEvent(
     meta?: unknown;
   },
 ): Promise<UsageEvent> {
+  // llm_tokens is once-per-run — resume/retry must not double-bill spend.
+  if (input.kind === "llm_tokens" && input.runId) {
+    const [existing] = await db
+      .select()
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.runId, input.runId),
+          eq(usageEvents.kind, "llm_tokens"),
+        ),
+      )
+      .limit(1);
+    if (existing) return existing;
+  }
+
   const [row] = await db
     .insert(usageEvents)
     .values({

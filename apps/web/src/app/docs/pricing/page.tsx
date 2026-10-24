@@ -61,20 +61,23 @@ export default function PricingPage() {
             <div className={styles.pricingActions}>
               <a
                 className={styles.btnHeroPrimary}
-                href={REPO}
-                target="_blank"
-                rel="noreferrer"
-              >
-                View on GitHub
-              </a>
-              <a
-                className={styles.btnSecondary}
                 href={SELF_HOST}
                 target="_blank"
                 rel="noreferrer"
               >
                 Self-host guide
               </a>
+              <a
+                className={styles.btnSecondary}
+                href={REPO}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View on GitHub
+              </a>
+              <Link className={styles.btnSecondary} href="/login">
+                Try hosted
+              </Link>
             </div>
           </article>
         </div>

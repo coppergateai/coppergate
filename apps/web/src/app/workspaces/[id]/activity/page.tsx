@@ -106,7 +106,9 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
   );
 
   const needsReview =
-    mission.metrics.needsApproval + mission.metrics.arenaNeedsAttention;
+    mission.metrics.needsApproval +
+    mission.metrics.needsEvidenceAccept +
+    mission.metrics.arenaNeedsAttention;
   const recentReplanFail = events.some(
     (e) => e.action === "maintainer.replan_queue_failed",
   );

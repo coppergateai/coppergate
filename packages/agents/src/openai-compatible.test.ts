@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildPrompt,
+  findDuplicateFilePath,
   OpenAiCompatibleCodingAgent,
+  parseFileBlocks,
 } from "./openai-compatible.js";
 import { createCodingAgent } from "./create-agent.js";
 import { FakeCodingAgent } from "./fake.js";
@@ -299,6 +301,131 @@ describe("OpenAiCompatibleCodingAgent", () => {
       events.some((e) => e.kind === "error" && e.payload?.code === "aborted"),
     );
     assert.ok(!events.some((e) => e.kind === "completion"));
+  });
+});
+
+describe("parseFileBlocks / duplicates", () => {
+  it("detects duplicate FILE paths", () => {
+    const files = parseFileBlocks(
+      [
+        "### FILE: app/page.tsx",
+        "```",
+        "export default function A() {}",
+        "```",
+        "### FILE: app/page.tsx",
+        "```",
+        "export default function B() {}",
+        "```",
+      ].join("\n"),
+    );
+    assert.equal(files.length, 2);
+    assert.equal(findDuplicateFilePath(files), "app/page.tsx");
+  });
+
+  it("refuses completion when model emits duplicate FILE paths", async () => {
+    const agent = new OpenAiCompatibleCodingAgent({
+      apiKey: "sk-test",
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: [
+                    "### FILE: README.md",
+                    "```",
+                    "# one real product increment body",
+                    "```",
+                    "### FILE: README.md",
+                    "```",
+                    "# conflicting second body for same path",
+                    "```",
+                  ].join("\n"),
+                },
+              },
+            ],
+            usage: { total_tokens: 40 },
+          }),
+          { status: 200 },
+        ),
+    });
+    const events = [];
+    for await (const ev of agent.run({
+      runId: "r-dup",
+      taskId: "t",
+      workspaceId: "w",
+      projectId: "p",
+      goal: "Docs",
+      scope: "readme",
+      allowedPaths: ["README.md"],
+      acceptanceCriteria: ["ok"],
+      baseSha: "abc",
+      toolAllowlist: [],
+      spendCapMicros: 100_000,
+    })) {
+      events.push(ev);
+    }
+    assert.ok(
+      events.some(
+        (e) => e.kind === "error" && e.payload?.code === "duplicate_file_path",
+      ),
+    );
+    assert.ok(!events.some((e) => e.kind === "completion"));
+  });
+});
+
+describe("malformed LLM JSON", () => {
+  it("retries then succeeds after malformed JSON body", async () => {
+    let hits = 0;
+    const agent = new OpenAiCompatibleCodingAgent({
+      apiKey: "sk-test",
+      maxRetries: 2,
+      fetchImpl: async () => {
+        hits += 1;
+        if (hits === 1) {
+          return new Response("{not-json", {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: [
+                    "### FILE: README.md",
+                    "```",
+                    "# recovered product increment",
+                    "```",
+                  ].join("\n"),
+                },
+              },
+            ],
+            usage: { total_tokens: 20 },
+          }),
+          { status: 200 },
+        );
+      },
+    });
+    const events = [];
+    for await (const ev of agent.run({
+      runId: "r-json",
+      taskId: "t",
+      workspaceId: "w",
+      projectId: "p",
+      goal: "Recover",
+      scope: "readme",
+      allowedPaths: ["README.md"],
+      acceptanceCriteria: ["ok"],
+      baseSha: "abc",
+      toolAllowlist: [],
+      spendCapMicros: 100_000,
+    })) {
+      events.push(ev);
+    }
+    assert.equal(hits, 2);
+    assert.ok(events.some((e) => e.kind === "completion"));
   });
 });
 

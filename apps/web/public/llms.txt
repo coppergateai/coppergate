@@ -1,6 +1,6 @@
 # Coppergate
 
-> Set a budget. Agents war. Survivors ship. Coppergate runs autonomous engineering agents inside a spend cap — contenders compete, fitness and evidence decide, you review what ships.
+> Set a budget. Agents compete. Survivors ship. Coppergate runs autonomous engineering agents inside a spend cap — contenders compete, fitness and evidence decide, you review what ships.
 
 Coppergate is an open-source (MIT) multi-agent arena for engineering work. Selection pressure (fitness relative to spend) ranks qualifying paths; weak agents lose budget and exit; survivors are prepared as pull/merge requests for human review.
 
