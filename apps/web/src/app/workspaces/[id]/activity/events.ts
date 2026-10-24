@@ -1041,8 +1041,13 @@ export function extractFacts(
 
   if (!meta) return facts;
 
+  const projectName = str(meta, "projectName");
   const projectId = str(meta, "projectId");
-  if (projectId) facts.push({ label: "Project", value: shortId(projectId) });
+  if (projectName) {
+    facts.push({ label: "Project", value: projectName });
+  } else if (projectId) {
+    facts.push({ label: "Project", value: shortId(projectId) });
+  }
 
   const taskId = str(meta, "taskId");
   if (taskId) facts.push({ label: "Task", value: shortId(taskId) });

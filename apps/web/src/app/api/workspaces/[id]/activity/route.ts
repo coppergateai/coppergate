@@ -1,5 +1,9 @@
-import { listAuditEventsForWorkspace } from "@coppergate/db";
+import {
+  listAuditEventsForWorkspace,
+  listProjectsForWorkspace,
+} from "@coppergate/db";
 import { activityHref } from "@/lib/activity-href";
+import { withProjectName } from "@/lib/activity-meta";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
@@ -31,15 +35,22 @@ export async function GET(request: Request, context: RouteContext) {
     const limitRaw = Number(url.searchParams.get("limit") ?? "50");
     const limit = Number.isFinite(limitRaw) ? limitRaw : 50;
 
-    const rows = await listAuditEventsForWorkspace(db, workspaceId, {
-      limit,
-      before,
-    });
+    const [rows, projectRows] = await Promise.all([
+      listAuditEventsForWorkspace(db, workspaceId, {
+        limit,
+        before,
+      }),
+      listProjectsForWorkspace(db, workspaceId),
+    ]);
+
+    const projectNameById = new Map(
+      projectRows.map(({ project }) => [project.id, project.name]),
+    );
 
     return jsonOk(
       {
         events: rows.map((r) => {
-          const meta = parseMeta(r.meta);
+          const meta = withProjectName(parseMeta(r.meta), projectNameById);
           return {
             id: r.id,
             actor: r.actor,
