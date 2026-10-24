@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   isPathAllowed,
+  isProfileEditAllowed,
   isSafeRelativePath,
   resolveSafeWorkdirPath,
 } from "./path-policy.js";
@@ -28,5 +29,13 @@ describe("path-policy", () => {
     const workdir = "/tmp/sandbox-run";
     assert.ok(resolveSafeWorkdirPath(workdir, "src/a.ts")?.startsWith(workdir));
     assert.equal(resolveSafeWorkdirPath(workdir, "../escape.ts"), null);
+  });
+
+  it("gates FILE edits on profile tool allowlist", () => {
+    assert.equal(isProfileEditAllowed(undefined), true);
+    assert.equal(isProfileEditAllowed([]), true);
+    assert.equal(isProfileEditAllowed(["read"]), false);
+    assert.equal(isProfileEditAllowed(["read", "edit"]), true);
+    assert.equal(isProfileEditAllowed(["*"]), true);
   });
 });

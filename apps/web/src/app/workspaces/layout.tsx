@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
+  title: "Workspaces",
   robots: { index: false, follow: false },
 };
 

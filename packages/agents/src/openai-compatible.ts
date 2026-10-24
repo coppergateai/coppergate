@@ -4,6 +4,7 @@ import { AgentPolicyError } from "./fake.js";
 import { buildFakeCompletion } from "./fake.js";
 import {
   isPathAllowed,
+  isProfileEditAllowed,
   isSafeRelativePath,
   resolveSafeWorkdirPath,
 } from "./path-policy.js";
@@ -162,6 +163,19 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
         message:
           "Model did not return FILE blocks. Refusing stub/scaffold fallback.",
         payload: { code: "no_file_blocks" },
+      };
+      return;
+    }
+
+    if (!isProfileEditAllowed(input.toolAllowlist)) {
+      yield {
+        kind: "error",
+        message: "Profile tools do not allow FILE edits",
+        payload: {
+          code: "tool_not_allowed",
+          required: "edit",
+          toolAllowlist: input.toolAllowlist,
+        },
       };
       return;
     }

@@ -21,7 +21,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const user = await currentUser();
-  if (!user) return { title: "Workspace · Coppergate" };
+  if (!user) return { title: "Workspace" };
   const { id } = await params;
   const access = await getWorkspaceForMember(db, id, user.id);
   const name = access?.workspace.name ?? "Workspace";

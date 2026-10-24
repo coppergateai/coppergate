@@ -6,7 +6,7 @@ import { SiteChrome } from "../site-chrome";
 export const metadata: Metadata = {
   title: "Privacy",
   description:
-    "How Coppergate handles early-access emails, GitHub authentication, and product data during private beta.",
+    "How Coppergate handles authentication, product data, and analytics for the open-source Survivor arena and hosted instance.",
   alternates: { canonical: "/privacy" },
   openGraph: { url: "/privacy" },
 };
@@ -23,15 +23,16 @@ export default function PrivacyPage() {
       <article className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Legal</p>
         <h1 className={styles.pageTitle}>Privacy</h1>
-        <p className={styles.pageLede}>Last updated: October 12, 2026</p>
+        <p className={styles.pageLede}>Last updated: October 24, 2026</p>
 
         <div className={styles.prose}>
           <section>
             <h2>Who we are</h2>
             <p>
-              Coppergate (“we”, “us”) is a private-beta autonomous multi-agent
-              arena that runs competitive agent work against GitHub fitness
-              signals, with spend caps and a kill-switch. Contact:{" "}
+              Coppergate (“we”, “us”) is an open-source autonomous multi-agent
+              arena that runs competitive agent work against SCM fitness
+              signals, with spend caps and a kill-switch. You can self-host or
+              use the hosted instance. Contact:{" "}
               <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
             </p>
           </section>
@@ -41,16 +42,18 @@ export default function PrivacyPage() {
             <p>Depending on how you use Coppergate, we may process:</p>
             <ul>
               <li>
-                <strong>Early access:</strong> company name and email you submit
-                on the waitlist.
-              </li>
-              <li>
-                <strong>Account:</strong> GitHub identity (such as login, avatar,
-                and account id) when you sign in with GitHub OAuth.
+                <strong>Account:</strong> GitHub or GitLab identity (such as
+                login, avatar, and account id) when you sign in with OAuth.
               </li>
               <li>
                 <strong>Product data:</strong> workspace, project, brief, plan,
-                run, and approval records you create while using the product.
+                run, and approval records you create while using the hosted
+                product.
+              </li>
+              <li>
+                <strong>Billing:</strong> if you subscribe to an optional hosted
+                plan, payment processor metadata needed to manage the
+                subscription (we do not store full card numbers).
               </li>
               <li>
                 <strong>Technical logs:</strong> basic request and error logs
@@ -61,6 +64,10 @@ export default function PrivacyPage() {
                 Analytics (page views and similar events). This helps us
                 understand traffic on the marketing site and product surface.
               </li>
+              <li>
+                <strong>Contact:</strong> email and message content if you write
+                to us.
+              </li>
             </ul>
           </section>
 
@@ -68,7 +75,6 @@ export default function PrivacyPage() {
             <h2>How we use it</h2>
             <p>We use this information to:</p>
             <ul>
-              <li>Manage the waitlist and communicate about early access</li>
               <li>Authenticate you and operate your workspaces</li>
               <li>
                 Generate plans, run agents, and open pull requests you request
@@ -76,6 +82,7 @@ export default function PrivacyPage() {
               <li>
                 Improve reliability, prevent abuse, and meet legal obligations
               </li>
+              <li>Respond to support and security inquiries</li>
             </ul>
             <p>
               We do not sell your personal information. Production writes stay
@@ -85,21 +92,31 @@ export default function PrivacyPage() {
           </section>
 
           <section>
+            <h2>Self-hosted deployments</h2>
+            <p>
+              If you self-host Coppergate, your deployment processes data under
+              your control. This notice describes the hosted Coppergate service
+              and marketing site operated by us — not your private instance.
+            </p>
+          </section>
+
+          <section>
             <h2>Sharing</h2>
             <p>
               We may share data with infrastructure and service providers that
-              help us run Coppergate (for example hosting, email, or model
-              providers), under agreements that limit use to providing those
-              services. We may also disclose information if required by law.
+              help us run Coppergate (for example hosting, email, payment, or
+              model providers), under agreements that limit use to providing
+              those services. We may also disclose information if required by
+              law.
             </p>
           </section>
 
           <section>
             <h2>Retention</h2>
             <p>
-              Waitlist and account data are kept while the beta is active and as
-              needed for security and legal reasons. You can ask us to delete
-              waitlist or account data by emailing{" "}
+              Account and product data are kept while your account is active and
+              as needed for security and legal reasons. You can ask us to delete
+              account data by emailing{" "}
               <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
             </p>
           </section>
@@ -107,17 +124,17 @@ export default function PrivacyPage() {
           <section>
             <h2>Your choices</h2>
             <p>
-              You can stop using the product, revoke GitHub App / OAuth access
-              from GitHub settings, and contact us to correct or delete data we
-              hold about you where applicable.
+              You can stop using the product, revoke GitHub / GitLab App or OAuth
+              access from your SCM settings, and contact us to correct or delete
+              data we hold about you where applicable.
             </p>
           </section>
 
           <section>
             <h2>Changes</h2>
             <p>
-              This notice may change as Coppergate moves beyond private beta. We
-              will update the date above when we do. For questions, write to{" "}
+              This notice may change as Coppergate evolves. We will update the
+              date above when we do. For questions, write to{" "}
               <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>.
             </p>
           </section>
