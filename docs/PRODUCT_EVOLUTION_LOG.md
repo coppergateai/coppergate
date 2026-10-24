@@ -165,5 +165,36 @@
 
 ### Remaining opportunities
 
-- Mission Control live check after deploy (arenaNeedsAttention via Cycle 4 classifier).
+- ~~Mission Control live check after deploy (arenaNeedsAttention via Cycle 4 classifier).~~ → Cycle 7
 - Hosted Playwright: Evidence Accept + Retry happy paths.
+
+---
+
+## 2026-10-24 — Cycle 7 (Mission Control ↔ Evidence)
+
+### Discovered
+
+| Problem | Evidence | Class |
+|---------|----------|--------|
+| Accept-ready tasks in attention list but omitted from Needs attention number | mission-control metric = inbox + arena only | Improve — dishonest metric |
+| Review CTAs deep-linked to task detail, skipping Evidence Accept | mission-control.ts review_required href | Improve |
+
+### Decisions
+
+1. Add `needsEvidenceAccept` (REVIEW_REQUIRED count) into the attention total.
+2. Attention rows + metric CTA land on `?tab=evidence`.
+
+### Implemented
+
+- `packages/db/src/mission-control.ts` metric + Evidence href/copy.
+- `mission-control.tsx` total + meta: inbox · evidence · arena; status line for Accept-ready.
+
+### Validation
+
+- Web/db typecheck.
+- Classifier tests still green.
+
+### Remaining opportunities
+
+- Hosted Playwright: Evidence Accept + Retry + MC attention count.
+- Inbox empty state could deep-link Evidence when Accept-ready exists.

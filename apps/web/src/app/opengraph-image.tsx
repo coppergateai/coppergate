@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Coppergate — Set a budget. Agents war. Survivors ship.";
+export const alt = "Coppergate — Set a budget. Agents compete. Survivors ship.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -60,7 +60,7 @@ export default function OpenGraphImage() {
               maxWidth: 900,
             }}
           >
-            Set a budget. Agents war. Survivors ship.
+            Set a budget. Agents compete. Survivors ship.
           </div>
           <div
             style={{

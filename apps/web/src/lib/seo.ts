@@ -4,7 +4,7 @@ import { getSiteUrl } from "./site-url";
 export const SITE_NAME = "Coppergate";
 
 export const SITE_TITLE =
-  "Coppergate — Set a budget. Agents war. Survivors ship.";
+  "Coppergate — Set a budget. Agents compete. Survivors ship.";
 
 export const SITE_DESCRIPTION =
   "MIT open-source Survivor arena for engineering teams: agents compete inside a spend cap from issue to verified GitHub/GitLab PR. Self-host free or try hosted — fitness and evidence decide; you review what ships.";
