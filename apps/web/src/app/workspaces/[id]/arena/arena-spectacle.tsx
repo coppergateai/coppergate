@@ -261,6 +261,8 @@ export function ArenaSpectacle({
   const [pending, setPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  /** Idle roster stays collapsed — full fan-out is too noisy for ops. */
+  const [showIdle, setShowIdle] = useState<Set<string>>(new Set());
   const expandInitialized = useRef(false);
   const [selected, setSelected] = useState<SelectedAgent | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -595,7 +597,9 @@ export function ArenaSpectacle({
                     <span className={styles.expandHint}>
                       {isExpanded
                         ? "Hide agents"
-                        : `View ${lane.contenders.length} agents`}
+                        : hotAgents.length > 0
+                          ? `View ${hotAgents.length} active · ${lane.contenders.length - hotAgents.length} idle`
+                          : `View roster · ${lane.contenders.length} idle`}
                     </span>
                   </button>
 
@@ -613,65 +617,123 @@ export function ArenaSpectacle({
                           </span>
                         ))}
                       </div>
-                      <div className={styles.agents}>
-                        {lane.contenders.length === 0 ? (
-                          <p className={styles.emptyAgents}>
-                            Contenders arm on Resume
-                          </p>
-                        ) : (
-                          [...lane.contenders]
-                            .map((c) => ({
-                              c,
-                              state: classifyRuntime(c, arenaLive),
-                            }))
-                            .sort(
-                              (a, b) =>
-                                RUNTIME_RANK[a.state] - RUNTIME_RANK[b.state],
-                            )
-                            .map(({ c, state }) => {
-                              const selectedHere =
-                                selected?.contenderId === c.id &&
-                                selected.projectId === lane.projectId;
-                              const hot = state !== "idle";
-                              return (
+                      {(() => {
+                        const ranked = [...lane.contenders]
+                          .map((c) => ({
+                            c,
+                            state: classifyRuntime(c, arenaLive),
+                          }))
+                          .sort(
+                            (a, b) =>
+                              RUNTIME_RANK[a.state] - RUNTIME_RANK[b.state],
+                          );
+                        const active = ranked.filter((x) => x.state !== "idle");
+                        const idle = ranked.filter((x) => x.state === "idle");
+                        const idleOpen = showIdle.has(lane.projectId);
+                        const renderAgent = (
+                          c: ContenderView,
+                          state: RuntimeState,
+                          compact: boolean,
+                        ) => {
+                          const selectedHere =
+                            selected?.contenderId === c.id &&
+                            selected.projectId === lane.projectId;
+                          const hot = state !== "idle";
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              className={`${styles.agent} ${TONE[state].agent} ${
+                                state === "running" ? styles.agentPulse : ""
+                              } ${selectedHere ? styles.agentSelected : ""} ${
+                                compact ? styles.agentCompact : ""
+                              }`}
+                              onClick={() =>
+                                setSelected({
+                                  projectId: lane.projectId,
+                                  contenderId: c.id,
+                                })
+                              }
+                            >
+                              <div className={styles.agentTop}>
+                                <span className={styles.agentRole}>
+                                  {titleCase(c.profileKey)}
+                                </span>
+                                <span className={styles.agentState}>
+                                  {runtimeLabel(state)}
+                                </span>
+                              </div>
+                              {hot ? (
+                                <p className={styles.agentActivity}>
+                                  {activityLine(c, state)}
+                                </p>
+                              ) : compact ? null : (
+                                <p className={styles.agentMode}>
+                                  {temperLabel(c.temperament)} · {c.strategy}
+                                </p>
+                              )}
+                            </button>
+                          );
+                        };
+
+                        if (lane.contenders.length === 0) {
+                          return (
+                            <p className={styles.emptyAgents}>
+                              Contenders arm on Resume
+                            </p>
+                          );
+                        }
+
+                        return (
+                          <>
+                            <div className={styles.agents}>
+                              {active.length === 0 ? (
+                                <p className={styles.emptyAgents}>
+                                  No active agents — roster standing by
+                                </p>
+                              ) : (
+                                active.map(({ c, state }) =>
+                                  renderAgent(c, state, false),
+                                )
+                              )}
+                            </div>
+                            {idle.length > 0 ? (
+                              <div className={styles.idleRoster}>
                                 <button
-                                  key={c.id}
                                   type="button"
-                                  className={`${styles.agent} ${TONE[state].agent} ${
-                                    state === "running"
-                                      ? styles.agentPulse
-                                      : ""
-                                  } ${selectedHere ? styles.agentSelected : ""}`}
-                                  onClick={() =>
-                                    setSelected({
-                                      projectId: lane.projectId,
-                                      contenderId: c.id,
-                                    })
-                                  }
+                                  className={styles.idleToggle}
+                                  aria-expanded={idleOpen}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowIdle((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(lane.projectId)) {
+                                        next.delete(lane.projectId);
+                                      } else {
+                                        next.add(lane.projectId);
+                                      }
+                                      return next;
+                                    });
+                                  }}
                                 >
-                                  <div className={styles.agentTop}>
-                                    <span className={styles.agentRole}>
-                                      {titleCase(c.profileKey)}
-                                    </span>
-                                    <span className={styles.agentState}>
-                                      {runtimeLabel(state)}
-                                    </span>
-                                  </div>
-                                  {hot ? (
-                                    <p className={styles.agentActivity}>
-                                      {activityLine(c, state)}
-                                    </p>
-                                  ) : (
-                                    <p className={styles.agentMode}>
-                                      {temperLabel(c.temperament)} ·{" "}
-                                      {c.strategy}
-                                    </p>
-                                  )}
+                                  {idleOpen
+                                    ? `Hide ${idle.length} idle`
+                                    : `Show ${idle.length} idle`}
                                 </button>
-                              );
-                            })
-                        )}
-                      </div>
+                                {idleOpen ? (
+                                  <div
+                                    className={`${styles.agents} ${styles.agentsIdle}`}
+                                  >
+                                    {idle.map(({ c, state }) =>
+                                      renderAgent(c, state, true),
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </>
+                        );
+                      })()}
                     </div>
                   ) : null}
                 </article>
