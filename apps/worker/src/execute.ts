@@ -52,9 +52,11 @@ import {
   type GithubDeliveryClient,
 } from "@coppergate/github";
 import {
+  DockerSandboxManager,
   LocalSandboxManager,
   type SandboxCloneMode,
   type SandboxHandle,
+  type SandboxManager,
 } from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
 import { buildDeliveryFiles } from "./delivery-files.js";
@@ -68,9 +70,21 @@ import {
   type ResolvedGithubDelivery,
 } from "./github-delivery.js";
 
-function resolveSandboxMode(): "local" | "off" {
+function resolveSandboxMode(): "local" | "docker" | "off" {
   const raw = (process.env.SANDBOX_MODE ?? "local").trim().toLowerCase();
-  return raw === "off" || raw === "0" || raw === "false" ? "off" : "local";
+  if (raw === "off" || raw === "0" || raw === "false") return "off";
+  if (raw === "docker" || raw === "gvisor" || raw === "docker-gvisor") {
+    return "docker";
+  }
+  return "local";
+}
+
+function createSandboxManager(
+  mode: "local" | "docker" | "off",
+): SandboxManager | null {
+  if (mode === "off") return null;
+  if (mode === "docker") return new DockerSandboxManager();
+  return new LocalSandboxManager();
 }
 
 /**
@@ -296,8 +310,17 @@ export async function executeClaimedRun(
   );
 
   const sandboxMode = resolveSandboxMode();
-  const sandboxManager =
-    sandboxMode === "local" ? new LocalSandboxManager() : null;
+  if (
+    sandboxMode === "local" &&
+    process.env.NODE_ENV === "production" &&
+    process.env.ALLOW_LOCAL_SANDBOX !== "1"
+  ) {
+    log.warn(
+      "SANDBOX_MODE=local in production — host spawn is not strong isolation; set SANDBOX_MODE=docker for gVisor/runc containers (ALLOW_LOCAL_SANDBOX=1 silences)",
+      { runId: run.id },
+    );
+  }
+  const sandboxManager = createSandboxManager(sandboxMode);
   let sandbox: SandboxHandle | null = null;
   /** Captured before sandbox destroy so delivery can use real file bodies. */
   let deliveryBundle: Awaited<ReturnType<typeof buildDeliveryFiles>> | null =
