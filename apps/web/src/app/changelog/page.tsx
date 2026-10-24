@@ -15,6 +15,15 @@ export const metadata: Metadata = publicPageMetadata({
 const entries = [
   {
     date: "2026-10-24",
+    title: "OSS conversion consistency",
+    items: [
+      "Brand line unified: Agents compete (title, footer, OG, manifest)",
+      "Nav primary: Start on GitHub; Try hosted secondary — no duplicate Sign in",
+      "Pricing / changelog / mobile drawer: self-host-first CTA hierarchy",
+    ],
+  },
+  {
+    date: "2026-10-24",
     title: "Paid pricing deferred",
     items: [
       "Public pricing: Community $0 only — paid hosted plan CTAs removed",

@@ -23,6 +23,9 @@ type Props = {
   recent: SerializedApproval[];
   initialTab: InboxTab;
   initialSelectedId: string | null;
+  /** REVIEW_REQUIRED deliveries — Accept lives on Evidence, not Inbox. */
+  evidenceCount?: number;
+  evidenceHref?: string | null;
 };
 
 function formatRelative(iso: string): string {
@@ -88,6 +91,8 @@ export function InboxShell({
   recent,
   initialTab,
   initialSelectedId,
+  evidenceCount = 0,
+  evidenceHref = null,
 }: Props) {
   const router = useRouter();
   const toast = useToast();
@@ -391,17 +396,24 @@ export function InboxShell({
           <p className={styles.emptyBody}>{emptyCopy.body}</p>
           {counts.pending === 0 && tab !== "recent" ? (
             <p className={styles.emptyHint}>
-              Nothing pending usually means autonomous work is running or gates
-              are quiet — check Arena or Activity.
+              {evidenceCount > 0
+                ? `${evidenceCount} deliver${evidenceCount === 1 ? "y" : "ies"} waiting on Evidence Accept — Inbox is only for brief/task gates.`
+                : "Nothing pending usually means autonomous work is running or gates are quiet — check Arena or Activity."}
             </p>
           ) : null}
           <div className={styles.emptyActions}>
-            <Link
-              href={`/workspaces/${workspaceId}/projects`}
-              className={styles.emptyCta}
-            >
-              Browse projects
-            </Link>
+            {evidenceCount > 0 && evidenceHref ? (
+              <Link href={evidenceHref} className={styles.emptyCta}>
+                Open Evidence → Accept
+              </Link>
+            ) : (
+              <Link
+                href={`/workspaces/${workspaceId}/projects`}
+                className={styles.emptyCta}
+              >
+                Browse projects
+              </Link>
+            )}
             <Link
               href={`/workspaces/${workspaceId}/arena`}
               className={styles.emptyLink}

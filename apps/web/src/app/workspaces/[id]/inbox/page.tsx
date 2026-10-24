@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
   getWorkspaceForMember,
+  getWorkspaceMissionControl,
   listInboxApprovalsForWorkspace,
   listRecentDecidedApprovalsForWorkspace,
 } from "@coppergate/db";
@@ -39,9 +40,10 @@ export default async function WorkspaceInboxPage({
     notFound();
   }
 
-  const [pendingRows, recentRows] = await Promise.all([
+  const [pendingRows, recentRows, mission] = await Promise.all([
     listInboxApprovalsForWorkspace(db, id, { status: "pending" }),
     listRecentDecidedApprovalsForWorkspace(db, id),
+    getWorkspaceMissionControl(db, id, access.workspace.name),
   ]);
 
   const pending = pendingRows.map((r) => serializeApproval(r, id));
@@ -49,6 +51,9 @@ export default async function WorkspaceInboxPage({
   const initialTab = parseTab(sp.tab);
   const initialSelectedId =
     typeof sp.a === "string" && sp.a.length > 0 ? sp.a : null;
+  const evidenceAttention = mission.attention.find(
+    (a) => a.kind === "review_required",
+  );
 
   return (
     <Suspense fallback={<div style={{ padding: "1rem" }}>Loading inbox…</div>}>
@@ -60,6 +65,8 @@ export default async function WorkspaceInboxPage({
         recent={recent}
         initialTab={initialTab}
         initialSelectedId={initialSelectedId}
+        evidenceCount={mission.metrics.needsEvidenceAccept}
+        evidenceHref={evidenceAttention?.href ?? null}
       />
     </Suspense>
   );

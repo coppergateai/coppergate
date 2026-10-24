@@ -45,6 +45,8 @@ export function GithubPanel({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showAllConnected, setShowAllConnected] = useState(false);
+  const CONNECTED_PREVIEW = 5;
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${workspaceId}/github`, {
@@ -183,9 +185,14 @@ export function GithubPanel({
 
         {connected.length > 0 ? (
           <div className={styles.subBlock}>
-            <h3 className={styles.subTitle}>Connected repos</h3>
+            <h3 className={styles.subTitle}>
+              Connected repos · {connected.length}
+            </h3>
             <ul className={styles.list}>
-              {connected.map((repo) => (
+              {(showAllConnected
+                ? connected
+                : connected.slice(0, CONNECTED_PREVIEW)
+              ).map((repo) => (
                 <li key={repo.id} className={styles.row}>
                   <span>
                     {repo.fullName}
@@ -226,6 +233,17 @@ export function GithubPanel({
                 </li>
               ))}
             </ul>
+            {connected.length > CONNECTED_PREVIEW ? (
+              <button
+                type="button"
+                className={styles.linkBtn}
+                onClick={() => setShowAllConnected((v) => !v)}
+              >
+                {showAllConnected
+                  ? "Show fewer"
+                  : `Show all ${connected.length} repos`}
+              </button>
+            ) : null}
           </div>
         ) : null}
 
