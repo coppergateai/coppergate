@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SkeletonStack } from "@/components/app/ui";
+import { AgentInspector } from "./agent-inspector";
 import styles from "./arena-mission.module.css";
 
 type ContenderRun = {
@@ -59,14 +59,6 @@ type Snapshot = {
 };
 
 type RuntimeState = "running" | "awaitingCi" | "needsAttention" | "idle";
-
-type RunEvent = {
-  id: string;
-  seq: number;
-  kind: string;
-  payload: unknown;
-  createdAt: string;
-};
 
 type Props = {
   workspaceId: string;
@@ -157,13 +149,6 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
   return run.status.replace(/_/g, " ");
 }
 
-function formatUsd(micros: number): string {
-  const dollars = micros / 1_000_000;
-  if (dollars === 0) return "$0";
-  if (dollars < 0.01) return "<$0.01";
-  return `$${dollars.toFixed(dollars < 1 ? 3 : 2)}`;
-}
-
 function formatSyncAge(syncedAt: string | null, nowMs: number): string {
   if (!syncedAt) return "—";
   const delta = Math.max(0, Math.floor((nowMs - Date.parse(syncedAt)) / 1000));
@@ -230,18 +215,6 @@ const TONE = {
   },
 } as const;
 
-function eventSummary(event: RunEvent): string {
-  const payload = event.payload;
-  if (payload && typeof payload === "object") {
-    const obj = payload as Record<string, unknown>;
-    if (typeof obj.message === "string") return obj.message;
-    if (typeof obj.summary === "string") return obj.summary;
-    if (typeof obj.text === "string") return obj.text;
-    if (typeof obj.status === "string") return obj.status;
-  }
-  return event.kind;
-}
-
 export function ArenaSpectacle({
   workspaceId,
   workspaceName,
@@ -257,8 +230,6 @@ export function ArenaSpectacle({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const expandInitialized = useRef(false);
   const [selected, setSelected] = useState<SelectedAgent | null>(null);
-  const [events, setEvents] = useState<RunEvent[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const applySnapshot = useCallback((data: Snapshot) => {
@@ -357,32 +328,6 @@ export function ArenaSpectacle({
     if (!contender) return null;
     return { lane, contender, state: classifyRuntime(contender) };
   }, [selected, snapshot]);
-
-  useEffect(() => {
-    if (!selectedAgent?.contender.latestRun) {
-      setEvents([]);
-      return;
-    }
-    const runId = selectedAgent.contender.latestRun.id;
-    let cancelled = false;
-    setEventsLoading(true);
-    void fetch(
-      `/api/runs/${runId}/events?workspaceId=${encodeURIComponent(workspaceId)}`,
-      { credentials: "same-origin" },
-    )
-      .then(async (res) => {
-        const data = (await res.json()) as { events?: RunEvent[] };
-        if (!cancelled && res.ok) {
-          setEvents((data.events ?? []).slice(-12).reverse());
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setEventsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedAgent?.contender.latestRun?.id, workspaceId]);
 
   async function control(action: "start" | "pause" | "stop") {
     if (action === "stop") {
@@ -672,115 +617,15 @@ export function ArenaSpectacle({
       </div>
 
       {selectedAgent ? (
-        <aside className={styles.inspector} aria-label="Agent inspector">
-          <div className={styles.inspectorHead}>
-            <div>
-              <p className={styles.inspectorEyebrow}>Agent inspector</p>
-              <h2 className={styles.inspectorTitle}>
-                {titleCase(selectedAgent.contender.profileKey)}
-              </h2>
-              <p className={styles.inspectorRepo}>
-                {selectedAgent.lane.repoFullName}
-              </p>
-            </div>
-            <button
-              type="button"
-              className={styles.inspectorClose}
-              onClick={() => setSelected(null)}
-              aria-label="Close inspector"
-            >
-              Close
-            </button>
-          </div>
-
-          <span
-            className={`${styles.statusBadge} ${TONE[selectedAgent.state].badge}`}
-          >
-            {runtimeLabel(selectedAgent.state)}
-          </span>
-
-          <section className={styles.inspectorSection}>
-            <h3 className={styles.inspectorSectionTitle}>Current task</h3>
-            {selectedAgent.contender.latestRun ? (
-              <>
-                <p className={styles.inspectorTask}>
-                  {selectedAgent.contender.latestRun.taskTitle}
-                </p>
-                <p className={styles.inspectorMeta}>
-                  Status{" "}
-                  {selectedAgent.contender.latestRun.status.replace(/_/g, " ")}
-                  {" · "}
-                  Cost{" "}
-                  {formatUsd(
-                    selectedAgent.contender.latestRun.actualCostMicros,
-                  )}
-                </p>
-                <div className={styles.inspectorLinks}>
-                  <Link
-                    href={`/workspaces/${workspaceId}/projects/${selectedAgent.lane.projectId}/tasks/${selectedAgent.contender.latestRun.taskId}`}
-                    className={styles.inspectorLink}
-                  >
-                    Open delivery review
-                  </Link>
-                  {selectedAgent.contender.latestRun.prUrl ? (
-                    <a
-                      href={selectedAgent.contender.latestRun.prUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={styles.inspectorLink}
-                    >
-                      PR #{selectedAgent.contender.latestRun.prNumber ?? "?"}
-                    </a>
-                  ) : null}
-                </div>
-                {selectedAgent.contender.latestRun.errorCode ? (
-                  <p className={styles.inspectorError}>
-                    {selectedAgent.contender.latestRun.errorCode}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className={styles.inspectorEmpty}>
-                No run yet for this agent. Standing by for the next task.
-              </p>
-            )}
-          </section>
-
-          <section className={styles.inspectorSection}>
-            <h3 className={styles.inspectorSectionTitle}>Config</h3>
-            <p className={styles.inspectorMeta}>
-              {temperLabel(selectedAgent.contender.temperament)} ·{" "}
-              {selectedAgent.contender.strategy}
-              {" · "}
-              Budget {formatUsd(selectedAgent.contender.budgetMicrosRemaining)}{" "}
-              remaining
-            </p>
-          </section>
-
-          <section className={styles.inspectorSection}>
-            <h3 className={styles.inspectorSectionTitle}>Recent activity</h3>
-            {eventsLoading ? (
-              <p className={styles.inspectorEmpty}>Loading events…</p>
-            ) : events.length === 0 ? (
-              <p className={styles.inspectorEmpty}>No events yet.</p>
-            ) : (
-              <ul className={styles.eventList}>
-                {events.map((ev) => (
-                  <li key={ev.id} className={styles.eventItem}>
-                    <span className={styles.eventTime}>
-                      {new Date(ev.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
-                    </span>
-                    <span className={styles.eventText}>{eventSummary(ev)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </aside>
+        <AgentInspector
+          workspaceId={workspaceId}
+          projectId={selectedAgent.lane.projectId}
+          repoFullName={selectedAgent.lane.repoFullName}
+          contender={selectedAgent.contender}
+          statusLabel={runtimeLabel(selectedAgent.state)}
+          statusBadgeClass={TONE[selectedAgent.state].badge ?? ""}
+          onClose={() => setSelected(null)}
+        />
       ) : null}
     </div>
   );

@@ -82,9 +82,10 @@ Layout: AppChrome sidebar — **Overview**, Projects, Arena, Inbox, Activity, Se
 Varsayılan app teması: **light** (toggle ile dark).
 
 ### `/workspaces/[id]` — Mission Control (Overview)
-- Metrikler: Active runs, Needs approval, Verified PRs (ay), Budget used/cap
-- Needs your attention: pending approvals, budget paused, REVIEW_REQUIRED
-- Active executions: in-flight tasks / arena lanes + CTA
+- Header: workspace eyebrow, status chip + copy, Open Arena CTA
+- Metrik kartları: Active runs, Needs approval, Verified PRs (ay), Budget used/cap
+- Sol: Needs your attention + Recent activity timeline (audit events, Activity ile aynı human labels)
+- Sağ: Active executions (pipeline steps) + Quick actions
 - İlk 10 sn’de müdahale gereken iş görünür
 
 ### `/workspaces/[id]/projects` — Projeler
@@ -179,7 +180,7 @@ Sekmeler (`?tab=`):
 /workspaces/[id]/projects/[projectId]/tasks/[taskId]  Task + Accept
 /workspaces/[id]/arena     Arena spectacle
 /workspaces/[id]/inbox     Approvals
-/workspaces/[id]/activity  Audit log
+/workspaces/[id]/activity  Agent Operations Timeline
 /workspaces/[id]/settings  Workspace config
 /share/r/[token]           Public redacted report
 /ops/health                Ops health UI

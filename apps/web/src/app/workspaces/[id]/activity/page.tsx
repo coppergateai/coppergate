@@ -1,30 +1,18 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
+  getTaskForWorkspace,
   getWorkspaceForMember,
+  getWorkspaceMissionControl,
   listAuditEventsForWorkspace,
+  listWorkspaceArenaSnapshot,
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import styles from "../inbox/inbox.module.css";
+import { ActivityShell } from "./activity-shell";
+import type { ActivityEvent } from "./events";
+import { countEventsToday } from "./events";
 
 type PageProps = { params: Promise<{ id: string }> };
-
-type AuditRow = Awaited<
-  ReturnType<typeof listAuditEventsForWorkspace>
->[number];
-
-function formatRelative(iso: Date): string {
-  const diff = Date.now() - iso.getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 48) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 14) return `${days}d ago`;
-  return iso.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function parseMeta(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
@@ -39,6 +27,8 @@ function hrefFor(
   workspaceId: string,
   action: string,
   meta: Record<string, unknown> | null,
+  targetType: string | null,
+  targetId: string | null,
 ): string | null {
   const projectId =
     typeof meta?.projectId === "string" ? meta.projectId : null;
@@ -49,76 +39,47 @@ function hrefFor(
   if (projectId) {
     return `/workspaces/${workspaceId}/projects/${projectId}`;
   }
-  if (action.startsWith("signal.")) {
-    return `/workspaces/${workspaceId}/settings?tab=signals`;
+  if (targetType === "project" && targetId) {
+    return `/workspaces/${workspaceId}/projects/${targetId}`;
+  }
+  if (action.startsWith("signal.") || action.startsWith("credentials.")) {
+    const tab = action.startsWith("credentials.") ? "llm" : "signals";
+    return `/workspaces/${workspaceId}/settings?tab=${tab}`;
+  }
+  if (action.startsWith("mcp.")) {
+    return `/workspaces/${workspaceId}/settings?tab=llm`;
+  }
+  if (
+    action.startsWith("arena.") ||
+    action.startsWith("tournament.") ||
+    action === "contender.eliminated" ||
+    action === "contender.debit" ||
+    action === "fitness.score"
+  ) {
+    return projectId
+      ? `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`
+      : `/workspaces/${workspaceId}/arena`;
   }
   return null;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  "brief.approved": "Brief approved",
-  "brief.submitted": "Brief submitted",
-  "task.approved": "Task approved",
-  "task.submitted": "Task submitted",
-  "task.accepted": "Task accepted",
-  "task.rejected": "Task rejected",
-  "run.started": "Run started",
-  "run.completed": "Run completed",
-  "run.failed": "Run failed",
-  "run.cancelled": "Run cancelled",
-  "signal.ingested": "Signal ingested",
-  "signal.armed": "Signal armed",
-  "project.created": "Project created",
-  "workspace.updated": "Workspace updated",
-  "approval.resolved": "Approval resolved",
-  "merge.enabled": "Merge enabled",
-  "merge.disabled": "Merge disabled",
-  "merge.attempt": "Merge attempted",
-  "merge.blocked": "Merge blocked",
-  "merge.blocked_cleared": "Merge unblocked",
-  "ship.rollback": "Ship rollback opened",
-  "maintainer.replan": "Backlog replan",
-  "maintainer.release": "Release published",
-  "task.import_issue": "Issue imported",
-  "maintainer.replan_queue_failed": "Replan queue failed",
-  "maintainer.auto_accept": "Auto-accepted PR",
-  "arena.started": "Arena started",
-  "arena.stopped": "Arena stopped",
-};
+/** Tournament audit rows often store taskId without projectId — resolve for links. */
+async function resolveTaskProjects(
+  workspaceId: string,
+  taskIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(taskIds)].filter(Boolean);
+  if (unique.length === 0) return new Map();
 
-function labelFor(action: string): string {
-  return ACTION_LABELS[action] ?? action.replace(/\./g, " · ");
-}
+  const rows = await Promise.all(
+    unique.map((taskId) => getTaskForWorkspace(db, workspaceId, taskId)),
+  );
 
-type GroupedRow = {
-  key: string;
-  action: string;
-  title: string;
-  count: number;
-  latest: AuditRow;
-  meta: Record<string, unknown> | null;
-};
-
-/** Collapse consecutive identical actions (e.g. merge.blocked spam). */
-function groupConsecutive(rows: AuditRow[]): GroupedRow[] {
-  const out: GroupedRow[] = [];
-  for (const r of rows) {
-    const title = labelFor(r.action);
-    const prev = out[out.length - 1];
-    if (prev && prev.action === r.action) {
-      prev.count += 1;
-      continue;
-    }
-    out.push({
-      key: r.id,
-      action: r.action,
-      title,
-      count: 1,
-      latest: r,
-      meta: parseMeta(r.meta),
-    });
+  const map = new Map<string, string>();
+  for (const task of rows) {
+    if (task) map.set(task.id, task.projectId);
   }
-  return out;
+  return map;
 }
 
 export default async function WorkspaceActivityPage({ params }: PageProps) {
@@ -129,91 +90,77 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
   const access = await getWorkspaceForMember(db, id, user.id);
   if (!access) notFound();
 
-  const rows = await listAuditEventsForWorkspace(db, id, { limit: 80 });
-  const grouped = groupConsecutive(rows);
+  const [rows, mission, arena] = await Promise.all([
+    listAuditEventsForWorkspace(db, id, { limit: 100 }),
+    getWorkspaceMissionControl(db, id, access.workspace.name),
+    listWorkspaceArenaSnapshot(db, id),
+  ]);
+
+  const parsed = rows.map((r) => ({
+    row: r,
+    meta: parseMeta(r.meta),
+  }));
+
+  const taskIdsNeedingProject = parsed
+    .map(({ meta }) => {
+      const taskId = typeof meta?.taskId === "string" ? meta.taskId : null;
+      const projectId =
+        typeof meta?.projectId === "string" ? meta.projectId : null;
+      return taskId && !projectId ? taskId : null;
+    })
+    .filter((x): x is string => Boolean(x));
+
+  const taskProjectMap = await resolveTaskProjects(id, taskIdsNeedingProject);
+
+  const events: ActivityEvent[] = parsed.map(({ row: r, meta: rawMeta }) => {
+    let meta = rawMeta;
+    const taskId = typeof meta?.taskId === "string" ? meta.taskId : null;
+    const projectId =
+      typeof meta?.projectId === "string" ? meta.projectId : null;
+    if (taskId && !projectId) {
+      const resolved = taskProjectMap.get(taskId);
+      if (resolved) {
+        meta = { ...(meta ?? {}), projectId: resolved };
+      }
+    }
+    return {
+      id: r.id,
+      actor: r.actor,
+      action: r.action,
+      targetType: r.targetType,
+      targetId: r.targetId,
+      meta,
+      href: hrefFor(id, r.action, meta, r.targetType, r.targetId),
+      createdAt: r.createdAt.toISOString(),
+    };
+  });
+
+  const activeAgents = arena.projects.reduce(
+    (sum, lane) =>
+      sum + lane.contenders.filter((c) => c.status === "ACTIVE").length,
+    0,
+  );
+
+  const needsReview = mission.metrics.needsApproval;
+  const systemHealthy =
+    needsReview === 0 && mission.metrics.budgetStatus !== "paused";
 
   return (
-    <main className={styles.main}>
-      <header className={styles.pageBar}>
-        <div className={styles.pageBarLeft}>
-          <h1 className={styles.title}>Activity</h1>
-          <div className={styles.chips}>
-            <span className={styles.chip}>{access.workspace.name}</span>
-            <span className={styles.chip}>{grouped.length} recent</span>
-          </div>
-        </div>
-        <Link
-          href={`/workspaces/${id}/inbox`}
-          className={styles.toolbarGhost}
-        >
-          Inbox
-        </Link>
-      </header>
-
-      <div className={styles.body}>
-        {grouped.length === 0 ? (
-          <div className={styles.empty}>
-            <p className={styles.emptyTitle}>No activity yet</p>
-            <p className={styles.emptyBody}>
-              Approvals, briefs, signals, and runs will show up here.{" "}
-              <Link
-                href={`/workspaces/${id}/projects`}
-                className={styles.emptyLink}
-              >
-                Open projects
-              </Link>
-            </p>
-          </div>
-        ) : (
-          <ul className={styles.list}>
-            {grouped.map((g) => {
-              const href = hrefFor(id, g.action, g.meta);
-              const displayTitle =
-                g.count > 1 ? `${g.title} ×${g.count}` : g.title;
-              const detail =
-                g.action === "merge.blocked" &&
-                typeof g.meta?.message === "string"
-                  ? `${g.meta.message} — Fix GitHub branch protection / CODEOWNERS so the Coppergate App can merge, then clear merge.blocked.`
-                  : typeof g.meta?.cta === "string"
-                    ? g.meta.cta
-                    : typeof g.meta?.message === "string"
-                      ? g.meta.message
-                      : g.latest.targetType && g.latest.targetId
-                        ? `${g.latest.targetType} ${g.latest.targetId.slice(0, 8)}`
-                        : g.latest.actor;
-              const inner = (
-                <>
-                  <span
-                    className={`${styles.statusRing} ${styles.statusSettled}`}
-                    aria-hidden
-                  />
-                  <span className={styles.rowBody}>
-                    <span className={styles.rowTop}>
-                      <span className={styles.rowType}>{g.latest.actor}</span>
-                      <span className={styles.rowTime}>
-                        {formatRelative(g.latest.createdAt)}
-                      </span>
-                    </span>
-                    <span className={styles.rowTitle}>{displayTitle}</span>
-                    <span className={styles.rowMeta}>{detail}</span>
-                  </span>
-                </>
-              );
-              return (
-                <li key={g.key} className={styles.row}>
-                  {href ? (
-                    <Link href={href} className={styles.rowLinkActivity}>
-                      {inner}
-                    </Link>
-                  ) : (
-                    <div className={styles.rowLinkActivity}>{inner}</div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </main>
+    <ActivityShell
+      workspaceId={id}
+      workspaceName={access.workspace.name}
+      events={events}
+      metrics={{
+        eventsToday: countEventsToday(events),
+        activeAgents,
+        needsReview,
+        systemHealthy,
+        healthLabel: systemHealthy
+          ? "System healthy"
+          : mission.metrics.budgetStatus === "paused"
+            ? "Budget paused"
+            : "Needs attention",
+      }}
+    />
   );
 }
