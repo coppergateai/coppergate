@@ -33,8 +33,9 @@ export default async function LoginPage() {
           <BrandMark className={styles.authMark} size={52} />
           <h1 className={styles.authTitle}>Try the hosted arena</h1>
           <p className={styles.authLede}>
-            Sign in with GitHub or GitLab to open workspaces. We only request
-            identity scopes — repository access comes later under your control.
+            Free to explore — no paid plan required. Sign in with GitHub or
+            GitLab to open workspaces. We only request identity scopes —
+            repository access comes later under your control.
           </p>
           {githubReady ? (
             <a className={styles.authCta} href="/api/auth/github">
@@ -65,11 +66,15 @@ export default async function LoginPage() {
             Prefer self-host? Read the guide →
           </a>
           <p className={styles.authNote}>
-            MIT · Self-host or try hosted · Kill-switch + spend caps
+            MIT · Community $0 to self-host · Kill-switch + spend caps
           </p>
-          <Link className={styles.authBack} href="/">
-            ← Back home
-          </Link>
+          <p className={styles.authNote}>
+            <Link href="/docs/pricing">Pricing</Link>
+            {" · "}
+            <Link href="/docs/limitations">Limitations</Link>
+            {" · "}
+            <Link href="/">Home</Link>
+          </p>
         </div>
       </div>
     </SiteChrome>

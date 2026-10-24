@@ -15,6 +15,15 @@ export const metadata: Metadata = publicPageMetadata({
 const entries = [
   {
     date: "2026-10-24",
+    title: "Mid-page conversion exits",
+    items: [
+      "Fitness + pilot sections: contextual CTAs into evidence / get-started / FAQ",
+      "FAQ primary: Self-host guide (aligned with final CTA)",
+      "Login: free-to-explore copy, Pricing/Limitations links, quieter auth card",
+    ],
+  },
+  {
+    date: "2026-10-24",
     title: "OSS conversion consistency",
     items: [
       "Brand line unified: Agents compete (title, footer, OG, manifest)",

@@ -2938,10 +2938,8 @@
   padding: 2rem 1.75rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background:
-    radial-gradient(80% 70% at 50% 0%, var(--copper-dim), transparent 55%),
-    var(--surface);
-  box-shadow: var(--shadow-elevated);
+  background: var(--surface);
+  box-shadow: none;
   text-align: center;
 }
 

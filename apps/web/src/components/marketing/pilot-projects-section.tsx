@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PILOT_PROJECTS } from "./pilot-projects";
 import styles from "./marketing.module.css";
 
@@ -44,6 +45,23 @@ export function PilotProjectsSection() {
             </li>
           ))}
         </ul>
+
+        <div className={styles.sectionCtas}>
+          <a
+            className={styles.btnSecondary}
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Coppergate on GitHub
+          </a>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
+          </Link>
+          <a className={styles.inlineDocLink} href="#faq">
+            FAQ →
+          </a>
+        </div>
       </div>
     </section>
   );
