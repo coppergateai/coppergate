@@ -23,7 +23,7 @@ export function FaqBlock() {
             </p>
             <div className={styles.faqCtas}>
               <a
-                className={styles.btnSecondary}
+                className={styles.btnHeroPrimary}
                 href="https://github.com/coppergateai/coppergate"
                 target="_blank"
                 rel="noreferrer"

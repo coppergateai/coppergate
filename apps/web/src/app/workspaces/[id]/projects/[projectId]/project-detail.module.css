@@ -877,6 +877,81 @@ html[data-theme="light"] .legendFree {
   font-size: 0.8rem;
 }
 
+.configFold {
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.015);
+  overflow: hidden;
+}
+
+.configFoldSummary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.7rem 0.95rem;
+  color: var(--mute-strong);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.configFoldSummary::-webkit-details-marker {
+  display: none;
+}
+
+.configFoldSummary::after {
+  content: "+";
+  float: right;
+  color: var(--mute-soft);
+  font-weight: 500;
+}
+
+.configFold[open] > .configFoldSummary::after {
+  content: "−";
+}
+
+.configGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1.15rem;
+  margin: 0;
+  padding: 0.85rem 0.95rem 0.95rem;
+  border-top: 1px solid var(--line);
+}
+
+.configGrid > div {
+  min-width: 0;
+}
+
+.configGrid dt {
+  margin: 0 0 0.15rem;
+  color: var(--mute-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.configGrid dd {
+  margin: 0;
+  color: var(--paper);
+  font-size: 0.88rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.configGridWide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .configGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .subTitle {
   margin: 0 0 0.35rem;
   font-size: 0.95rem;

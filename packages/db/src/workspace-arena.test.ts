@@ -1,6 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import {
+  classifyContenderRuntime,
   closeDb,
   connectRepository,
   createDb,
@@ -13,9 +14,139 @@ import {
   startWorkspaceArena,
   stopWorkspaceArena,
   upsertGithubInstallation,
+  type WorkspaceArenaContenderRun,
 } from "./index.js";
 
 const url = process.env.DATABASE_URL;
+
+function runStub(
+  overrides: Partial<WorkspaceArenaContenderRun> & { status: string },
+): WorkspaceArenaContenderRun {
+  return {
+    id: "run-1",
+    taskId: "task-1",
+    taskTitle: "Stub",
+    actualCostMicros: 0,
+    prUrl: null,
+    prNumber: null,
+    errorCode: null,
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+describe("classifyContenderRuntime", () => {
+  it("treats CANCELLED as idle even with errorCode", () => {
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "CANCELLED", errorCode: "incomplete" }),
+        1_000_000,
+      ),
+      "idle",
+    );
+  });
+
+  it("flags FAILED / BLOCKED / EXPIRED as needsAttention when arena is live", () => {
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "FAILED" }), 1_000_000, {
+        arenaLive: true,
+      }),
+      "needsAttention",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "BLOCKED" }), 1_000_000, {
+        arenaLive: true,
+      }),
+      "needsAttention",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "EXPIRED" }), 1_000_000, {
+        arenaLive: true,
+      }),
+      "needsAttention",
+    );
+  });
+
+  it("quiets terminal failures when arena is not live", () => {
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "FAILED" }), 1_000_000, {
+        arenaLive: false,
+      }),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "BLOCKED" }), 1_000_000, {
+        arenaLive: false,
+      }),
+      "idle",
+    );
+  });
+
+  it("flags stuck VALIDATING as needsAttention when arena is not live", () => {
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "VALIDATING" }), 1_000_000, {
+        arenaLive: false,
+      }),
+      "needsAttention",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "WAITING_CI" }), 1_000_000, {
+        arenaLive: false,
+      }),
+      "needsAttention",
+    );
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "REVIEW_REQUIRED" }),
+        1_000_000,
+        { arenaLive: false },
+      ),
+      "awaitingCi",
+    );
+  });
+
+  it("does not treat SUCCEEDED + errorCode as needsAttention", () => {
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "SUCCEEDED", errorCode: "stale_warning" }),
+        1_000_000,
+      ),
+      "idle",
+    );
+  });
+
+  it("flags exhausted budget as needsAttention even when arena is stopped", () => {
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "FAILED" }), 0, {
+        arenaLive: false,
+      }),
+      "needsAttention",
+    );
+  });
+
+  it("maps live and CI statuses", () => {
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "RUNNING" }), 1),
+      "running",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "QUEUED" }), 1),
+      "running",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "WAITING_CI" }), 1, {
+        arenaLive: true,
+      }),
+      "awaitingCi",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "VALIDATING" }), 1, {
+        arenaLive: true,
+      }),
+      "awaitingCi",
+    );
+  });
+});
 
 describe("workspace arena fan-out", { skip: !url }, () => {
   const db = createDb(url!, { max: 2 });

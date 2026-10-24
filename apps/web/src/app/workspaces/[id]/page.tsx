@@ -5,14 +5,27 @@ import {
   getWorkspaceMissionControl,
   listAuditEventsForWorkspace,
 } from "@coppergate/db";
+import { activityHref } from "@/lib/activity-href";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { ActivityEvent } from "./activity/events";
 import { MissionControl } from "./mission-control";
 
-export const metadata: Metadata = { title: "Mission Control" };
-
 type PageProps = { params: Promise<{ id: string }> };
+
+/** Same-segment as layout — template from layout does not apply here. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const user = await currentUser();
+  if (!user) return { title: "Mission Control" };
+  const { id } = await params;
+  const access = await getWorkspaceForMember(db, id, user.id);
+  const name = access?.workspace.name ?? "Workspace";
+  return { title: `Mission Control · ${name}` };
+}
 
 function parseMeta(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
@@ -21,36 +34,6 @@ function parseMeta(raw: string | null): Record<string, unknown> | null {
   } catch {
     return null;
   }
-}
-
-function hrefFor(
-  workspaceId: string,
-  action: string,
-  meta: Record<string, unknown> | null,
-  targetType: string | null,
-  targetId: string | null,
-): string | null {
-  const projectId =
-    typeof meta?.projectId === "string" ? meta.projectId : null;
-  const taskId = typeof meta?.taskId === "string" ? meta.taskId : null;
-  if (taskId && projectId) {
-    return `/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}`;
-  }
-  if (projectId) {
-    return `/workspaces/${workspaceId}/projects/${projectId}`;
-  }
-  if (targetType === "project" && targetId) {
-    return `/workspaces/${workspaceId}/projects/${targetId}`;
-  }
-  if (action.startsWith("signal.")) {
-    return `/workspaces/${workspaceId}/settings?tab=signals`;
-  }
-  if (action.startsWith("arena.") || action.startsWith("tournament.")) {
-    return projectId
-      ? `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`
-      : `/workspaces/${workspaceId}/arena`;
-  }
-  return null;
 }
 
 export default async function WorkspaceOverviewPage({ params }: PageProps) {
@@ -83,7 +66,7 @@ export default async function WorkspaceOverviewPage({ params }: PageProps) {
       targetType: r.targetType,
       targetId: r.targetId,
       meta,
-      href: hrefFor(
+      href: activityHref(
         access.workspace.id,
         r.action,
         meta,

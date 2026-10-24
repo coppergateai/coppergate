@@ -940,12 +940,21 @@ export function shortId(id: string | null | undefined): string {
   return id.length > 10 ? id.slice(0, 8) : id;
 }
 
+function looksLikeUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f-]{4,}$/i.test(value);
+}
+
 export function actorLabel(actor: string): string {
   if (actor.startsWith("system:")) {
-    return actor.replace("system:", "SYSTEM:").toUpperCase();
+    const kind = actor.slice("system:".length).replace(/_/g, " ");
+    return kind ? `System · ${kind}` : "System";
   }
   if (actor.startsWith("worker")) {
-    return actor.toUpperCase();
+    const rest = actor.slice("worker".length).replace(/^[:\-_]/, "");
+    return rest ? `Worker · ${shortId(rest)}` : "Worker";
+  }
+  if (looksLikeUuid(actor)) {
+    return `Actor · ${shortId(actor)}`;
   }
   return actor;
 }

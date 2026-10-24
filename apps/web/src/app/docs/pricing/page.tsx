@@ -81,11 +81,14 @@ export default function PricingPage() {
 
         <div className={styles.pricingFootnote}>
           <p>
-            Community self-host stays $0 forever. Optional paid hosted plans are
-            deferred — do not expect Starter/Pro checkout until we reopen
-            pricing.
+            Community self-host stays $0 forever. There is no paid plan checkout
+            on this site right now — when hosted paid tiers return, we will
+            publish clear pricing here first.
           </p>
           <p>
+            Prefer a managed instance without paying?{" "}
+            <Link href="/login">Try hosted</Link>
+            {" · "}
             Questions?{" "}
             <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>
           </p>

@@ -1,4 +1,5 @@
 import { listAuditEventsForWorkspace } from "@coppergate/db";
+import { activityHref } from "@/lib/activity-href";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
@@ -15,31 +16,6 @@ function parseMeta(raw: string | null): Record<string, unknown> | null {
   } catch {
     return null;
   }
-}
-
-function activityHref(
-  workspaceId: string,
-  action: string,
-  meta: Record<string, unknown> | null,
-  targetType: string | null,
-  targetId: string | null,
-): string | null {
-  const projectId =
-    typeof meta?.projectId === "string" ? meta.projectId : null;
-  const taskId = typeof meta?.taskId === "string" ? meta.taskId : null;
-  if (taskId && projectId) {
-    return `/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}`;
-  }
-  if (projectId) {
-    return `/workspaces/${workspaceId}/projects/${projectId}`;
-  }
-  if (targetType === "task" && targetId && projectId) {
-    return `/workspaces/${workspaceId}/projects/${projectId}/tasks/${targetId}`;
-  }
-  if (action.startsWith("signal.")) {
-    return `/workspaces/${workspaceId}/settings?tab=signals`;
-  }
-  return null;
 }
 
 /** Workspace activity timeline from audit_events. */

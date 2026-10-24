@@ -83,7 +83,7 @@ export type WorkspaceArenaControlResult = {
   projects: WorkspaceArenaProjectLane[];
 };
 
-function isLiveArenaStatus(status: string | null | undefined): boolean {
+export function isLiveArenaStatus(status: string | null | undefined): boolean {
   return status === "RUNNING" || status === "ARMED";
 }
 
@@ -95,30 +95,37 @@ function deriveWorkspaceStatus(
     : "STOPPED";
 }
 
+export type ClassifyContenderRuntimeOptions = {
+  /** When false (paused/killed arena), terminal failures are history — not a live fire. */
+  arenaLive?: boolean;
+};
+
 /** Runtime bucket for a contender's latest run (Mission Control strip). */
 export function classifyContenderRuntime(
   latestRun: WorkspaceArenaContenderRun | null,
   budgetMicrosRemaining: number,
+  options?: ClassifyContenderRuntimeOptions,
 ): "running" | "awaitingCi" | "needsAttention" | "idle" {
+  const arenaLive = options?.arenaLive ?? true;
   if (budgetMicrosRemaining <= 0) return "needsAttention";
   if (!latestRun) return "idle";
   const st = latestRun.status;
+  // Soft-cancel / stop is a quiet terminal — not an ops fire to chase.
+  if (st === "CANCELLED") return "idle";
   if (st === "RUNNING" || st === "QUEUED") return "running";
-  if (
-    st === "VALIDATING" ||
-    st === "WAITING_CI" ||
-    st === "REVIEW_REQUIRED"
-  ) {
+  if (st === "REVIEW_REQUIRED") return "awaitingCi";
+  if (st === "VALIDATING" || st === "WAITING_CI") {
+    // Mid-flight validation while the arena is stopped is stuck debt, not "awaiting".
+    if (!arenaLive) return "needsAttention";
     return "awaitingCi";
   }
-  if (
-    st === "FAILED" ||
-    st === "BLOCKED" ||
-    st === "EXPIRED" ||
-    Boolean(latestRun.errorCode)
-  ) {
+  if (st === "FAILED" || st === "BLOCKED" || st === "EXPIRED") {
+    // Last-session terminals stay quiet until the arena is live again.
+    if (!arenaLive) return "idle";
     return "needsAttention";
   }
+  // errorCode on non-failed terminals (e.g. incomplete after cancel) must not
+  // inflate Needs attention while the arena is stopped.
   return "idle";
 }
 
@@ -132,10 +139,12 @@ function deriveSummary(
     idle: 0,
   };
   for (const lane of lanes) {
+    const arenaLive = isLiveArenaStatus(lane.arenaStatus);
     for (const c of lane.contenders) {
       const bucket = classifyContenderRuntime(
         c.latestRun,
         c.budgetMicrosRemaining,
+        { arenaLive },
       );
       summary[bucket] += 1;
     }
@@ -257,11 +266,13 @@ async function lastRunForProject(
 }
 
 function laneSeverity(lane: WorkspaceArenaProjectLane): number {
+  const arenaLive = isLiveArenaStatus(lane.arenaStatus);
   let worst = 0;
   for (const c of lane.contenders) {
     const bucket = classifyContenderRuntime(
       c.latestRun,
       c.budgetMicrosRemaining,
+      { arenaLive },
     );
     const rank =
       bucket === "needsAttention"
@@ -273,8 +284,13 @@ function laneSeverity(lane: WorkspaceArenaProjectLane): number {
             : 0;
     if (rank > worst) worst = rank;
   }
-  const last = lane.lastRun?.status;
-  if (last === "FAILED" || last === "BLOCKED" || last === "EXPIRED") {
+  // Only elevate by last-run failure while the arena is actively fighting.
+  if (
+    arenaLive &&
+    (lane.lastRun?.status === "FAILED" ||
+      lane.lastRun?.status === "BLOCKED" ||
+      lane.lastRun?.status === "EXPIRED")
+  ) {
     worst = Math.max(worst, 3);
   }
   return worst;

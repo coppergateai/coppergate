@@ -100,14 +100,14 @@ export default function LimitationsPage() {
           >
             View on GitHub
           </a>
-          <Link className={styles.btnSecondary} href="/login">
-            Try hosted
+          <Link className={styles.btnSecondary} href="/docs/pricing">
+            Pricing ($0)
           </Link>
           <Link className={styles.btnSecondary} href="/docs/supported-stack">
             Supported stack
           </Link>
-          <Link className={styles.btnSecondary} href="/docs/pricing">
-            Pricing
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
           </Link>
         </div>
       </div>

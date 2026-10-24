@@ -336,6 +336,7 @@ function toMarkdown(report: {
   for (const v of report.visits) {
     lines.push(`### ${v.id}`);
     lines.push(`- URL → ${v.landed}`);
+    lines.push(`- title: ${v.title || "—"}`);
     lines.push(`- h1: ${v.h1 ?? "—"}`);
     lines.push(`- ${v.durationMs}ms | console:${v.consoleErrors.length} | failed:${v.failedRequests.length}`);
     if (v.consoleErrors.length) {

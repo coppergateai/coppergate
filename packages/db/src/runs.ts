@@ -654,15 +654,24 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
     SET
       status = 'FAILED',
       error_code = 'validating_lease_expired',
-      error_message = 'VALIDATING lease expired — worker lost ownership before delivery completed',
+      error_message = CASE
+        WHEN lease_until IS NOT NULL AND lease_until < now()
+          THEN 'VALIDATING lease expired — worker lost ownership before delivery completed'
+        ELSE 'VALIDATING exceeded wall-clock without a live lease — fail closed'
+      END,
       lease_owner = NULL,
       lease_until = NULL,
       finished_at = now(),
       updated_at = now()
     WHERE status = 'VALIDATING'
-      AND lease_until IS NOT NULL
-      AND lease_until < now()
       AND cancel_requested_at IS NULL
+      AND (
+        (lease_until IS NOT NULL AND lease_until < now())
+        OR (
+          lease_until IS NULL
+          AND updated_at < ${wallCutoff}::timestamptz
+        )
+      )
     RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
   `;
 

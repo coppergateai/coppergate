@@ -32,28 +32,33 @@ export function FinalCta({ signedInLogin = null }: Props) {
           />
         </div>
         <h2 id="final-title" className={styles.finalTitle}>
-          Clone it. Arm the arena.
+          Ready to run the arena
           <br />
-          Ship what survives.
+          on your terms.
         </h2>
         <p className={styles.finalLede}>
-          Coppergate is MIT-licensed. Self-host with Compose and your own keys,
-          or try the hosted instance. Bring a repo, set a spend cap, and review
-          a verified PR — no invite gate on the community path.
+          Start with the MIT source and a spend cap — or open the hosted
+          instance to explore. Either path ends in a reviewable PR, not a chat
+          transcript. Community pricing stays $0.
         </p>
 
         <div className={styles.finalActions}>
           <a
             className={styles.btnHeroPrimary}
+            href={SELF_HOST}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Self-host guide
+            <IconArrow />
+          </a>
+          <a
+            className={styles.btnSecondary}
             href={REPO}
             target="_blank"
             rel="noreferrer"
           >
             View on GitHub
-            <IconArrow />
-          </a>
-          <a className={styles.btnSecondary} href={SELF_HOST} target="_blank" rel="noreferrer">
-            Self-host guide
           </a>
           <Link
             className={styles.btnSecondary}
@@ -68,11 +73,12 @@ export function FinalCta({ signedInLogin = null }: Props) {
             ? `Signed in as @${signedInLogin}. Open workspaces above to continue.`
             : (
               <>
-                Questions? hello@coppergate.ai — community support, not a sales
-                funnel.{" "}
+                Free forever to self-host.{" "}
                 <Link href="/docs/pricing">Pricing</Link>
                 {" · "}
                 <Link href="/docs/limitations">Limitations</Link>
+                {" · "}
+                hello@coppergate.ai
               </>
             )}
         </p>

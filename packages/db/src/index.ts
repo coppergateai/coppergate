@@ -395,11 +395,13 @@ export {
 } from "./maintainer.js";
 export {
   classifyContenderRuntime,
+  isLiveArenaStatus,
   killWorkspaceArena,
   listWorkspaceArenaSnapshot,
   sortArenaProjectLanes,
   startWorkspaceArena,
   stopWorkspaceArena,
+  type ClassifyContenderRuntimeOptions,
   type WorkspaceArenaContenderRun,
   type WorkspaceArenaContenderView,
   type WorkspaceArenaControlResult,

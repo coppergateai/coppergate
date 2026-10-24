@@ -92,20 +92,20 @@ export default function SecurityPage() {
         </div>
 
         <div className={styles.docsCtaRow}>
-          <Link className={styles.btnHeroPrimary} href="/docs">
+          <a
+            className={styles.btnHeroPrimary}
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View on GitHub
+          </a>
+          <Link className={styles.btnSecondary} href="/docs">
             Read the docs
           </Link>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted
           </Link>
-          <a
-            className={styles.btnSecondary}
-            href="https://github.com/coppergateai/coppergate"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
         </div>
       </article>
     </SiteChrome>

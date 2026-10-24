@@ -17,8 +17,9 @@ const entries = [
     date: "2026-10-24",
     title: "Paid pricing deferred",
     items: [
-      "Public pricing: Community $0 only — Starter/Pro ($99/$199) removed from UI",
+      "Public pricing: Community $0 only — paid hosted plan CTAs removed",
       "Settings → Billing no longer offers paid checkout while pricing is off",
+      "Marketing CTAs: contextual mid-page actions + self-host-first final CTA",
     ],
   },
   {

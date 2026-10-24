@@ -222,6 +222,35 @@ describe("agent run claim/lease", { skip: !url }, () => {
     assert.equal(after?.leaseOwner, null);
   });
 
+  it("fails lease-less VALIDATING past wall-clock updated_at", async () => {
+    const { run } = await enqueueAgentRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      idempotencyKey: `validating-wall-${Date.now()}`,
+      estimatedCostMicros: 10_000,
+    });
+    const claimed = await claimRunById(db, run.id, "validating-wall", 60_000);
+    assert.ok(claimed);
+
+    const stale = new Date(Date.now() - 50 * 60_000);
+    await db
+      .update(agentRuns)
+      .set({
+        status: "VALIDATING",
+        leaseOwner: null,
+        leaseUntil: null,
+        updatedAt: stale,
+      })
+      .where(eq(agentRuns.id, claimed!.id));
+
+    const reaped = await reapStaleRuns(db);
+    assert.ok(reaped.failedValidatingRuns.some((r) => r.id === claimed!.id));
+    const after = await getAgentRun(db, claimed!.id);
+    assert.equal(after?.status, "FAILED");
+    assert.equal(after?.errorCode, "validating_lease_expired");
+  });
+
   it("poison-fails RUNNING after max reclaims", async () => {
     const { run } = await enqueueAgentRun(db, {
       workspaceId,

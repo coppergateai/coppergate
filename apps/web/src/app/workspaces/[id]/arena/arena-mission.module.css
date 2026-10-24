@@ -193,61 +193,53 @@
   font-size: 0.85rem;
 }
 
-.summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-bottom: 1.35rem;
-}
-
-@media (max-width: 720px) {
-  .summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .stageWithInspector .mainCol {
-    max-width: 100%;
-  }
-}
-
-.metric {
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--mc-line);
-  border-radius: 4px;
-  background: var(--mc-surface);
-}
-
-.metricValue {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-
-.metricLabel {
-  margin: 0.35rem 0 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.summaryStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 1.25rem;
+  margin: 0 0 1.25rem;
+  padding: 0.15rem 0 0.85rem;
+  border-bottom: 1px solid var(--mc-line);
   color: var(--mc-text-mute);
+  font-size: 0.84rem;
 }
 
-.metricRunning .metricValue {
+.summaryItem {
+  margin: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.summaryItem strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.summaryRunning {
   color: var(--mc-active);
 }
 
-.metricWaiting .metricValue {
+.summaryWaiting {
   color: var(--mc-waiting);
 }
 
-.metricAttention .metricValue {
+.summaryAttention {
   color: var(--mc-attention);
 }
 
-.metricIdle .metricValue {
+.summaryIdle {
   color: var(--mc-idle);
+}
+
+@media (max-width: 720px) {
+  .stageWithInspector .mainCol {
+    max-width: 100%;
+  }
 }
 
 .lanes {
@@ -453,17 +445,17 @@
 
 .agents {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.55rem;
 }
 
 .agent {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.2rem;
-  padding: 0.7rem 0.75rem;
-  border-radius: 3px;
+  gap: 0.35rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 4px;
   border: 1px solid var(--mc-line);
   background: var(--mc-canvas);
   color: inherit;
@@ -515,17 +507,22 @@
 
 .agentTop {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.5rem;
   width: 100%;
 }
 
 .agentState {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--mc-text-mute);
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(107, 114, 128, 0.28);
 }
 
 .agent_running .agentState {

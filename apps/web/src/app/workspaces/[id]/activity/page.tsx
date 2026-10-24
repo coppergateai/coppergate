@@ -7,6 +7,7 @@ import {
   listAuditEventsForWorkspace,
   listWorkspaceArenaSnapshot,
 } from "@coppergate/db";
+import { activityHref } from "@/lib/activity-href";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ActivityShell } from "./activity-shell";
@@ -24,60 +25,6 @@ function parseMeta(raw: string | null): Record<string, unknown> | null {
   } catch {
     return null;
   }
-}
-
-function hrefFor(
-  workspaceId: string,
-  action: string,
-  meta: Record<string, unknown> | null,
-  targetType: string | null,
-  targetId: string | null,
-): string | null {
-  const projectId =
-    typeof meta?.projectId === "string" ? meta.projectId : null;
-  const taskId = typeof meta?.taskId === "string" ? meta.taskId : null;
-  if (taskId && projectId) {
-    return `/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}`;
-  }
-  if (projectId) {
-    return `/workspaces/${workspaceId}/projects/${projectId}`;
-  }
-  if (targetType === "project" && targetId) {
-    return `/workspaces/${workspaceId}/projects/${targetId}`;
-  }
-  if (action.startsWith("signal.") || action.startsWith("credentials.")) {
-    const tab = action.startsWith("credentials.") ? "llm" : "signals";
-    return `/workspaces/${workspaceId}/settings?tab=${tab}`;
-  }
-  if (action.startsWith("mcp.")) {
-    return `/workspaces/${workspaceId}/settings?tab=llm`;
-  }
-  if (
-    action.startsWith("arena.") ||
-    action.startsWith("tournament.") ||
-    action === "contender.eliminated" ||
-    action === "contender.debit" ||
-    action === "fitness.score"
-  ) {
-    return projectId
-      ? `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`
-      : `/workspaces/${workspaceId}/arena`;
-  }
-  if (action === "maintainer.replan_queue_failed") {
-    if (projectId) {
-      return `/workspaces/${workspaceId}/projects/${projectId}`;
-    }
-    if (targetType === "task" && targetId) {
-      return `/workspaces/${workspaceId}/activity`;
-    }
-    return `/workspaces/${workspaceId}/activity`;
-  }
-  if (action === "merge.blocked" || action === "merge.blocked_cleared") {
-    return projectId
-      ? `/workspaces/${workspaceId}/projects/${projectId}?tab=configuration`
-      : `/workspaces/${workspaceId}/activity`;
-  }
-  return null;
 }
 
 /** Tournament audit rows often store taskId without projectId — resolve for links. */
@@ -147,7 +94,7 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
       targetType: r.targetType,
       targetId: r.targetId,
       meta,
-      href: hrefFor(id, r.action, meta, r.targetType, r.targetId),
+      href: activityHref(id, r.action, meta, r.targetType, r.targetId),
       createdAt: r.createdAt.toISOString(),
     };
   });
