@@ -70,10 +70,14 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
         throw new Error(body.error?.message ?? "Import failed");
       }
       const taskId = body.task?.id;
+      const status = body.task?.status;
       if (!taskId) throw new Error("Import succeeded but task id missing");
-      router.push(
-        `/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}`,
-      );
+      // Accept lives on Evidence; freshly queued work belongs on Delivery.
+      const dest =
+        status === "REVIEW_REQUIRED"
+          ? `/workspaces/${workspaceId}/projects/${projectId}?tab=evidence`
+          : `/workspaces/${workspaceId}/projects/${projectId}?tab=delivery`;
+      router.push(dest);
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));

@@ -135,7 +135,13 @@ async function main() {
       .locator("header a", { hasText: /^Pricing$/ })
       .getAttribute("href"),
   };
-  await tryHosted.click();
+  const navPrimary = page.locator("header a", { hasText: /Start on GitHub/ }).first();
+  hrefs.navPrimary = await navPrimary.getAttribute("href");
+  hrefs.navTryHosted = await page
+    .locator("header a", { hasText: /^Try hosted$/ })
+    .first()
+    .getAttribute("href");
+  await page.locator("header a", { hasText: /^Try hosted$/ }).first().click();
   await page.waitForLoadState("domcontentloaded");
   hrefs.afterClick = page.url();
   await page.screenshot({ path: resolve(out, "v4-click-login.png") });
@@ -152,12 +158,16 @@ async function main() {
   });
   const mpage = await mctx.newPage();
   await mpage.goto(BASE + "/", { waitUntil: "domcontentloaded" });
-  const menuBtn = mpage.locator('button[aria-label*="menu" i], button[aria-expanded]').first();
-  if (await menuBtn.count()) {
-    await menuBtn.click();
-    await mpage.waitForTimeout(300);
-    await mpage.screenshot({ path: resolve(out, "v4m-menu.png") });
-  }
+  const menuBtn = mpage.getByRole("button", { name: /open menu/i });
+  await menuBtn.click();
+  await mpage.waitForTimeout(400);
+  await mpage.screenshot({ path: resolve(out, "v4m-menu.png") });
+  hrefs.mobileDrawerCtas = (
+    await mpage.locator(".drawer a, [class*='drawer'] a").allTextContents()
+  )
+    .map((t) => t.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" | ");
 
   const summary = {
     hrefs,

@@ -4,6 +4,7 @@ import { listInboxApprovalsForWorkspace } from "./approvals.js";
 import { getWorkspaceSpendSummary } from "./budgets.js";
 import { listAuditEventsForWorkspace } from "./audit.js";
 import { displayTaskTitle } from "./display-title.js";
+import { getTaskEvidenceBundle } from "./evidence.js";
 import { getWorkspaceConcurrency } from "./plan-policy.js";
 import {
   classifyContenderRuntime,
@@ -274,18 +275,22 @@ export async function getWorkspaceMissionControl(
   }
 
   for (const t of reviewTasks) {
-    if (attention.some((x) => x.href.includes(t.id))) continue;
+    if (attention.some((x) => x.id === `review-${t.id}`)) continue;
     const title = displayTaskTitle(t.title);
+    const bundle = await getTaskEvidenceBundle(db, workspaceId, t.id);
+    const acceptReady = bundle?.selected?.acceptReady === true;
     attention.push({
       id: `review-${t.id}`,
       kind: "review_required",
-      title: t.prUrl
+      title: acceptReady
         ? `Accept delivery · ${title}`
-        : `Accept ready · ${title}`,
-      detail: `${t.projectName} · Evidence Center — gates clear for Accept`,
+        : `Review gates · ${title}`,
+      detail: acceptReady
+        ? `${t.projectName} · Gates clear — Accept in Evidence`
+        : `${t.projectName} · Evidence open — hard gates still blocking Accept`,
       href: `/workspaces/${workspaceId}/projects/${t.projectId}?tab=evidence`,
       priority: "high",
-      ctaLabel: "Open Evidence",
+      ctaLabel: acceptReady ? "Accept in Evidence" : "Open Evidence",
     });
   }
 

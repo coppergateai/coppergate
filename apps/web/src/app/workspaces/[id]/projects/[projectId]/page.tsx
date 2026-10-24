@@ -170,13 +170,13 @@ export default async function ProjectDetailPage({
       tasks.some(({ task }) => task.githubIssueNumber != null),
     ) ?? false;
 
+  // Human Accept gates live on Evidence — don't double-count on Delivery.
   const ACTIVE_DELIVERY = new Set([
     "QUEUED",
     "RUNNING",
     "VALIDATING",
     "WAITING_CI",
     "IN_REVIEW",
-    "REVIEW_REQUIRED",
   ]);
   const deliveryCount = boardTasks.filter((t) =>
     ACTIVE_DELIVERY.has(t.status),
