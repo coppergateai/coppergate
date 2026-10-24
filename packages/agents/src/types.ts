@@ -28,6 +28,11 @@ export type AgentRunInput = {
   sandboxId?: string;
   /** Cooperative cancel check between events. */
   isCancelRequested?: () => boolean | Promise<boolean>;
+  /**
+   * Abort in-flight LLM HTTP when lease is lost, cancel is hard-stopped, or timeout fires.
+   * Cooperative `isCancelRequested` alone cannot interrupt a hung fetch.
+   */
+  abortSignal?: AbortSignal;
   /** implement (default) opens/updates code; pr_review posts review markdown only. */
   mode?: AgentRunMode;
   /** Extra PR context for pr_review mode (title, files, etc.). */

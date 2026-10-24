@@ -7,6 +7,7 @@ import {
   type CodingAgent,
 } from "@coppergate/agents";
 import {
+  applyTaskTransition,
   claimNextRun,
   createDb,
   getDefaultLlmByok,
@@ -254,8 +255,28 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
     while (!(options.shouldStop?.() ?? false)) {
       try {
         const reaped = await reapStaleRuns(db);
-        if (reaped > 0) {
-          log.info("reaped stale runs", { count: reaped });
+        if (reaped.requeued > 0 || reaped.failedValidating > 0) {
+          log.info("reaped stale runs", {
+            requeued: reaped.requeued,
+            failedValidating: reaped.failedValidating,
+          });
+        }
+        for (const stale of reaped.failedValidatingRuns) {
+          try {
+            await applyTaskTransition(db, {
+              workspaceId: stale.workspaceId,
+              taskId: stale.taskId,
+              toStatus: "FAILED",
+              actor: `worker:${workerId}`,
+              reason: "validating lease expired",
+            });
+          } catch (err) {
+            log.warn("task FAILED after validating lease expiry skipped", {
+              taskId: stale.taskId,
+              runId: stale.id,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
         }
 
         // Retention purge (TASK028) — at most once per 5 minutes per worker.

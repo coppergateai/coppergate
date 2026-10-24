@@ -1,9 +1,12 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { AgentEvent, AgentRunInput, CodingAgent } from "./types.js";
 import { FakeCodingAgent } from "./fake.js";
 import {
   OpenAiCompatibleCodingAgent,
   type OpenAiCompatibleConfig,
 } from "./openai-compatible.js";
+import { resolveSafeWorkdirPath } from "./path-policy.js";
 import { harnessStubAllowed } from "./stub-detect.js";
 
 /**
@@ -68,8 +71,6 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
     }
 
     // Legacy stub path — only with explicit opt-in (tests / demos).
-    const { mkdir, writeFile } = await import("node:fs/promises");
-    const { dirname, join } = await import("node:path");
     const { buildFakeCompletion } = await import("./fake.js");
 
     const workdir = input.sandboxWorkdir?.trim();
@@ -95,7 +96,15 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
     };
 
     const relPath = resolveHarnessWritePath(input.allowedPaths);
-    const absPath = join(workdir, relPath);
+    const absPath = resolveSafeWorkdirPath(workdir, relPath);
+    if (!absPath) {
+      yield {
+        kind: "error",
+        message: `Refused harness write outside sandbox: ${relPath}`,
+        payload: { code: "path_escape", path: relPath },
+      };
+      return;
+    }
     await mkdir(dirname(absPath), { recursive: true });
     const goalOneLine = input.goal.slice(0, 160).replace(/\n/g, " ");
     const body = [
@@ -216,5 +225,14 @@ function resolveHarnessWritePath(allowedPaths: string[]): string {
   if (!first || first === "**/*" || first.includes("*")) {
     return "app/page.tsx";
   }
-  return first.replace(/^\.\//, "");
+  const cleaned = first.replace(/^\.\//, "").replace(/\\/g, "/");
+  if (
+    !cleaned ||
+    cleaned.startsWith("/") ||
+    cleaned.split("/").includes("..") ||
+    /^[a-zA-Z]:/.test(cleaned)
+  ) {
+    return "app/page.tsx";
+  }
+  return cleaned;
 }

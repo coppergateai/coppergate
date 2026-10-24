@@ -1,6 +1,32 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { SignalVerifyResult } from "./types.js";
 
+/**
+ * Derive a per-workspace webhook secret from the deployment root secret.
+ * Prevents a shared SIGNAL_WEBHOOK_SECRET from authorizing ingest into any
+ * workspace path.
+ */
+export function deriveWorkspaceSignalSecret(
+  rootSecret: string,
+  workspaceId: string,
+): string {
+  return createHmac("sha256", rootSecret)
+    .update(`v1:signal-webhook:${workspaceId}`)
+    .digest("hex");
+}
+
+/** Prefer provider override, then global root; always bind to workspaceId. */
+export function resolveWorkspaceSignalSecret(input: {
+  workspaceId: string;
+  rootSecret?: string | null;
+  providerSecret?: string | null;
+}): string | null {
+  const root =
+    input.providerSecret?.trim() || input.rootSecret?.trim() || null;
+  if (!root) return null;
+  return deriveWorkspaceSignalSecret(root, input.workspaceId);
+}
+
 function headerGet(
   headers: Headers | Record<string, string | null | undefined>,
   name: string,

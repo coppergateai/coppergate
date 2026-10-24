@@ -5,11 +5,15 @@ import {
   countRecentSignalIngestsByProvider,
   ensureDefaultAutoArmRule,
   evaluateIngestQuota,
+  getActiveWorkspaceById,
   ingestSignal,
   ingestSonarFitness,
 } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
-import { getSignalAdapter } from "@coppergate/signals";
+import {
+  getSignalAdapter,
+  resolveWorkspaceSignalSecret,
+} from "@coppergate/signals";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
@@ -26,7 +30,8 @@ const RATE_WINDOW_MS = 60_000;
 
 /**
  * Provider webhook ingress (TASK063) — workspace-scoped.
- * Auth: X-Coppergate-Signal-Secret or SIGNAL_WEBHOOK_SECRET / provider env.
+ * Auth: X-Coppergate-Signal-Secret must match the workspace-derived secret
+ * (HMAC of SIGNAL_WEBHOOK_SECRET / SIGNAL_<PROVIDER>_SECRET + workspaceId).
  */
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
@@ -37,11 +42,20 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError("not_found", `Unknown signal provider: ${provider}`);
     }
 
-    const secret =
-      process.env.SIGNAL_WEBHOOK_SECRET ??
-      process.env[`SIGNAL_${provider.toUpperCase()}_SECRET`] ??
-      env.SIGNAL_WEBHOOK_SECRET ??
-      null;
+    const workspace = await getActiveWorkspaceById(db, workspaceId);
+    if (!workspace) {
+      throw new ApiError("not_found", "Workspace not found");
+    }
+
+    const rootSecret =
+      process.env.SIGNAL_WEBHOOK_SECRET ?? env.SIGNAL_WEBHOOK_SECRET ?? null;
+    const providerSecret =
+      process.env[`SIGNAL_${provider.toUpperCase()}_SECRET`] ?? null;
+    const secret = resolveWorkspaceSignalSecret({
+      workspaceId,
+      rootSecret,
+      providerSecret,
+    });
 
     const rawBody = await request.text();
     const verified = adapter.verify({

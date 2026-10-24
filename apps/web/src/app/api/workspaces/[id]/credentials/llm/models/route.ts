@@ -1,4 +1,8 @@
 import { ApiError } from "@coppergate/errors";
+import {
+  SandboxPolicyError,
+  assertSafeServerFetchUrl,
+} from "@coppergate/sandbox";
 import { requireUser } from "@/lib/auth";
 import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
@@ -40,12 +44,17 @@ export async function POST(request: Request, context: RouteContext) {
     const base = normalizeModelsBase(body.baseUrl);
     let modelsUrl: URL;
     try {
-      modelsUrl = new URL(`${base}/models`);
-    } catch {
+      // Loopback allowed for local Ollama / LM Studio; private LAN + metadata blocked.
+      const safeBase = assertSafeServerFetchUrl(base, { allowLoopback: true });
+      const baseHref = safeBase.href.endsWith("/")
+        ? safeBase.href
+        : `${safeBase.href}/`;
+      modelsUrl = new URL("models", baseHref);
+    } catch (err) {
+      if (err instanceof SandboxPolicyError) {
+        throw new ApiError("bad_request", err.message);
+      }
       throw new ApiError("bad_request", "Invalid baseUrl");
-    }
-    if (modelsUrl.protocol !== "http:" && modelsUrl.protocol !== "https:") {
-      throw new ApiError("bad_request", "baseUrl must be http(s)");
     }
 
     const headers: Record<string, string> = {

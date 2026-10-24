@@ -119,3 +119,114 @@ export function assertNotPrivileged(privileged: boolean | undefined): void {
     );
   }
 }
+
+function isPrivateIpv4(host: string): boolean {
+  if (
+    host.startsWith("10.") ||
+    host.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+  ) {
+    return true;
+  }
+  if (host === "127.0.0.1" || host.startsWith("127.")) return true;
+  if (host === "0.0.0.0") return true;
+  return false;
+}
+
+function isLoopbackHost(host: string): boolean {
+  const h = normalizeHost(host);
+  return (
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    h === "::1" ||
+    h === "[::1]" ||
+    h.endsWith(".localhost")
+  );
+}
+
+export type SafeFetchUrlOptions = {
+  /** Allow http://localhost / 127.0.0.1 (e.g. local Ollama). Default false. */
+  allowLoopback?: boolean;
+  /** Allow RFC1918 / private hosts (e.g. self-hosted Sonar). Default false. */
+  allowPrivate?: boolean;
+  /** Require https. Default false (http allowed when not private/metadata). */
+  requireHttps?: boolean;
+};
+
+/**
+ * Validate a URL before server-side fetch to reduce SSRF to metadata /
+ * link-local / private networks. Does not resolve DNS rebinding.
+ */
+export function assertSafeServerFetchUrl(
+  rawUrl: string,
+  options: SafeFetchUrlOptions = {},
+): URL {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new SandboxPolicyError("invalid", "Invalid URL");
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new SandboxPolicyError("invalid", "URL must be http(s)");
+  }
+  if (options.requireHttps && url.protocol !== "https:") {
+    throw new SandboxPolicyError("invalid", "URL must be https");
+  }
+  if (url.username || url.password) {
+    throw new SandboxPolicyError("invalid", "URL credentials are not allowed");
+  }
+
+  const host = normalizeHost(url.hostname);
+  if (!host) {
+    throw new SandboxPolicyError("invalid", "URL host is required");
+  }
+
+  if (isLinkLocalOrMetadata(host) && !isLoopbackHost(host)) {
+    throw new SandboxPolicyError(
+      "egress_denied",
+      "URL host is blocked (metadata/link-local)",
+    );
+  }
+
+  const loopback = isLoopbackHost(host);
+  if (loopback && !options.allowLoopback) {
+    throw new SandboxPolicyError(
+      "egress_denied",
+      "Loopback URLs are not allowed",
+    );
+  }
+
+  if (!loopback && isPrivateIpv4(host) && !options.allowPrivate) {
+    throw new SandboxPolicyError(
+      "egress_denied",
+      "Private network URLs are not allowed",
+    );
+  }
+
+  // IPv6 unique-local / unspecified
+  if (
+    (host.startsWith("fc") || host.startsWith("fd") || host === "::") &&
+    !options.allowPrivate
+  ) {
+    throw new SandboxPolicyError(
+      "egress_denied",
+      "Private network URLs are not allowed",
+    );
+  }
+
+  return url;
+}
+
+export function isSafeServerFetchUrl(
+  rawUrl: string,
+  options: SafeFetchUrlOptions = {},
+): boolean {
+  try {
+    assertSafeServerFetchUrl(rawUrl, options);
+    return true;
+  } catch {
+    return false;
+  }
+}

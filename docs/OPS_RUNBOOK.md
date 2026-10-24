@@ -2,10 +2,11 @@
 
 ## Worker crash mid-run
 
-1. Leases expire after `leaseMs` (default 30s). `reapStaleRuns` returns RUNNING rows with expired leases to QUEUED.
-2. User can **Cancel** then **Retry** from task detail without operator help.
-3. Check worker logs for `claimed run` / `run processed` / `worker loop iteration failed`.
-4. If a run is stuck RUNNING with a fresh lease, cancel it (sets `cancel_requested_at`); the worker cooperatively stops.
+1. Leases expire after `leaseMs` (default 30s). Workers renew via heartbeat (~`leaseMs/3`) during agent/validation work.
+2. `reapStaleRuns`: expired **RUNNING** → `QUEUED` (reclaim); expired **VALIDATING** → `FAILED` (`validating_lease_expired`) and the worker fails the matching task. VALIDATING is not silently re-queued.
+3. User can **Cancel** then **Retry** from task detail without operator help.
+4. Check worker logs for `claimed run` / `run processed` / `lost run lease ownership` / `worker loop iteration failed`.
+5. If a run is stuck RUNNING with a fresh lease, cancel it (sets `cancel_requested_at`); the worker cooperatively stops (LLM fetch is also aborted via `AbortSignal`).
 
 ## Poison / failing messages
 
@@ -20,7 +21,7 @@
 
 ## Backoff
 
-- Worker idle poll: `pollMs` (default 1s). On loop errors, sleeps `pollMs` before the next iteration.
+- Worker idle poll: `pollMs` (default 1s). On loop errors, exponential backoff up to 30s before the next iteration.
 - Do not tight-loop claim on persistent DB errors; restart the process after fixing connectivity.
 
 ## Recovery checklist

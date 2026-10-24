@@ -25,7 +25,12 @@ export {
   syncOutboundSafe,
 } from "./outbound.js";
 export { getSignalAdapter, listSignalProviders } from "./adapters.js";
-export { verifySharedSecret, verifyHmacSha256 } from "./verify.js";
+export {
+  deriveWorkspaceSignalSecret,
+  resolveWorkspaceSignalSecret,
+  verifySharedSecret,
+  verifyHmacSha256,
+} from "./verify.js";
 export {
   detectFlakePattern,
   type FlakeObservation,

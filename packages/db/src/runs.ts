@@ -485,12 +485,30 @@ export async function renewRunLease(
   return updated;
 }
 
+export type ReapStaleRunsResult = {
+  /** Expired RUNNING leases returned to QUEUED. */
+  requeued: number;
+  /** Expired VALIDATING leases failed closed (not re-queued mid-validation). */
+  failedValidating: number;
+  /** Runs failed for VALIDATING lease expiry — caller should fail matching tasks. */
+  failedValidatingRuns: Array<{
+    id: string;
+    taskId: string;
+    workspaceId: string;
+    projectId: string;
+    estimatedCostMicros: number;
+  }>;
+};
+
 /**
- * Reaper: expired RUNNING leases → QUEUED (clears owner).
- * Returns number of rows reaped.
+ * Reaper:
+ * - expired RUNNING leases → QUEUED (clears owner) for reclaim
+ * - expired VALIDATING leases → FAILED (fail closed; not safe to re-queue mid-validation)
+ *
+ * VALIDATING sticks forever without this path: claim only picks QUEUED / stale RUNNING.
  */
-export async function reapStaleRuns(db: Database): Promise<number> {
-  const result = await db.$client<{ id: string }[]>`
+export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> {
+  const requeuedRows = await db.$client<{ id: string }[]>`
     UPDATE agent_runs
     SET
       status = 'QUEUED',
@@ -503,7 +521,56 @@ export async function reapStaleRuns(db: Database): Promise<number> {
       AND cancel_requested_at IS NULL
     RETURNING id
   `;
-  return result.length;
+
+  const failedRows = await db.$client<
+    {
+      id: string;
+      task_id: string;
+      workspace_id: string;
+      project_id: string;
+      estimated_cost_micros: number | null;
+    }[]
+  >`
+    UPDATE agent_runs
+    SET
+      status = 'FAILED',
+      error_code = 'validating_lease_expired',
+      error_message = 'VALIDATING lease expired — worker lost ownership before delivery completed',
+      lease_owner = NULL,
+      lease_until = NULL,
+      finished_at = now(),
+      updated_at = now()
+    WHERE status = 'VALIDATING'
+      AND lease_until IS NOT NULL
+      AND lease_until < now()
+      AND cancel_requested_at IS NULL
+    RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros
+  `;
+
+  const failedValidatingRuns = failedRows.map((row) => ({
+    id: String(row.id),
+    taskId: String(row.task_id),
+    workspaceId: String(row.workspace_id),
+    projectId: String(row.project_id),
+    estimatedCostMicros: Number(row.estimated_cost_micros ?? 0),
+  }));
+
+  for (const run of failedValidatingRuns) {
+    if (run.estimatedCostMicros <= 0) continue;
+    await releaseEstimateForRun(db, {
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      taskId: run.taskId,
+      runId: run.id,
+      amountMicros: run.estimatedCostMicros,
+    }).catch(() => undefined);
+  }
+
+  return {
+    requeued: requeuedRows.length,
+    failedValidating: failedValidatingRuns.length,
+    failedValidatingRuns,
+  };
 }
 
 /**

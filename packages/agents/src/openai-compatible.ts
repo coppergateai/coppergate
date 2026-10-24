@@ -1,7 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { AgentPolicyError } from "./fake.js";
 import { buildFakeCompletion } from "./fake.js";
+import {
+  isPathAllowed,
+  isSafeRelativePath,
+  resolveSafeWorkdirPath,
+} from "./path-policy.js";
 import { isStubFileContent } from "./stub-detect.js";
 import type {
   AgentEvent,
@@ -16,9 +21,15 @@ export type OpenAiCompatibleConfig = {
   /** Micros per 1k tokens (combined in/out estimate). Default 2000 ($0.002). */
   priceMicrosPer1kTokens?: number;
   fetchImpl?: typeof fetch;
+  /** Per-request timeout for chat completions. Default 120s. */
+  timeoutMs?: number;
+  /** Bounded retries for transient 429/5xx. Default 2 (3 attempts total). */
+  maxRetries?: number;
 };
 
 type ParsedFile = { path: string; content: string };
+
+const DEFAULT_CHAT_TIMEOUT_MS = 120_000;
 
 /**
  * Single-provider CodingAgent (D6 / TASK023) behind OpenAI-compatible Chat Completions.
@@ -29,6 +40,8 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
   private readonly model: string;
   private readonly price: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
+  private readonly maxRetries: number;
 
   constructor(private readonly config: OpenAiCompatibleConfig) {
     if (!config.apiKey.trim()) {
@@ -41,6 +54,8 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
     this.model = config.model ?? "gpt-4o-mini";
     this.price = config.priceMicrosPer1kTokens ?? 2_000;
     this.fetchImpl = config.fetchImpl ?? fetch;
+    this.timeoutMs = config.timeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS;
+    this.maxRetries = Math.max(0, config.maxRetries ?? 2);
   }
 
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
@@ -66,8 +81,30 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       return;
     }
 
+    if (input.abortSignal?.aborted) {
+      yield {
+        kind: "error",
+        message: "Aborted before LLM call",
+        payload: { code: "aborted" },
+      };
+      return;
+    }
+
     const prompt = buildPrompt(input);
-    const result = await this.chat(prompt);
+    let result: { content: string; totalTokens: number };
+    try {
+      result = await this.chat(prompt, input.abortSignal);
+    } catch (err) {
+      if (isAbortError(err)) {
+        yield {
+          kind: "error",
+          message: "LLM request aborted",
+          payload: { code: "aborted" },
+        };
+        return;
+      }
+      throw err;
+    }
 
     const tokens = result.totalTokens;
     const costMicros = Math.ceil((tokens / 1000) * this.price);
@@ -96,7 +133,7 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       return;
     }
 
-    if (await input.isCancelRequested?.()) {
+    if (await input.isCancelRequested?.() || input.abortSignal?.aborted) {
       yield {
         kind: "error",
         message: "Cancelled",
@@ -130,6 +167,26 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
     }
 
     for (const f of files) {
+      if (!isSafeRelativePath(f.path)) {
+        yield {
+          kind: "error",
+          message: `Path escape rejected: ${f.path}`,
+          payload: { code: "path_escape", path: f.path },
+        };
+        return;
+      }
+      if (!isPathAllowed(f.path, input.allowedPaths)) {
+        yield {
+          kind: "error",
+          message: `Path not allowed: ${f.path}`,
+          payload: {
+            code: "path_not_allowed",
+            path: f.path,
+            allowedPaths: input.allowedPaths,
+          },
+        };
+        return;
+      }
       if (isStubFileContent(f.content)) {
         yield {
           kind: "error",
@@ -143,7 +200,15 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
     const workdir = input.sandboxWorkdir?.trim();
     if (workdir) {
       for (const f of files) {
-        const absPath = join(workdir, f.path);
+        const absPath = resolveSafeWorkdirPath(workdir, f.path);
+        if (!absPath) {
+          yield {
+            kind: "error",
+            message: `Path escape rejected: ${f.path}`,
+            payload: { code: "path_escape", path: f.path },
+          };
+          return;
+        }
         await mkdir(dirname(absPath), { recursive: true });
         await writeFile(absPath, f.content, "utf8");
         yield {
@@ -184,61 +249,100 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
 
   private async chat(
     userContent: string,
+    externalSignal?: AbortSignal,
   ): Promise<{ content: string; totalTokens: number }> {
-    const res = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: this.model,
-        temperature: 0.2,
-        messages: [
-          {
-            role: "system",
-            content: [
-              "You are a senior product engineer shipping real capabilities.",
-              "Implement acceptance criteria with tests when applicable.",
-              "Prefer user-visible product increments over docs-only or typos.",
-              "Never emit coppergateSignalFix, scaffold stubs, or placeholder Signal fix pages.",
-              "Output one or more FILE blocks exactly as:",
-              "### FILE: relative/path.ext",
-              "```",
-              "full file contents",
-              "```",
-              "No secrets. Stay within allowed paths.",
-            ].join(" "),
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      if (externalSignal?.aborted) {
+        throw abortError();
+      }
+      const timeout = new AbortController();
+      const timer = setTimeout(() => timeout.abort(), this.timeoutMs);
+      const signal = mergeAbortSignals(externalSignal, timeout.signal);
+
+      try {
+        const res = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.config.apiKey}`,
+            "Content-Type": "application/json",
           },
-          { role: "user", content: userContent },
-        ],
-      }),
-    });
+          body: JSON.stringify({
+            model: this.model,
+            temperature: 0.2,
+            messages: [
+              {
+                role: "system",
+                content: [
+                  "You are a senior product engineer shipping real capabilities.",
+                  "Implement acceptance criteria with tests when applicable.",
+                  "Prefer user-visible product increments over docs-only or typos.",
+                  "Never emit coppergateSignalFix, scaffold stubs, or placeholder Signal fix pages.",
+                  "Output one or more FILE blocks exactly as:",
+                  "### FILE: relative/path.ext",
+                  "```",
+                  "full file contents",
+                  "```",
+                  "No secrets. Stay within allowed paths.",
+                ].join(" "),
+              },
+              { role: "user", content: userContent },
+            ],
+          }),
+          signal,
+        });
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new AgentPolicyError(
-        `LLM request failed (${res.status}): ${body.slice(0, 200)}`,
-      );
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          const transient = res.status === 429 || res.status >= 500;
+          if (transient && attempt < this.maxRetries) {
+            lastError = new AgentPolicyError(
+              `LLM request failed (${res.status}): ${body.slice(0, 200)}`,
+            );
+            await sleep(backoffMs(attempt));
+            continue;
+          }
+          throw new AgentPolicyError(
+            `LLM request failed (${res.status}): ${body.slice(0, 200)}`,
+          );
+        }
+
+        const json = (await res.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+          usage?: {
+            total_tokens?: number;
+            prompt_tokens?: number;
+            completion_tokens?: number;
+          };
+        };
+        const content = json.choices?.[0]?.message?.content?.trim() || "(empty)";
+        const usageTotal = json.usage?.total_tokens;
+        const summed =
+          (json.usage?.prompt_tokens ?? 0) +
+          (json.usage?.completion_tokens ?? 0);
+        const totalTokens =
+          usageTotal ??
+          (summed > 0 ? summed : Math.max(100, Math.ceil(content.length / 4)));
+
+        return { content, totalTokens };
+      } catch (err) {
+        if (isAbortError(err)) throw err;
+        lastError = err;
+        const msg = err instanceof Error ? err.message : String(err);
+        const maybeTransient =
+          /ECONNRESET|ETIMEDOUT|fetch failed|network/i.test(msg);
+        if (maybeTransient && attempt < this.maxRetries) {
+          await sleep(backoffMs(attempt));
+          continue;
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
     }
-
-    const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      usage?: {
-        total_tokens?: number;
-        prompt_tokens?: number;
-        completion_tokens?: number;
-      };
-    };
-    const content = json.choices?.[0]?.message?.content?.trim() || "(empty)";
-    const usageTotal = json.usage?.total_tokens;
-    const summed =
-      (json.usage?.prompt_tokens ?? 0) + (json.usage?.completion_tokens ?? 0);
-    const totalTokens =
-      usageTotal ??
-      (summed > 0 ? summed : Math.max(100, Math.ceil(content.length / 4)));
-
-    return { content, totalTokens };
+    throw lastError instanceof Error
+      ? lastError
+      : new AgentPolicyError("LLM request failed after retries");
   }
 }
 
@@ -314,4 +418,47 @@ export function parseFileBlocks(text: string): ParsedFile[] {
     if (path && content.trim()) files.push({ path, content });
   }
   return files;
+}
+
+function backoffMs(attempt: number): number {
+  return Math.min(8_000, 500 * 2 ** attempt);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function abortError(): DOMException {
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+function isAbortError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const name = (err as { name?: string }).name;
+  return name === "AbortError";
+}
+
+/** Prefer AbortSignal.any when available; otherwise manual merge. */
+function mergeAbortSignals(
+  a: AbortSignal | undefined,
+  b: AbortSignal,
+): AbortSignal {
+  if (!a) return b;
+  const anyFn = (
+    AbortSignal as unknown as {
+      any?: (signals: AbortSignal[]) => AbortSignal;
+    }
+  ).any;
+  if (typeof anyFn === "function") {
+    return anyFn([a, b]);
+  }
+  const merged = new AbortController();
+  const onAbort = () => merged.abort();
+  if (a.aborted || b.aborted) {
+    merged.abort();
+    return merged.signal;
+  }
+  a.addEventListener("abort", onAbort, { once: true });
+  b.addEventListener("abort", onAbort, { once: true });
+  return merged.signal;
 }
