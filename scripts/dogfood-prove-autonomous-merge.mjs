@@ -24,7 +24,7 @@ import {
   maintainerEvents,
   workspaces,
 } from "../packages/db/src/index.ts";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte } from "../packages/db/node_modules/drizzle-orm/index.js";
 
 function argValue(name) {
   const i = process.argv.indexOf(name);

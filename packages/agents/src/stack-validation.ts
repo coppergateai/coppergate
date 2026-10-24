@@ -80,9 +80,14 @@ export async function runStackValidation(
   }
 
   if (stack === "go" || hasGoMod) {
-    const goTest = await input.exec(["go", "test", "./..."], {
-      timeoutMs: 300_000,
-    });
+    // -p 1 keeps peak RAM low on small worker VMs (Go compile OOMs at 512–2GB).
+    // kprompt's suite needs ~2–3+ minutes even locally; Fly shared CPUs need more headroom.
+    const goTest = await input.exec(
+      ["go", "test", "-p", "1", "-count", "1", "-timeout", "8m", "./..."],
+      {
+        timeoutMs: 600_000,
+      },
+    );
     checks.push({
       name: "go_test",
       passed: goTest.exitCode === 0,

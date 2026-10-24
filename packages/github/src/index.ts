@@ -31,6 +31,8 @@ export {
   type WebhookHandlerResult,
 } from "./handlers.js";
 export {
+  countGoodFirstIssues,
+  createIssue,
   listOpenIssues,
   mergePullRequest,
   type GithubIssueSummary,
@@ -46,6 +48,12 @@ export {
   formatReleaseNotes,
   type GithubReleaseResult,
 } from "./release.js";
+export {
+  createRevertPullRequest,
+  getRepoFile,
+  updateRepoFile,
+  type RepoFile,
+} from "./contents.js";
 export {
   getPullRequestContext,
   listOpenPulls,
@@ -67,8 +75,10 @@ export {
   type RepoRef,
 } from "./delivery.js";
 export {
+  fetchCommitCheckEvidence,
   mapCheckRunPayload,
   mapCheckSuitePayload,
+  mapCommitStatusPayload,
   type CheckSuitePayload,
   type CheckRunConclusion,
   type NormalizedCheckEvidence,

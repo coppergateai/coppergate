@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { SkeletonStack } from "@/components/app/ui";
 import { ArenaPitch, type PitchMetrics } from "./arena-pitch";
@@ -38,7 +39,6 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
   const [contenders, setContenders] = useState<ContenderView[]>([]);
   const [metrics, setMetrics] = useState<PitchMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -86,7 +86,6 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
     void load();
   }, [load]);
 
-  // Live refresh while the match is on
   useEffect(() => {
     if (!arena || !isRunning(arena.status)) return;
     const id = window.setInterval(() => {
@@ -95,29 +94,8 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
     return () => window.clearInterval(id);
   }, [arena, load]);
 
-  async function control(action: "start" | "stop") {
-    setPending(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/arena/${action}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId }),
-      });
-      const data = (await res.json()) as {
-        error?: { message?: string };
-      };
-      if (!res.ok) {
-        setError(data.error?.message ?? "Request failed");
-        return;
-      }
-      await load();
-    } finally {
-      setPending(false);
-    }
-  }
-
   const running = arena ? isRunning(arena.status) : false;
+  const arenaHref = `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`;
 
   return (
     <section
@@ -129,8 +107,14 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
         War arena
       </h2>
       <p className={styles.sectionLede}>
-        Open gates invents vision and backlog; contenders fight under budget
-        until a survivor ships. Seal the pit to freeze the loop.
+        Start and Stop now run at the workspace level — open the arena to arm
+        every project pit, or watch this project&apos;s contenders live.
+      </p>
+
+      <p className={styles.sectionLede}>
+        <Link href={arenaHref} className={styles.inlineLink}>
+          {isOwner ? "Workspace Start / Stop →" : "Open workspace arena →"}
+        </Link>
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -146,10 +130,10 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
           arenaStatus={arena?.status ?? "idle"}
           contenders={contenders}
           metrics={metrics}
-          isOwner={isOwner}
-          pending={pending}
-          onStart={() => void control("start")}
-          onStop={() => void control("stop")}
+          isOwner={false}
+          pending={false}
+          onStart={() => undefined}
+          onStop={() => undefined}
         />
       )}
     </section>

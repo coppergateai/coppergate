@@ -49,11 +49,12 @@ export function CostExplorerStrip({ workspaceId, projectId }: Props) {
         Cost explorer (7d)
       </h2>
       <p className={styles.sectionLede}>
-        Spent {usd(data.spentMicros)} in the last {data.windowDays} days
+        Coppergate budget units: {usd(data.spentMicros)} in the last{" "}
+        {data.windowDays} days
         {data.topTasks.length
           ? ` · top ${data.topTasks.length} task${data.topTasks.length === 1 ? "" : "s"}`
           : " · no task-attributed usage yet"}
-        .
+        . Provider/BYOK invoices are billed separately.
       </p>
       {data.topTasks.length > 0 ? (
         <ul className={styles.costList}>

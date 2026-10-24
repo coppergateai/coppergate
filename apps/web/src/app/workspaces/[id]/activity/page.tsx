@@ -10,6 +10,10 @@ import styles from "../inbox/inbox.module.css";
 
 type PageProps = { params: Promise<{ id: string }> };
 
+type AuditRow = Awaited<
+  ReturnType<typeof listAuditEventsForWorkspace>
+>[number];
+
 function formatRelative(iso: Date): string {
   const diff = Date.now() - iso.getTime();
   const mins = Math.floor(diff / 60_000);
@@ -69,10 +73,52 @@ const ACTION_LABELS: Record<string, string> = {
   "approval.resolved": "Approval resolved",
   "merge.enabled": "Merge enabled",
   "merge.disabled": "Merge disabled",
+  "merge.attempt": "Merge attempted",
+  "merge.blocked": "Merge blocked",
+  "merge.blocked_cleared": "Merge unblocked",
+  "ship.rollback": "Ship rollback opened",
+  "maintainer.replan": "Backlog replan",
+  "maintainer.release": "Release published",
+  "task.import_issue": "Issue imported",
+  "maintainer.replan_queue_failed": "Replan queue failed",
+  "maintainer.auto_accept": "Auto-accepted PR",
+  "arena.started": "Arena started",
+  "arena.stopped": "Arena stopped",
 };
 
 function labelFor(action: string): string {
   return ACTION_LABELS[action] ?? action.replace(/\./g, " · ");
+}
+
+type GroupedRow = {
+  key: string;
+  action: string;
+  title: string;
+  count: number;
+  latest: AuditRow;
+  meta: Record<string, unknown> | null;
+};
+
+/** Collapse consecutive identical actions (e.g. merge.blocked spam). */
+function groupConsecutive(rows: AuditRow[]): GroupedRow[] {
+  const out: GroupedRow[] = [];
+  for (const r of rows) {
+    const title = labelFor(r.action);
+    const prev = out[out.length - 1];
+    if (prev && prev.action === r.action) {
+      prev.count += 1;
+      continue;
+    }
+    out.push({
+      key: r.id,
+      action: r.action,
+      title,
+      count: 1,
+      latest: r,
+      meta: parseMeta(r.meta),
+    });
+  }
+  return out;
 }
 
 export default async function WorkspaceActivityPage({ params }: PageProps) {
@@ -83,7 +129,8 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
   const access = await getWorkspaceForMember(db, id, user.id);
   if (!access) notFound();
 
-  const rows = await listAuditEventsForWorkspace(db, id, { limit: 60 });
+  const rows = await listAuditEventsForWorkspace(db, id, { limit: 80 });
+  const grouped = groupConsecutive(rows);
 
   return (
     <main className={styles.main}>
@@ -92,7 +139,7 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
           <h1 className={styles.title}>Activity</h1>
           <div className={styles.chips}>
             <span className={styles.chip}>{access.workspace.name}</span>
-            <span className={styles.chip}>{rows.length} recent</span>
+            <span className={styles.chip}>{grouped.length} recent</span>
           </div>
         </div>
         <Link
@@ -104,7 +151,7 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
       </header>
 
       <div className={styles.body}>
-        {rows.length === 0 ? (
+        {grouped.length === 0 ? (
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>No activity yet</p>
             <p className={styles.emptyBody}>
@@ -119,16 +166,21 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
           </div>
         ) : (
           <ul className={styles.list}>
-            {rows.map((r) => {
-              const meta = parseMeta(r.meta);
-              const href = hrefFor(id, r.action, meta);
-              const title = labelFor(r.action);
+            {grouped.map((g) => {
+              const href = hrefFor(id, g.action, g.meta);
+              const displayTitle =
+                g.count > 1 ? `${g.title} ×${g.count}` : g.title;
               const detail =
-                typeof meta?.message === "string"
-                  ? meta.message
-                  : r.targetType && r.targetId
-                    ? `${r.targetType} ${r.targetId.slice(0, 8)}`
-                    : r.actor;
+                g.action === "merge.blocked" &&
+                typeof g.meta?.message === "string"
+                  ? `${g.meta.message} — Fix GitHub branch protection / CODEOWNERS so the Coppergate App can merge, then clear merge.blocked.`
+                  : typeof g.meta?.cta === "string"
+                    ? g.meta.cta
+                    : typeof g.meta?.message === "string"
+                      ? g.meta.message
+                      : g.latest.targetType && g.latest.targetId
+                        ? `${g.latest.targetType} ${g.latest.targetId.slice(0, 8)}`
+                        : g.latest.actor;
               const inner = (
                 <>
                   <span
@@ -137,18 +189,18 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
                   />
                   <span className={styles.rowBody}>
                     <span className={styles.rowTop}>
-                      <span className={styles.rowType}>{r.actor}</span>
+                      <span className={styles.rowType}>{g.latest.actor}</span>
                       <span className={styles.rowTime}>
-                        {formatRelative(r.createdAt)}
+                        {formatRelative(g.latest.createdAt)}
                       </span>
                     </span>
-                    <span className={styles.rowTitle}>{title}</span>
+                    <span className={styles.rowTitle}>{displayTitle}</span>
                     <span className={styles.rowMeta}>{detail}</span>
                   </span>
                 </>
               );
               return (
-                <li key={r.id} className={styles.row}>
+                <li key={g.key} className={styles.row}>
                   {href ? (
                     <Link href={href} className={styles.rowLinkActivity}>
                       {inner}

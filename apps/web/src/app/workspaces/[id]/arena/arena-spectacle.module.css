@@ -1,0 +1,415 @@
+.stage {
+  --iron: #14110e;
+  --iron-mid: #1e1914;
+  --ash: #3a3128;
+  --ember: #c45c4a;
+  --ember-hot: #e07850;
+  --brass: #c9a24a;
+  --bone: #e8dcc8;
+  --bone-mute: rgba(232, 220, 200, 0.55);
+  --line-soft: rgba(200, 150, 90, 0.22);
+  position: relative;
+  min-height: calc(100vh - 3.5rem);
+  overflow: hidden;
+  color: var(--bone);
+  background:
+    radial-gradient(70% 50% at 50% 0%, rgba(196, 92, 74, 0.14) 0%, transparent 55%),
+    linear-gradient(180deg, #1a1510 0%, var(--iron) 45%, #0a0908 100%);
+}
+
+.lottieFloor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: min(42vh, 320px);
+  z-index: 0;
+  opacity: 0.12;
+  pointer-events: none;
+  overflow: hidden;
+  mask-image: linear-gradient(180deg, #000 0%, #000 35%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 35%, transparent 100%);
+}
+
+.lottieFill {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none;
+  opacity: 1;
+}
+
+.lottieFloorLive {
+  opacity: 0.18;
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(10, 9, 8, 0.15) 0%, transparent 35%, rgba(10, 9, 8, 0.55) 100%);
+  pointer-events: none;
+}
+
+.hero {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: clamp(1.4rem, 4vw, 2.6rem) clamp(1.1rem, 3vw, 2.2rem) 1.2rem;
+  max-width: 52rem;
+}
+
+.brand {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 7vw, 4.2rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  color: var(--bone);
+}
+
+.lede {
+  margin: 0;
+  max-width: 34rem;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--bone-mute);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+  margin-top: 0.25rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-mute);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.pillDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--ash);
+}
+
+.pillLive {
+  color: var(--brass);
+  border-color: rgba(201, 162, 74, 0.45);
+}
+
+.nowStrip {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(36rem, 100%);
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--bone);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.pillLive .pillDot {
+  background: var(--ember-hot);
+  box-shadow: 0 0 0 0 rgba(224, 120, 80, 0.55);
+  animation: livePulse 1.6s ease-out infinite;
+}
+
+@keyframes livePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(224, 120, 80, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(224, 120, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(224, 120, 80, 0);
+  }
+}
+
+.ctaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+  padding: 0.55rem 1.05rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+}
+
+.btnStart {
+  color: #1a120c;
+  background: linear-gradient(180deg, var(--brass) 0%, #a8842e 100%);
+  border-color: rgba(201, 162, 74, 0.7);
+}
+
+.btnStart:hover:not(:disabled) {
+  background: linear-gradient(180deg, #d8b35a 0%, var(--brass) 100%);
+}
+
+.btnStart:disabled {
+  color: rgba(232, 220, 200, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  border-color: var(--line-soft);
+  filter: none;
+}
+
+.btnStop {
+  color: var(--bone);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.btnStop:hover:not(:disabled) {
+  border-color: rgba(196, 92, 74, 0.55);
+  color: #f0c4b8;
+}
+
+.btnStopLive {
+  color: #1a120c;
+  background: linear-gradient(180deg, var(--ember-hot) 0%, var(--ember) 100%);
+  border-color: rgba(196, 92, 74, 0.75);
+}
+
+.btnStopLive:hover:not(:disabled) {
+  color: #1a120c;
+  background: linear-gradient(180deg, #e89070 0%, var(--ember-hot) 100%);
+}
+
+.error {
+  margin: 0;
+  color: #f0a090;
+  font-size: 0.85rem;
+}
+
+.lanes {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem clamp(1.1rem, 3vw, 2.2rem) 2.5rem;
+}
+
+.lane {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) 1fr;
+  gap: 0.85rem 1.2rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--line-soft);
+  background: transparent;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: laneEnter 0.55s ease forwards;
+}
+
+.laneFocused {
+  border-color: rgba(201, 162, 74, 0.4);
+  background: rgba(201, 162, 74, 0.06);
+}
+
+.laneLive {
+  border-left: 2px solid var(--ember);
+}
+
+@media (max-width: 720px) {
+  .lane {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes laneEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.laneMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.laneName {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--bone);
+}
+
+.laneRepo {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--bone-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.laneStatus {
+  margin: 0.15rem 0 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(232, 220, 200, 0.4);
+}
+
+.laneStatusLive {
+  color: var(--brass);
+}
+
+.fighters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.4rem;
+}
+
+.fighter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem 0.35rem 0.4rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 0.78rem;
+  color: var(--bone);
+}
+
+.fighterPulse {
+  animation: fighterPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes fighterPulse {
+  0%,
+  100% {
+    border-color: var(--line-soft);
+  }
+  50% {
+    border-color: rgba(224, 120, 80, 0.65);
+  }
+}
+
+.fighterMark {
+  width: 1.55rem;
+  height: 1.55rem;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #1a120c;
+  background: var(--brass);
+}
+
+.temperSteady {
+  background: #8a9a7a;
+}
+
+.temperSwift {
+  background: var(--ember-hot);
+}
+
+.temperBalanced {
+  background: var(--brass);
+}
+
+.fighterMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  line-height: 1.15;
+}
+
+.fighterKey {
+  font-weight: 650;
+}
+
+.fighterSub {
+  font-size: 0.62rem;
+  color: var(--bone-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.emptyFighters {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--bone-mute);
+}
+
+.lastRun {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  color: rgba(232, 220, 200, 0.38);
+}
+
+.empty {
+  position: relative;
+  z-index: 3;
+  padding: 2rem clamp(1.1rem, 3vw, 2.2rem);
+  color: var(--bone-mute);
+}
+
+.loading {
+  position: relative;
+  z-index: 3;
+  padding: 2rem clamp(1.1rem, 3vw, 2.2rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pillLive .pillDot,
+  .fighterPulse,
+  .lane {
+    animation: none;
+  }
+
+  .lane {
+    opacity: 1;
+    transform: none;
+  }
+}

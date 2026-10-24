@@ -197,6 +197,13 @@
       "when": 1729300000000,
       "tag": "0027_maintainer",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1729400000000,
+      "tag": "0028_agent_platform",
+      "breakpoints": true
     }
   ]
 }

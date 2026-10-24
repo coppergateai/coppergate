@@ -100,7 +100,13 @@ describe("runStackValidation", () => {
     assert.equal(report.validator, "stack-v1");
     assert.equal(report.passed, true);
     assert.ok(
-      calls.some((c) => c[0] === "go" && c[1] === "test" && c[2] === "./..."),
+      calls.some(
+        (c) =>
+          c[0] === "go" &&
+          c[1] === "test" &&
+          c.includes("-p") &&
+          c.includes("./..."),
+      ),
     );
     assert.ok(report.checks.some((c) => c.name === "go_test" && c.passed));
   });

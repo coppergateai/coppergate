@@ -1,20 +1,26 @@
 #!/usr/bin/env node
 /**
  * Verify workspace BYOK decrypts with CREDENTIALS_ENCRYPTION_KEY,
- * then enable maintainer at $50/mo on kprompt + kprompt-website.
+ * then set workspace pooled envelope ($100/mo default) and enable maintainer
+ * on kprompt (+ website if present). Project budgets are paused by setWorkspaceBudget.
  */
 import {
+  DEFAULT_MONTHLY_BUDGET_MICROS,
   closeDb,
   createDb,
   enableMaintainerMode,
   getDefaultLlmByok,
   getProjectSpendSummary,
+  getWorkspaceSpendSummary,
   listProjectsForWorkspace,
+  setWorkspaceBudget,
   workspaces,
 } from "../packages/db/src/index.ts";
 import { openSecret, parseEncryptionKey } from "../packages/github/src/index.ts";
 
-const budgetMicros = Number(process.env.MAINTAINER_BUDGET_MICROS ?? "50000000");
+const budgetMicros = Number(
+  process.env.MAINTAINER_BUDGET_MICROS ?? String(DEFAULT_MONTHLY_BUDGET_MICROS),
+);
 const actor = process.env.DOGFOOD_ACTOR ?? "script:ops-raise-budget-byok";
 const slug = process.env.WORKSPACE_SLUG ?? "kprompt";
 const targetNames = (
@@ -49,37 +55,30 @@ try {
   }
 
   const listed = await listProjectsForWorkspace(db, ws.id);
-  // listProjects may only return primary — also scan via enable targets by name
-  // from a raw select through listed + fallback names
-  let targets = listed.filter(
+  const targets = listed.filter(
     (p) =>
       targetNames.includes(p.project.name) ||
       targetNames.includes(p.repository.baseRepoFullName.split("/")[1] ?? ""),
   );
 
-  // If website missing from listProjects, look up by scanning workspaces projects table via SQL helper
-  if (targets.length < targetNames.length) {
-    const { projects } = await import("../packages/db/src/schema.ts");
-    const { eq } = await import("drizzle-orm");
-    const all = await db
-      .select()
-      .from(projects)
-      .where(eq(projects.workspaceId, ws.id));
-    const byName = new Map(all.map((p) => [p.name, p]));
-    targets = targetNames
-      .map((name) => {
-        const hit = listed.find((p) => p.project.name === name);
-        if (hit) return hit;
-        const row = byName.get(name);
-        if (!row) return null;
-        return { project: row, repository: { baseRepoFullName: name } };
-      })
-      .filter(Boolean);
+  if (targets.length === 0) {
+    throw new Error(
+      `No matching projects: ${targetNames.join(", ")} (have: ${listed
+        .map((p) => p.project.name)
+        .join(", ")})`,
+    );
   }
 
-  if (targets.length === 0) {
-    throw new Error(`No matching projects: ${targetNames.join(", ")}`);
-  }
+  const softAlert = Math.floor(budgetMicros * 0.8);
+  const workspaceBudget = await setWorkspaceBudget(db, {
+    workspaceId: ws.id,
+    capMicros: budgetMicros,
+    softAlertMicros: softAlert,
+    actor,
+    status: "active",
+    period: "monthly",
+    pauseProjectBudgets: true,
+  });
 
   const results = [];
   for (const t of targets) {
@@ -100,10 +99,7 @@ try {
     });
     let spend = null;
     try {
-      spend = await getProjectSpendSummary(db, {
-        workspaceId: ws.id,
-        projectId: project.id,
-      });
+      spend = await getProjectSpendSummary(db, ws.id, project.id);
     } catch {
       spend = null;
     }
@@ -114,10 +110,14 @@ try {
       autonomyLevel: project.autonomyLevel,
       mergeEnabled: project.mergeEnabled,
       monthlyBudgetMicros: policy.monthlyBudgetMicros,
+      pooled: spend?.pooled ?? null,
       capMicros: spend?.capMicros ?? null,
       availableMicros: spend?.availableMicros ?? null,
+      projectSpentMicros: spend?.projectSpentMicros ?? null,
     });
   }
+
+  const wsSpend = await getWorkspaceSpendSummary(db, ws.id);
 
   console.log(
     JSON.stringify(
@@ -129,6 +129,14 @@ try {
         byokLabel: byok.label,
         byokVendor: byok.vendor,
         byokModel: byok.model,
+        workspaceBudget: {
+          id: workspaceBudget.id,
+          capMicros: workspaceBudget.capMicros,
+          status: workspaceBudget.status,
+          period: workspaceBudget.period,
+          availableMicros: wsSpend?.availableMicros ?? null,
+          spentMicros: wsSpend?.spentMicros ?? null,
+        },
         results,
       },
       null,

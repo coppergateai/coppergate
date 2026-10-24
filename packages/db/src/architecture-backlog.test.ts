@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  extractArchitectureIdFromTitle,
+  markArchitectureIdDoneInMarkdown,
   parseArchitectureOpenTasks,
   pickNextArchitectureTask,
 } from "./architecture-backlog.js";
@@ -23,5 +25,13 @@ describe("architecture-backlog", () => {
     assert.ok(!ids.includes("P-006"));
     const next = pickNextArchitectureTask(tasks);
     assert.equal(next?.id, "P-007");
+  });
+
+  it("marks Open table rows Done for writeback", () => {
+    const md = `| P-007 | **Refresh stale default models** | Hygiene | Open | notes |`;
+    const { content, changed } = markArchitectureIdDoneInMarkdown(md, "P-007");
+    assert.equal(changed, true);
+    assert.match(content, /\|\s*Done\s*\|/);
+    assert.equal(extractArchitectureIdFromTitle("P-007: Refresh models"), "P-007");
   });
 });

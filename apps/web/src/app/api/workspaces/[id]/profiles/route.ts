@@ -25,11 +25,22 @@ function serializeProfile(p: {
   promptGuidance: string;
   toolAllowlistJson: string;
   strategyDefault: string;
+  temperament?: string;
+  skillKeysJson?: string;
   maxSpendMicros: number;
   locked: boolean;
   llmCredentialId: string | null;
   preferredModel: string | null;
 }) {
+  let skillKeys: string[] = [];
+  try {
+    const parsed = JSON.parse(p.skillKeysJson ?? "[]") as unknown;
+    if (Array.isArray(parsed)) {
+      skillKeys = parsed.filter((x): x is string => typeof x === "string");
+    }
+  } catch {
+    skillKeys = [];
+  }
   return {
     id: p.id,
     workspaceId: p.workspaceId,
@@ -38,6 +49,8 @@ function serializeProfile(p: {
     promptGuidance: p.promptGuidance,
     toolAllowlistJson: p.toolAllowlistJson,
     strategyDefault: p.strategyDefault,
+    temperament: p.temperament ?? "balanced",
+    skillKeys,
     maxSpendMicros: p.maxSpendMicros,
     locked: p.locked,
     llmCredentialId: p.llmCredentialId,
@@ -83,6 +96,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       key?: string;
       promptGuidance?: string;
       strategyDefault?: string;
+      temperament?: "steady" | "swift" | "balanced";
+      skillKeys?: string[];
       maxSpendMicros?: number;
       toolAllowlist?: string[];
       llmCredentialId?: string | null;
@@ -97,6 +112,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       actor: `user:${user.id}`,
       promptGuidance: body.promptGuidance,
       strategyDefault: body.strategyDefault,
+      temperament: body.temperament,
+      skillKeys: body.skillKeys,
       maxSpendMicros: body.maxSpendMicros,
       toolAllowlist: body.toolAllowlist,
       llmCredentialId: body.llmCredentialId,

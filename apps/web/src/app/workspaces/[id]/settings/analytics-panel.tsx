@@ -54,7 +54,8 @@ export function AnalyticsPanel({ workspaceId, isOwner }: Props) {
         Cost analytics (30d)
       </h2>
       <p className={styles.sectionLede}>
-        Spend and acceptance across arenas in this workspace.
+        Coppergate budget units and acceptance across arenas — not your
+        OpenAI/BYOK provider invoice.
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
       {data ? (

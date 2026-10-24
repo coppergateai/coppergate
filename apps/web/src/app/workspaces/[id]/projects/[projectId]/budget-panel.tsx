@@ -11,6 +11,8 @@ type Usage = {
   availableMicros: number;
   currency: string;
   budgetStatus: string;
+  pooled?: boolean;
+  projectSpentMicros?: number;
 };
 
 type Props = {
@@ -41,6 +43,23 @@ export function BudgetPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  const pooled = Boolean(usage.pooled);
+
+  async function reloadUsage() {
+    const usageRes = await fetch(
+      `/api/projects/${projectId}/usage?workspaceId=${workspaceId}`,
+      { credentials: "same-origin" },
+    );
+    const usageBody = (await usageRes.json()) as {
+      usage?: Usage;
+      error?: { message: string };
+    };
+    if (!usageRes.ok) {
+      throw new Error(usageBody.error?.message ?? "Reload failed");
+    }
+    if (usageBody.usage) setUsage(usageBody.usage);
+  }
+
   async function save(status?: "active" | "paused") {
     setPending(true);
     setError(null);
@@ -50,13 +69,17 @@ export function BudgetPanel({
         throw new Error("Enter a valid non-negative dollar amount");
       }
       const capMicros = Math.round(dollarsNum * 1_000_000);
-      const res = await fetch(`/api/projects/${projectId}/budget`, {
+      const url = pooled
+        ? `/api/workspaces/${workspaceId}/budget`
+        : `/api/projects/${projectId}/budget`;
+      const res = await fetch(url, {
         method: "PUT",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workspaceId,
+          ...(pooled ? {} : { workspaceId }),
           capMicros,
+          ...(pooled ? { period: "monthly" } : {}),
           ...(status ? { status } : {}),
         }),
       });
@@ -64,19 +87,7 @@ export function BudgetPanel({
         error?: { message: string };
       };
       if (!res.ok) throw new Error(body.error?.message ?? "Save failed");
-
-      const usageRes = await fetch(
-        `/api/projects/${projectId}/usage?workspaceId=${workspaceId}`,
-        { credentials: "same-origin" },
-      );
-      const usageBody = (await usageRes.json()) as {
-        usage?: Usage;
-        error?: { message: string };
-      };
-      if (!usageRes.ok) {
-        throw new Error(usageBody.error?.message ?? "Reload failed");
-      }
-      if (usageBody.usage) setUsage(usageBody.usage);
+      await reloadUsage();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -91,6 +102,7 @@ export function BudgetPanel({
   const reservedPct =
     cap > 0 ? Math.min(100 - spentPct, (usage.reservedMicros / cap) * 100) : 0;
   const paused = usage.budgetStatus === "paused";
+  const projectSpent = usage.projectSpentMicros ?? usage.spentMicros;
 
   return (
     <section
@@ -100,7 +112,7 @@ export function BudgetPanel({
     >
       <div className={styles.sectionHead}>
         <h2 id="budget-heading" className={styles.sectionLabel}>
-          Budget
+          {pooled ? "Workspace envelope" : "Budget"}
         </h2>
         <span
           className={
@@ -113,7 +125,9 @@ export function BudgetPanel({
         </span>
       </div>
       <p className={styles.sectionLede}>
-        Hard stop for agent spend. Pause blocks new worker claims.
+        {pooled
+          ? `Workspace $${dollars(usage.availableMicros)} left · this project $${dollars(projectSpent)} this period`
+          : "Hard stop for agent spend. Pause blocks new worker claims."}
       </p>
 
       <div className={styles.meterBlock}>
@@ -129,23 +143,36 @@ export function BudgetPanel({
         </div>
         <div className={styles.meterStats}>
           <div>
-            <span className={styles.meterStatLabel}>Cap</span>
+            <span className={styles.meterStatLabel}>
+              {pooled ? "Workspace cap" : "Cap"}
+            </span>
             <span className={styles.meterStatValue}>
               {dollars(usage.capMicros)} {usage.currency}
             </span>
           </div>
           <div>
-            <span className={styles.meterStatLabel}>Spent</span>
+            <span className={styles.meterStatLabel}>
+              {pooled ? "Workspace spent" : "Spent"}
+            </span>
             <span className={styles.meterStatValue}>
               {dollars(usage.spentMicros)}
             </span>
           </div>
-          <div>
-            <span className={styles.meterStatLabel}>Reserved</span>
-            <span className={styles.meterStatValue}>
-              {dollars(usage.reservedMicros)}
-            </span>
-          </div>
+          {pooled ? (
+            <div>
+              <span className={styles.meterStatLabel}>This project</span>
+              <span className={styles.meterStatValue}>
+                {dollars(projectSpent)}
+              </span>
+            </div>
+          ) : (
+            <div>
+              <span className={styles.meterStatLabel}>Reserved</span>
+              <span className={styles.meterStatValue}>
+                {dollars(usage.reservedMicros)}
+              </span>
+            </div>
+          )}
           <div>
             <span className={styles.meterStatLabel}>Available</span>
             <span className={styles.meterStatValue}>
@@ -159,7 +186,7 @@ export function BudgetPanel({
         <div className={styles.panel}>
           <div className={styles.btnRow}>
             <label className={styles.field}>
-              Cap (USD)
+              {pooled ? "Workspace cap (USD / mo)" : "Cap (USD)"}
               <input
                 className={styles.inputNarrow}
                 value={capDollars}
@@ -173,24 +200,24 @@ export function BudgetPanel({
               disabled={pending}
               onClick={() => void save()}
             >
-              {pending ? "Saving…" : "Save cap"}
+              {pending ? "Saving…" : pooled ? "Save envelope" : "Save cap"}
             </button>
-            {usage.capMicros === 0 ? (
+            {!pooled || usage.capMicros === 0 ? (
               <button
                 type="button"
                 className={styles.ghostBtn}
                 disabled={pending}
                 onClick={() => {
-                  setCapDollars("5.00");
+                  setCapDollars("100.00");
                   setPending(true);
                   setError(null);
-                  void fetch(`/api/projects/${projectId}/budget`, {
+                  void fetch(`/api/workspaces/${workspaceId}/budget`, {
                     method: "PUT",
                     credentials: "same-origin",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                      workspaceId,
-                      capMicros: 5_000_000,
+                      capMicros: 100_000_000,
+                      period: "monthly",
                       status: "active",
                     }),
                   })
@@ -201,6 +228,7 @@ export function BudgetPanel({
                       if (!res.ok) {
                         throw new Error(body.error?.message ?? "Save failed");
                       }
+                      await reloadUsage();
                       router.refresh();
                     })
                     .catch((err: unknown) =>
@@ -211,16 +239,14 @@ export function BudgetPanel({
                     .finally(() => setPending(false));
                 }}
               >
-                Set $5 cap
+                Set $100 envelope
               </button>
             ) : null}
             <button
               type="button"
               className={styles.ghostBtn}
               disabled={pending}
-              onClick={() =>
-                void save(paused ? "active" : "paused")
-              }
+              onClick={() => void save(paused ? "active" : "paused")}
             >
               {paused ? "Resume spend" : "Pause spend"}
             </button>

@@ -896,6 +896,10 @@ export const agentProfiles = pgTable(
     toolAllowlistJson: text("tool_allowlist_json").notNull().default("[]"),
     /** balanced | blitz | fortress */
     strategyDefault: text("strategy_default").notNull().default("balanced"),
+    /** steady | swift | balanced — character / pacing */
+    temperament: text("temperament").notNull().default("balanced"),
+    /** JSON string[] of agent_skills keys assigned to this profile */
+    skillKeysJson: text("skill_keys_json").notNull().default("[]"),
     maxSpendMicros: bigint("max_spend_micros", { mode: "number" })
       .notNull()
       .default(100_000),
@@ -919,6 +923,64 @@ export const agentProfiles = pgTable(
     uniqueIndex("agent_profiles_ws_key_uidx").on(t.workspaceId, t.key),
     index("agent_profiles_key_idx").on(t.key),
     index("agent_profiles_llm_credential_id_idx").on(t.llmCredentialId),
+  ],
+);
+
+/** Cursor-style skill procedures assigned to agent profiles. */
+export const agentSkills = pgTable(
+  "agent_skills",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, {
+      onDelete: "cascade",
+    }),
+    key: text("key").notNull(),
+    title: text("title").notNull(),
+    bodyMarkdown: text("body_markdown").notNull().default(""),
+    version: integer("version").notNull().default(1),
+    parentSkillId: uuid("parent_skill_id"),
+    evolvedFromRunId: uuid("evolved_from_run_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("agent_skills_ws_key_uidx").on(t.workspaceId, t.key),
+    index("agent_skills_key_idx").on(t.key),
+  ],
+);
+
+/** Workspace MCP / external tool bridges (SonarQube first). */
+export const workspaceMcpConnections = pgTable(
+  "workspace_mcp_connections",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    displayName: text("display_name").notNull(),
+    endpointUrl: text("endpoint_url").notNull(),
+    encryptedPayload: text("encrypted_payload").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    toolAllowlistJson: text("tool_allowlist_json").notNull().default("[]"),
+    metaJson: text("meta_json"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("workspace_mcp_connections_ws_idx").on(t.workspaceId),
+    uniqueIndex("workspace_mcp_connections_ws_provider_uidx").on(
+      t.workspaceId,
+      t.provider,
+    ),
   ],
 );
 
@@ -1144,6 +1206,9 @@ export type DeliveryShareToken = typeof deliveryShareTokens.$inferSelect;
 export type SignalEvent = typeof signalEvents.$inferSelect;
 export type AutoArmRule = typeof autoArmRules.$inferSelect;
 export type AgentProfile = typeof agentProfiles.$inferSelect;
+export type AgentSkill = typeof agentSkills.$inferSelect;
+export type WorkspaceMcpConnection = typeof workspaceMcpConnections.$inferSelect;
+export type AgentTemperament = "steady" | "swift" | "balanced";
 export type MaintainerEvent = typeof maintainerEvents.$inferSelect;
 export type SignalEventStatus =
   | "received"

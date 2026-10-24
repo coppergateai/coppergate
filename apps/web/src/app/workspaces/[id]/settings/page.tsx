@@ -4,6 +4,7 @@ import {
   getInstallationForWorkspace,
   getProjectSpendSummary,
   getWorkspaceForMember,
+  getWorkspaceSpendSummary,
   listProjectsForWorkspace,
   listRepositoryConnections,
 } from "@coppergate/db";
@@ -11,7 +12,9 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AnalyticsPanel } from "./analytics-panel";
 import { BillingPanel } from "./billing-panel";
+import { AgentsPanel } from "./agents-panel";
 import { ByokPanel } from "./byok-panel";
+import { McpPanel } from "./mcp-panel";
 import { CostExplorerPanel } from "./cost-explorer";
 import { DangerZone } from "./danger-zone";
 import { DemoSeedPanel } from "./demo-seed-panel";
@@ -20,6 +23,7 @@ import { ScmConnectionsPanel } from "./scm-connections";
 import {
   ProjectsBudgetPanel,
   type ProjectBudgetRow,
+  type WorkspaceBudgetSummary,
 } from "./projects-budget-panel";
 import { SettingsShell } from "./settings-shell";
 import { SignalsPanel } from "./signals-panel";
@@ -64,26 +68,44 @@ export default async function WorkspaceSettingsPage({
   await listRepositoryConnections(db, workspace.id);
 
   const projectRows = await listProjectsForWorkspace(db, workspace.id);
-  const budgetRows: ProjectBudgetRow[] = await Promise.all(
-    projectRows.map(async ({ project, repository }) => {
-      const usage = await getProjectSpendSummary(
-        db,
-        workspace.id,
-        project.id,
-      );
-      return {
+  const wsSpend = await getWorkspaceSpendSummary(db, workspace.id);
+  const workspaceBudget: WorkspaceBudgetSummary = wsSpend
+    ? {
+        capMicros: wsSpend.capMicros,
+        spentMicros: wsSpend.spentMicros,
+        reservedMicros: wsSpend.reservedMicros,
+        availableMicros: wsSpend.availableMicros,
+        currency: wsSpend.currency,
+        budgetStatus: wsSpend.budgetStatus,
+        period: wsSpend.period,
+      }
+    : null;
+  // Prefer cached project.spentMicros under a workspace pool — avoid N× spend
+  // summaries (kprompt has many sibling projects; that was timing out settings).
+  const budgetRows: ProjectBudgetRow[] = wsSpend
+    ? projectRows.map(({ project, repository }) => ({
         projectId: project.id,
         name: project.name,
         repoFullName: repository.baseRepoFullName,
-        capMicros: usage.capMicros,
-        spentMicros: usage.spentMicros,
-        reservedMicros: usage.reservedMicros,
-        availableMicros: usage.availableMicros,
-        currency: usage.currency,
-        budgetStatus: usage.budgetStatus,
-      };
-    }),
-  );
+        projectSpentMicros: project.spentMicros,
+        currency: wsSpend.currency,
+      }))
+    : await Promise.all(
+        projectRows.map(async ({ project, repository }) => {
+          const usage = await getProjectSpendSummary(
+            db,
+            workspace.id,
+            project.id,
+          );
+          return {
+            projectId: project.id,
+            name: project.name,
+            repoFullName: repository.baseRepoFullName,
+            projectSpentMicros: usage.projectSpentMicros ?? usage.spentMicros,
+            currency: usage.currency,
+          };
+        }),
+      );
 
   const general = (
     <div className={styles.stackWide}>
@@ -118,6 +140,7 @@ export default async function WorkspaceSettingsPage({
       <ProjectsBudgetPanel
         workspaceId={workspace.id}
         isOwner={role === "owner"}
+        initialWorkspace={workspaceBudget}
         initialProjects={budgetRows}
       />
       {process.env.NODE_ENV !== "production" ||
@@ -198,10 +221,20 @@ export default async function WorkspaceSettingsPage({
             ),
             signals,
             llm: (
-              <ByokPanel
-                workspaceId={workspace.id}
-                isOwner={role === "owner"}
-              />
+              <div className={styles.stackWide}>
+                <ByokPanel
+                  workspaceId={workspace.id}
+                  isOwner={role === "owner"}
+                />
+                <AgentsPanel
+                  workspaceId={workspace.id}
+                  isOwner={role === "owner"}
+                />
+                <McpPanel
+                  workspaceId={workspace.id}
+                  isOwner={role === "owner"}
+                />
+              </div>
             ),
             analytics: (
               <div className={styles.stackWide}>

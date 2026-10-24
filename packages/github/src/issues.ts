@@ -4,6 +4,7 @@ export type GithubIssueSummary = {
   body: string | null;
   htmlUrl: string;
   state: string;
+  labels: string[];
 };
 
 export async function listOpenIssues(input: {
@@ -14,7 +15,7 @@ export async function listOpenIssues(input: {
 }): Promise<GithubIssueSummary[]> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const res = await fetchImpl(
-    `https://api.github.com/repos/${input.owner}/${input.repo}/issues?state=open&per_page=30`,
+    `https://api.github.com/repos/${input.owner}/${input.repo}/issues?state=open&per_page=50`,
     {
       headers: {
         Accept: "application/vnd.github+json",
@@ -33,6 +34,7 @@ export async function listOpenIssues(input: {
     html_url: string;
     state: string;
     pull_request?: unknown;
+    labels?: Array<{ name?: string } | string>;
   }>;
   return rows
     .filter((r) => !r.pull_request)
@@ -42,7 +44,67 @@ export async function listOpenIssues(input: {
       body: r.body,
       htmlUrl: r.html_url,
       state: r.state,
+      labels: (r.labels ?? []).map((l) =>
+        typeof l === "string" ? l : (l.name ?? ""),
+      ).filter(Boolean),
     }));
+}
+
+export async function createIssue(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  title: string;
+  body?: string;
+  labels?: string[];
+  fetchImpl?: typeof fetch;
+}): Promise<GithubIssueSummary> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/issues`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${input.token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: input.title,
+        body: input.body ?? "",
+        labels: input.labels ?? [],
+      }),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`createIssue failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+  const body = (await res.json()) as {
+    number: number;
+    title: string;
+    body: string | null;
+    html_url: string;
+    state: string;
+    labels?: Array<{ name?: string } | string>;
+  };
+  return {
+    number: body.number,
+    title: body.title,
+    body: body.body,
+    htmlUrl: body.html_url,
+    state: body.state,
+    labels: (body.labels ?? []).map((l) =>
+      typeof l === "string" ? l : (l.name ?? ""),
+    ).filter(Boolean),
+  };
+}
+
+export function countGoodFirstIssues(issues: GithubIssueSummary[]): number {
+  return issues.filter((i) =>
+    i.labels.some((l) => l.toLowerCase() === "good first issue"),
+  ).length;
 }
 
 export async function mergePullRequest(input: {

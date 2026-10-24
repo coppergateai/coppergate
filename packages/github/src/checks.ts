@@ -102,3 +102,130 @@ export function mapCheckSuitePayload(
     repoFullName: payload.repository?.full_name ?? null,
   };
 }
+
+/** Classic commit status webhook (`status` event) — Vercel often uses this. */
+export function mapCommitStatusPayload(payload: {
+  state?: string;
+  context?: string;
+  target_url?: string | null;
+  sha?: string;
+  repository?: { full_name?: string };
+}): NormalizedCheckEvidence {
+  const state = (payload.state ?? "unknown").toLowerCase();
+  const completed = state === "success" || state === "failure" || state === "error";
+  const conclusion =
+    state === "success"
+      ? "success"
+      : state === "failure" || state === "error"
+        ? "failure"
+        : state === "pending"
+          ? null
+          : state;
+  const blocksAccept = completed && (state === "failure" || state === "error");
+  const passed = completed && state === "success";
+
+  return {
+    provider: "github_check_run",
+    checkRunId: null,
+    name: payload.context ?? "status",
+    status: completed ? "completed" : state,
+    conclusion,
+    blocksAccept,
+    passed,
+    headSha: payload.sha ?? null,
+    detailsUrl: payload.target_url ?? null,
+    repoFullName: payload.repository?.full_name ?? null,
+  };
+}
+
+type GhCheckRun = {
+  id?: number;
+  name?: string;
+  status?: string;
+  conclusion?: string | null;
+  details_url?: string | null;
+  head_sha?: string;
+};
+
+type GhCommitStatus = {
+  context?: string;
+  state?: string;
+  target_url?: string | null;
+};
+
+/** Poll GitHub for check runs + commit statuses on a SHA (webhook miss recovery). */
+export async function fetchCommitCheckEvidence(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  headSha: string;
+  fetchImpl?: typeof fetch;
+}): Promise<NormalizedCheckEvidence[]> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const headers = {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${input.token}`,
+    "User-Agent": "coppergate-worker",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  const repoFullName = `${input.owner}/${input.repo}`;
+  const out: NormalizedCheckEvidence[] = [];
+
+  const checksRes = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/commits/${encodeURIComponent(input.headSha)}/check-runs?per_page=50`,
+    { headers },
+  );
+  if (checksRes.ok) {
+    const body = (await checksRes.json()) as { check_runs?: GhCheckRun[] };
+    for (const cr of body.check_runs ?? []) {
+      out.push(
+        mapCheckRunPayload({
+          check_run: {
+            id: cr.id,
+            name: cr.name,
+            status: cr.status,
+            conclusion: cr.conclusion,
+            details_url: cr.details_url,
+            head_sha: cr.head_sha ?? input.headSha,
+          },
+          repository: { full_name: repoFullName },
+        }),
+      );
+    }
+  }
+
+  const statusRes = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/commits/${encodeURIComponent(input.headSha)}/status`,
+    { headers },
+  );
+  if (statusRes.ok) {
+    const body = (await statusRes.json()) as {
+      statuses?: GhCommitStatus[];
+      state?: string;
+    };
+    for (const st of body.statuses ?? []) {
+      out.push(
+        mapCommitStatusPayload({
+          state: st.state,
+          context: st.context,
+          target_url: st.target_url,
+          sha: input.headSha,
+          repository: { full_name: repoFullName },
+        }),
+      );
+    }
+    // Combined rollup when statuses array empty but overall state known
+    if ((body.statuses?.length ?? 0) === 0 && body.state && body.state !== "pending") {
+      out.push(
+        mapCommitStatusPayload({
+          state: body.state,
+          context: "combined",
+          sha: input.headSha,
+          repository: { full_name: repoFullName },
+        }),
+      );
+    }
+  }
+
+  return out;
+}

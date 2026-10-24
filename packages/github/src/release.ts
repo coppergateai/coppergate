@@ -60,13 +60,46 @@ export async function createGithubRelease(input: {
   };
 }
 
-/** Build a simple changelog body from merged PR titles. */
+function bucketHighlight(title: string): "features" | "fixes" | "other" {
+  const t = title.toLowerCase();
+  if (/\b(fix|bug|hotfix|revert|security|cve)\b/.test(t)) return "fixes";
+  if (
+    /\b(feat|feature|add|ship|provider|docs?|content|ux|perf)\b/.test(t) ||
+    /\b(P|W|A|S|AG|RT)-\d+/i.test(title)
+  ) {
+    return "features";
+  }
+  return "other";
+}
+
+/** Build a user-facing changelog body from merged PR / task titles. */
 export function formatReleaseNotes(input: {
   version: string;
   highlights: string[];
 }): string {
-  const lines = input.highlights.length
-    ? input.highlights.map((h) => `- ${h}`)
-    : ["- Maintainer cycle ship"];
-  return `## ${input.version}\n\n${lines.join("\n")}\n\n_Shipped by Coppergate maintainer._\n`;
+  const features: string[] = [];
+  const fixes: string[] = [];
+  const other: string[] = [];
+  for (const h of input.highlights) {
+    const line = h.trim();
+    if (!line) continue;
+    const bucket = bucketHighlight(line);
+    if (bucket === "features") features.push(line);
+    else if (bucket === "fixes") fixes.push(line);
+    else other.push(line);
+  }
+
+  const sections: string[] = [`## ${input.version}`, ``];
+  if (features.length) {
+    sections.push(`### What's new`, ...features.map((h) => `- ${h}`), ``);
+  }
+  if (fixes.length) {
+    sections.push(`### Fixes`, ...fixes.map((h) => `- ${h}`), ``);
+  }
+  if (other.length || (!features.length && !fixes.length)) {
+    const rows = other.length ? other : ["Maintainer cycle ship"];
+    sections.push(`### Changes`, ...rows.map((h) => `- ${h}`), ``);
+  }
+  sections.push(`_Shipped by Coppergate maintainer._`, ``);
+  return sections.join("\n");
 }
