@@ -3,8 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app";
+import {
+  acceptBlockedReason as computeAcceptBlocked,
+  HARD_GATE_COPY,
+  gateStatusLabel,
+  type GateStatus,
+} from "@/lib/hard-gates";
 import { TournamentPanel } from "./tournament-panel";
 import styles from "./task-detail.module.css";
+
+type EvidenceGate = {
+  id: string;
+  label: string;
+  status: GateStatus;
+  detail: string;
+  hard: boolean;
+};
 
 type Run = {
   id: string;
@@ -107,8 +121,28 @@ export function TaskDetailPanel({
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [evidenceGates, setEvidenceGates] = useState<EvidenceGate[]>([]);
+  const [evidenceAcceptReady, setEvidenceAcceptReady] = useState<
+    boolean | null
+  >(null);
 
   const selected = runs.find((r) => r.id === selectedRunId) ?? runs[0] ?? null;
+
+  const refreshEvidence = useCallback(async () => {
+    const qs = new URLSearchParams({ workspaceId });
+    if (selectedRunId) qs.set("runId", selectedRunId);
+    const res = await fetch(`/api/tasks/${taskId}/evidence?${qs}`, {
+      credentials: "same-origin",
+    });
+    const body = (await res.json()) as {
+      evidence?: {
+        selected?: { gates?: EvidenceGate[]; acceptReady?: boolean };
+      };
+    };
+    if (!res.ok) return;
+    setEvidenceGates(body.evidence?.selected?.gates ?? []);
+    setEvidenceAcceptReady(body.evidence?.selected?.acceptReady ?? null);
+  }, [taskId, workspaceId, selectedRunId]);
 
   const refreshRuns = useCallback(async () => {
     const res = await fetch(
@@ -169,6 +203,7 @@ export function TaskDetailPanel({
     void refreshArtifacts().catch((err: unknown) =>
       setError(err instanceof Error ? err.message : "Artifacts failed"),
     );
+    void refreshEvidence().catch(() => undefined);
     if (!selectedRunId) return;
     const active =
       (selected &&
@@ -181,11 +216,13 @@ export function TaskDetailPanel({
       void refreshRuns();
       void refreshEvents();
       void refreshArtifacts();
+      void refreshEvidence();
     }, 2000);
     return () => clearInterval(t);
   }, [
     refreshArtifacts,
     refreshEvents,
+    refreshEvidence,
     refreshRuns,
     selected,
     selectedRunId,
@@ -403,16 +440,40 @@ export function TaskDetailPanel({
     return { checks, blocking, passed, awaitingLive, acceptReady };
   })();
 
-  const acceptBlockedReason = !ciFitness.acceptReady
-    ? ciFitness.blocking
-      ? "CI checks failed — Accept disabled"
-      : "Awaiting live CI evidence — Accept disabled"
-    : null;
+  const validationFailed = evidenceGates.some(
+    (g) => g.id === "validation" && g.status === "failed",
+  );
+  const policyFailed = evidenceGates.some(
+    (g) => g.id === "policy" && g.status === "failed",
+  );
+  const acceptReady =
+    evidenceAcceptReady != null
+      ? evidenceAcceptReady
+      : ciFitness.acceptReady && !validationFailed && !policyFailed;
+  const acceptBlockedReason = computeAcceptBlocked({
+    acceptReady,
+    ciBlocking: ciFitness.blocking,
+    ciAwaitingLive: ciFitness.awaitingLive,
+    ciPassed: ciFitness.passed,
+    validationFailed,
+    policyFailed,
+  });
+
+  const stages = [
+    { id: "scope", label: "Scope", n: "01" },
+    { id: "execution", label: "Execution", n: "02" },
+    { id: "verification", label: "Verification", n: "03" },
+    { id: "review", label: "Review", n: "04" },
+    { id: "delivery", label: "Delivery", n: "05" },
+  ] as const;
 
   return (
     <div className={styles.root}>
+      <p className={styles.kicker}>
+        Delivery · {task.status.replaceAll("_", " ")}
+      </p>
       <p className={styles.meta}>
-        {task.status} · attempt {task.attemptCount}/{task.maxAttempts}
+        Attempt {task.attemptCount}/{task.maxAttempts}
         {task.prUrl ? (
           <>
             {" · "}
@@ -430,8 +491,58 @@ export function TaskDetailPanel({
             : null}
       </p>
       <h1 className={styles.title}>{task.title}</h1>
-      <p className={styles.goal}>{task.goal}</p>
-      <p className={styles.scope}>Scope: {task.scope}</p>
+
+      <nav className={styles.stageNav} aria-label="Delivery review stages">
+        {stages.map((s) => (
+          <a key={s.id} href={`#${s.id}`} className={styles.stageChip}>
+            <span className={styles.stageNum}>{s.n}</span>
+            {s.label}
+          </a>
+        ))}
+      </nav>
+
+      {task.status === "REVIEW_REQUIRED" || evidenceGates.length > 0 ? (
+        <div className={styles.gateBanner}>
+          <p className={styles.gateBannerTitle}>
+            {acceptReady
+              ? HARD_GATE_COPY.allHardPassed
+              : (acceptBlockedReason ?? "Gates incomplete")}
+          </p>
+          <p className={styles.gateBannerMeta}>
+            {HARD_GATE_COPY.humanStillRequired}
+          </p>
+          {evidenceGates.length > 0 ? (
+            <ul className={styles.gateGrid}>
+              {evidenceGates.map((g) => (
+                <li key={g.id} className={styles.gateRow}>
+                  <span
+                    className={
+                      g.status === "passed"
+                        ? styles.gateOk
+                        : g.status === "failed"
+                          ? styles.gateBad
+                          : styles.gateWait
+                    }
+                  >
+                    {gateStatusLabel(g.status)}
+                  </span>
+                  <span>
+                    {g.label}
+                    {g.hard ? " · hard" : ""}
+                  </span>
+                  <span className={styles.gateRowDetail}>{g.detail}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
+      <section id="scope" className={styles.section}>
+        <h2 className={styles.sectionTitle}>01 · Scope</h2>
+        <p className={styles.goal}>{task.goal}</p>
+        <p className={styles.scope}>Scope: {task.scope}</p>
+      </section>
 
       {isOwner ? (
         <div className={styles.actions}>
@@ -490,7 +601,7 @@ export function TaskDetailPanel({
             <>
               <button
                 type="button"
-                disabled={pending || !ciFitness.acceptReady}
+                disabled={pending || !acceptReady}
                 className={styles.btn}
                 title={acceptBlockedReason ?? "Accept delivery"}
                 onClick={() =>
@@ -553,8 +664,8 @@ export function TaskDetailPanel({
       <RecoveryCopy taskStatus={task.status} run={selected} />
 
       {diffSummary || deliveryReport || ciFitness.checks.length > 0 || ciFitness.awaitingLive ? (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Delivery for review</h2>
+        <section id="verification" className={styles.section}>
+          <h2 className={styles.sectionTitle}>03 · Verification</h2>
           <p className={styles.sectionLede}>
             Cost {(costMicros / 100).toFixed(2)}¢
             {diffSummary ? ` · ${diffSummary.files.length} file(s)` : null}
@@ -637,9 +748,9 @@ export function TaskDetailPanel({
             </p>
           ) : null}
           {reviewFindings ? (
-            <div style={{ marginBottom: "0.85rem" }}>
+            <div id="review" style={{ marginBottom: "0.85rem" }}>
               <p className={styles.subLabel}>
-                Reviewer: {reviewFindings.summary}
+                04 · Review · {reviewFindings.summary}
               </p>
               <ul className={styles.list}>
                 {reviewFindings.findings.map((f) => (
@@ -703,10 +814,12 @@ export function TaskDetailPanel({
         </section>
       ) : null}
 
-      <TournamentPanel workspaceId={workspaceId} taskId={taskId} />
+      <div id="execution">
+        <TournamentPanel workspaceId={workspaceId} taskId={taskId} />
+      </div>
 
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Runs & cost</h2>
+      <section id="delivery" className={styles.section}>
+        <h2 className={styles.sectionTitle}>02 · Execution · Runs & cost</h2>
         <p className={styles.sectionLede}>
           Selected run cost:{" "}
           {costMicros ? `${(costMicros / 100).toFixed(2)}¢` : "—"}

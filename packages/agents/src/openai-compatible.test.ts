@@ -52,7 +52,19 @@ describe("OpenAiCompatibleCodingAgent", () => {
       fetchImpl: async () =>
         new Response(
           JSON.stringify({
-            choices: [{ message: { content: "Update README" } }],
+            choices: [
+              {
+                message: {
+                  content: [
+                    "### FILE: README.md",
+                    "```",
+                    "# Docs",
+                    "Clear product increment for acceptance.",
+                    "```",
+                  ].join("\n"),
+                },
+              },
+            ],
             usage: { total_tokens: 400 },
           }),
           { status: 200 },
