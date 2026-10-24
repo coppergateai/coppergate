@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import {
+  agentRuns,
   auditEvents,
   budgets,
   projects,
@@ -9,6 +10,13 @@ import {
   type UsageEvent,
   type UsageKind,
 } from "./schema.js";
+
+const ACTIVE_RESERVE_RUN_STATUSES = [
+  "QUEUED",
+  "RUNNING",
+  "VALIDATING",
+  "WAITING_CI",
+] as const;
 
 export class BudgetError extends Error {
   readonly code: "not_found" | "invalid" | "insufficient" | "paused";
@@ -647,4 +655,236 @@ export async function releaseEstimateForTask(
     quantity: "1",
     meta: { taskId: input.taskId },
   });
+}
+
+/** Net estimate still held for a task in the current budget period. */
+export async function outstandingEstimateReserveForTask(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    taskId: string;
+  },
+): Promise<number> {
+  const budget = await getWorkspaceBudgetRow(db, input.workspaceId);
+  const since =
+    budget?.period === "monthly" ? (budget.periodStartedAt ?? null) : null;
+
+  const [reservedRow] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${usageEvents.costMicros}), 0)`,
+    })
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.workspaceId, input.workspaceId),
+        eq(usageEvents.projectId, input.projectId),
+        eq(usageEvents.taskId, input.taskId),
+        eq(usageEvents.kind, "estimate_reserve"),
+        since ? gte(usageEvents.createdAt, since) : undefined,
+      ),
+    );
+  const [releasedRow] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${usageEvents.costMicros}), 0)`,
+    })
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.workspaceId, input.workspaceId),
+        eq(usageEvents.projectId, input.projectId),
+        eq(usageEvents.taskId, input.taskId),
+        eq(usageEvents.kind, "estimate_release"),
+        since ? gte(usageEvents.createdAt, since) : undefined,
+      ),
+    );
+  return Math.max(
+    0,
+    Number(reservedRow?.total ?? 0) - Number(releasedRow?.total ?? 0),
+  );
+}
+
+/**
+ * Release estimate held for a finished/cancelled run (capped by outstanding).
+ * Safe to call multiple times — second call is a no-op when nothing remains.
+ */
+export async function releaseEstimateForRun(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    taskId: string;
+    runId: string;
+    amountMicros: number;
+  },
+): Promise<UsageEvent | null> {
+  if (input.amountMicros <= 0) return null;
+  const outstanding = await outstandingEstimateReserveForTask(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    taskId: input.taskId,
+  });
+  const amount = Math.min(input.amountMicros, outstanding);
+  if (amount <= 0) return null;
+  return appendUsageEvent(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    taskId: input.taskId,
+    runId: input.runId,
+    kind: "estimate_release",
+    costMicros: amount,
+    quantity: "1",
+    meta: { taskId: input.taskId, runId: input.runId },
+  });
+}
+
+export type StaleReserveReconcileRow = {
+  workspaceId: string;
+  projectId: string;
+  taskId: string;
+  outstandingMicros: number;
+  activeHoldMicros: number;
+  releaseMicros: number;
+};
+
+export type StaleReserveReconcileResult = {
+  dryRun: boolean;
+  workspaceId: string | null;
+  rows: StaleReserveReconcileRow[];
+  releasedMicros: number;
+  releasedEvents: number;
+};
+
+/**
+ * Release estimate_reserve that is no longer covered by active runs
+ * (QUEUED / RUNNING / VALIDATING / WAITING_CI). Keeps a hold equal to the
+ * sum of estimatedCostMicros on those runs. One-shot ops / period cleanup.
+ */
+export async function reconcileStaleEstimateReserves(
+  db: Database,
+  input: {
+    workspaceId?: string | null;
+    dryRun?: boolean;
+  } = {},
+): Promise<StaleReserveReconcileResult> {
+  const dryRun = input.dryRun !== false;
+  const workspaceFilter = input.workspaceId?.trim() || null;
+
+  const budgetRows = await db
+    .select()
+    .from(budgets)
+    .where(
+      and(
+        isNull(budgets.projectId),
+        workspaceFilter ? eq(budgets.workspaceId, workspaceFilter) : undefined,
+      ),
+    );
+
+  const rows: StaleReserveReconcileRow[] = [];
+  let releasedMicros = 0;
+  let releasedEvents = 0;
+
+  for (const budget of budgetRows) {
+    const since =
+      budget.period === "monthly" ? (budget.periodStartedAt ?? null) : null;
+
+    const reserveAgg = await db
+      .select({
+        projectId: usageEvents.projectId,
+        taskId: usageEvents.taskId,
+        reserved: sql<number>`coalesce(sum(case when ${usageEvents.kind} = 'estimate_reserve' then ${usageEvents.costMicros} else 0 end), 0)`,
+        released: sql<number>`coalesce(sum(case when ${usageEvents.kind} = 'estimate_release' then ${usageEvents.costMicros} else 0 end), 0)`,
+      })
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.workspaceId, budget.workspaceId),
+          inArray(usageEvents.kind, ["estimate_reserve", "estimate_release"]),
+          since ? gte(usageEvents.createdAt, since) : undefined,
+          sql`${usageEvents.taskId} is not null`,
+        ),
+      )
+      .groupBy(usageEvents.projectId, usageEvents.taskId);
+
+    for (const agg of reserveAgg) {
+      if (!agg.taskId) continue;
+      const outstanding = Math.max(
+        0,
+        Number(agg.reserved ?? 0) - Number(agg.released ?? 0),
+      );
+      if (outstanding <= 0) continue;
+
+      const [activeHold] = await db
+        .select({
+          total: sql<number>`coalesce(sum(${agentRuns.estimatedCostMicros}), 0)`,
+        })
+        .from(agentRuns)
+        .where(
+          and(
+            eq(agentRuns.workspaceId, budget.workspaceId),
+            eq(agentRuns.projectId, agg.projectId),
+            eq(agentRuns.taskId, agg.taskId),
+            inArray(agentRuns.status, [...ACTIVE_RESERVE_RUN_STATUSES]),
+          ),
+        );
+      const activeHoldMicros = Math.max(0, Number(activeHold?.total ?? 0));
+      const releaseMicros = Math.max(0, outstanding - activeHoldMicros);
+      if (releaseMicros <= 0) continue;
+
+      const row: StaleReserveReconcileRow = {
+        workspaceId: budget.workspaceId,
+        projectId: agg.projectId,
+        taskId: agg.taskId,
+        outstandingMicros: outstanding,
+        activeHoldMicros,
+        releaseMicros,
+      };
+      rows.push(row);
+
+      if (!dryRun) {
+        await appendUsageEvent(db, {
+          workspaceId: budget.workspaceId,
+          projectId: agg.projectId,
+          taskId: agg.taskId,
+          kind: "estimate_release",
+          costMicros: releaseMicros,
+          quantity: "1",
+          meta: {
+            reason: "reconcile_stale_estimate_reserves",
+            outstandingBefore: outstanding,
+            activeHoldMicros,
+          },
+        });
+        await db.insert(auditEvents).values({
+          id: crypto.randomUUID(),
+          workspaceId: budget.workspaceId,
+          actor: "script:reconcile-stale-reserves",
+          action: "budget.estimate_release_reconcile",
+          targetType: "task",
+          targetId: agg.taskId,
+          meta: JSON.stringify({
+            projectId: agg.projectId,
+            releaseMicros,
+            outstandingBefore: outstanding,
+            activeHoldMicros,
+          }),
+          createdAt: new Date(),
+        });
+        releasedMicros += releaseMicros;
+        releasedEvents += 1;
+      }
+    }
+  }
+
+  if (dryRun) {
+    releasedMicros = rows.reduce((s, r) => s + r.releaseMicros, 0);
+  }
+
+  return {
+    dryRun,
+    workspaceId: workspaceFilter,
+    rows,
+    releasedMicros,
+    releasedEvents: dryRun ? 0 : releasedEvents,
+  };
 }

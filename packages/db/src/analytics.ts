@@ -1,6 +1,19 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
-import { agentRuns, projects, tasks, usageEvents } from "./schema.js";
+import {
+  agentRuns,
+  projects,
+  tasks,
+  usageEvents,
+  type UsageKind,
+} from "./schema.js";
+
+/** Matches budget ledger spend (excludes estimate_reserve / estimate_release). */
+const SPENT_KINDS: UsageKind[] = [
+  "llm_tokens",
+  "sandbox_seconds",
+  "adjustment",
+];
 
 export type CostAnalytics30d = {
   windowDays: number;
@@ -39,6 +52,7 @@ export async function getWorkspaceCostAnalytics(
     .where(
       and(
         eq(usageEvents.workspaceId, input.workspaceId),
+        inArray(usageEvents.kind, SPENT_KINDS),
         gte(usageEvents.createdAt, since),
       ),
     );
@@ -138,6 +152,7 @@ export async function getProjectCostExplorer(
       and(
         eq(usageEvents.workspaceId, input.workspaceId),
         eq(usageEvents.projectId, input.projectId),
+        inArray(usageEvents.kind, SPENT_KINDS),
         gte(usageEvents.createdAt, since),
       ),
     );
@@ -207,11 +222,13 @@ export async function getWorkspaceMonthToDateUsage(
   const byKindMap = new Map<string, { spentMicros: number; count: number }>();
   let spentMicros = 0;
   for (const u of usage) {
-    spentMicros += u.cost || 0;
     const cur = byKindMap.get(u.kind) ?? { spentMicros: 0, count: 0 };
     cur.spentMicros += u.cost || 0;
     cur.count += 1;
     byKindMap.set(u.kind, cur);
+    if ((SPENT_KINDS as string[]).includes(u.kind)) {
+      spentMicros += u.cost || 0;
+    }
   }
 
   return {
@@ -252,6 +269,7 @@ export async function getWorkspaceCostExplorer(
     .where(
       and(
         eq(usageEvents.workspaceId, input.workspaceId),
+        inArray(usageEvents.kind, SPENT_KINDS),
         gte(usageEvents.createdAt, since),
       ),
     );

@@ -256,16 +256,52 @@ async function lastRunForProject(
   };
 }
 
+function laneSeverity(lane: WorkspaceArenaProjectLane): number {
+  let worst = 0;
+  for (const c of lane.contenders) {
+    const bucket = classifyContenderRuntime(
+      c.latestRun,
+      c.budgetMicrosRemaining,
+    );
+    const rank =
+      bucket === "needsAttention"
+        ? 3
+        : bucket === "running"
+          ? 2
+          : bucket === "awaitingCi"
+            ? 1
+            : 0;
+    if (rank > worst) worst = rank;
+  }
+  const last = lane.lastRun?.status;
+  if (last === "FAILED" || last === "BLOCKED" || last === "EXPIRED") {
+    worst = Math.max(worst, 3);
+  }
+  return worst;
+}
+
+/** Needs attention first, then running, awaiting CI, idle. */
+export function sortArenaProjectLanes(
+  projects: WorkspaceArenaProjectLane[],
+): WorkspaceArenaProjectLane[] {
+  return [...projects].sort((a, b) => {
+    const diff = laneSeverity(b) - laneSeverity(a);
+    if (diff !== 0) return diff;
+    return a.projectName.localeCompare(b.projectName);
+  });
+}
+
 function snapshotPayload(
   workspaceId: string,
   projects: WorkspaceArenaProjectLane[],
 ): WorkspaceArenaSnapshot {
+  const ordered = sortArenaProjectLanes(projects);
   return {
     workspaceId,
-    status: deriveWorkspaceStatus(projects),
-    summary: deriveSummary(projects),
+    status: deriveWorkspaceStatus(ordered),
+    summary: deriveSummary(ordered),
     syncedAt: new Date().toISOString(),
-    projects,
+    projects: ordered,
   };
 }
 

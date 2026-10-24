@@ -8,6 +8,8 @@ import {
   BudgetError,
   getProjectSpendSummary,
   getWorkspaceSpendSummary,
+  outstandingEstimateReserveForTask,
+  releaseEstimateForRun,
   reserveEstimateForTask,
   setProjectBudget,
   setWorkspaceBudget,
@@ -200,6 +202,39 @@ describe("project budgets", { skip: !url }, () => {
     assert.equal(summary.reservedMicros, 40_000);
     assert.equal(summary.availableMicros, 60_000);
     assert.equal(summary.spentMicros, 0);
+  });
+
+  it("releases estimate for a finished run and restores available", async () => {
+    await setProjectBudget(db, {
+      workspaceId,
+      projectId,
+      capMicros: 100_000,
+      status: "active",
+      actor,
+    });
+    await reserveEstimateForTask(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      estimateMicros: 40_000,
+    });
+    const runId = crypto.randomUUID();
+    await releaseEstimateForRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      runId,
+      amountMicros: 40_000,
+    });
+    const outstanding = await outstandingEstimateReserveForTask(db, {
+      workspaceId,
+      projectId,
+      taskId,
+    });
+    assert.equal(outstanding, 0);
+    const summary = await getProjectSpendSummary(db, workspaceId, projectId);
+    assert.equal(summary.reservedMicros, 0);
+    assert.equal(summary.availableMicros, 100_000);
   });
 });
 

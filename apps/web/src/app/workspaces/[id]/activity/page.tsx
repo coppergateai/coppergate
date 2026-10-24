@@ -60,6 +60,15 @@ function hrefFor(
       ? `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`
       : `/workspaces/${workspaceId}/arena`;
   }
+  if (action === "maintainer.replan_queue_failed") {
+    if (projectId) {
+      return `/workspaces/${workspaceId}/projects/${projectId}`;
+    }
+    if (targetType === "task" && targetId) {
+      return `/workspaces/${workspaceId}/activity`;
+    }
+    return `/workspaces/${workspaceId}/activity`;
+  }
   return null;
 }
 
@@ -141,9 +150,15 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
     0,
   );
 
-  const needsReview = mission.metrics.needsApproval;
+  const needsReview =
+    mission.metrics.needsApproval + mission.metrics.arenaNeedsAttention;
+  const recentReplanFail = events.some(
+    (e) => e.action === "maintainer.replan_queue_failed",
+  );
   const systemHealthy =
-    needsReview === 0 && mission.metrics.budgetStatus !== "paused";
+    needsReview === 0 &&
+    mission.metrics.budgetStatus !== "paused" &&
+    !recentReplanFail;
 
   return (
     <ActivityShell
@@ -159,7 +174,9 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
           ? "System healthy"
           : mission.metrics.budgetStatus === "paused"
             ? "Budget paused"
-            : "Needs attention",
+            : recentReplanFail
+              ? "Replan failing"
+              : "Needs attention",
       }}
     />
   );

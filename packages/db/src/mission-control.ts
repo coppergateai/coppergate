@@ -2,6 +2,7 @@ import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { listInboxApprovalsForWorkspace } from "./approvals.js";
 import { getWorkspaceSpendSummary } from "./budgets.js";
+import { listAuditEventsForWorkspace } from "./audit.js";
 import { listWorkspaceArenaSnapshot } from "./workspace-arena.js";
 import { agentRuns, projects, tasks } from "./schema.js";
 
@@ -23,7 +24,10 @@ const ACTIVE_TASK_STATUSES = [
 export type MissionControlAttentionKind =
   | "approval"
   | "budget_paused"
-  | "review_required";
+  | "budget_reserved"
+  | "review_required"
+  | "arena_failed"
+  | "replan_failed";
 
 export type MissionControlAttentionItem = {
   id: string;
@@ -54,9 +58,15 @@ export type WorkspaceMissionControl = {
     highPriorityApprovals: number;
     verifiedPrsThisMonth: number;
     budgetSpentMicros: number;
+    budgetReservedMicros: number;
+    budgetAvailableMicros: number;
     budgetCapMicros: number;
     budgetCurrency: string;
     budgetStatus: string | null;
+    arenaRunning: number;
+    arenaAwaitingCi: number;
+    arenaNeedsAttention: number;
+    arenaIdle: number;
   };
   attention: MissionControlAttentionItem[];
   executions: MissionControlExecution[];
@@ -85,6 +95,28 @@ function startOfUtcMonth(now = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
+function laneNeedsAttention(lane: {
+  lastRun: { status: string } | null;
+  contenders: Array<{
+    budgetMicrosRemaining: number;
+    latestRun: { status: string; errorCode: string | null } | null;
+  }>;
+}): boolean {
+  const st = lane.lastRun?.status;
+  if (st === "FAILED" || st === "BLOCKED" || st === "EXPIRED") return true;
+  return lane.contenders.some((c) => {
+    if (c.budgetMicrosRemaining <= 0) return true;
+    const run = c.latestRun;
+    if (!run) return false;
+    return (
+      run.status === "FAILED" ||
+      run.status === "BLOCKED" ||
+      run.status === "EXPIRED" ||
+      Boolean(run.errorCode)
+    );
+  });
+}
+
 /**
  * Aggregated Mission Control snapshot for a workspace overview.
  * Caller must already have verified membership.
@@ -104,6 +136,7 @@ export async function getWorkspaceMissionControl(
     reviewTasks,
     activeTasks,
     arena,
+    recentAudit,
   ] = await Promise.all([
     getWorkspaceSpendSummary(db, workspaceId),
     listInboxApprovalsForWorkspace(db, workspaceId, { status: "pending" }),
@@ -168,6 +201,7 @@ export async function getWorkspaceMissionControl(
       .orderBy(desc(tasks.updatedAt))
       .limit(12),
     listWorkspaceArenaSnapshot(db, workspaceId),
+    listAuditEventsForWorkspace(db, workspaceId, { limit: 40 }),
   ]);
 
   const activeRuns = activeRunRows.reduce((s, r) => s + Number(r.n), 0);
@@ -202,6 +236,21 @@ export async function getWorkspaceMissionControl(
       href: `/workspaces/${workspaceId}/settings?tab=general`,
       priority: "high",
     });
+  } else if (
+    spend &&
+    spend.capMicros > 0 &&
+    spend.reservedMicros / spend.capMicros >= 0.5
+  ) {
+    const reservedUsd = (spend.reservedMicros / 1_000_000).toFixed(2);
+    const availableUsd = (spend.availableMicros / 1_000_000).toFixed(2);
+    attention.push({
+      id: "budget-reserved",
+      kind: "budget_reserved",
+      title: "Large budget reservation held",
+      detail: `$${reservedUsd} reserved · $${availableUsd} available`,
+      href: `/workspaces/${workspaceId}/settings?tab=general`,
+      priority: "normal",
+    });
   }
 
   for (const t of reviewTasks) {
@@ -218,20 +267,70 @@ export async function getWorkspaceMissionControl(
     });
   }
 
+  const failedLanes = arena.projects.filter(laneNeedsAttention).slice(0, 4);
+  for (const lane of failedLanes) {
+    const status = lane.lastRun?.status ?? "attention";
+    attention.push({
+      id: `arena-${lane.projectId}`,
+      kind: "arena_failed",
+      title: `Arena needs attention · ${lane.projectName}`,
+      detail: `Last run ${status} · Open Arena`,
+      href: `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(lane.projectId)}`,
+      priority: "high",
+    });
+  }
+
+  const replanFails = recentAudit
+    .filter((e) => e.action === "maintainer.replan_queue_failed")
+    .slice(0, 2);
+  for (const ev of replanFails) {
+    let projectId: string | null = null;
+    if (ev.meta) {
+      try {
+        const meta = JSON.parse(ev.meta) as { projectId?: string };
+        projectId = typeof meta.projectId === "string" ? meta.projectId : null;
+      } catch {
+        projectId = null;
+      }
+    }
+    const href = projectId
+      ? `/workspaces/${workspaceId}/projects/${projectId}`
+      : `/workspaces/${workspaceId}/activity`;
+    attention.push({
+      id: `replan-${ev.id}`,
+      kind: "replan_failed",
+      title: "Replan queue failed",
+      detail: "Maintainer could not queue the next task",
+      href,
+      priority: "high",
+    });
+  }
+
   attention.sort((a, b) => {
     if (a.priority === b.priority) return 0;
     return a.priority === "high" ? -1 : 1;
   });
 
-  const executions: MissionControlExecution[] = activeTasks.map((t) => ({
-    projectId: t.projectId,
-    projectName: t.projectName,
-    taskId: t.id,
-    taskTitle: t.title,
-    phase: phaseForStatus(t.status),
-    status: t.status,
-    href: `/workspaces/${workspaceId}/projects/${t.projectId}/tasks/${t.id}`,
-  }));
+  // Dedupe identical in-flight titles for the executions strip
+  const seenExecTitles = new Set<string>();
+  const executions: MissionControlExecution[] = [];
+  for (const t of activeTasks) {
+    const dedupeKey = `${t.title}::${t.status}`;
+    if (seenExecTitles.has(dedupeKey) && t.status === "QUEUED") {
+      continue;
+    }
+    seenExecTitles.add(dedupeKey);
+    executions.push({
+      projectId: t.projectId,
+      projectName: t.projectName,
+      taskId: t.id,
+      taskTitle: t.title,
+      phase: phaseForStatus(t.status),
+      status: t.status,
+      href: `/workspaces/${workspaceId}/projects/${t.projectId}/tasks/${t.id}`,
+    });
+    if (executions.length >= 10) break;
+  }
 
   // Fall back to arena lanes when no in-flight tasks but arena is live
   if (executions.length === 0 && arena.status === "LIVE") {
@@ -263,11 +362,17 @@ export async function getWorkspaceMissionControl(
       highPriorityApprovals,
       verifiedPrsThisMonth: Number(verifiedRows[0]?.n ?? 0),
       budgetSpentMicros: spend?.spentMicros ?? 0,
+      budgetReservedMicros: spend?.reservedMicros ?? 0,
+      budgetAvailableMicros: spend?.availableMicros ?? 0,
       budgetCapMicros: spend?.capMicros ?? 0,
       budgetCurrency: spend?.currency ?? "USD",
       budgetStatus: spend?.budgetStatus ?? null,
+      arenaRunning: arena.summary.running,
+      arenaAwaitingCi: arena.summary.awaitingCi,
+      arenaNeedsAttention: arena.summary.needsAttention,
+      arenaIdle: arena.summary.idle,
     },
-    attention: attention.slice(0, 8),
+    attention: attention.slice(0, 10),
     executions: executions.slice(0, 10),
   };
 }

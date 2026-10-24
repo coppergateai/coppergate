@@ -127,14 +127,19 @@ export function MissionControl({ data, recentEvents }: Props) {
   const hasBudget = metrics.budgetCapMicros > 0;
   const needsAttention = attention.length > 0;
   const budgetPaused = metrics.budgetStatus === "paused";
+  const arenaHot = metrics.arenaNeedsAttention > 0;
+  const opsWarn = needsAttention || budgetPaused || arenaHot;
   const recent = groupActivityEvents(recentEvents).slice(0, 8);
 
   const statusLine = (() => {
     if (budgetPaused) {
       return "Budget envelope paused — executions are frozen until you raise the cap.";
     }
+    if (arenaHot) {
+      return `${metrics.arenaNeedsAttention} agent${metrics.arenaNeedsAttention === 1 ? "" : "s"} need attention in Arena${needsAttention ? ` · ${attention.length} item${attention.length === 1 ? "" : "s"} queued for you` : ""}.`;
+    }
     if (needsAttention) {
-      return `All systems operational, ${attention.length} item${attention.length === 1 ? "" : "s"} need your review.`;
+      return `${attention.length} item${attention.length === 1 ? "" : "s"} need your review.`;
     }
     return "All systems operational. No items need your review.";
   })();
@@ -151,10 +156,10 @@ export function MissionControl({ data, recentEvents }: Props) {
           </p>
           <div className={styles.statusRow}>
             <span
-              className={`${styles.opsChip} ${needsAttention || budgetPaused ? styles.opsChipWarn : ""}`}
+              className={`${styles.opsChip} ${opsWarn ? styles.opsChipWarn : ""}`}
             >
               <span className={styles.opsDot} aria-hidden />
-              {needsAttention || budgetPaused ? "Needs attention" : "Operational"}
+              {opsWarn ? "Needs attention" : "Operational"}
             </span>
             <p className={styles.statusText}>{statusLine}</p>
           </div>
@@ -182,19 +187,26 @@ export function MissionControl({ data, recentEvents }: Props) {
           <p className={styles.metricMeta}>
             {metrics.activeRunProjects}{" "}
             {metrics.activeRunProjects === 1 ? "project" : "projects"}
+            {metrics.arenaRunning > 0
+              ? ` · ${metrics.arenaRunning} arena running`
+              : ""}
           </p>
           <SparkBars tone="copper" />
         </div>
         <div className={styles.metric}>
           <div className={styles.metricTop}>
-            <p className={styles.metricLabel}>Needs approval</p>
+            <p className={styles.metricLabel}>Needs attention</p>
             <span className={styles.metricIcon} aria-hidden>
               ◇
             </span>
           </div>
-          <p className={styles.metricValue}>{pad2(metrics.needsApproval)}</p>
+          <p className={styles.metricValue}>
+            {pad2(metrics.needsApproval + metrics.arenaNeedsAttention)}
+          </p>
           <p className={styles.metricMeta}>
-            {metrics.highPriorityApprovals} high priority
+            {metrics.needsApproval} approval
+            {metrics.needsApproval === 1 ? "" : "s"} ·{" "}
+            {metrics.arenaNeedsAttention} arena
           </p>
         </div>
         <div className={styles.metric}>
@@ -212,19 +224,19 @@ export function MissionControl({ data, recentEvents }: Props) {
         </div>
         <div className={styles.metric}>
           <div className={styles.metricTop}>
-            <p className={styles.metricLabel}>Budget used</p>
+            <p className={styles.metricLabel}>Budget</p>
             <span className={styles.metricIcon} aria-hidden>
               $
             </span>
           </div>
           <p className={styles.metricValue}>
             {hasBudget
-              ? formatUsd(metrics.budgetSpentMicros, metrics.budgetCurrency)
+              ? formatUsd(metrics.budgetAvailableMicros, metrics.budgetCurrency)
               : "—"}
           </p>
           <p className={styles.metricMeta}>
             {hasBudget
-              ? `of ${formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}`
+              ? `left · spent ${formatUsd(metrics.budgetSpentMicros, metrics.budgetCurrency)} · reserved ${formatUsd(metrics.budgetReservedMicros, metrics.budgetCurrency)} / ${formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}`
               : "No envelope set"}
             {budgetPaused ? " · Paused" : ""}
           </p>
@@ -252,7 +264,7 @@ export function MissionControl({ data, recentEvents }: Props) {
                 </span>
                 <p className={styles.emptyTitle}>You&apos;re all caught up</p>
                 <p className={styles.emptyBody}>
-                  No approvals or blockers.{" "}
+                  No approvals, failed arena runs, or blockers.{" "}
                   <Link href={`/workspaces/${data.workspaceId}/projects`}>
                     Open projects
                   </Link>{" "}

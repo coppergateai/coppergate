@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import {
   assertSufficientBudget,
   BudgetError,
+  releaseEstimateForRun,
   reserveEstimateForTask,
 } from "./budgets.js";
 import type { Database } from "./client.js";
@@ -974,6 +975,15 @@ async function freezeArenaOpenWork(
         updatedAt: input.now,
       })
       .where(inArray(agentRuns.id, queuedIds));
+    for (const run of activeRuns.filter((r) => r.status === "QUEUED")) {
+      await releaseEstimateForRun(db, {
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        taskId: run.taskId,
+        runId: run.id,
+        amountMicros: run.estimatedCostMicros ?? 0,
+      });
+    }
   }
   if (inflightIds.length > 0) {
     await db
@@ -994,7 +1004,7 @@ async function freezeArenaOpenWork(
     .limit(1);
   if (!arena) return;
   const soloQueued = await db
-    .select({ id: agentRuns.id })
+    .select()
     .from(agentRuns)
     .where(
       and(
@@ -1019,6 +1029,15 @@ async function freezeArenaOpenWork(
           soloQueued.map((r) => r.id),
         ),
       );
+    for (const run of soloQueued) {
+      await releaseEstimateForRun(db, {
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        taskId: run.taskId,
+        runId: run.id,
+        amountMicros: run.estimatedCostMicros ?? 0,
+      });
+    }
   }
   const soloInflight = await db
     .select({ id: agentRuns.id })
