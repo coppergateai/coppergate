@@ -17,6 +17,21 @@ type Props = {
   reviewTaskTitle?: string | null;
 };
 
+const PIPELINE: Array<{
+  id: "budget" | "issue" | "arena" | "review";
+  label: string;
+}> = [
+  { id: "budget", label: "Budget" },
+  { id: "issue", label: "Issue" },
+  { id: "arena", label: "Arena" },
+  { id: "review", label: "Evidence" },
+];
+
+function stepIndex(step: NextActionStep): number {
+  if (step === "done") return PIPELINE.length;
+  return PIPELINE.findIndex((s) => s.id === step);
+}
+
 /**
  * Issue → Verified PR happy-path glue: one next action, no new orchestration.
  */
@@ -28,6 +43,7 @@ export function NextActionStrip({
   reviewTaskTitle,
 }: Props) {
   const base = `/workspaces/${workspaceId}/projects/${projectId}`;
+  const active = stepIndex(step);
 
   let title = "First verified PR complete";
   let detail =
@@ -44,7 +60,7 @@ export function NextActionStrip({
   } else if (step === "issue") {
     title = "Start from a GitHub issue";
     detail =
-      "Import a small issue, confirm scope, then arm the arena for a verified PR.";
+      "Import a small issue, confirm scope, then arm Arena for a verified PR.";
     href = `${base}?tab=overview#issues`;
     cta = "Import issue";
   } else if (step === "arena") {
@@ -73,21 +89,44 @@ export function NextActionStrip({
       className={`${styles.section} ${styles.nextAction}`}
       aria-labelledby="next-action-heading"
     >
-      <div className={styles.sectionHead}>
-        <h2 id="next-action-heading" className={styles.sectionLabel}>
-          Next action
-        </h2>
-        <p className={styles.nextActionPath}>
-          Issue → Execution → Evidence → Accept
-        </p>
+      <ol className={styles.pipeline} aria-label="Delivery pipeline">
+        {PIPELINE.map((s, i) => {
+          const done = i < active;
+          const current = i === active && step !== "done";
+          return (
+            <li
+              key={s.id}
+              className={`${styles.pipelineStep} ${
+                done
+                  ? styles.pipelineDone
+                  : current
+                    ? styles.pipelineCurrent
+                    : styles.pipelineTodo
+              }`}
+              aria-current={current ? "step" : undefined}
+            >
+              <span className={styles.pipelineIndex} aria-hidden>
+                {done ? "✓" : i + 1}
+              </span>
+              <span className={styles.pipelineLabel}>{s.label}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <div className={styles.nextActionBody}>
+        <div className={styles.nextActionCopy}>
+          <h2 id="next-action-heading" className={styles.sectionLabel}>
+            Next action
+          </h2>
+          <p className={styles.nextActionTitle}>{title}</p>
+          <p className={styles.sectionLede}>{detail}</p>
+        </div>
+        {href ? (
+          <Link href={href} className={styles.primaryBtn}>
+            {cta}
+          </Link>
+        ) : null}
       </div>
-      <p className={styles.nextActionTitle}>{title}</p>
-      <p className={styles.sectionLede}>{detail}</p>
-      {href ? (
-        <Link href={href} className={styles.primaryBtn}>
-          {cta}
-        </Link>
-      ) : null}
     </section>
   );
 }

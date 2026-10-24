@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { displayTaskTitle } from "@coppergate/db";
 import styles from "./project-detail.module.css";
 
 type PlanTask = {
@@ -77,7 +78,7 @@ export function PlanPanel({
     }
   }
 
-  const agentsHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
+  const arenaHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
 
   return (
     <section id="plan" className={styles.section} aria-labelledby="plan-heading">
@@ -92,7 +93,7 @@ export function PlanPanel({
       {!plan ? (
         <p className={styles.muted}>
           Open{" "}
-          <Link href={agentsHref}>Agents</Link>{" "}
+          <Link href={arenaHref}>Arena</Link>{" "}
           and press Start. Coppergate invents the vision, queues the next
           improvement, and ships through PR merge.
         </p>
@@ -118,17 +119,24 @@ export function PlanPanel({
             {plan.milestones.reduce((n, m) => n + m.tasks.length, 0)} tasks ·{" "}
             {plan.dependencyCount} dependencies
           </p>
-          {plan.milestones.map((m) => (
-            <div key={m.id}>
-              <h3 className={styles.subTitle}>
-                {m.sequence}. {m.title}
-              </h3>
-              <p className={styles.muted}>
-                {m.description}
-                {m.estimatedCostMicros != null
-                  ? ` · ~$${(m.estimatedCostMicros / 1_000_000).toFixed(2)} est.`
-                  : ""}
-              </p>
+          {plan.milestones.map((m, index) => (
+            <details
+              key={m.id}
+              className={styles.milestoneDetails}
+              open={index === 0}
+            >
+              <summary className={styles.milestoneSummary}>
+                <span className={styles.subTitle}>
+                  {m.sequence}. {m.title}
+                </span>
+                <span className={styles.milestoneMeta}>
+                  {m.tasks.length} task{m.tasks.length === 1 ? "" : "s"}
+                  {m.estimatedCostMicros != null
+                    ? ` · ~$${(m.estimatedCostMicros / 1_000_000).toFixed(2)}`
+                    : ""}
+                </span>
+              </summary>
+              <p className={styles.muted}>{m.description}</p>
               <ul className={styles.taskList}>
                 {m.tasks.map((t) => (
                   <li key={t.id} className={styles.taskItem}>
@@ -137,7 +145,7 @@ export function PlanPanel({
                         href={`/workspaces/${workspaceId}/projects/${projectId}/tasks/${t.id}`}
                         className={styles.taskTitle}
                       >
-                        {t.title}
+                        {displayTaskTitle(t.title) || t.title}
                       </Link>
                     </div>
                     <div className={styles.taskMeta}>
@@ -150,12 +158,17 @@ export function PlanPanel({
                         ? ` · waits on ${t.dependsOnTaskIds.length} predecessor${t.dependsOnTaskIds.length === 1 ? "" : "s"}`
                         : ""}
                     </div>
-                    <div className={styles.taskScope}>Scope: {t.scope}</div>
-                    <ul className={styles.criteria}>
-                      {t.acceptanceCriteria.map((c) => (
-                        <li key={c}>{c}</li>
-                      ))}
-                    </ul>
+                    <details className={styles.taskDetails}>
+                      <summary>Scope &amp; criteria</summary>
+                      <div className={styles.taskScope}>Scope: {t.scope}</div>
+                      {t.acceptanceCriteria.length > 0 ? (
+                        <ul className={styles.criteria}>
+                          {t.acceptanceCriteria.map((c) => (
+                            <li key={c}>{c}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </details>
                     {t.status === "DRAFT" && t.dependsOnTaskIds.length > 0 ? (
                       <p className={styles.hint}>
                         Auto-queues after the predecessor is DONE — no Approve
@@ -165,7 +178,7 @@ export function PlanPanel({
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           ))}
         </div>
       ) : null}

@@ -50,6 +50,7 @@ export function isContenderStrategy(value: string): value is ContenderStrategy {
 }
 
 export const TERMINAL_RUN_STATUSES = new Set([
+  "WAITING_CI",
   "REVIEW_REQUIRED",
   "FAILED",
   "CANCELLED",

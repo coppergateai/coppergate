@@ -25,7 +25,7 @@ type Props = {
 };
 
 /**
- * Manual idea → brief entry is retired. Start on Agents bootstraps vision.
+ * Manual idea → brief entry is retired. Start in Arena bootstraps vision.
  * This panel only surfaces the auto vision when one already exists.
  */
 export function BriefPanel({
@@ -34,7 +34,7 @@ export function BriefPanel({
   initialBrief,
   isOwner,
 }: Props) {
-  const agentsHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
+  const arenaHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
   const brief = initialBrief;
 
   return (
@@ -61,13 +61,13 @@ export function BriefPanel({
           title="No vision yet"
           body={
             isOwner
-              ? "Open Agents and press Start. Coppergate writes the vision, queues work, and ships under budget."
-              : "An owner starts the autonomous loop from Agents."
+              ? "Open Arena and press Start. Coppergate writes the vision, queues work, and ships under budget."
+              : "An owner starts the autonomous loop from Arena."
           }
           action={
             isOwner ? (
-              <Link href={agentsHref} className={styles.linkCta}>
-                Go to Agents → Start
+              <Link href={arenaHref} className={styles.linkCta}>
+                Open Arena → Start
               </Link>
             ) : undefined
           }
@@ -101,8 +101,8 @@ export function BriefPanel({
             </div>
           ) : null}
           {isOwner ? (
-            <Link href={agentsHref} className={styles.linkCta}>
-              Agents → Start / Stop
+            <Link href={arenaHref} className={styles.linkCta}>
+              Arena → Start / Stop
             </Link>
           ) : null}
         </div>

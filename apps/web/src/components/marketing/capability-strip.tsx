@@ -32,7 +32,7 @@ const items = [
   },
   {
     title: "Your infrastructure",
-    body: "Self-host or cloud. Bring your own LLM keys. GitHub and GitLab delivery stays in your repos.",
+    body: "Self-host or hosted. Bring your own LLM keys. GitHub and GitLab delivery stays in your repos.",
     href: "/docs/supported-stack",
     link: "See stack",
     Icon: IconGithubNative,

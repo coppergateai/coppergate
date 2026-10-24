@@ -204,6 +204,24 @@
   gap: 0.65rem;
 }
 
+.textLink {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--mute);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 550;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.textLink:hover {
+  color: var(--copper-hot);
+}
+
 .sortLabel {
   color: var(--mute-soft);
   font-size: 0.8rem;
