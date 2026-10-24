@@ -15,6 +15,8 @@ export {
   signalEvents,
   autoArmRules,
   agentProfiles,
+  agentSkills,
+  workspaceMcpConnections,
   maintainerEvents,
   memberships,
   milestones,
@@ -61,6 +63,9 @@ export {
   type SignalEventStatus,
   type AutoArmRule,
   type AgentProfile,
+  type AgentSkill,
+  type AgentTemperament,
+  type WorkspaceMcpConnection,
   type MaintainerEvent,
   type MaintainerEventKind,
   type BudgetPeriod,
@@ -323,9 +328,21 @@ export {
 } from "./budgets.js";
 export {
   parseArchitectureOpenTasks,
+  extractArchitectureIdFromTitle,
+  isToyArchitectureTitle,
+  markArchitectureIdDoneInMarkdown,
   pickNextArchitectureTask,
   type ArchitectureOpenTask,
 } from "./architecture-backlog.js";
+export {
+  formatCommunityIssueBody,
+  isCommunityScoutDue,
+  proposeCommunityIssues,
+  recordCommunityScoutEvent,
+  titlesOverlap,
+  type CommunityIssueCandidate,
+  type OpenIssueRef,
+} from "./community-scout.js";
 export {
   DEFAULT_MAINTAINER_POLICY,
   DEFAULT_MONTHLY_BUDGET_MICROS,
@@ -334,6 +351,9 @@ export {
   disableMaintainerMode,
   enableMaintainerMode,
   ensureAutonomousVisionAndBacklog,
+  clearMergeBlockedForProject,
+  DEFAULT_ARCHITECTURE_PATHS,
+  fetchArchitectureBacklogMarkdown,
   requeueOrphanQueuedTasks,
   shouldReplanVision,
   MIN_REPLAN_AVAILABLE_MICROS,
@@ -347,6 +367,7 @@ export {
   pickMetaTournamentChallenger,
   rollbackProfileEvolution,
   runVisionReplan,
+  isMergeProtectionBlock,
   selectAutoAcceptRun,
   serializeMaintainerPolicy,
   shouldRollbackProfileForFitness,
@@ -361,6 +382,17 @@ export {
   type MaintainerPolicy,
   type MaintainerTickResult,
 } from "./maintainer.js";
+export {
+  listWorkspaceArenaSnapshot,
+  startWorkspaceArena,
+  stopWorkspaceArena,
+  type WorkspaceArenaContenderView,
+  type WorkspaceArenaControlResult,
+  type WorkspaceArenaLastRun,
+  type WorkspaceArenaLiveStatus,
+  type WorkspaceArenaProjectLane,
+  type WorkspaceArenaSnapshot,
+} from "./workspace-arena.js";
 export {
   DEFAULT_LEASE_MS,
   RunError,
@@ -494,6 +526,7 @@ export {
   type SignalEnvelopeInput,
 } from "./signals.js";
 export { ingestSonarFitness } from "./sonar-fitness.js";
+export { callSonarTool, type SonarToolName } from "./sonarqube-mcp.js";
 export {
   ingestCoverageFitness,
   ingestE2eFitness,
@@ -514,6 +547,38 @@ export {
   resolveSpawnProfileKeys,
   updateWorkspaceAgentProfile,
 } from "./profiles.js";
+export {
+  TEMPERAMENT_VALUES,
+  defaultTemperamentForProfileKey,
+  isAgentTemperament,
+  strategyForTemperament,
+  temperamentGuidance,
+  withTemperamentGuidance,
+} from "./temperament.js";
+export {
+  DEFAULT_PROFILE_SKILL_KEYS,
+  SYSTEM_SKILL_SEEDS,
+  ensureSystemAgentSkills,
+  evolveSkill,
+  getEffectiveAgentSkill,
+  listAgentSkills,
+  loadSkillsForPrompt,
+  parseSkillKeysJson,
+  upsertWorkspaceSkill,
+} from "./skills.js";
+export {
+  MCP_PROVIDERS,
+  SONARQUBE_TOOLS,
+  filterMcpToolsForProfile,
+  getMcpConnection,
+  isMcpProvider,
+  listMcpConnections,
+  parseToolAllowlistJson,
+  serializeMcpConnectionPublic,
+  setMcpConnectionEnabled,
+  upsertMcpConnection,
+  type McpProvider,
+} from "./mcp.js";
 export {
   exportWorkspaceAuditBundle,
   getSpendBySignalSource,

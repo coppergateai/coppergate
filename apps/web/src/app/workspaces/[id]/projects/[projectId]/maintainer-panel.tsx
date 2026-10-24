@@ -26,6 +26,9 @@ type Policy = {
   autoRelease: boolean;
   selfImprove: boolean;
   communityReplies: boolean;
+  communityScout?: boolean;
+  communityScoutIntervalHours?: number;
+  communityScoutMaxPerRun?: number;
   autoQueueReplanTasks?: boolean;
   releaseTagStyle?: string;
 };
@@ -103,7 +106,7 @@ export function MaintainerPanel({
       if (!res.ok) {
         throw new Error(body.error?.message ?? "Update failed");
       }
-      setEnabled(Boolean(body.enabled));
+      if (typeof body.enabled === "boolean") setEnabled(body.enabled);
       if (body.policy) setPolicy(body.policy);
       await load();
       router.refresh();
@@ -146,13 +149,23 @@ export function MaintainerPanel({
         </label>
         {isOwner ? (
           enabled ? (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => void post("disable")}
-            >
-              Disable maintainer mode
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => void post("disable")}
+              >
+                Disable maintainer mode
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                title="After fixing GitHub branch protection / CODEOWNERS, clear sticky merge.blocked so the worker retries"
+                onClick={() => void post("clear_merge_blocked")}
+              >
+                Clear merge blocks
+              </button>
+            </>
           ) : (
             <button
               type="button"
@@ -170,6 +183,11 @@ export function MaintainerPanel({
           )
         ) : null}
       </div>
+      <p className={styles.sectionLede} style={{ marginTop: "0.5rem" }}>
+        Merge blocked by GitHub? Add the Coppergate App to PR review bypass (or
+        approve as CODEOWNER), then use Clear merge blocks. Coppergate never
+        bypasses protection itself.
+      </p>
 
       {policy ? (
         <ul className={styles.sectionLede} style={{ marginTop: "0.75rem" }}>
@@ -184,6 +202,12 @@ export function MaintainerPanel({
           <li>Release tags: {policy.releaseTagStyle ?? "daily"}</li>
           <li>Self-improve: {policy.selfImprove ? "yes" : "no"}</li>
           <li>Community replies: {policy.communityReplies ? "yes" : "no"}</li>
+          <li>
+            Community scout:{" "}
+            {policy.communityScout === false ? "off" : "on"} · every{" "}
+            {policy.communityScoutIntervalHours ?? 8}h · max{" "}
+            {policy.communityScoutMaxPerRun ?? 2}/run
+          </li>
         </ul>
       ) : null}
 

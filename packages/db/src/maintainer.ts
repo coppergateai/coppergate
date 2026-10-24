@@ -75,6 +75,18 @@ export type MaintainerPolicy = {
   autoRelease: boolean;
   selfImprove: boolean;
   communityReplies: boolean;
+  /** Periodically open good-first-issue GitHub issues for community (not imported). */
+  communityScout: boolean;
+  communityScoutIntervalHours: number;
+  communityScoutMaxPerRun: number;
+  communityScoutMaxOpenGoodFirst: number;
+  /**
+   * After scout creates issues, auto-import up to N into the primary board
+   * (DRAFT → submit). 0 = create-only (legacy).
+   */
+  communityScoutAutoImportMax: number;
+  /** When true, open a revert PR if a recent auto-merge's checks go red. */
+  shipRollbackOnCiFail: boolean;
   /** When true, enable multi-repo + coordinated PRs for product stacks. */
   coordinatedMultiRepo: boolean;
   allowedSignalProviders: string[];
@@ -103,6 +115,12 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   autoRelease: true,
   selfImprove: true,
   communityReplies: true,
+  communityScout: true,
+  communityScoutIntervalHours: 8,
+  communityScoutMaxPerRun: 2,
+  communityScoutMaxOpenGoodFirst: 5,
+  communityScoutAutoImportMax: 1,
+  shipRollbackOnCiFail: true,
   coordinatedMultiRepo: false,
   allowedSignalProviders: ["*", "ci_failure", "sentry", "dependabot", "codeql"],
   pathAllowlist: [],
@@ -206,6 +224,34 @@ export function parseMaintainerPolicy(
         typeof v.continuousBacklog === "boolean"
           ? v.continuousBacklog
           : DEFAULT_MAINTAINER_POLICY.continuousBacklog,
+      communityScout:
+        typeof v.communityScout === "boolean"
+          ? v.communityScout
+          : DEFAULT_MAINTAINER_POLICY.communityScout,
+      communityScoutIntervalHours:
+        typeof v.communityScoutIntervalHours === "number" &&
+        v.communityScoutIntervalHours >= 1
+          ? Math.min(168, Math.floor(v.communityScoutIntervalHours))
+          : DEFAULT_MAINTAINER_POLICY.communityScoutIntervalHours,
+      communityScoutMaxPerRun:
+        typeof v.communityScoutMaxPerRun === "number" &&
+        v.communityScoutMaxPerRun >= 0
+          ? Math.min(5, Math.floor(v.communityScoutMaxPerRun))
+          : DEFAULT_MAINTAINER_POLICY.communityScoutMaxPerRun,
+      communityScoutMaxOpenGoodFirst:
+        typeof v.communityScoutMaxOpenGoodFirst === "number" &&
+        v.communityScoutMaxOpenGoodFirst >= 0
+          ? Math.min(20, Math.floor(v.communityScoutMaxOpenGoodFirst))
+          : DEFAULT_MAINTAINER_POLICY.communityScoutMaxOpenGoodFirst,
+      communityScoutAutoImportMax:
+        typeof v.communityScoutAutoImportMax === "number" &&
+        v.communityScoutAutoImportMax >= 0
+          ? Math.min(5, Math.floor(v.communityScoutAutoImportMax))
+          : DEFAULT_MAINTAINER_POLICY.communityScoutAutoImportMax,
+      shipRollbackOnCiFail:
+        typeof v.shipRollbackOnCiFail === "boolean"
+          ? v.shipRollbackOnCiFail
+          : DEFAULT_MAINTAINER_POLICY.shipRollbackOnCiFail,
       releaseTagStyle:
         v.releaseTagStyle === "semver_patch" ? "semver_patch" : "daily",
     };
@@ -485,10 +531,32 @@ export async function requeueOrphanQueuedTasks(
   let resumed = 0;
   for (const task of queued) {
     const runs = await listRunsForTask(db, input.workspaceId, task.id);
-    const active = runs.some((r) =>
-      ["QUEUED", "RUNNING", "VALIDATING"].includes(r.status),
+    // Arena mode requires contenderId — orphan QUEUED rows without one block fan-out.
+    const active = runs.some(
+      (r) =>
+        ["QUEUED", "RUNNING", "VALIDATING"].includes(r.status) &&
+        (arena.status === "RUNNING" || arena.status === "ARMED"
+          ? Boolean(r.contenderId)
+          : true),
     );
     if (active) continue;
+    for (const r of runs) {
+      if (
+        r.status === "QUEUED" &&
+        !r.contenderId &&
+        (arena.status === "RUNNING" || arena.status === "ARMED")
+      ) {
+        await db
+          .update(agentRuns)
+          .set({
+            status: "FAILED",
+            errorCode: "orphan_no_contender",
+            errorMessage: "replaced by tournament fan-out",
+            updatedAt: new Date(),
+          })
+          .where(eq(agentRuns.id, r.id));
+      }
+    }
     try {
       await enqueueQueuedTask(db, {
         workspaceId: input.workspaceId,
@@ -1012,6 +1080,8 @@ export async function tickMaintainerProject(
     workspaceId: string;
     projectId: string;
     actor?: string;
+    /** Installation / PAT for architecture Open ID fetch. */
+    architectureToken?: string | null;
   },
 ): Promise<MaintainerTickResult> {
   const actor = input.actor ?? "system:maintainer";
@@ -1369,6 +1439,7 @@ export async function tickMaintainerProject(
         workspaceId: input.workspaceId,
         projectId: input.projectId,
         actor,
+        architectureToken: input.architectureToken,
       });
       result.replanned = true;
     } catch (err) {
@@ -1595,6 +1666,25 @@ export async function maybeSelfImproveProfile(
   let changed = false;
   const tip =
     " Prefer capability-complete diffs with tests, stay within path allowlist, and refuse scaffold/typo-only PRs.";
+  // Evolve assigned skills with a short tip (gated self-improve).
+  try {
+    const { evolveSkill, parseSkillKeysJson } = await import("./skills.js");
+    const skillKeys = parseSkillKeysJson(base.skillKeysJson);
+    const skillTip =
+      "Prefer capability-complete diffs with tests; refuse scaffold/typo-only PRs.";
+    for (const key of skillKeys.slice(0, 2)) {
+      await evolveSkill(db, {
+        workspaceId: input.workspaceId,
+        key,
+        tip: skillTip,
+        runId: winners[0]?.id ?? null,
+        actor: input.actor,
+      });
+    }
+  } catch {
+    /* skills optional */
+  }
+
   if (!base.promptGuidance.includes("refuse scaffold/typo-only")) {
     const nextGuidance = `${base.promptGuidance.trim()}${tip}`.slice(0, 4000);
     const [evolved] = await db
@@ -1776,6 +1866,8 @@ export async function runVisionReplan(
     maxAutoQueue?: number;
     /** Optional architecture / roadmap markdown (Open P-/W-/A-/S- rows). */
     roadmapMarkdown?: string;
+    /** Installation / PAT when env ARCHITECTURE_* tokens are unset. */
+    architectureToken?: string | null;
   },
 ): Promise<{ taskCount: number; queued: number }> {
   const brief = await getLatestBriefForProject(
@@ -1802,40 +1894,56 @@ export async function runVisionReplan(
   const roadmapMd =
     input.roadmapMarkdown?.trim() ||
     process.env.ARCHITECTURE_BACKLOG_MD?.trim() ||
-    (await fetchArchitectureBacklogMarkdown()) ||
+    (await fetchArchitectureBacklogMarkdown(input.architectureToken)) ||
     "";
   const archTask = pickNextArchitectureTask(
     parseArchitectureOpenTasks(roadmapMd),
   );
+  // No architecture Open ID → do not invent scaffold/generic ship tasks.
+  if (!archTask) {
+    await recordMaintainerEvent(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      kind: "replan",
+      payload: {
+        briefId: brief.id,
+        taskCount: 0,
+        queued: 0,
+        autoQueue,
+        skipped: true,
+        reason: "no_architecture_open_id",
+      },
+    });
+    await recordAuditEvent(db, {
+      workspaceId: input.workspaceId,
+      actor: input.actor,
+      action: "maintainer.replan",
+      targetType: "project",
+      targetId: input.projectId,
+      meta: {
+        briefId: brief.id,
+        taskCount: 0,
+        queued: 0,
+        skipped: true,
+        reason: "no_architecture_open_id",
+      },
+    });
+    await db
+      .update(projects)
+      .set({ lastVisionReplanAt: new Date(), updatedAt: new Date() })
+      .where(eq(projects.id, input.projectId));
+    return { taskCount: 0, queued: 0 };
+  }
+
   const estimateBand = {
     S: 500_000,
     M: 2_000_000,
     L: 5_000_000,
   } as const;
-  const complexity = archTask?.estimateComplexity ?? ("M" as const);
-  const shipTitle =
-    archTask?.title ??
-    `Ship: ${(brief.title || "product increment").slice(0, 120)}`;
-  const shipGoal =
-    archTask?.goal ??
-    `Ship a user-visible product increment for ${brief.title}: ${brief.problem.slice(0, 280)}`;
-  let briefCriteria: string[] = [];
-  try {
-    const parsed = JSON.parse(brief.acceptanceCriteria || "[]") as unknown;
-    if (Array.isArray(parsed)) {
-      briefCriteria = parsed.filter((x): x is string => typeof x === "string");
-    }
-  } catch {
-    briefCriteria = [];
-  }
-  const shipAcceptance =
-    archTask?.acceptanceCriteria ??
-    [
-      "Capability is implemented on the primary repo (not scaffold/typo)",
-      "Tests or validation cover the change",
-      "CI green; PR title describes the capability",
-      ...briefCriteria.slice(0, 2),
-    ];
+  const complexity = archTask.estimateComplexity;
+  const shipTitle = archTask.title.slice(0, 200);
+  const shipGoal = archTask.goal.slice(0, 2000);
+  const shipAcceptance = archTask.acceptanceCriteria;
 
   const plan = await generateProjectPlan(db, {
     workspaceId: input.workspaceId,
@@ -1844,14 +1952,12 @@ export async function runVisionReplan(
     milestones: [
       {
         title: `Maintainer cycle ${stamp}`,
-        description: `Autonomous replan from vision: ${brief.title}${
-          archTask ? ` · roadmap ${archTask.id}` : ""
-        }`,
+        description: `Autonomous replan from vision: ${brief.title} · roadmap ${archTask.id}`,
         tasks: [
           {
             key: `m-${stamp}-ship`,
-            title: shipTitle.slice(0, 200),
-            goal: shipGoal.slice(0, 2000),
+            title: shipTitle,
+            goal: shipGoal,
             scope:
               brief.scope.slice(0, 800) ||
               "Primary-repo product increment with tests and docs as needed",
@@ -1889,12 +1995,15 @@ export async function runVisionReplan(
 
   let queued = 0;
   if (autoQueue) {
+    const toyTitleRe =
+      /\b(scaffold project structure|tiny readme typo|propose next scoped improvement|scoped improvement|autonomous ship loop)\b/i;
     for (const m of plan.milestones) {
       for (const tv of m.tasks) {
         if (queued >= maxAutoQueue) break;
         // Only root tasks (no deps) — dependents wait for later ticks / human
         if ((tv.dependsOnTaskIds?.length ?? 0) > 0) continue;
         if (tv.task.status !== "DRAFT") continue;
+        if (toyTitleRe.test(tv.task.title)) continue;
         try {
           await submitTaskForApproval(db, {
             workspaceId: input.workspaceId,
@@ -2131,6 +2240,20 @@ export async function getWorkspaceMaintainerRollup(
   };
 }
 
+/** GitHub branch protection / review gate — do not retry merge every tick. */
+export function isMergeProtectionBlock(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("approving review") ||
+    m.includes("review is required") ||
+    m.includes("code owner") ||
+    m.includes("not authorized") ||
+    m.includes("protected branch") ||
+    m.includes("required status check") ||
+    m.includes("changes requested")
+  );
+}
+
 /** Tasks that still need GitHub merge after auto-accept (worker). */
 export async function listAutoMergeCandidates(
   db: Database,
@@ -2148,7 +2271,47 @@ export async function listAutoMergeCandidates(
     .orderBy(desc(maintainerEvents.createdAt))
     .limit(20);
 
+  const blockRows = await db
+    .select()
+    .from(maintainerEvents)
+    .where(
+      and(
+        eq(maintainerEvents.projectId, projectId),
+        inArray(maintainerEvents.kind, ["merge_blocked", "auto_merge"]),
+      ),
+    )
+    .orderBy(desc(maintainerEvents.createdAt))
+    .limit(80);
+
+  const blockedPrs = new Set<number>();
+  for (const row of blockRows) {
+    let payload: {
+      prNumber?: number;
+      merged?: boolean;
+      message?: string;
+      blocked?: boolean;
+    } = {};
+    try {
+      payload = JSON.parse(row.payload) as typeof payload;
+    } catch {
+      continue;
+    }
+    if (typeof payload.prNumber !== "number") continue;
+    if (row.kind === "merge_blocked" || payload.blocked === true) {
+      blockedPrs.add(payload.prNumber);
+      continue;
+    }
+    if (
+      payload.merged === false &&
+      typeof payload.message === "string" &&
+      isMergeProtectionBlock(payload.message)
+    ) {
+      blockedPrs.add(payload.prNumber);
+    }
+  }
+
   const out: Array<{ task: Task; prNumber: number; runId: string }> = [];
+  const seenPr = new Set<number>();
   for (const ev of recent) {
     let payload: { taskId?: string; prNumber?: number; runId?: string } = {};
     try {
@@ -2157,12 +2320,16 @@ export async function listAutoMergeCandidates(
       continue;
     }
     if (!payload.taskId || !payload.prNumber || !payload.runId) continue;
+    if (blockedPrs.has(payload.prNumber) || seenPr.has(payload.prNumber)) {
+      continue;
+    }
     const [task] = await db
       .select()
       .from(tasks)
       .where(eq(tasks.id, payload.taskId))
       .limit(1);
     if (!task || task.status !== "DONE") continue;
+    seenPr.add(payload.prNumber);
     out.push({
       task,
       prNumber: payload.prNumber,
@@ -2183,26 +2350,37 @@ export async function markAutoMerged(
     message: string;
   },
 ): Promise<void> {
+  const blocked =
+    !input.merged && isMergeProtectionBlock(input.message);
   await recordMaintainerEvent(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
-    kind: "auto_merge",
+    kind: blocked ? "merge_blocked" : "auto_merge",
     payload: {
       taskId: input.taskId,
       prNumber: input.prNumber,
       merged: input.merged,
       message: input.message,
+      blocked,
     },
   });
 }
+
+/** Default architecture markdown paths (primary-capable Open IDs first). */
+export const DEFAULT_ARCHITECTURE_PATHS =
+  "PROVIDER-TASKS.md,RUNTIME-TASKS.md,AGENT-TASKS.md,APP-TASKS.md,WEBSITE-TASKS.md,CONTENT-PLAN.md";
 
 /**
  * Best-effort load of architecture Open tasks from GitHub.
  * ARCHITECTURE_REPO=owner/repo (default kprompt/kprompt-architecture)
  * ARCHITECTURE_PATHS=comma list of markdown files
+ * Pass `token` (installation) when env tokens are absent — worker path.
  */
-async function fetchArchitectureBacklogMarkdown(): Promise<string> {
+export async function fetchArchitectureBacklogMarkdown(
+  tokenOverride?: string | null,
+): Promise<string> {
   const token =
+    tokenOverride?.trim() ||
     process.env.ARCHITECTURE_GITHUB_TOKEN?.trim() ||
     process.env.GITHUB_TOKEN?.trim() ||
     process.env.GH_TOKEN?.trim();
@@ -2214,13 +2392,12 @@ async function fetchArchitectureBacklogMarkdown(): Promise<string> {
   if (!owner || !name) return "";
 
   const paths = (
-    process.env.ARCHITECTURE_PATHS?.trim() ||
-    "CONTENT-PLAN.md,PROVIDER-TASKS.md,DISTRIBUTION.md"
+    process.env.ARCHITECTURE_PATHS?.trim() || DEFAULT_ARCHITECTURE_PATHS
   )
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean)
-    .slice(0, 6);
+    .slice(0, 8);
 
   const chunks: string[] = [];
   for (const path of paths) {
@@ -2255,4 +2432,74 @@ async function fetchArchitectureBacklogMarkdown(): Promise<string> {
     }
   }
   return chunks.join("\n\n");
+}
+
+/** Clear sticky merge_blocked so a PR can be retried after GitHub rights change. */
+export async function clearMergeBlockedForProject(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    prNumbers?: number[];
+    actor: string;
+  },
+): Promise<{ cleared: number }> {
+  const rows = await db
+    .select()
+    .from(maintainerEvents)
+    .where(
+      and(
+        eq(maintainerEvents.projectId, input.projectId),
+        eq(maintainerEvents.kind, "merge_blocked"),
+      ),
+    )
+    .orderBy(desc(maintainerEvents.createdAt))
+    .limit(100);
+
+  let cleared = 0;
+  for (const row of rows) {
+    let payload: { prNumber?: number } = {};
+    try {
+      payload = JSON.parse(row.payload) as typeof payload;
+    } catch {
+      continue;
+    }
+    if (
+      input.prNumbers &&
+      input.prNumbers.length > 0 &&
+      (typeof payload.prNumber !== "number" ||
+        !input.prNumbers.includes(payload.prNumber))
+    ) {
+      continue;
+    }
+    await db
+      .delete(maintainerEvents)
+      .where(eq(maintainerEvents.id, row.id));
+    cleared += 1;
+  }
+
+  if (cleared > 0) {
+    await recordAuditEvent(db, {
+      workspaceId: input.workspaceId,
+      actor: input.actor,
+      action: "merge.blocked_cleared",
+      targetType: "project",
+      targetId: input.projectId,
+      meta: {
+        cleared,
+        prNumbers: input.prNumbers ?? null,
+      },
+    });
+    await recordMaintainerEvent(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      kind: "merge_unblocked",
+      payload: {
+        cleared,
+        prNumbers: input.prNumbers ?? null,
+        actor: input.actor,
+      },
+    });
+  }
+  return { cleared };
 }

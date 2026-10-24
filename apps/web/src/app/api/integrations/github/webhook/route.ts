@@ -4,6 +4,7 @@ import {
   installationStatusFromAction,
   mapCheckRunPayload,
   mapCheckSuitePayload,
+  mapCommitStatusPayload,
   parseGithubWebhookHeaders,
   verifyGithubWebhookSignature,
   type CheckRunWebhookPayload,
@@ -166,6 +167,20 @@ export async function POST(request: Request) {
       note = ingested.attached
         ? `check_suite attached to run ${ingested.run?.id}`
         : `check_suite.${action ?? "unknown"} (no matching run)`;
+    } else if (headers.event === "status") {
+      const evidence = mapCommitStatusPayload(
+        parsed as {
+          state?: string;
+          context?: string;
+          target_url?: string | null;
+          sha?: string;
+          repository?: { full_name?: string };
+        },
+      );
+      const ingested = await ingestCiEvidence(db, evidence);
+      note = ingested.attached
+        ? `status attached to run ${ingested.run?.id}`
+        : `status.${evidence.conclusion ?? evidence.status} (no matching run)`;
     } else if (
       headers.event === "code_scanning_alert" ||
       headers.event === "dependabot_alert"

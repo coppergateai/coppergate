@@ -50,7 +50,8 @@ export function CostExplorerPanel({ workspaceId }: Props) {
         Cost explorer (7d)
       </h2>
       <p className={styles.sectionLede}>
-        Recent spend by project — companion to 30d analytics.
+        Coppergate budget units by project (internal estimates) — not your
+        OpenAI/BYOK invoice. Companion to 30d analytics.
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
       {data ? (

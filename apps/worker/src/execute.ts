@@ -28,16 +28,19 @@ import {
   ingestCiEvidence,
   ingestSonarFitness,
   isRunCancelRequested,
+  loadSkillsForPrompt,
   markRunAwaitingReview,
   markRunFailed,
   markRunValidating,
   maybeScoreAndResolveTournament,
   notifyWorkspace,
   parseJsonArray,
+  parseSkillKeysJson,
   persistDeliveryArtifacts,
   persistReviewFindings,
   renewRunLease,
   setTaskPrUrl,
+  withTemperamentGuidance,
   type AgentRun,
   type Database,
   type Task,
@@ -247,7 +250,27 @@ export async function executeClaimedRun(
           profileKey,
         );
         if (profile?.promptGuidance?.trim()) {
-          promptGuidance = profile.promptGuidance.trim();
+          promptGuidance = withTemperamentGuidance(
+            profile.promptGuidance.trim(),
+            profile.temperament,
+          );
+        }
+        if (profile) {
+          try {
+            const keys = parseSkillKeysJson(profile.skillKeysJson);
+            const skillsBlock = await loadSkillsForPrompt(
+              db,
+              run.workspaceId,
+              keys,
+            );
+            if (skillsBlock) {
+              strategyContext = [strategyContext, skillsBlock]
+                .filter(Boolean)
+                .join("\n\n");
+            }
+          } catch {
+            /* skills optional */
+          }
         }
       } catch {
         /* profile optional */
@@ -498,15 +521,26 @@ export async function executeClaimedRun(
           title: task.title,
           filesChanged: completion.filesChanged,
           fileBodies: deliveryBundle.files,
+          fromSandbox: deliveryBundle.fromSandbox,
         });
+        const noRealFiles =
+          deliveryModeHint === "http" &&
+          !(agent instanceof FakeCodingAgent) &&
+          (deliveryBundle.fromSandbox === 0 ||
+            deliveryBundle.files.length === 0);
         // CI / FakeCodingAgent paths still use fixture diffs — only enforce on live http.
-        if (toy.toy && deliveryModeHint === "http" && !(agent instanceof FakeCodingAgent)) {
+        if (
+          (toy.toy || noRealFiles) &&
+          deliveryModeHint === "http" &&
+          !(agent instanceof FakeCodingAgent)
+        ) {
+          const reason = toy.reason ?? "no_sandbox_files";
           await appendRunEvent(db, {
             runId: run.id,
             workspaceId: run.workspaceId,
             kind: "error",
             payload: {
-              message: `Stub/toy delivery refused: ${toy.reason}`,
+              message: `Stub/toy delivery refused: ${reason}`,
               code: "stub_delivery",
             },
           });
@@ -514,7 +548,7 @@ export async function executeClaimedRun(
             runId: run.id,
             workerId,
             errorCode: "stub_delivery",
-            errorMessage: (toy.reason ?? "stub_delivery").slice(0, 500),
+            errorMessage: reason.slice(0, 500),
           });
           await safeTaskTransition(db, task, "FAILED", workerId, log);
           await maybeResolveTournamentAfterRun(db, run, workerId, log);

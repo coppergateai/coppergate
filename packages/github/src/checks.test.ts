@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mapCheckRunPayload, mapCheckSuitePayload } from "./checks.js";
+import {
+  fetchCommitCheckEvidence,
+  mapCheckRunPayload,
+  mapCheckSuitePayload,
+  mapCommitStatusPayload,
+} from "./checks.js";
 
 describe("CI check mapping", () => {
   it("marks success as passed and non-blocking", () => {
@@ -42,5 +47,60 @@ describe("CI check mapping", () => {
       },
     });
     assert.equal(ev.blocksAccept, true);
+  });
+
+  it("maps Vercel commit status success as passed", () => {
+    const ev = mapCommitStatusPayload({
+      state: "success",
+      context: "Vercel",
+      sha: "abc123",
+      repository: { full_name: "acme/app" },
+    });
+    assert.equal(ev.passed, true);
+    assert.equal(ev.blocksAccept, false);
+    assert.equal(ev.headSha, "abc123");
+  });
+
+  it("polls check-runs and statuses for a sha", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("/check-runs")) {
+        return new Response(
+          JSON.stringify({
+            check_runs: [
+              {
+                id: 7,
+                name: "Vercel Preview Comments",
+                status: "completed",
+                conclusion: "success",
+                head_sha: "deadbeef",
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/status")) {
+        return new Response(
+          JSON.stringify({
+            state: "success",
+            statuses: [
+              { context: "Vercel", state: "success", target_url: "https://v" },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response("nope", { status: 404 });
+    };
+    const rows = await fetchCommitCheckEvidence({
+      token: "t",
+      owner: "acme",
+      repo: "app",
+      headSha: "deadbeef",
+      fetchImpl,
+    });
+    assert.ok(rows.some((r) => r.name === "Vercel Preview Comments" && r.passed));
+    assert.ok(rows.some((r) => r.name === "Vercel" && r.passed));
   });
 });

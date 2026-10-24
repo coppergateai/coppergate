@@ -6,7 +6,7 @@ import { describe, it } from "node:test";
 import { buildDeliveryFiles } from "./delivery-files.js";
 
 describe("buildDeliveryFiles", () => {
-  it("reads sandbox workdir content and skips README stubs", async () => {
+  it("reads sandbox workdir content and skips missing README", async () => {
     const workdir = await mkdtemp(join(tmpdir(), "cg-deliv-"));
     await mkdir(join(workdir, "app"), { recursive: true });
     await writeFile(
@@ -27,7 +27,7 @@ describe("buildDeliveryFiles", () => {
     assert.match(files[0]!.content, /export default function Page/);
   });
 
-  it("falls back to stub when path missing from sandbox", async () => {
+  it("returns empty when path missing from sandbox — never invents stubs", async () => {
     const workdir = await mkdtemp(join(tmpdir(), "cg-deliv-"));
     const { files, fromSandbox } = await buildDeliveryFiles({
       workdir,
@@ -35,7 +35,16 @@ describe("buildDeliveryFiles", () => {
       runId: "run-2",
     });
     assert.equal(fromSandbox, 0);
-    assert.equal(files[0]!.path, "src/missing.ts");
-    assert.match(files[0]!.content, /coppergate run run-2/);
+    assert.equal(files.length, 0);
+  });
+
+  it("returns empty when workdir missing", async () => {
+    const { files, fromSandbox } = await buildDeliveryFiles({
+      workdir: null,
+      filesChanged: ["app/page.tsx"],
+      runId: "run-3",
+    });
+    assert.equal(fromSandbox, 0);
+    assert.equal(files.length, 0);
   });
 });

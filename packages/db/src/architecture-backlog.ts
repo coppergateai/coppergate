@@ -33,7 +33,16 @@ export function parseArchitectureOpenTasks(
       lower.startsWith("* ") ||
       line.includes("|");
     if (!openish) continue;
-    if (/\b(done|closed|merged|shipped)\b/i.test(line) && !/\[ \]/.test(line)) {
+    // Skip closed rows; keep "| Open |" even when the description mentions "done".
+    const statusDone =
+      /\|\s*(Done|Closed|Merged|Shipped)\s*\|/i.test(line) ||
+      (/^\s*[-*]\s*\[[xX]\]/.test(line) && !/\[ \]/.test(line));
+    if (statusDone) continue;
+    if (
+      /\b(done|closed|merged|shipped)\b/i.test(line) &&
+      !/\bOpen\b/i.test(line) &&
+      !/\[ \]/.test(line)
+    ) {
       continue;
     }
 
@@ -73,6 +82,13 @@ export function parseArchitectureOpenTasks(
   return out;
 }
 
+const TOY_TITLE_RE =
+  /\b(scaffold project structure|tiny readme typo|propose next scoped improvement|scoped improvement|autonomous ship loop)\b/i;
+
+export function isToyArchitectureTitle(title: string): boolean {
+  return TOY_TITLE_RE.test(title);
+}
+
 export function pickNextArchitectureTask(
   tasks: ArchitectureOpenTask[],
   opts?: { excludeTitleSubstrings?: string[] },
@@ -83,7 +99,51 @@ export function pickNextArchitectureTask(
   for (const t of tasks) {
     const hay = t.title.toLowerCase();
     if (exclude.some((e) => e && hay.includes(e))) continue;
+    if (isToyArchitectureTitle(t.title)) continue;
     return t;
   }
-  return tasks[0] ?? null;
+  return null;
+}
+
+/** Pull program ID from a Coppergate task/PR title (`P-007: …`). */
+export function extractArchitectureIdFromTitle(
+  title: string | null | undefined,
+): string | null {
+  if (!title) return null;
+  const m = title.match(ID_RE);
+  return m?.[1] ? m[1].toUpperCase() : null;
+}
+
+/**
+ * Flip Open → Done for a table/checklist row containing the architecture ID.
+ * Returns unchanged content when the ID is absent.
+ */
+export function markArchitectureIdDoneInMarkdown(
+  markdown: string,
+  architectureId: string,
+): { content: string; changed: boolean } {
+  const id = architectureId.toUpperCase();
+  if (!ID_RE.test(id) && !new RegExp(`\\b${id}\\b`, "i").test(id)) {
+    return { content: markdown, changed: false };
+  }
+  const idEsc = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const lines = markdown.split(/\r?\n/);
+  let changed = false;
+  const out = lines.map((line) => {
+    if (!new RegExp(`\\b${idEsc}\\b`, "i").test(line)) return line;
+    if (/\bDone\b/i.test(line) && !/\bOpen\b/i.test(line)) return line;
+    let next = line;
+    if (/\|\s*Open\s*\|/i.test(next)) {
+      next = next.replace(/\|\s*Open\s*\|/i, "| Done |");
+      changed = true;
+    } else if (/\[ \]/.test(next)) {
+      next = next.replace(/\[ \]/, "[x]");
+      changed = true;
+    } else if (/\bOpen\b/i.test(next)) {
+      next = next.replace(/\bOpen\b/i, "Done");
+      changed = true;
+    }
+    return next;
+  });
+  return { content: out.join("\n"), changed };
 }

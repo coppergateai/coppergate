@@ -5,98 +5,148 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import styles from "./settings.module.css";
 
-export type ProjectBudgetRow = {
-  projectId: string;
-  name: string;
-  repoFullName: string;
+export type WorkspaceBudgetSummary = {
   capMicros: number;
   spentMicros: number;
   reservedMicros: number;
   availableMicros: number;
   currency: string;
   budgetStatus: string;
+  period: string;
+} | null;
+
+export type ProjectBudgetRow = {
+  projectId: string;
+  name: string;
+  repoFullName: string;
+  /** This project's period spend (informational under workspace pool). */
+  projectSpentMicros: number;
+  currency: string;
 };
 
 type Props = {
   workspaceId: string;
   isOwner: boolean;
+  initialWorkspace: WorkspaceBudgetSummary;
   initialProjects: ProjectBudgetRow[];
 };
+
+function dollars(micros: number): string {
+  const d = micros / 1_000_000;
+  if (d === 0) return "0";
+  if (Math.abs(d) < 0.01) return d.toFixed(4);
+  return d.toFixed(2);
+}
 
 export function ProjectsBudgetPanel({
   workspaceId,
   isOwner,
+  initialWorkspace,
   initialProjects,
 }: Props) {
   const router = useRouter();
-  const [rows, setRows] = useState(initialProjects);
+  const [envelope, setEnvelope] = useState(initialWorkspace);
+  const [rows] = useState(initialProjects);
+  const [capDollars, setCapDollars] = useState(
+    String(((initialWorkspace?.capMicros ?? 100_000_000) / 1_000_000).toFixed(2)),
+  );
   const [error, setError] = useState<string | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-  async function setStatus(
-    projectId: string,
-    status: "active" | "paused",
-    capMicros: number,
-  ) {
-    setPendingId(projectId);
+  async function save(status?: "active" | "paused") {
+    setPending(true);
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/budget`, {
+      const dollarsNum = Number(capDollars);
+      if (!Number.isFinite(dollarsNum) || dollarsNum < 0) {
+        throw new Error("Enter a valid non-negative dollar amount");
+      }
+      const capMicros = Math.round(dollarsNum * 1_000_000);
+      const res = await fetch(`/api/workspaces/${workspaceId}/budget`, {
         method: "PUT",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId, capMicros, status }),
+        body: JSON.stringify({
+          capMicros,
+          period: "monthly",
+          ...(status ? { status } : {}),
+        }),
       });
-      const body = (await res.json()) as { error?: { message: string } };
-      if (!res.ok) throw new Error(body.error?.message ?? "Update failed");
-
-      const usageRes = await fetch(
-        `/api/projects/${projectId}/usage?workspaceId=${workspaceId}`,
-        { credentials: "same-origin" },
-      );
-      const usageBody = (await usageRes.json()) as {
-        usage?: {
-          capMicros: number;
-          spentMicros: number;
-          reservedMicros: number;
-          availableMicros: number;
-          currency: string;
-          budgetStatus: string;
-        };
+      const body = (await res.json()) as {
+        usage?: WorkspaceBudgetSummary;
         error?: { message: string };
       };
-      if (!usageRes.ok) {
-        throw new Error(usageBody.error?.message ?? "Reload failed");
-      }
-      if (usageBody.usage) {
-        setRows((prev) =>
-          prev.map((r) =>
-            r.projectId === projectId
-              ? {
-                  ...r,
-                  ...usageBody.usage!,
-                }
-              : r,
-          ),
-        );
-      }
+      if (!res.ok) throw new Error(body.error?.message ?? "Save failed");
+      if (body.usage) setEnvelope(body.usage);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      setError(err instanceof Error ? err.message : "Save failed");
     } finally {
-      setPendingId(null);
+      setPending(false);
     }
   }
+
+  const paused = envelope?.budgetStatus === "paused";
 
   return (
     <section className={styles.section} aria-labelledby="budgets-heading">
       <h2 id="budgets-heading" className={styles.sectionLabel}>
-        Project budgets
+        Monthly envelope
       </h2>
       <p className={styles.sectionLede}>
-        Lower caps or pause spend. Workers refuse new agent work while paused.
+        One workspace pool for all projects. Workers refuse new agent work when
+        the envelope is paused or spent.
       </p>
 
+      {envelope ? (
+        <p className={styles.rowMeta}>
+          Cap {dollars(envelope.capMicros)} {envelope.currency} · available{" "}
+          {dollars(envelope.availableMicros)} · spent{" "}
+          {dollars(envelope.spentMicros)} · {envelope.budgetStatus} ·{" "}
+          {envelope.period}
+        </p>
+      ) : (
+        <p className={styles.muted}>
+          No workspace envelope yet. Set a monthly cap to pool spend across
+          projects.
+        </p>
+      )}
+
+      {isOwner ? (
+        <div className={styles.rowActions} style={{ marginTop: "0.75rem" }}>
+          <label className={styles.rowMeta}>
+            Cap (USD / month)
+            <input
+              value={capDollars}
+              onChange={(e) => setCapDollars(e.target.value)}
+              inputMode="decimal"
+              style={{ marginLeft: "0.5rem", width: "6rem" }}
+            />
+          </label>
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            disabled={pending}
+            onClick={() => void save()}
+          >
+            {pending ? "Saving…" : "Save envelope"}
+          </button>
+          {envelope ? (
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              disabled={pending}
+              onClick={() => void save(paused ? "active" : "paused")}
+            >
+              {paused ? "Resume spend" : "Pause spend"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <h3 className={styles.sectionLabel} style={{ marginTop: "1.5rem" }}>
+        Project spend this period
+      </h3>
       {rows.length === 0 ? (
         <p className={styles.muted}>
           No projects yet.{" "}
@@ -119,9 +169,8 @@ export function ProjectsBudgetPanel({
                   {row.name}
                 </Link>
                 <p className={styles.rowMeta}>
-                  {row.repoFullName} · cap {row.capMicros / 1_000_000}{" "}
-                  {row.currency} · available {row.availableMicros / 1_000_000} ·{" "}
-                  {row.budgetStatus}
+                  {row.repoFullName} · spent{" "}
+                  {dollars(row.projectSpentMicros)} {row.currency}
                 </p>
               </div>
               {isOwner ? (
@@ -129,23 +178,7 @@ export function ProjectsBudgetPanel({
                   <button
                     type="button"
                     className={styles.ghostBtn}
-                    disabled={pendingId === row.projectId}
-                    onClick={() =>
-                      void setStatus(
-                        row.projectId,
-                        row.budgetStatus === "paused" ? "active" : "paused",
-                        row.capMicros,
-                      )
-                    }
-                  >
-                    {row.budgetStatus === "paused"
-                      ? "Resume spend"
-                      : "Pause spend"}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.ghostBtn}
-                    disabled={pendingId === row.projectId}
+                    disabled={pending}
                     onClick={() => {
                       if (
                         !window.confirm(
@@ -154,7 +187,7 @@ export function ProjectsBudgetPanel({
                       ) {
                         return;
                       }
-                      setPendingId(row.projectId);
+                      setPending(true);
                       setError(null);
                       void fetch(
                         `/api/projects/${row.projectId}?workspaceId=${workspaceId}`,
@@ -169,9 +202,6 @@ export function ProjectsBudgetPanel({
                               body.error?.message ?? "Archive failed",
                             );
                           }
-                          setRows((prev) =>
-                            prev.filter((r) => r.projectId !== row.projectId),
-                          );
                           router.refresh();
                         })
                         .catch((err: unknown) => {
@@ -181,7 +211,7 @@ export function ProjectsBudgetPanel({
                               : "Archive failed",
                           );
                         })
-                        .finally(() => setPendingId(null));
+                        .finally(() => setPending(false));
                     }}
                   >
                     Archive

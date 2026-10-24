@@ -77,8 +77,38 @@ test("hosted project + GitHub PRs health check", async ({ page, request }) => {
   });
   assertions.push({
     name: "Agents tab renders",
-    ok: /Agents|Arena|Start|Stop|LIVE|IDLE|PAUSED|Contender/i.test(tabs.arena),
+    ok: /Agents|Arena|Start|Stop|LIVE|IDLE|PAUSED|Contender|Workspace Start/i.test(
+      tabs.arena,
+    ),
     detail: clip(tabs.arena, 160),
+  });
+
+  const arenaUrl = `${baseUrl()}/workspaces/${target.workspaceId}/arena`;
+  await page.goto(arenaUrl, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1200);
+  const arenaPageText = await pageText(page);
+  const arenaLanded = !page.url().includes("/login");
+  assertions.push({
+    name: "workspace arena session",
+    ok: arenaLanded,
+    detail: page.url(),
+  });
+  assertions.push({
+    name: "workspace arena Start/Stop + status",
+    ok:
+      (/Start/i.test(arenaPageText) || /Stop/i.test(arenaPageText)) &&
+      /LIVE|STOPPED/i.test(arenaPageText),
+    detail: clip(arenaPageText, 200),
+  });
+  const arenaApi = await request.get(
+    `/api/workspaces/${target.workspaceId}/arena`,
+  );
+  assertions.push({
+    name: "workspace arena API",
+    ok: arenaApi.ok(),
+    detail: arenaApi.ok()
+      ? `${arenaApi.status()}`
+      : `${arenaApi.status()} ${clip(await arenaApi.text(), 120)}`,
   });
 
   let coppergatePulls: HostedCheckReport["coppergatePulls"] = [];

@@ -172,6 +172,9 @@ export default async function ProjectDetailPage({
         autonomyLevel={row.project.autonomyLevel}
         budgetStatus={usage.budgetStatus}
         capMicros={usage.capMicros}
+        availableMicros={usage.availableMicros}
+        projectSpentMicros={usage.projectSpentMicros}
+        pooled={usage.pooled}
         currency={usage.currency}
         taskCount={boardTasks.length}
         pendingApprovals={pendingApprovals}
@@ -190,9 +193,9 @@ export default async function ProjectDetailPage({
                   steps={[
                     {
                       id: "budget",
-                      title: "Set an active spend cap",
+                      title: "Set an active workspace envelope",
                       detail:
-                        "Hard cap is the only brake. Start small ($5–50); the loop pauses when the envelope is spent.",
+                        "One monthly pool for all projects. Start at $100; the loop pauses when the envelope is spent.",
                       href: hasBudget
                         ? undefined
                         : `${basePath}?tab=overview#budget`,
@@ -235,6 +238,8 @@ export default async function ProjectDetailPage({
                 availableMicros: usage.availableMicros,
                 currency: usage.currency,
                 budgetStatus: usage.budgetStatus,
+                pooled: usage.pooled,
+                projectSpentMicros: usage.projectSpentMicros,
               }}
               isOwner={isOwner}
             />

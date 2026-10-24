@@ -18,6 +18,9 @@ type Props = {
   autonomyLevel: string;
   budgetStatus: string;
   capMicros: number;
+  availableMicros?: number;
+  projectSpentMicros?: number;
+  pooled?: boolean;
   currency: string;
   taskCount: number;
   pendingApprovals: number;
@@ -55,6 +58,9 @@ export function ProjectShell({
   autonomyLevel,
   budgetStatus,
   capMicros,
+  availableMicros,
+  projectSpentMicros,
+  pooled,
   currency,
   taskCount,
   pendingApprovals,
@@ -110,8 +116,14 @@ export function ProjectShell({
             : styles.chip
         }
       >
-        {budgetStatus === "paused" ? "Paused" : "Budget"}{" "}
-        {formatCap(capMicros, currency)}
+        {budgetStatus === "paused"
+          ? "Paused"
+          : pooled
+            ? `Workspace ${formatCap(availableMicros ?? 0, currency)} left`
+            : "Budget"}{" "}
+        {pooled
+          ? `· project ${formatCap(projectSpentMicros ?? 0, currency)}`
+          : formatCap(capMicros, currency)}
       </span>
       {pendingApprovals > 0 ? (
         <span className={`${styles.chip} ${styles.chipWarn}`}>

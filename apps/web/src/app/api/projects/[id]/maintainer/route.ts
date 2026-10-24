@@ -1,4 +1,5 @@
 import {
+  clearMergeBlockedForProject,
   DEFAULT_MONTHLY_BUDGET_MICROS,
   disableMaintainerMode,
   enableMaintainerMode,
@@ -89,6 +90,21 @@ export async function POST(request: Request, context: RouteContext) {
         {
           enabled: project.maintainerEnabled,
           policy: parseMaintainerPolicy(project.maintainerPolicyJson),
+        },
+        { correlationId },
+      );
+    }
+
+    if (action === "clear_merge_blocked") {
+      const result = await clearMergeBlockedForProject(db, {
+        workspaceId: body.workspaceId,
+        projectId,
+        actor: user.id,
+      });
+      return jsonOk(
+        {
+          cleared: result.cleared,
+          hint: "Retry merge on the next worker tick after GitHub branch protection / CODEOWNERS allows the Coppergate App to merge.",
         },
         { correlationId },
       );

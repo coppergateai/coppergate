@@ -84,6 +84,12 @@ export function CommandPalette({ workspaces = [] }: Props) {
           group: "Workspace",
         },
         {
+          id: "arena",
+          label: "Arena",
+          href: `/workspaces/${workspaceId}/arena`,
+          group: "Workspace",
+        },
+        {
           id: "inbox",
           label: "Inbox",
           href: `/workspaces/${workspaceId}/inbox`,

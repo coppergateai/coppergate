@@ -75,10 +75,39 @@ async function main(): Promise<void> {
   });
   assertions.push({
     name: "Agents tab renders",
-    ok: /Agents|Arena|Start|Stop|LIVE|IDLE|PAUSED|Contender|war/i.test(
+    ok: /Agents|Arena|Start|Stop|LIVE|IDLE|PAUSED|Contender|war|Workspace Start/i.test(
       tabs.arena,
     ),
     detail: clip(tabs.arena, 200),
+  });
+
+  page.setDefaultTimeout(45_000);
+  const arenaUrl = `${baseUrl()}/workspaces/${target.workspaceId}/arena`;
+  await page.goto(arenaUrl, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(1000);
+  const arenaPageText = await pageText(page);
+  const arenaLanded = !page.url().includes("/login");
+  assertions.push({
+    name: "workspace arena session",
+    ok: arenaLanded,
+    detail: page.url(),
+  });
+  assertions.push({
+    name: "workspace arena Start/Stop + status",
+    ok:
+      (/Start/i.test(arenaPageText) || /Stop/i.test(arenaPageText)) &&
+      /LIVE|STOPPED/i.test(arenaPageText),
+    detail: clip(arenaPageText, 220),
+  });
+  const arenaApi = await context.request.get(
+    `${baseUrl()}/api/workspaces/${target.workspaceId}/arena`,
+  );
+  assertions.push({
+    name: "workspace arena API",
+    ok: arenaApi.ok(),
+    detail: arenaApi.ok()
+      ? `${arenaApi.status()}`
+      : `${arenaApi.status()} ${clip(await arenaApi.text(), 120)}`,
   });
 
   let coppergatePulls: HostedCheckReport["coppergatePulls"] = [];

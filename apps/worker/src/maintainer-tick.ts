@@ -5,11 +5,13 @@ import {
   buildMaintainerReleaseTag,
   getInstallationForWorkspace,
   getProjectForWorkspace,
+  isMergeProtectionBlock,
   listAutoMergeCandidates,
+  listMaintainerProjects,
   markAutoMerged,
   parseMaintainerPolicy,
   recordAuditEvent,
-  tickAllMaintainerProjects,
+  tickMaintainerProject,
   type Database,
   type GithubInstallation,
 } from "@coppergate/db";
@@ -19,6 +21,10 @@ import {
   mergePullRequest,
 } from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
+import { writeArchitectureTaskDone } from "./architecture-writeback.js";
+import { runCommunityScoutForProject } from "./community-scout-tick.js";
+import { refreshPendingCiEvidence } from "./refresh-ci-evidence.js";
+import { maybeShipRollbackForProject } from "./ship-rollback.js";
 
 export type ResolveInstallationToken = (
   db: Database,
@@ -39,12 +45,47 @@ export async function runMaintainerSchedulerTick(
   releases: number;
 }> {
   const actor = opts?.actor ?? "system:maintainer";
-  const ticks = await tickAllMaintainerProjects(db, actor);
+
+  if (opts?.resolveToken) {
+    try {
+      await refreshPendingCiEvidence(db, log, {
+        resolveToken: opts.resolveToken,
+      });
+    } catch (err) {
+      log.warn("ci evidence refresh skipped", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const projects = await listMaintainerProjects(db);
   let merged = 0;
   let releases = 0;
   let autoAccepted = 0;
 
-  for (const tick of ticks) {
+  for (const project of projects) {
+    let architectureToken: string | null = null;
+    const installation = await getInstallationForWorkspace(
+      db,
+      project.workspaceId,
+    );
+    if (installation && opts?.resolveToken) {
+      try {
+        architectureToken = await opts.resolveToken(db, installation);
+      } catch (err) {
+        log.warn("architecture token resolve failed", {
+          projectId: project.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    const tick = await tickMaintainerProject(db, {
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      actor,
+      architectureToken,
+    });
     autoAccepted += tick.autoAccepted;
     if (tick.errors.length) {
       log.warn("maintainer tick errors", {
@@ -61,27 +102,46 @@ export async function runMaintainerSchedulerTick(
     if (!bound) continue;
 
     const policy = parseMaintainerPolicy(bound.project.maintainerPolicyJson);
-    if (!policy.autoMerge || !bound.project.mergeEnabled) continue;
     if (bound.project.autonomyLevel !== "L2") continue;
+    if (!installation || !opts?.resolveToken || !architectureToken) continue;
 
-    const installation = await getInstallationForWorkspace(
-      db,
-      tick.workspaceId,
-    );
-    if (!installation || !opts?.resolveToken) {
-      continue;
-    }
+    const token = architectureToken;
 
-    let token: string;
     try {
-      token = await opts.resolveToken(db, installation);
+      await runCommunityScoutForProject(db, log, {
+        workspaceId: tick.workspaceId,
+        project: bound.project,
+        token,
+      });
     } catch (err) {
-      log.warn("maintainer token resolve failed", {
+      log.warn("community scout failed", {
         projectId: tick.projectId,
         error: err instanceof Error ? err.message : String(err),
       });
-      continue;
     }
+
+    if (policy.shipRollbackOnCiFail) {
+      const [ownerRb, nameRb] = bound.repository.baseRepoFullName.split("/");
+      if (ownerRb && nameRb) {
+        try {
+          await maybeShipRollbackForProject(db, log, {
+            workspaceId: tick.workspaceId,
+            projectId: tick.projectId,
+            owner: ownerRb,
+            repo: nameRb,
+            token,
+            actor,
+          });
+        } catch (err) {
+          log.warn("ship rollback tick failed", {
+            projectId: tick.projectId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }
+
+    if (!policy.autoMerge || !bound.project.mergeEnabled) continue;
 
     const [owner, name] = bound.repository.baseRepoFullName.split("/");
     if (!owner || !name) continue;
@@ -105,22 +165,48 @@ export async function runMaintainerSchedulerTick(
           merged: result.merged,
           message: result.message,
         });
+        const blocked =
+          !result.merged && isMergeProtectionBlock(result.message);
         await recordAuditEvent(db, {
           workspaceId: tick.workspaceId,
           actor,
-          action: "merge.attempt",
+          action: blocked ? "merge.blocked" : "merge.attempt",
           targetType: "merge",
           targetId: c.task.id,
           meta: {
+            projectId: tick.projectId,
+            taskId: c.task.id,
             prNumber: c.prNumber,
             merged: result.merged,
             message: result.message,
             maintainer: true,
+            blocked,
+            cta: blocked
+              ? "Fix GitHub branch protection / CODEOWNERS so the Coppergate App can merge, then clear merge.blocked"
+              : undefined,
           },
         });
         if (result.merged) {
           merged += 1;
           mergedTitles.push(c.task.title);
+          try {
+            await writeArchitectureTaskDone(log, {
+              token,
+              taskTitle: c.task.title,
+              prNumber: c.prNumber,
+            });
+          } catch (err) {
+            log.warn("architecture writeback skipped", {
+              prNumber: c.prNumber,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        } else if (blocked) {
+          log.info("merge blocked — will not retry", {
+            projectId: tick.projectId,
+            prNumber: c.prNumber,
+            message: result.message.slice(0, 160),
+          });
         }
       } catch (err) {
         log.warn("maintainer auto-merge failed", {
@@ -171,14 +257,14 @@ export async function runMaintainerSchedulerTick(
   }
 
   log.info("maintainer scheduler tick", {
-    projects: ticks.length,
+    projects: projects.length,
     autoAccepted,
     merged,
     releases,
   });
 
   return {
-    projects: ticks.length,
+    projects: projects.length,
     autoAccepted,
     merged,
     releases,

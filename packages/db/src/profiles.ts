@@ -10,7 +10,14 @@ import {
   agentProfiles,
   contenders,
   type AgentProfile,
+  type AgentTemperament,
 } from "./schema.js";
+import { DEFAULT_PROFILE_SKILL_KEYS } from "./skills.js";
+import {
+  defaultTemperamentForProfileKey,
+  isAgentTemperament,
+  strategyForTemperament,
+} from "./temperament.js";
 
 export class ProfileError extends Error {
   readonly code: "not_found" | "invalid" | "forbidden";
@@ -28,8 +35,9 @@ export const SYSTEM_PROFILE_SEEDS = [
     displayName: "Fixer",
     promptGuidance:
       "Fix the reported bug or failure with focused blast radius and a regression test that proves the fix.",
-    toolAllowlist: ["read", "edit", "test", "git"],
-    strategyDefault: "balanced",
+    toolAllowlist: ["read", "edit", "test", "git", "mcp:sonarqube"],
+    strategyDefault: "blitz" as const,
+    temperament: "swift" as const,
     maxSpendMicros: 500_000,
   },
   {
@@ -38,7 +46,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Ship the acceptance criteria as a user-visible product increment with tests and docs when needed. For Go prefer go test ./.... Refuse scaffold stubs, typos, and empty structure PRs.",
     toolAllowlist: ["read", "edit", "test", "git"],
-    strategyDefault: "balanced",
+    strategyDefault: "balanced" as const,
+    temperament: "balanced" as const,
     maxSpendMicros: 2_000_000,
   },
   {
@@ -47,7 +56,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Select the next product increment from the vision or architecture Open IDs (P-/W-/A-/S-). Prefer capabilities with tests over bugs/docs-only. Output a scoped ship task, not a rewrite or typo.",
     toolAllowlist: ["read", "git"],
-    strategyDefault: "balanced",
+    strategyDefault: "balanced" as const,
+    temperament: "balanced" as const,
     maxSpendMicros: 500_000,
   },
   {
@@ -56,7 +66,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Adversarial review: reject scope creep, missing tests, unsafe changes, and path-allowlist violations. Prefer fail-closed judgments with concrete fix notes.",
     toolAllowlist: ["read", "test", "git"],
-    strategyDefault: "fortress",
+    strategyDefault: "fortress" as const,
+    temperament: "steady" as const,
     maxSpendMicros: 60_000,
   },
   {
@@ -64,8 +75,9 @@ export const SYSTEM_PROFILE_SEEDS = [
     displayName: "Security",
     promptGuidance:
       "Remediate the vulnerability or SAST finding without weakening auth or expanding attack surface.",
-    toolAllowlist: ["read", "edit", "test", "git"],
-    strategyDefault: "fortress",
+    toolAllowlist: ["read", "edit", "test", "git", "mcp:sonarqube"],
+    strategyDefault: "fortress" as const,
+    temperament: "steady" as const,
     maxSpendMicros: 100_000,
   },
   {
@@ -74,7 +86,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Improve performance within budget; measure before/after; avoid premature abstraction.",
     toolAllowlist: ["read", "edit", "test", "git"],
-    strategyDefault: "balanced",
+    strategyDefault: "balanced" as const,
+    temperament: "balanced" as const,
     maxSpendMicros: 100_000,
   },
   {
@@ -83,7 +96,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Update docs/OpenAPI/README to match code changes. Do not change runtime behavior.",
     toolAllowlist: ["read", "edit", "git"],
-    strategyDefault: "balanced",
+    strategyDefault: "balanced" as const,
+    temperament: "balanced" as const,
     maxSpendMicros: 40_000,
   },
   {
@@ -92,7 +106,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Add or fix tests that catch the reported failure. Prefer deterministic assertions.",
     toolAllowlist: ["read", "edit", "test", "git"],
-    strategyDefault: "fortress",
+    strategyDefault: "fortress" as const,
+    temperament: "steady" as const,
     maxSpendMicros: 60_000,
   },
   {
@@ -101,7 +116,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Triage issues and signals: severity, duplicate, effort band, labels. Prefer actionable next steps; do not expand scope.",
     toolAllowlist: ["read", "git"],
-    strategyDefault: "blitz",
+    strategyDefault: "blitz" as const,
+    temperament: "swift" as const,
     maxSpendMicros: 40_000,
   },
   {
@@ -110,7 +126,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Reply helpfully on GitHub issues/Discussions. Stay on-topic, never share secrets, escalate security reports.",
     toolAllowlist: ["read"],
-    strategyDefault: "balanced",
+    strategyDefault: "balanced" as const,
+    temperament: "balanced" as const,
     maxSpendMicros: 30_000,
   },
   {
@@ -119,7 +136,8 @@ export const SYSTEM_PROFILE_SEEDS = [
     promptGuidance:
       "Prepare changelog and release notes from merged work. Do not change runtime behavior outside version bump files.",
     toolAllowlist: ["read", "edit", "git"],
-    strategyDefault: "fortress",
+    strategyDefault: "fortress" as const,
+    temperament: "steady" as const,
     maxSpendMicros: 50_000,
   },
 ] as const;
@@ -177,6 +195,8 @@ export async function ensureSystemAgentProfiles(
       out.push(hit);
       continue;
     }
+    const temperament = seed.temperament;
+    const skillKeys = DEFAULT_PROFILE_SKILL_KEYS[seed.key] ?? [];
     const [created] = await db
       .insert(agentProfiles)
       .values({
@@ -187,6 +207,8 @@ export async function ensureSystemAgentProfiles(
         promptGuidance: seed.promptGuidance,
         toolAllowlistJson: JSON.stringify(seed.toolAllowlist),
         strategyDefault: seed.strategyDefault,
+        temperament,
+        skillKeysJson: JSON.stringify(skillKeys),
         maxSpendMicros: seed.maxSpendMicros,
         locked: true,
         createdAt: now,
@@ -262,6 +284,8 @@ export async function updateWorkspaceAgentProfile(
     actor: string;
     promptGuidance?: string;
     strategyDefault?: string;
+    temperament?: AgentTemperament;
+    skillKeys?: string[];
     maxSpendMicros?: number;
     toolAllowlist?: string[];
     llmCredentialId?: string | null;
@@ -271,10 +295,17 @@ export async function updateWorkspaceAgentProfile(
   if (!BOUNDED_KEYS.has(input.key)) {
     throw new ProfileError("invalid", `profile key not in bounded catalog`);
   }
-  const allowedTools = new Set(["read", "edit", "test", "git"]);
+  const allowedTools = new Set([
+    "read",
+    "edit",
+    "test",
+    "git",
+    "mcp:sonarqube",
+    "mcp:*",
+  ]);
   if (input.toolAllowlist) {
     for (const t of input.toolAllowlist) {
-      if (!allowedTools.has(t)) {
+      if (!allowedTools.has(t) && !t.startsWith("sonar_")) {
         throw new ProfileError(
           "forbidden",
           `tool ${t} not allowed — cannot escalate tools`,
@@ -287,6 +318,9 @@ export async function updateWorkspaceAgentProfile(
     !["balanced", "blitz", "fortress"].includes(input.strategyDefault)
   ) {
     throw new ProfileError("invalid", "invalid strategyDefault");
+  }
+  if (input.temperament && !isAgentTemperament(input.temperament)) {
+    throw new ProfileError("invalid", "invalid temperament");
   }
   if (
     input.maxSpendMicros != null &&
@@ -324,6 +358,11 @@ export async function updateWorkspaceAgentProfile(
       ? undefined
       : input.preferredModel?.trim() || null;
 
+  const nextTemperament: AgentTemperament | undefined = input.temperament;
+  const nextStrategy =
+    input.strategyDefault ??
+    (nextTemperament ? strategyForTemperament(nextTemperament) : undefined);
+
   if (existing) {
     if (existing.locked) {
       throw new ProfileError("forbidden", "profile is locked");
@@ -332,7 +371,12 @@ export async function updateWorkspaceAgentProfile(
       .update(agentProfiles)
       .set({
         promptGuidance: input.promptGuidance ?? existing.promptGuidance,
-        strategyDefault: input.strategyDefault ?? existing.strategyDefault,
+        strategyDefault: nextStrategy ?? existing.strategyDefault,
+        temperament: nextTemperament ?? existing.temperament,
+        skillKeysJson:
+          input.skillKeys !== undefined
+            ? JSON.stringify(input.skillKeys)
+            : existing.skillKeysJson,
         maxSpendMicros: input.maxSpendMicros ?? existing.maxSpendMicros,
         toolAllowlistJson:
           input.toolAllowlist !== undefined
@@ -376,7 +420,18 @@ export async function updateWorkspaceAgentProfile(
         input.toolAllowlist !== undefined
           ? JSON.stringify(input.toolAllowlist)
           : system.toolAllowlistJson,
-      strategyDefault: input.strategyDefault ?? system.strategyDefault,
+      strategyDefault:
+        nextStrategy ?? input.strategyDefault ?? system.strategyDefault,
+      temperament:
+        nextTemperament ??
+        (isAgentTemperament(system.temperament)
+          ? system.temperament
+          : defaultTemperamentForProfileKey(input.key)),
+      skillKeysJson:
+        input.skillKeys !== undefined
+          ? JSON.stringify(input.skillKeys)
+          : system.skillKeysJson ||
+            JSON.stringify(DEFAULT_PROFILE_SKILL_KEYS[input.key] ?? []),
       maxSpendMicros: input.maxSpendMicros ?? system.maxSpendMicros,
       llmCredentialId: input.llmCredentialId ?? null,
       preferredModel: preferredModel ?? null,
