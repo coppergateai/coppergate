@@ -85,18 +85,28 @@ const WRITE_TOOL_TOKENS = new Set([
   "*",
 ]);
 
+/** Path globs mistaken for tools (historical bug: run.toolAllowlist ← task.allowedPaths). */
+function looksLikePathGlob(token: string): boolean {
+  const t = token.trim();
+  if (!t) return true;
+  if (t.includes("/") || t.includes("\\")) return true;
+  if (t === "**" || t === "*" || t === "**/*" || t === "*/**") return true;
+  return false;
+}
+
 /**
  * Combined gate for FILE writes:
  * - profileTools (when set) must include edit/*
  * - toolAllowlist (when set) must include a write token
  * Empty lists preserve legacy "no gate" behavior.
+ * Path-like entries in toolAllowlist are ignored (not tool names).
  */
 export function isEditToolAllowed(input: {
   toolAllowlist?: string[];
   profileTools?: string[];
 }): boolean {
   if (!isProfileEditAllowed(input.profileTools)) return false;
-  const tools = input.toolAllowlist ?? [];
+  const tools = (input.toolAllowlist ?? []).filter((t) => !looksLikePathGlob(t));
   if (tools.length === 0) return true;
   return tools.some((t) => WRITE_TOOL_TOKENS.has(t.trim().toLowerCase()));
 }

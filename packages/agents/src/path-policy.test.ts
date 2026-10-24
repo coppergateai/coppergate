@@ -55,5 +55,14 @@ describe("path-policy", () => {
       }),
       false,
     );
+    // Path globs must not block edits (legacy confusion with allowedPaths).
+    assert.equal(isEditToolAllowed({ toolAllowlist: ["**/*"] }), true);
+    assert.equal(
+      isEditToolAllowed({
+        toolAllowlist: ["**/*"],
+        profileTools: ["read", "edit", "git"],
+      }),
+      true,
+    );
   });
 });
