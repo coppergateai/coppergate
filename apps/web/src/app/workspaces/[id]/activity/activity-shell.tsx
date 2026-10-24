@@ -80,9 +80,16 @@ function glyphFor(group: ActivityGroup): string {
 }
 
 function tagsFor(group: ActivityGroup): string[] {
+  if (group.count > 1) {
+    return [`${group.count} projects`];
+  }
   const tags: string[] = [];
-  // Prefer human action + target; drop raw actor UUIDs from the dense list.
-  if (group.technicalLabel) tags.push(group.technicalLabel);
+  // Prefer target over short verb tags that just echo the title ("stop", "pause").
+  const tech = group.technicalLabel.split(" ×")[0] ?? "";
+  const titleLower = group.title.toLowerCase();
+  if (tech && tech.length > 2 && !titleLower.includes(tech.toLowerCase())) {
+    tags.push(tech);
+  }
   if (group.targetType && group.targetId) {
     tags.push(`${group.targetType} ${shortId(group.targetId)}`);
   } else if (typeof group.meta?.projectId === "string") {
