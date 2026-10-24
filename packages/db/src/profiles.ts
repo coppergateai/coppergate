@@ -2,12 +2,15 @@ import { and, asc, eq, isNull, or } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { recordAuditEvent } from "./briefs.js";
 import {
+  DEFAULT_CONTENDER_BUDGET_MICROS,
   ensureArenaForProject,
+  isContenderStrategy,
   MAX_TOURNAMENT_FANOUT,
 } from "./arena.js";
 import { getLlmByokById } from "./credentials.js";
 import {
   agentProfiles,
+  arenas,
   contenders,
   type AgentProfile,
   type AgentTemperament,
@@ -144,6 +147,11 @@ export const SYSTEM_PROFILE_SEEDS = [
 
 export const BOUNDED_KEYS: Set<string> = new Set(
   SYSTEM_PROFILE_SEEDS.map((s) => s.key as string),
+);
+
+/** Full sole-dev / maintainer arena roster (stable catalog order). */
+export const FULL_ARENA_PROFILE_KEYS: string[] = SYSTEM_PROFILE_SEEDS.map(
+  (s) => s.key as string,
 );
 
 export const DEFAULT_SPAWN_MATRIX: Record<string, string[]> = {
@@ -454,6 +462,8 @@ export async function updateWorkspaceAgentProfile(
 
 /**
  * Align arena contenders with spawn matrix profile keys before fan-out (TASK104).
+ * Inserts missing ACTIVE contenders per key; eliminates ACTIVE slots whose
+ * profileKey is not in the requested set (e.g. engineer_2 clones).
  */
 export async function applySpawnProfilesToArena(
   db: Database,
@@ -464,14 +474,20 @@ export async function applySpawnProfilesToArena(
     profileKeys: string[];
   },
 ): Promise<void> {
-  const keys = input.profileKeys.filter((k) => BOUNDED_KEYS.has(k));
+  const seen = new Set<string>();
+  const keys: string[] = [];
+  for (const k of input.profileKeys) {
+    if (!BOUNDED_KEYS.has(k) || seen.has(k)) continue;
+    seen.add(k);
+    keys.push(k);
+  }
   if (keys.length === 0) return;
 
   await ensureSystemAgentProfiles(db);
   const profiles = await listAgentProfiles(db, input.workspaceId);
   const byKey = new Map(profiles.map((p) => [p.key, p]));
 
-  const n = Math.min(MAX_TOURNAMENT_FANOUT, Math.max(keys.length, 2));
+  const n = Math.min(MAX_TOURNAMENT_FANOUT, Math.max(keys.length, 1));
   const { arena, contenders: pool } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
@@ -480,25 +496,69 @@ export async function applySpawnProfilesToArena(
     contenderCount: n,
   });
 
+  const now = new Date();
   const active = pool.filter((c) => c.status === "ACTIVE");
-  for (let i = 0; i < active.length; i++) {
-    const key = keys[i % keys.length]!;
-    const profile = byKey.get(key);
-    const strategy = profile?.strategyDefault ?? "balanced";
+  const byProfile = new Map<string, (typeof active)[number]>();
+  const wanted = new Set(keys);
+
+  for (const c of active) {
+    const keep =
+      wanted.has(c.profileKey) && !byProfile.has(c.profileKey);
+    if (keep) {
+      byProfile.set(c.profileKey, c);
+      continue;
+    }
+    // Orphan clones (engineer_2), duplicate keys, or keys dropped from roster
     await db
       .update(contenders)
       .set({
-        profileKey: key,
-        strategy,
-        updatedAt: new Date(),
+        status: "ELIMINATED",
+        eliminatedAt: now,
+        updatedAt: now,
       })
       .where(
-        and(
-          eq(contenders.id, active[i]!.id),
-          eq(contenders.arenaId, arena.id),
-        ),
+        and(eq(contenders.id, c.id), eq(contenders.arenaId, arena.id)),
       );
   }
+
+  for (const key of keys) {
+    const profile = byKey.get(key);
+    const rawStrategy = profile?.strategyDefault ?? "balanced";
+    const strategy = isContenderStrategy(rawStrategy) ? rawStrategy : "balanced";
+    const existing = byProfile.get(key);
+    if (existing) {
+      await db
+        .update(contenders)
+        .set({
+          profileKey: key,
+          strategy,
+          updatedAt: now,
+        })
+        .where(
+          and(eq(contenders.id, existing.id), eq(contenders.arenaId, arena.id)),
+        );
+      continue;
+    }
+    await db.insert(contenders).values({
+      id: crypto.randomUUID(),
+      arenaId: arena.id,
+      workspaceId: input.workspaceId,
+      profileKey: key,
+      strategy,
+      budgetMicrosRemaining: DEFAULT_CONTENDER_BUDGET_MICROS,
+      status: "ACTIVE",
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  // Keep arena defaultContenderN aligned with the live roster width.
+  await db
+    .update(arenas)
+    .set({ defaultContenderN: n, updatedAt: now })
+    .where(
+      and(eq(arenas.id, arena.id), eq(arenas.workspaceId, input.workspaceId)),
+    );
 
   await recordAuditEvent(db, {
     workspaceId: input.workspaceId,

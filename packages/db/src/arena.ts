@@ -28,8 +28,11 @@ import {
  * Hard-cap until TASK039 relaxes parallel-repo policy.
  * ContenderRuns still isolate via distinct run rows + branch names.
  */
-/** Hard-cap raised with TASK039 (was 2). Independent tasks also parallelize. */
-export const MAX_TOURNAMENT_FANOUT = 3;
+/**
+ * Hard-cap on ContenderRuns per tournament.
+ * Keep aligned with SYSTEM_PROFILE_SEEDS / BOUNDED_KEYS size in profiles.ts (11).
+ */
+export const MAX_TOURNAMENT_FANOUT = 11;
 
 /** Default spend exponent for efficiency payoff — GAME_THEORY.md */
 /** Lower α reduces thrift bias so meaningful fitness can beat tiny cheap diffs. */
