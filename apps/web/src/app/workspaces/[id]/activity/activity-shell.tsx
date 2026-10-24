@@ -17,7 +17,6 @@ import {
   type ActivityOutcome,
   actorLabel,
   categoryLabel,
-  countEventsToday,
   dayKey,
   extractFacts,
   formatAbsolute,
@@ -81,14 +80,18 @@ function glyphFor(group: ActivityGroup): string {
 }
 
 function tagsFor(group: ActivityGroup): string[] {
-  const tags: string[] = [actorLabel(group.actor)];
-  tags.push(group.technicalLabel);
+  const tags: string[] = [];
+  // Prefer human action + target; drop raw actor UUIDs from the dense list.
+  if (group.technicalLabel) tags.push(group.technicalLabel);
   if (group.targetType && group.targetId) {
     tags.push(`${group.targetType} ${shortId(group.targetId)}`);
   } else if (typeof group.meta?.projectId === "string") {
     tags.push(`project ${shortId(group.meta.projectId)}`);
+  } else {
+    const actor = actorLabel(group.actor);
+    if (actor && !actor.startsWith("Actor ·")) tags.push(actor);
   }
-  return tags.slice(0, 3);
+  return tags.slice(0, 2);
 }
 
 function arenaHref(workspaceId: string, projectId: string | null): string {
@@ -276,42 +279,36 @@ export function ActivityShell({
             </p>
           </header>
 
-          <div className={styles.metrics} aria-label="Activity metrics">
-            <div className={styles.metric}>
-              <p className={styles.metricLabel}>Events today</p>
-              <p className={styles.metricValue}>
-                {String(metrics.eventsToday).padStart(2, "0")}
-              </p>
-              <p className={styles.metricMeta}>
-                {countEventsToday(events) === metrics.eventsToday
-                  ? "In loaded feed"
-                  : "From audit feed"}
-              </p>
-            </div>
-            <div className={styles.metric}>
-              <p className={styles.metricLabel}>Active agents</p>
-              <p className={styles.metricValue}>
-                {String(metrics.activeAgents).padStart(2, "0")}
-              </p>
-              <p className={styles.metricMeta}>Arena contenders</p>
-            </div>
-            <div className={styles.metric}>
-              <p className={styles.metricLabel}>Needs attention</p>
-              <p className={styles.metricValue}>
-                {String(metrics.needsReview).padStart(2, "0")}
-              </p>
-              <p className={styles.metricMeta}>
-                {metrics.needsReview > 0 ? (
-                  <Link href={`/workspaces/${workspaceId}/arena`}>
+          <div className={styles.summaryStrip} aria-label="Activity metrics">
+            <p className={styles.summaryItem}>
+              <strong>{metrics.eventsToday}</strong> events today
+            </p>
+            <p className={styles.summaryItem}>
+              <strong>{metrics.activeAgents}</strong> agents live
+            </p>
+            <p className={styles.summaryItem}>
+              {metrics.needsReview > 0 ? (
+                <>
+                  <strong>{metrics.needsReview}</strong> need attention ·{" "}
+                  <Link
+                    href={`/workspaces/${workspaceId}/arena`}
+                    className={styles.summaryLink}
+                  >
                     Open Arena
                   </Link>
-                ) : (
-                  <Link href={`/workspaces/${workspaceId}/inbox`}>
-                    Open inbox
+                </>
+              ) : (
+                <>
+                  <strong>0</strong> need attention ·{" "}
+                  <Link
+                    href={`/workspaces/${workspaceId}/inbox`}
+                    className={styles.summaryLink}
+                  >
+                    Inbox
                   </Link>
-                )}
-              </p>
-            </div>
+                </>
+              )}
+            </p>
           </div>
 
           <div className={styles.toolbar}>

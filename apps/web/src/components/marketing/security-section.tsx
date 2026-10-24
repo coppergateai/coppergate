@@ -57,6 +57,15 @@ export function SecuritySection() {
             </article>
           ))}
         </div>
+
+        <div className={styles.sectionCtas}>
+          <Link className={styles.btnSecondary} href="/security">
+            Read security overview
+          </Link>
+          <Link className={styles.btnSecondary} href="/docs/limitations">
+            See limitations
+          </Link>
+        </div>
       </div>
     </section>
   );

@@ -86,13 +86,17 @@ function nodeClass(group: ActivityGroup): string {
 }
 
 function tagsFor(group: ActivityGroup): string[] {
-  const tags = [actorLabel(group.actor), group.technicalLabel];
+  const tags: string[] = [];
+  if (group.technicalLabel) tags.push(group.technicalLabel);
   if (group.targetType && group.targetId) {
     tags.push(`${group.targetType} ${shortId(group.targetId)}`);
   } else if (typeof group.meta?.projectId === "string") {
     tags.push(`project ${shortId(group.meta.projectId)}`);
+  } else {
+    const actor = actorLabel(group.actor);
+    if (actor && !actor.startsWith("Actor ·")) tags.push(actor);
   }
-  return tags.slice(0, 3);
+  return tags.slice(0, 2);
 }
 
 export function MissionControl({ data, recentEvents }: Props) {

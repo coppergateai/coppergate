@@ -94,14 +94,26 @@ export function MultiRepoPanel({ workspaceId, projectId, isOwner }: Props) {
       className={styles.section}
       aria-labelledby="repos-heading"
     >
-      <h2 id="repos-heading" className={styles.sectionLabel}>
-        Repositories
-      </h2>
+      <div className={styles.sectionHead}>
+        <h2 id="repos-heading" className={styles.sectionLabel}>
+          Repositories
+        </h2>
+        {!loading && policy ? (
+          <span
+            className={
+              policy.enabled
+                ? `${styles.statusPill} ${styles.statusPillActive}`
+                : `${styles.statusPill} ${styles.statusPillPaused}`
+            }
+          >
+            {policy.enabled ? "Multi-repo" : "Primary only"}
+          </span>
+        ) : null}
+      </div>
       <p className={styles.sectionLede}>
-        One primary write repo per project. Secondary repos are context for this
-        arena when multi-repo is enabled (capped — not a full org merge); writes
-        stay on primary unless coordinated PRs are on. Agents do not chat across
-        repos.
+        One primary write repo. Secondaries are capped context when multi-repo
+        is on — not a full org merge. Writes stay on primary unless coordinated
+        PRs are enabled.
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}
@@ -136,9 +148,9 @@ export function MultiRepoPanel({ workspaceId, projectId, isOwner }: Props) {
               />
               Coordinated PRs
             </label>
-            <span>
-              max secondary {policy.maxSecondaryRepos} · file cap{" "}
-              {policy.maxSecondaryFiles}
+            <span className={styles.muted}>
+              max {policy.maxSecondaryRepos} secondary ·{" "}
+              {policy.maxSecondaryFiles} files
             </span>
           </div>
 

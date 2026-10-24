@@ -71,11 +71,19 @@ export function EvidenceSection() {
             </p>
           </div>
 
-          <p className={styles.demoNotice}>
-            <a className={styles.announceLink} href="#arena">
-              Open Arena demo →
+          <div className={styles.sectionCtas}>
+            <a className={styles.btnSecondary} href="#arena">
+              Open Arena demo
             </a>
-          </p>
+            <a
+              className={styles.inlineDocLink}
+              href="https://github.com/coppergateai/coppergate"
+              target="_blank"
+              rel="noreferrer"
+            >
+              View on GitHub →
+            </a>
+          </div>
         </article>
       </div>
     </section>

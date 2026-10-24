@@ -2050,6 +2050,20 @@
   }
 }
 
+.sectionCtas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+  margin-top: 1.75rem;
+}
+
+.sectionCtas .inlineDocLink {
+  margin-left: 0.15rem;
+  font-size: 0.9rem;
+  font-weight: 550;
+}
+
 /* —— FAQ reuse shell —— */
 .faq {
   padding: var(--section-y) 0;
@@ -2721,30 +2735,23 @@
   display: grid;
   gap: 1rem;
   margin-top: 2.25rem;
-}
-
-@media (min-width: 900px) {
-  .pricingGrid {
-    grid-template-columns: 1.15fr 1fr 1fr;
-    align-items: stretch;
-  }
+  max-width: 36rem;
 }
 
 .pricingCard {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  padding: 1.35rem 1.25rem 1.4rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
+  padding: 1.5rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
 }
 
 .pricingCardFeatured {
-  border-color: var(--copper-border);
-  background:
-    linear-gradient(180deg, var(--copper-fill-soft), transparent 55%),
-    var(--surface);
+  border-color: var(--line);
+  background: transparent;
 }
 
 .pricingEyebrow {

@@ -103,19 +103,29 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
       className={`${styles.section} ${styles.arenaSection}`}
       aria-labelledby="arena-heading"
     >
-      <h2 id="arena-heading" className={styles.sectionLabel}>
-        Arena
-      </h2>
+      <div className={styles.sectionHead}>
+        <h2 id="arena-heading" className={styles.sectionLabel}>
+          Arena
+        </h2>
+        {!loading && arena ? (
+          <span
+            className={
+              running
+                ? `${styles.statusPill} ${styles.statusPillActive}`
+                : `${styles.statusPill} ${styles.statusPillPaused}`
+            }
+          >
+            {arena.status.replace(/_/g, " ").toLowerCase()}
+          </span>
+        ) : null}
+      </div>
       <p className={styles.sectionLede}>
         Contenders compete under budget; fitness and CI pick the survivor.
-        Start and Stop run at the workspace level — open Arena to arm every
-        project, or watch this project&apos;s agents live.
-      </p>
-
-      <p className={styles.sectionLede}>
+        Start and Stop are workspace-level —{" "}
         <Link href={arenaHref} className={styles.inlineLink}>
-          {isOwner ? "Workspace Start / Stop →" : "Open workspace Arena →"}
+          {isOwner ? "open Arena to arm projects" : "watch agents live"}
         </Link>
+        .
       </p>
 
       {error ? <p className={styles.error}>{error}</p> : null}

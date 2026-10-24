@@ -5,7 +5,12 @@ import { getWorkspaceSpendSummary } from "./budgets.js";
 import { listAuditEventsForWorkspace } from "./audit.js";
 import { displayTaskTitle } from "./display-title.js";
 import { getWorkspaceConcurrency } from "./plan-policy.js";
-import { listWorkspaceArenaSnapshot } from "./workspace-arena.js";
+import {
+  classifyContenderRuntime,
+  isLiveArenaStatus,
+  listWorkspaceArenaSnapshot,
+  type WorkspaceArenaProjectLane,
+} from "./workspace-arena.js";
 import { agentRuns, projects, tasks } from "./schema.js";
 
 const ACTIVE_RUN_STATUSES = [
@@ -101,26 +106,22 @@ function startOfUtcMonth(now = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
-function laneNeedsAttention(lane: {
-  lastRun: { status: string } | null;
-  contenders: Array<{
-    budgetMicrosRemaining: number;
-    latestRun: { status: string; errorCode: string | null } | null;
-  }>;
-}): boolean {
-  const st = lane.lastRun?.status;
-  if (st === "FAILED" || st === "BLOCKED" || st === "EXPIRED") return true;
-  return lane.contenders.some((c) => {
-    if (c.budgetMicrosRemaining <= 0) return true;
-    const run = c.latestRun;
-    if (!run) return false;
-    return (
-      run.status === "FAILED" ||
-      run.status === "BLOCKED" ||
-      run.status === "EXPIRED" ||
-      Boolean(run.errorCode)
-    );
-  });
+function laneNeedsAttention(lane: WorkspaceArenaProjectLane): boolean {
+  const arenaLive = isLiveArenaStatus(lane.arenaStatus);
+  if (
+    arenaLive &&
+    (lane.lastRun?.status === "FAILED" ||
+      lane.lastRun?.status === "BLOCKED" ||
+      lane.lastRun?.status === "EXPIRED")
+  ) {
+    return true;
+  }
+  return lane.contenders.some(
+    (c) =>
+      classifyContenderRuntime(c.latestRun, c.budgetMicrosRemaining, {
+        arenaLive,
+      }) === "needsAttention",
+  );
 }
 
 /**

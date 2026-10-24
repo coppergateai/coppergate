@@ -60,6 +60,13 @@ type Snapshot = {
 
 type RuntimeState = "running" | "awaitingCi" | "needsAttention" | "idle";
 
+const RUNTIME_RANK: Record<RuntimeState, number> = {
+  needsAttention: 0,
+  running: 1,
+  awaitingCi: 2,
+  idle: 3,
+};
+
 type Props = {
   workspaceId: string;
   workspaceName: string;
@@ -75,27 +82,31 @@ function isLiveStatus(status: string | null | undefined) {
   return status === "RUNNING" || status === "ARMED";
 }
 
-function classifyRuntime(c: ContenderView): RuntimeState {
+/** Keep in sync with `classifyContenderRuntime` in `@coppergate/db`. */
+function classifyRuntime(
+  c: ContenderView,
+  arenaLive: boolean,
+): RuntimeState {
   if (c.budgetMicrosRemaining <= 0) return "needsAttention";
   const run = c.latestRun;
   if (!run) return "idle";
   const st = run.status;
+  // Soft-cancel / stop is a quiet terminal — not an ops fire to chase.
+  if (st === "CANCELLED") return "idle";
   if (st === "RUNNING" || st === "QUEUED") return "running";
-  if (
-    st === "VALIDATING" ||
-    st === "WAITING_CI" ||
-    st === "REVIEW_REQUIRED"
-  ) {
+  if (st === "REVIEW_REQUIRED") return "awaitingCi";
+  if (st === "VALIDATING" || st === "WAITING_CI") {
+    // Mid-flight validation while the arena is stopped is stuck debt, not "awaiting".
+    if (!arenaLive) return "needsAttention";
     return "awaitingCi";
   }
-  if (
-    st === "FAILED" ||
-    st === "BLOCKED" ||
-    st === "EXPIRED" ||
-    Boolean(run.errorCode)
-  ) {
+  if (st === "FAILED" || st === "BLOCKED" || st === "EXPIRED") {
+    // Last-session terminals stay quiet until the arena is live again.
+    if (!arenaLive) return "idle";
     return "needsAttention";
   }
+  // errorCode on non-failed terminals (e.g. incomplete after cancel) must not
+  // inflate Needs attention while the arena is stopped.
   return "idle";
 }
 
@@ -113,11 +124,12 @@ function runtimeLabel(state: RuntimeState): string {
 }
 
 function projectRuntime(lane: ProjectLane): RuntimeState {
-  const states = lane.contenders.map(classifyRuntime);
+  const arenaLive = isLiveStatus(lane.arenaStatus);
+  const states = lane.contenders.map((c) => classifyRuntime(c, arenaLive));
   if (states.includes("needsAttention")) return "needsAttention";
   if (states.includes("running")) return "running";
   if (states.includes("awaitingCi")) return "awaitingCi";
-  if (isLiveStatus(lane.arenaStatus)) return "running";
+  if (arenaLive) return "running";
   return "idle";
 }
 
@@ -326,7 +338,11 @@ export function ArenaSpectacle({
       (c) => c.id === selected.contenderId,
     );
     if (!contender) return null;
-    return { lane, contender, state: classifyRuntime(contender) };
+    return {
+      lane,
+      contender,
+      state: classifyRuntime(contender, isLiveStatus(lane.arenaStatus)),
+    };
   }, [selected, snapshot]);
 
   async function control(action: "start" | "pause" | "stop") {
@@ -454,23 +470,26 @@ export function ArenaSpectacle({
           {error ? <p className={styles.error}>{error}</p> : null}
         </header>
 
-        <section className={styles.summary} aria-label="Arena summary">
-          <div className={`${styles.metric} ${styles.metricRunning}`}>
-            <p className={styles.metricValue}>{summary.running}</p>
-            <p className={styles.metricLabel}>Running</p>
-          </div>
-          <div className={`${styles.metric} ${styles.metricWaiting}`}>
-            <p className={styles.metricValue}>{summary.awaitingCi}</p>
-            <p className={styles.metricLabel}>Awaiting CI</p>
-          </div>
-          <div className={`${styles.metric} ${styles.metricAttention}`}>
-            <p className={styles.metricValue}>{summary.needsAttention}</p>
-            <p className={styles.metricLabel}>Needs attention</p>
-          </div>
-          <div className={`${styles.metric} ${styles.metricIdle}`}>
-            <p className={styles.metricValue}>{summary.idle}</p>
-            <p className={styles.metricLabel}>Idle</p>
-          </div>
+        <section className={styles.summaryStrip} aria-label="Arena summary">
+          <p className={styles.summaryItem}>
+            <strong className={styles.summaryRunning}>{summary.running}</strong>{" "}
+            running
+          </p>
+          <p className={styles.summaryItem}>
+            <strong className={styles.summaryWaiting}>
+              {summary.awaitingCi}
+            </strong>{" "}
+            awaiting CI
+          </p>
+          <p className={styles.summaryItem}>
+            <strong className={styles.summaryAttention}>
+              {summary.needsAttention}
+            </strong>{" "}
+            need attention
+          </p>
+          <p className={styles.summaryItem}>
+            <strong className={styles.summaryIdle}>{summary.idle}</strong> idle
+          </p>
         </section>
 
         {loading ? (
@@ -488,8 +507,9 @@ export function ArenaSpectacle({
               const laneRuntime = projectRuntime(lane);
               const isExpanded = expanded.has(lane.projectId);
               const focused = lane.projectId === focusProjectId;
+              const arenaLive = isLiveStatus(lane.arenaStatus);
               const hotAgents = lane.contenders
-                .map((c) => ({ c, state: classifyRuntime(c) }))
+                .map((c) => ({ c, state: classifyRuntime(c, arenaLive) }))
                 .filter(({ state }) => state !== "idle")
                 .slice(0, 3);
               const activePhase = phaseIndex(lane.lastRun?.status);
@@ -571,42 +591,57 @@ export function ArenaSpectacle({
                             Contenders arm on Resume
                           </p>
                         ) : (
-                          lane.contenders.map((c) => {
-                            const state = classifyRuntime(c);
-                            const selectedHere =
-                              selected?.contenderId === c.id &&
-                              selected.projectId === lane.projectId;
-                            return (
-                              <button
-                                key={c.id}
-                                type="button"
-                                className={`${styles.agent} ${TONE[state].agent} ${
-                                  state === "running" ? styles.agentPulse : ""
-                                } ${selectedHere ? styles.agentSelected : ""}`}
-                                onClick={() =>
-                                  setSelected({
-                                    projectId: lane.projectId,
-                                    contenderId: c.id,
-                                  })
-                                }
-                              >
-                                <div className={styles.agentTop}>
-                                  <span className={styles.agentState}>
-                                    {runtimeLabel(state)}
-                                  </span>
-                                  <span className={styles.agentRole}>
-                                    {titleCase(c.profileKey)}
-                                  </span>
-                                </div>
-                                <p className={styles.agentMode}>
-                                  {temperLabel(c.temperament)} · {c.strategy}
-                                </p>
-                                <p className={styles.agentActivity}>
-                                  {activityLine(c, state)}
-                                </p>
-                              </button>
-                            );
-                          })
+                          [...lane.contenders]
+                            .map((c) => ({
+                              c,
+                              state: classifyRuntime(c, arenaLive),
+                            }))
+                            .sort(
+                              (a, b) =>
+                                RUNTIME_RANK[a.state] - RUNTIME_RANK[b.state],
+                            )
+                            .map(({ c, state }) => {
+                              const selectedHere =
+                                selected?.contenderId === c.id &&
+                                selected.projectId === lane.projectId;
+                              const hot = state !== "idle";
+                              return (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  className={`${styles.agent} ${TONE[state].agent} ${
+                                    state === "running"
+                                      ? styles.agentPulse
+                                      : ""
+                                  } ${selectedHere ? styles.agentSelected : ""}`}
+                                  onClick={() =>
+                                    setSelected({
+                                      projectId: lane.projectId,
+                                      contenderId: c.id,
+                                    })
+                                  }
+                                >
+                                  <div className={styles.agentTop}>
+                                    <span className={styles.agentRole}>
+                                      {titleCase(c.profileKey)}
+                                    </span>
+                                    <span className={styles.agentState}>
+                                      {runtimeLabel(state)}
+                                    </span>
+                                  </div>
+                                  {hot ? (
+                                    <p className={styles.agentActivity}>
+                                      {activityLine(c, state)}
+                                    </p>
+                                  ) : (
+                                    <p className={styles.agentMode}>
+                                      {temperLabel(c.temperament)} ·{" "}
+                                      {c.strategy}
+                                    </p>
+                                  )}
+                                </button>
+                              );
+                            })
                         )}
                       </div>
                     </div>

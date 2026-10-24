@@ -77,11 +77,11 @@ export default async function BlogIndexPage() {
           >
             View on GitHub
           </a>
-          <Link className={styles.btnSecondary} href="/login">
-            Try hosted
-          </Link>
           <Link className={styles.btnSecondary} href="/changelog">
             Changelog
+          </Link>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
           </Link>
         </div>
       </div>

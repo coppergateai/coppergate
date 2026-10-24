@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ComponentType } from "react";
 import {
   LogoAsana,
@@ -166,6 +167,15 @@ export function SignalAdaptersSection() {
             </li>
           ))}
         </ul>
+
+        <div className={styles.sectionCtas}>
+          <Link className={styles.btnSecondary} href="/docs/supported-stack">
+            Supported stack
+          </Link>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
+          </Link>
+        </div>
       </div>
 
       <div className={styles.integrationRows}>

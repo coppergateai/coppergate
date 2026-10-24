@@ -44,6 +44,11 @@ function dollars(micros: number) {
   return `$${(micros / 1_000_000).toFixed(2)}`;
 }
 
+function yn(value: boolean | undefined, fallback = true): string {
+  if (value === undefined) return fallback ? "Yes" : "No";
+  return value ? "Yes" : "No";
+}
+
 export function MaintainerPanel({
   workspaceId,
   projectId,
@@ -123,28 +128,38 @@ export function MaintainerPanel({
       className={styles.section}
       aria-labelledby="maintainer-heading"
     >
-      <h2 id="maintainer-heading" className={styles.sectionLabel}>
-        Autonomous maintainer
-      </h2>
+      <div className={styles.sectionHead}>
+        <h2 id="maintainer-heading" className={styles.sectionLabel}>
+          Autonomous maintainer
+        </h2>
+        <span
+          className={
+            enabled
+              ? `${styles.statusPill} ${styles.statusPillActive}`
+              : `${styles.statusPill} ${styles.statusPillPaused}`
+          }
+        >
+          {enabled ? "On" : "Off"}
+        </span>
+      </div>
       <p className={styles.sectionLede}>
-        Start in Arena invents vision and backlog — no plan entry. While the
-        monthly budget allows, the worker keeps inventing the next cycle in the
-        background. Cap hit → hard pause until the next period. Intervene via
-        budget or Stop. Canonical micro-envelope: $5/mo.
+        Start in Arena invents vision and backlog. While the monthly envelope
+        allows, the worker keeps shipping. Cap hit → hard pause. Canonical
+        micro-envelope: $5/mo.
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
 
-      <div className={styles.checkRow} style={{ gap: "0.75rem", flexWrap: "wrap" }}>
-        <label>
+      <div className={styles.btnRow}>
+        <label className={styles.field}>
           Monthly budget (USD)
           <input
+            className={styles.inputNarrow}
             type="number"
             min={1}
             step={1}
             value={budgetDollars}
             disabled={!isOwner || pending || enabled}
             onChange={(e) => setBudgetDollars(e.target.value)}
-            style={{ marginLeft: "0.5rem", width: "5rem" }}
           />
         </label>
         {isOwner ? (
@@ -152,13 +167,15 @@ export function MaintainerPanel({
             <>
               <button
                 type="button"
+                className={styles.ghostBtn}
                 disabled={pending}
                 onClick={() => void post("disable")}
               >
-                Disable maintainer mode
+                Disable
               </button>
               <button
                 type="button"
+                className={styles.ghostBtn}
                 disabled={pending}
                 title="After fixing GitHub branch protection / CODEOWNERS, clear sticky merge.blocked so the worker retries"
                 onClick={() => void post("clear_merge_blocked")}
@@ -169,6 +186,7 @@ export function MaintainerPanel({
           ) : (
             <button
               type="button"
+              className={styles.primaryBtn}
               disabled={pending}
               onClick={() => {
                 const n = Number(budgetDollars);
@@ -178,59 +196,110 @@ export function MaintainerPanel({
                 void post("enable", { monthlyBudgetMicros: micros });
               }}
             >
-              Enable maintainer mode
+              Enable maintainer
             </button>
           )
         ) : null}
       </div>
-      <p className={styles.sectionLede} style={{ marginTop: "0.5rem" }}>
+
+      <p className={styles.hint}>
         Merge blocked by GitHub? Add the Coppergate App to PR review bypass (or
-        approve as CODEOWNER), then use Clear merge blocks. Coppergate never
+        approve as CODEOWNER), then Clear merge blocks. Coppergate never
         bypasses protection itself.
       </p>
 
       {policy ? (
-        <ul className={styles.sectionLede} style={{ marginTop: "0.75rem" }}>
-          <li>Status: {enabled ? "ON" : "off"}</li>
-          <li>Envelope: {dollars(policy.monthlyBudgetMicros)} / month</li>
-          <li>Auto-merge: {policy.autoMerge ? "yes" : "no"}</li>
-          <li>Auto-release: {policy.autoRelease ? "yes" : "no"}</li>
-          <li>
-            Auto-queue replan:{" "}
-            {policy.autoQueueReplanTasks === false ? "no" : "yes"}
-          </li>
-          <li>Release tags: {policy.releaseTagStyle ?? "daily"}</li>
-          <li>Self-improve: {policy.selfImprove ? "yes" : "no"}</li>
-          <li>Community replies: {policy.communityReplies ? "yes" : "no"}</li>
-          <li>
-            Community scout:{" "}
-            {policy.communityScout === false ? "off" : "on"} · every{" "}
-            {policy.communityScoutIntervalHours ?? 8}h · max{" "}
-            {policy.communityScoutMaxPerRun ?? 2}/run
-          </li>
-        </ul>
+        <details className={styles.configFold} open>
+          <summary className={styles.configFoldSummary}>Policy</summary>
+          <dl className={styles.configGrid}>
+            <div>
+              <dt>Envelope</dt>
+              <dd>{dollars(policy.monthlyBudgetMicros)} / mo</dd>
+            </div>
+            <div>
+              <dt>Auto-merge</dt>
+              <dd>{yn(policy.autoMerge)}</dd>
+            </div>
+            <div>
+              <dt>Auto-release</dt>
+              <dd>{yn(policy.autoRelease)}</dd>
+            </div>
+            <div>
+              <dt>Auto-queue replan</dt>
+              <dd>{yn(policy.autoQueueReplanTasks !== false)}</dd>
+            </div>
+            <div>
+              <dt>Release tags</dt>
+              <dd>{policy.releaseTagStyle ?? "daily"}</dd>
+            </div>
+            <div>
+              <dt>Self-improve</dt>
+              <dd>{yn(policy.selfImprove)}</dd>
+            </div>
+            <div>
+              <dt>Community replies</dt>
+              <dd>{yn(policy.communityReplies)}</dd>
+            </div>
+            <div>
+              <dt>Community scout</dt>
+              <dd>
+                {policy.communityScout === false
+                  ? "Off"
+                  : `Every ${policy.communityScoutIntervalHours ?? 8}h · max ${policy.communityScoutMaxPerRun ?? 2}/run`}
+              </dd>
+            </div>
+          </dl>
+        </details>
       ) : null}
 
       {metrics ? (
-        <ul className={styles.sectionLede} style={{ marginTop: "0.5rem" }}>
-          <li>
-            Last 30d: {metrics.merges} merges · spend{" "}
-            {dollars(metrics.spendMicros)} / {dollars(metrics.capMicros)}
-            {metrics.spendWithinCap ? "" : " (over cap)"}
-            {metrics.costPerAcceptedMergeMicros != null && metrics.merges > 0
-              ? ` · ~${dollars(metrics.costPerAcceptedMergeMicros)}/merge`
-              : ""}
-          </li>
-          <li>
-            Human PR touches: {metrics.humanTouches} · auto-accepts:{" "}
-            {metrics.autoAccepts} · self-improves: {metrics.selfImproves} ·
-            meta-tournaments: {metrics.metaTournaments ?? 0} · replans:{" "}
-            {metrics.replans ?? 0} · ticks: {metrics.ticks}
-          </li>
-          {metrics.winningProfileKeys && metrics.winningProfileKeys.length > 0 ? (
-            <li>Winning profiles: {metrics.winningProfileKeys.join(", ")}</li>
-          ) : null}
-        </ul>
+        <details className={styles.configFold}>
+          <summary className={styles.configFoldSummary}>
+            Last 30 days · {metrics.merges} merges
+          </summary>
+          <dl className={styles.configGrid}>
+            <div>
+              <dt>Spend</dt>
+              <dd>
+                {dollars(metrics.spendMicros)} / {dollars(metrics.capMicros)}
+                {metrics.spendWithinCap ? "" : " · over cap"}
+              </dd>
+            </div>
+            {metrics.costPerAcceptedMergeMicros != null && metrics.merges > 0 ? (
+              <div>
+                <dt>Per merge</dt>
+                <dd>~{dollars(metrics.costPerAcceptedMergeMicros)}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>Human touches</dt>
+              <dd>{metrics.humanTouches}</dd>
+            </div>
+            <div>
+              <dt>Auto-accepts</dt>
+              <dd>{metrics.autoAccepts}</dd>
+            </div>
+            <div>
+              <dt>Self-improves</dt>
+              <dd>{metrics.selfImproves}</dd>
+            </div>
+            <div>
+              <dt>Replans</dt>
+              <dd>{metrics.replans ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Ticks</dt>
+              <dd>{metrics.ticks}</dd>
+            </div>
+            {metrics.winningProfileKeys &&
+            metrics.winningProfileKeys.length > 0 ? (
+              <div className={styles.configGridWide}>
+                <dt>Winning profiles</dt>
+                <dd>{metrics.winningProfileKeys.join(", ")}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </details>
       ) : null}
     </section>
   );

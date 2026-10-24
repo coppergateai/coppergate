@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   ILLUSTRATIVE_ARENA,
@@ -190,6 +191,23 @@ export function ArenaPreviewSection() {
               </div>
             </aside>
           </div>
+        </div>
+
+        <div className={styles.sectionCtas}>
+          <a
+            className={styles.btnSecondary}
+            href="https://github.com/coppergateai/coppergate"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Run it from GitHub
+          </a>
+          <Link className={styles.btnSecondary} href="/login">
+            Try hosted
+          </Link>
+          <a className={styles.inlineDocLink} href="#how-it-works">
+            See how it works →
+          </a>
         </div>
       </div>
     </section>
