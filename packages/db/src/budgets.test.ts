@@ -345,4 +345,26 @@ describe("workspace pooled budgets", { skip: !url }, () => {
     );
     await assertSufficientBudget(db, workspaceId, projectA, 10_000);
   });
+
+  it("dedupes llm_tokens usage once per runId", async () => {
+    const runId = crypto.randomUUID();
+    const first = await appendUsageEvent(db, {
+      workspaceId,
+      projectId: projectA,
+      runId,
+      kind: "llm_tokens",
+      costMicros: 1_000,
+      quantity: "10",
+    });
+    const second = await appendUsageEvent(db, {
+      workspaceId,
+      projectId: projectA,
+      runId,
+      kind: "llm_tokens",
+      costMicros: 99_000,
+      quantity: "999",
+    });
+    assert.equal(second.id, first.id);
+    assert.equal(second.costMicros, 1_000);
+  });
 });
