@@ -241,7 +241,9 @@ export async function executeClaimedRun(
     }
   }
 
-  let completion: FakeCompletionPayload | null = null;
+    let completion: FakeCompletionPayload | null = null;
+    let lastAgentErrorCode: string | null = null;
+    let lastAgentErrorMessage: string | null = null;
   let validationReport: Awaited<
     ReturnType<typeof runStackValidation>
   > | null = null;
@@ -583,13 +585,17 @@ export async function executeClaimedRun(
           }
         }
 
-        if (
-          event.kind === "error" &&
-          (event.payload?.code === "cancelled" ||
-            event.payload?.code === "aborted")
-        ) {
-          if (event.payload?.code === "cancelled") sawCancel = true;
-          break;
+        if (event.kind === "error") {
+          const code =
+            typeof event.payload?.code === "string" ? event.payload.code : null;
+          if (code) lastAgentErrorCode = code;
+          if (typeof event.message === "string" && event.message.trim()) {
+            lastAgentErrorMessage = event.message.slice(0, 500);
+          }
+          if (code === "cancelled" || code === "aborted") {
+            if (code === "cancelled") sawCancel = true;
+            break;
+          }
         }
 
         if (
@@ -715,8 +721,10 @@ export async function executeClaimedRun(
         await markRunFailed(db, {
           runId: run.id,
           workerId,
-          errorCode: "incomplete",
-          errorMessage: "Agent finished without completion payload",
+          errorCode: lastAgentErrorCode ?? "incomplete",
+          errorMessage:
+            lastAgentErrorMessage ??
+            "Agent finished without completion payload",
         });
       }
       await safeTaskTransition(

@@ -170,7 +170,8 @@ export async function enqueueAgentRun(
       agentProfileKey: input.agentProfileKey ?? "engineer",
       baseSha: input.baseSha ?? task.baseSha ?? "unknown",
       branchName: input.branchName ?? null,
-      toolAllowlist: task.allowedPaths,
+      // Tool names (edit/read/…), not path globs — allowedPaths is enforced separately.
+      toolAllowlist: "[]",
       spendCapMicros: input.spendCapMicros ?? task.estimateMicros ?? 0,
       estimatedCostMicros:
         input.estimatedCostMicros ?? task.estimateMicros ?? 0,
