@@ -1,4 +1,5 @@
 import {
+  killWorkspaceArena,
   listWorkspaceArenaSnapshot,
   startWorkspaceArena,
   stopWorkspaceArena,
@@ -19,6 +20,8 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+type ArenaAction = "start" | "pause" | "stop";
+
 /** Workspace arena snapshot — all non-archived project lanes. */
 export async function GET(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
@@ -33,7 +36,10 @@ export async function GET(request: Request, context: RouteContext) {
   }
 }
 
-/** Owner Start/Stop — fan-out across all non-archived projects. */
+/**
+ * Owner controls — fan-out across all non-archived projects.
+ * start = resume/arm, pause = soft stop, stop = hard kill.
+ */
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
@@ -46,32 +52,45 @@ export async function POST(request: Request, context: RouteContext) {
       action?: unknown;
     } | null;
 
+    const action = body?.action;
     if (
-      !body ||
-      (body.action !== "start" && body.action !== "stop")
+      action !== "start" &&
+      action !== "pause" &&
+      action !== "stop"
     ) {
-      throw new ApiError("bad_request", "action must be start or stop");
+      throw new ApiError(
+        "bad_request",
+        "action must be start, pause, or stop",
+      );
     }
 
     const result =
-      body.action === "start"
+      action === "start"
         ? await startWorkspaceArena(db, {
             workspaceId,
             actor: user.id,
           }).catch((err: unknown) => {
             throw mapArenaError(err);
           })
-        : await stopWorkspaceArena(db, {
-            workspaceId,
-            actor: user.id,
-          }).catch((err: unknown) => {
-            throw mapArenaError(err);
-          });
+        : action === "pause"
+          ? await stopWorkspaceArena(db, {
+              workspaceId,
+              actor: user.id,
+            }).catch((err: unknown) => {
+              throw mapArenaError(err);
+            })
+          : await killWorkspaceArena(db, {
+              workspaceId,
+              actor: user.id,
+            }).catch((err: unknown) => {
+              throw mapArenaError(err);
+            });
 
-    logger.info(`workspace arena ${body.action}`, {
+    logger.info(`workspace arena ${action as ArenaAction}`, {
       correlationId,
       workspaceId,
       started: result.started,
+      paused: result.paused,
       stopped: result.stopped,
       errorCount: result.errors.length,
       status: result.status,

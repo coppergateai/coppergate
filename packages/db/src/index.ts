@@ -387,15 +387,19 @@ export {
   type MaintainerTickResult,
 } from "./maintainer.js";
 export {
+  classifyContenderRuntime,
+  killWorkspaceArena,
   listWorkspaceArenaSnapshot,
   startWorkspaceArena,
   stopWorkspaceArena,
+  type WorkspaceArenaContenderRun,
   type WorkspaceArenaContenderView,
   type WorkspaceArenaControlResult,
   type WorkspaceArenaLastRun,
   type WorkspaceArenaLiveStatus,
   type WorkspaceArenaProjectLane,
   type WorkspaceArenaSnapshot,
+  type WorkspaceArenaSummary,
 } from "./workspace-arena.js";
 export {
   DEFAULT_LEASE_MS,

@@ -8,6 +8,7 @@ import {
   createWorkspaceWithOwner,
   getArenaForProject,
   insertTestUser,
+  killWorkspaceArena,
   listWorkspaceArenaSnapshot,
   startWorkspaceArena,
   stopWorkspaceArena,
@@ -87,10 +88,12 @@ describe("workspace arena fan-out", { skip: !url }, () => {
     await closeDb(db);
   });
 
-  it("lists lanes and fan-out start/stop across projects", async () => {
+  it("lists lanes and fan-out start/pause/kill across projects", async () => {
     const before = await listWorkspaceArenaSnapshot(db, workspaceId);
     assert.equal(before.status, "STOPPED");
     assert.equal(before.projects.length, 2);
+    assert.ok(before.syncedAt);
+    assert.ok(before.summary);
 
     const started = await startWorkspaceArena(db, { workspaceId, actor });
     assert.equal(started.started, 2);
@@ -119,21 +122,43 @@ describe("workspace arena fan-out", { skip: !url }, () => {
     const snap = await listWorkspaceArenaSnapshot(db, workspaceId);
     assert.equal(snap.status, "LIVE");
     assert.ok(snap.projects.every((p) => p.contenders.length >= 1));
+    assert.ok(
+      snap.projects.every((p) =>
+        p.contenders.every((c) => "latestRun" in c),
+      ),
+    );
 
-    const stopped = await stopWorkspaceArena(db, { workspaceId, actor });
-    assert.equal(stopped.stopped, 2);
-    assert.equal(stopped.errors.length, 0);
-    assert.equal(stopped.status, "STOPPED");
+    const paused = await stopWorkspaceArena(db, { workspaceId, actor });
+    assert.equal(paused.paused, 2);
+    assert.equal(paused.errors.length, 0);
+    assert.equal(paused.status, "STOPPED");
 
-    const afterA = await getArenaForProject(db, {
+    const afterPauseA = await getArenaForProject(db, {
       workspaceId,
       projectId: projectA,
     });
-    const afterB = await getArenaForProject(db, {
+    const afterPauseB = await getArenaForProject(db, {
       workspaceId,
       projectId: projectB,
     });
-    assert.equal(afterA?.status, "PAUSED");
-    assert.equal(afterB?.status, "PAUSED");
+    assert.equal(afterPauseA?.status, "PAUSED");
+    assert.equal(afterPauseB?.status, "PAUSED");
+
+    await startWorkspaceArena(db, { workspaceId, actor });
+    const killed = await killWorkspaceArena(db, { workspaceId, actor });
+    assert.equal(killed.stopped, 2);
+    assert.equal(killed.errors.length, 0);
+    assert.equal(killed.status, "STOPPED");
+
+    const afterKillA = await getArenaForProject(db, {
+      workspaceId,
+      projectId: projectA,
+    });
+    const afterKillB = await getArenaForProject(db, {
+      workspaceId,
+      projectId: projectB,
+    });
+    assert.equal(afterKillA?.status, "KILLED");
+    assert.equal(afterKillB?.status, "KILLED");
   });
 });
