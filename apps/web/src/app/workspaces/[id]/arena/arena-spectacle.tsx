@@ -15,8 +15,17 @@ type ContenderRun = {
   prUrl: string | null;
   prNumber: number | null;
   errorCode: string | null;
+  tournamentResult?: string | null;
   updatedAt: string;
 };
+
+const STALE_FAILURE_MS = 2 * 60 * 60 * 1000;
+
+function isStaleFailure(updatedAt: string): boolean {
+  const t = Date.parse(updatedAt);
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t > STALE_FAILURE_MS;
+}
 
 type ContenderView = {
   id: string;
@@ -87,7 +96,9 @@ function classifyRuntime(
   c: ContenderView,
   arenaLive: boolean,
 ): RuntimeState {
-  if (c.budgetMicrosRemaining <= 0) return "needsAttention";
+  // Budget elimination is selection, not a human ops fire.
+  void c.budgetMicrosRemaining;
+  if (c.status === "ELIMINATED") return "idle";
   const run = c.latestRun;
   if (!run) return "idle";
   const st = run.status;
@@ -103,6 +114,9 @@ function classifyRuntime(
   if (st === "FAILED" || st === "BLOCKED" || st === "EXPIRED") {
     // Last-session terminals stay quiet until the arena is live again.
     if (!arenaLive) return "idle";
+    if (run.tournamentResult === "LOSER") return "idle";
+    if (run.errorCode === "stub_delivery") return "idle";
+    if (isStaleFailure(run.updatedAt)) return "idle";
     return "needsAttention";
   }
   // errorCode on non-failed terminals (e.g. incomplete after cancel) must not
@@ -146,11 +160,18 @@ function projectStatusLabel(lane: ProjectLane): string {
 
 function activityLine(c: ContenderView, state: RuntimeState): string {
   const run = c.latestRun;
-  if (state === "needsAttention" && c.budgetMicrosRemaining <= 0) {
-    return "Budget exhausted";
-  }
   if (!run) {
+    if (c.budgetMicrosRemaining <= 0) return "Eliminated — budget spent";
     return state === "idle" ? "Standing by" : "No active run";
+  }
+  if (state === "idle") {
+    // Quiet historical terminals — do not surface old error codes as live status.
+    if (c.budgetMicrosRemaining <= 0) return "Standing by · budget spent";
+    if (run.taskTitle) return `Last · ${run.taskTitle}`;
+    return "Standing by";
+  }
+  if (state === "needsAttention" && c.budgetMicrosRemaining <= 0) {
+    return `Failed · budget spent · ${run.errorCode?.replace(/_/g, " ") ?? run.status}`;
   }
   if (run.errorCode) return run.errorCode.replace(/_/g, " ");
   if (run.taskTitle) {
@@ -302,10 +323,16 @@ export function ArenaSpectacle({
     if (focusProjectId) {
       next.add(focusProjectId);
     } else {
-      const active = snapshot.projects.find((lane) => {
-        const runtime = projectRuntime(lane);
-        return runtime !== "idle" || isLiveStatus(lane.arenaStatus);
-      });
+      // Prefer lanes that need human action after the attention classifier.
+      const attention = snapshot.projects.find(
+        (lane) => projectRuntime(lane) === "needsAttention",
+      );
+      const active =
+        attention ??
+        snapshot.projects.find((lane) => {
+          const runtime = projectRuntime(lane);
+          return runtime !== "idle" || isLiveStatus(lane.arenaStatus);
+        });
       if (active) next.add(active.projectId);
       else if (snapshot.projects[0]) next.add(snapshot.projects[0].projectId);
     }
@@ -428,7 +455,8 @@ export function ArenaSpectacle({
           </div>
           <h1 className={styles.brand}>Arena</h1>
           <p className={styles.lede}>
-            Autonomous engineering operations for {workspaceName}
+            Contenders compete under budget across {workspaceName}. Fitness and
+            CI pick survivors — Pause all drains the queue.
           </p>
 
           <div className={styles.controls}>

@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 import { SiteChrome } from "../site-chrome";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Changelog",
   description:
     "What’s new in Coppergate — open-source progress on delivery, gates, and evidence.",
-  alternates: { canonical: "/changelog" },
-  openGraph: { url: "/changelog" },
-};
+  path: "/changelog",
+});
 
 const entries = [
   {
@@ -37,7 +37,7 @@ const entries = [
     title: "Commercial wedge + hosted billing",
     items: [
       "D14 lock: GitHub issue → verified PR is the commercial wedge KPI",
-      "Stripe Checkout / portal for Hosted Starter & Pro (Settings → Billing)",
+      "Hosted billing plumbing landed (later deferred — public paid pricing off)",
       "Onboarding and recovery docs oriented to one-session first PR",
       "Wedge depth: Sentry + CI-fail auto-arm; expand-on-pull for the rest",
     ],

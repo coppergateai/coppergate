@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 import { SiteChrome } from "../site-chrome";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Terms",
   description:
     "Terms of use for Coppergate — open-source software, hosted service, arena policy, and acceptable use.",
-  alternates: { canonical: "/terms" },
-  openGraph: { url: "/terms" },
-};
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

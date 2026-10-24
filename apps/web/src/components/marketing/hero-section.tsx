@@ -1,16 +1,9 @@
-import Link from "next/link";
 import { HeroMissionMock } from "./hero-mission-mock";
+import { HostedCtaLink } from "./hosted-cta-link";
 import { IconArrow } from "./icons";
 import styles from "./marketing.module.css";
 
-type Props = {
-  signedIn: boolean;
-};
-
-export function HeroSection({ signedIn }: Props) {
-  const hostedHref = signedIn ? "/workspaces" : "/login";
-  const hostedLabel = signedIn ? "Open workspaces" : "Try hosted";
-
+export function HeroSection() {
   return (
     <section className={styles.hero} aria-labelledby="hero-title">
       <div className={styles.heroInner}>
@@ -18,7 +11,7 @@ export function HeroSection({ signedIn }: Props) {
           <p className={styles.heroBrand}>Coppergate</p>
 
           <h1 id="hero-title" className={styles.headline}>
-            Set a budget. Agents war.
+            Set a budget. Agents compete.
             <br />
             <span className={styles.headlineAccent}> Survivors ship.</span>
           </h1>
@@ -39,9 +32,7 @@ export function HeroSection({ signedIn }: Props) {
               Start on GitHub
               <IconArrow />
             </a>
-            <Link className={styles.btnSecondary} href={hostedHref}>
-              {hostedLabel}
-            </Link>
+            <HostedCtaLink className={styles.btnSecondary} />
           </div>
 
           <ul className={styles.trustList}>

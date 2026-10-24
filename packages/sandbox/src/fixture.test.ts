@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { access, cp, mkdtemp, rm } from "node:fs/promises";
+import { access, cp, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,13 +53,12 @@ describe("nextjs_ts fixture in sandbox", () => {
 
       if (!nodeModulesOk) {
         // Lightweight accept path: greeting unit file must be present after clone-at-sha copy
-        await access(join(sandbox.workdir, "src/lib/greeting.ts"));
-        const head = await mgr.exec(sandbox, [
-          "node",
-          "-e",
-          "const fs=require('fs'); const t=fs.readFileSync('src/lib/greeting.ts','utf8'); if(!t.includes('export function greeting')) process.exit(1)",
-        ]);
-        assert.equal(head.exitCode, 0);
+        // (read from host — sandbox blocks interpreter eval flags like node -e).
+        const greeting = await readFile(
+          join(sandbox.workdir, "src/lib/greeting.ts"),
+          "utf8",
+        );
+        assert.match(greeting, /export function greeting/);
       } else {
         const test = await mgr.exec(
           sandbox,

@@ -170,6 +170,21 @@ export default async function ProjectDetailPage({
       tasks.some(({ task }) => task.githubIssueNumber != null),
     ) ?? false;
 
+  const ACTIVE_DELIVERY = new Set([
+    "QUEUED",
+    "RUNNING",
+    "VALIDATING",
+    "WAITING_CI",
+    "IN_REVIEW",
+    "REVIEW_REQUIRED",
+  ]);
+  const deliveryCount = boardTasks.filter((t) =>
+    ACTIVE_DELIVERY.has(t.status),
+  ).length;
+  const evidenceCount = boardTasks.filter(
+    (t) => t.status === "REVIEW_REQUIRED",
+  ).length;
+
   let nextStep: NextActionStep = "done";
   if (!hasBudget) nextStep = "budget";
   else if (reviewTask) nextStep = "review";
@@ -204,7 +219,8 @@ export default async function ProjectDetailPage({
         projectSpentMicros={usage.projectSpentMicros}
         pooled={usage.pooled}
         currency={usage.currency}
-        taskCount={boardTasks.length}
+        deliveryCount={deliveryCount}
+        evidenceCount={evidenceCount}
         pendingApprovals={pendingApprovals}
         lastRunStatus={lastRunStatus}
         initialTab={parseProjectTab(sp.tab)}

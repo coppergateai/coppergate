@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 import { SiteChrome } from "../site-chrome";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Security",
   description:
     "How Coppergate keeps autonomy accountable — SCM identity, fitness gates, spend caps, and a kill-switch.",
-  alternates: { canonical: "/security" },
-  openGraph: { url: "/security" },
-};
+  path: "/security",
+});
 
 export default function SecurityPage() {
   return (

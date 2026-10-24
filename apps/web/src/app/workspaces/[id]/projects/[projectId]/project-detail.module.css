@@ -1167,6 +1167,22 @@ html[data-theme="light"] .legendFree {
   color: var(--mute-soft);
 }
 
+.evidenceSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 1.15rem;
+  margin: 0.15rem 0 0.35rem;
+  color: var(--mute);
+  font-size: 0.82rem;
+}
+
+.evidenceSummary strong {
+  color: var(--paper);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
 .evidenceList {
   list-style: none;
   margin: 0.75rem 0 0;
@@ -1177,35 +1193,91 @@ html[data-theme="light"] .legendFree {
 .evidenceRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem 1rem;
-  padding: 0.9rem 0;
+  padding: 0.95rem 0;
   border-bottom: 1px solid var(--line);
 }
 
+.evidenceMain {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.evidenceHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+}
+
+.evidencePill {
+  flex: 0 0 auto;
+  padding: 0.12rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  color: var(--mute-strong);
+}
+
+.evidencePillOk {
+  border-color: rgba(110, 180, 120, 0.4);
+  background: rgba(110, 180, 120, 0.1);
+  color: var(--success-bright, var(--success));
+}
+
+.evidencePillFail {
+  border-color: rgba(212, 101, 90, 0.4);
+  background: rgba(212, 101, 90, 0.1);
+  color: var(--danger);
+}
+
+.evidencePillWarn {
+  border-color: rgba(232, 168, 72, 0.4);
+  background: rgba(232, 168, 72, 0.1);
+  color: var(--warn);
+}
+
+.evidencePillMute {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--mute);
+}
+
 .evidenceTitle {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--paper);
-  text-decoration: none;
+  text-align: left;
   letter-spacing: -0.015em;
+  cursor: pointer;
 }
 
 .evidenceTitle:hover {
-  color: var(--copper);
+  color: var(--copper-hot, var(--copper));
 }
 
 .evidenceMeta {
-  margin: 0.25rem 0 0;
+  margin: 0.3rem 0 0;
   font-size: 0.8rem;
   color: var(--mute);
+  line-height: 1.4;
 }
 
 .evidenceActions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+  flex: 0 0 auto;
 }
 
 .gateList {

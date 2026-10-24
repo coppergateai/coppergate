@@ -3,14 +3,14 @@ import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Recovery",
   description:
     "Self-serve recovery when arena runs fail — cancel, retry, CI Accept gate, budget, and kill-switch.",
-  alternates: { canonical: "/docs/recovery" },
-  openGraph: { url: "/docs/recovery" },
-};
+  path: "/docs/recovery",
+});
 
 export default function RecoveryPage() {
   return (

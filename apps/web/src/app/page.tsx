@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import {
   ArenaPreviewSection,
   CapabilityStrip,
@@ -14,34 +13,22 @@ import {
   StackRibbon,
   SurvivorWorkflow,
 } from "@/components/marketing";
-import { currentUser } from "@/lib/auth";
+import { publicPageMetadata } from "@/lib/seo";
 import { JsonLd } from "./json-ld";
 import { LandingFunnelBeacon } from "./landing-funnel";
 import { SiteChrome } from "./site-chrome";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/" },
-  openGraph: { url: "/" },
-};
-
-async function HeroAuth() {
-  const user = await currentUser();
-  return <HeroSection signedIn={Boolean(user)} />;
-}
-
-async function FinalCtaAuth() {
-  const user = await currentUser();
-  return <FinalCta signedInLogin={user?.login ?? null} />;
-}
+export const metadata: Metadata = publicPageMetadata({
+  path: "/",
+  // Root layout already sets the default title/description.
+});
 
 export default function HomePage() {
   return (
     <SiteChrome>
       <LandingFunnelBeacon />
       <JsonLd />
-      <Suspense fallback={<HeroSection signedIn={false} />}>
-        <HeroAuth />
-      </Suspense>
+      <HeroSection />
       <StackRibbon />
       <CapabilityStrip />
       <ArenaPreviewSection />
@@ -52,9 +39,7 @@ export default function HomePage() {
       <SecuritySection />
       <PilotProjectsSection />
       <FaqBlock />
-      <Suspense fallback={null}>
-        <FinalCtaAuth />
-      </Suspense>
+      <FinalCta />
     </SiteChrome>
   );
 }

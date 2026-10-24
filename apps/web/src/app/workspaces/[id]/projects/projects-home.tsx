@@ -45,6 +45,27 @@ type Props = {
   canManage: boolean;
 };
 
+function formatStack(stack: string) {
+  const key = stack.toLowerCase();
+  const map: Record<string, string> = {
+    nextjs_ts: "Next.js",
+    node: "Node",
+    python: "Python",
+    go: "Go",
+    ruby: "Ruby",
+    shell: "Shell",
+    html: "HTML",
+    unknown: "Unknown",
+  };
+  return map[key] ?? stack.replace(/_/g, " ");
+}
+
+function formatMode(mode: string) {
+  if (mode === "existing_repo") return "Existing repo";
+  if (mode === "new_product") return "New product";
+  return mode.replace(/_/g, " ");
+}
+
 function formatRole(role: string) {
   if (role === "owner") return "Owner";
   if (role === "member") return "Member";
@@ -553,7 +574,7 @@ export function ProjectsHome({
                           href={`/workspaces/${workspaceId}/projects/${project.id}`}
                           className={styles.rowStack}
                         >
-                          {project.stack}
+                          {formatStack(project.stack)}
                         </Link>
                         <Link
                           href={`/workspaces/${workspaceId}/projects/${project.id}`}
@@ -573,7 +594,7 @@ export function ProjectsHome({
                           className={styles.rowMode}
                         >
                           <BranchIcon />
-                          {project.mode}
+                          {formatMode(project.mode)}
                         </Link>
                         <Link
                           href={`/workspaces/${workspaceId}/projects/${project.id}`}
@@ -655,7 +676,9 @@ export function ProjectsHome({
                       className={styles.card}
                     >
                       <div className={styles.cardTop}>
-                        <span className={styles.rowId}>{project.stack}</span>
+                        <span className={styles.rowId}>
+                          {formatStack(project.stack)}
+                        </span>
                         {project.ready ? (
                           <span className={styles.stateReady}>Brief ready</span>
                         ) : (
@@ -667,7 +690,7 @@ export function ProjectsHome({
                         {project.repoFullName ?? "No repository"}
                       </p>
                       <p className={styles.cardMeta}>
-                        {project.mode} · {project.updatedAt}
+                        {formatMode(project.mode)} · {project.updatedAt}
                       </p>
                     </Link>
                   </li>

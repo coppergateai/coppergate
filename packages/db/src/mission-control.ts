@@ -66,6 +66,8 @@ export type WorkspaceMissionControl = {
     activeRuns: number;
     activeRunProjects: number;
     needsApproval: number;
+    /** REVIEW_REQUIRED deliveries waiting on Evidence Accept (not inbox gates). */
+    needsEvidenceAccept: number;
     highPriorityApprovals: number;
     verifiedPrsThisMonth: number;
     budgetSpentMicros: number;
@@ -108,18 +110,11 @@ function startOfUtcMonth(now = new Date()): Date {
 
 function laneNeedsAttention(lane: WorkspaceArenaProjectLane): boolean {
   const arenaLive = isLiveArenaStatus(lane.arenaStatus);
-  if (
-    arenaLive &&
-    (lane.lastRun?.status === "FAILED" ||
-      lane.lastRun?.status === "BLOCKED" ||
-      lane.lastRun?.status === "EXPIRED")
-  ) {
-    return true;
-  }
   return lane.contenders.some(
     (c) =>
       classifyContenderRuntime(c.latestRun, c.budgetMicrosRemaining, {
         arenaLive,
+        contenderStatus: c.status,
       }) === "needsAttention",
   );
 }

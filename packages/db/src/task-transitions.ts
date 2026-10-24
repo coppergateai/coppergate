@@ -620,6 +620,12 @@ export async function decideTaskReview(
     const runs = await listRunsForTask(db, input.workspaceId, task.id);
     const latest = runs[0];
     if (latest) {
+      if (latest.status === "WAITING_CI") {
+        throw new TaskTransitionError(
+          "policy",
+          "Cannot accept: latest run is still WAITING_CI",
+        );
+      }
       const fitness = await getRunCiFitness(db, latest.id);
       if (fitness.blocking || latest.errorCode === "ci_failed") {
         throw new TaskTransitionError(
@@ -631,6 +637,12 @@ export async function decideTaskReview(
         throw new TaskTransitionError(
           "policy",
           "Cannot accept: awaiting live CI evidence on the latest run",
+        );
+      }
+      if (!fitness.acceptReady) {
+        throw new TaskTransitionError(
+          "policy",
+          "Cannot accept: CI fitness is not accept-ready",
         );
       }
     }

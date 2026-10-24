@@ -3,14 +3,14 @@ import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Supported stack",
   description:
     "SCM delivery, Signal Adapters, and fitness evidence for the Coppergate Survivor arena.",
-  alternates: { canonical: "/docs/supported-stack" },
-  openGraph: { url: "/docs/supported-stack" },
-};
+  path: "/docs/supported-stack",
+});
 
 export default function SupportedStackPage() {
   return (

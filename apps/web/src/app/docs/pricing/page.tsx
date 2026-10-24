@@ -3,14 +3,14 @@ import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Pricing",
   description:
     "Coppergate is MIT open source. Self-host with your own keys at $0 — paid hosted plans are not offered right now.",
-  alternates: { canonical: "/docs/pricing" },
-  openGraph: { url: "/docs/pricing" },
-};
+  path: "/docs/pricing",
+});
 
 const SELF_HOST =
   "https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md";

@@ -5,10 +5,13 @@ import { describe, it } from "node:test";
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
 import {
+  OG_IMAGE,
   PUBLIC_STATIC_ROUTES,
   ROBOTS_DISALLOW,
   SITE_TITLE,
+  TWITTER_IMAGE,
   absoluteUrl,
+  publicPageMetadata,
   robotsHost,
 } from "./seo";
 
@@ -68,6 +71,38 @@ describe("sitemap route", () => {
     );
     assert.ok(!urls.some((u) => u.includes("/login")));
     assert.ok(!urls.some((u) => u.includes("/workspaces")));
+  });
+});
+
+describe("publicPageMetadata", () => {
+  it("always attaches share images with canonical URL", () => {
+    const meta = publicPageMetadata({
+      title: "Blog",
+      description: "Notes",
+      path: "/blog",
+    });
+    assert.equal(meta.alternates?.canonical, "/blog");
+    const og = meta.openGraph;
+    assert.ok(og && typeof og === "object" && !Array.isArray(og));
+    assert.equal(og.url, "/blog");
+    assert.deepEqual(og.images, [OG_IMAGE]);
+    assert.deepEqual(meta.twitter?.images, [TWITTER_IMAGE]);
+  });
+
+  it("merges article openGraph fields without dropping images", () => {
+    const meta = publicPageMetadata({
+      title: "Post",
+      description: "Body",
+      path: "/blog/post",
+      openGraph: {
+        type: "article",
+        publishedTime: "2026-10-20T00:00:00.000Z",
+      },
+    });
+    const og = meta.openGraph as { type?: string; images?: unknown } | undefined;
+    assert.ok(og && typeof og === "object");
+    assert.equal(og.type, "article");
+    assert.deepEqual(og.images, [OG_IMAGE]);
   });
 });
 

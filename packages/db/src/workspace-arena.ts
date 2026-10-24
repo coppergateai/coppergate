@@ -26,8 +26,19 @@ export type WorkspaceArenaContenderRun = {
   prUrl: string | null;
   prNumber: number | null;
   errorCode: string | null;
+  /** WINNER | LOSER | CANCELLED — losers are expected, not ops fires. */
+  tournamentResult: string | null;
   updatedAt: string;
 };
+
+/** Failures older than this do not inflate Needs attention while the arena is live. */
+export const STALE_FAILURE_ATTENTION_MS = 2 * 60 * 60 * 1000;
+
+function isStaleFailureTimestamp(updatedAt: string, nowMs = Date.now()): boolean {
+  const t = Date.parse(updatedAt);
+  if (!Number.isFinite(t)) return false;
+  return nowMs - t > STALE_FAILURE_ATTENTION_MS;
+}
 
 export type WorkspaceArenaContenderView = {
   id: string;
@@ -98,6 +109,10 @@ function deriveWorkspaceStatus(
 export type ClassifyContenderRuntimeOptions = {
   /** When false (paused/killed arena), terminal failures are history — not a live fire. */
   arenaLive?: boolean;
+  /** Contender row status — eliminated agents are not ops fires. */
+  contenderStatus?: string | null;
+  /** Injected clock for stale-failure tests. */
+  nowMs?: number;
 };
 
 /** Runtime bucket for a contender's latest run (Mission Control strip). */
@@ -107,7 +122,10 @@ export function classifyContenderRuntime(
   options?: ClassifyContenderRuntimeOptions,
 ): "running" | "awaitingCi" | "needsAttention" | "idle" {
   const arenaLive = options?.arenaLive ?? true;
-  if (budgetMicrosRemaining <= 0) return "needsAttention";
+  const nowMs = options?.nowMs ?? Date.now();
+  // Contender budget is selection pressure (losers starve) — not an ops fire.
+  void budgetMicrosRemaining;
+  if (options?.contenderStatus === "ELIMINATED") return "idle";
   if (!latestRun) return "idle";
   const st = latestRun.status;
   // Soft-cancel / stop is a quiet terminal — not an ops fire to chase.
@@ -122,6 +140,11 @@ export function classifyContenderRuntime(
   if (st === "FAILED" || st === "BLOCKED" || st === "EXPIRED") {
     // Last-session terminals stay quiet until the arena is live again.
     if (!arenaLive) return "idle";
+    // Tournament losers and simulated-delivery stubs are expected outcomes.
+    if (latestRun.tournamentResult === "LOSER") return "idle";
+    if (latestRun.errorCode === "stub_delivery") return "idle";
+    // Stale failures linger on the contender until the next fan-out — don't scream.
+    if (isStaleFailureTimestamp(latestRun.updatedAt, nowMs)) return "idle";
     return "needsAttention";
   }
   // errorCode on non-failed terminals (e.g. incomplete after cancel) must not
@@ -144,7 +167,7 @@ function deriveSummary(
       const bucket = classifyContenderRuntime(
         c.latestRun,
         c.budgetMicrosRemaining,
-        { arenaLive },
+        { arenaLive, contenderStatus: c.status },
       );
       summary[bucket] += 1;
     }
@@ -189,6 +212,7 @@ async function latestRunsByContender(
       prUrl: agentRuns.prUrl,
       prNumber: agentRuns.prNumber,
       errorCode: agentRuns.errorCode,
+      tournamentResult: agentRuns.tournamentResult,
       updatedAt: agentRuns.updatedAt,
     })
     .from(agentRuns)
@@ -213,6 +237,7 @@ async function latestRunsByContender(
       prUrl: row.prUrl,
       prNumber: row.prNumber,
       errorCode: row.errorCode,
+      tournamentResult: row.tournamentResult ?? null,
       updatedAt: row.updatedAt.toISOString(),
     });
   }
@@ -272,7 +297,7 @@ function laneSeverity(lane: WorkspaceArenaProjectLane): number {
     const bucket = classifyContenderRuntime(
       c.latestRun,
       c.budgetMicrosRemaining,
-      { arenaLive },
+      { arenaLive, contenderStatus: c.status },
     );
     const rank =
       bucket === "needsAttention"
@@ -284,12 +309,14 @@ function laneSeverity(lane: WorkspaceArenaProjectLane): number {
             : 0;
     if (rank > worst) worst = rank;
   }
-  // Only elevate by last-run failure while the arena is actively fighting.
+  // Only elevate by fresh last-run failure while the arena is actively fighting.
   if (
     arenaLive &&
     (lane.lastRun?.status === "FAILED" ||
       lane.lastRun?.status === "BLOCKED" ||
-      lane.lastRun?.status === "EXPIRED")
+      lane.lastRun?.status === "EXPIRED") &&
+    lane.lastRun.updatedAt &&
+    !isStaleFailureTimestamp(lane.lastRun.updatedAt)
   ) {
     worst = Math.max(worst, 3);
   }

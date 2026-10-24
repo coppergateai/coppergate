@@ -2,16 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteChrome } from "@/app/site-chrome";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
+import { JsonLdScript } from "@/components/seo/json-ld-script";
 import styles from "@/components/marketing/marketing.module.css";
 import { listBlogPosts } from "@/lib/blog";
+import { publicPageMetadata } from "@/lib/seo";
+import { getSiteUrl } from "@/lib/site-url";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Blog",
   description:
     "Notes on multi-agent arenas, agent spend caps, and fitness evidence — from the Coppergate team.",
-  alternates: { canonical: "/blog" },
-  openGraph: { url: "/blog" },
-};
+  path: "/blog",
+});
 
 function formatDate(iso: string) {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -25,6 +27,26 @@ function formatDate(iso: string) {
 
 export default async function BlogIndexPage() {
   const posts = await listBlogPosts();
+  const siteUrl = getSiteUrl();
+
+  const collectionLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Coppergate Blog",
+    description:
+      "Notes on multi-agent arenas, agent spend caps, and fitness evidence.",
+    url: `${siteUrl}/blog`,
+    isPartOf: { "@type": "WebSite", name: "Coppergate", url: siteUrl },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: posts.map((post, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: `${siteUrl}/blog/${post.slug}`,
+        name: post.title,
+      })),
+    },
+  };
 
   return (
     <SiteChrome>
@@ -34,6 +56,7 @@ export default async function BlogIndexPage() {
           { name: "Blog", path: "/blog" },
         ]}
       />
+      <JsonLdScript data={collectionLd} />
       <div className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Blog</p>
         <h1 className={styles.pageTitle}>Blog</h1>
@@ -52,8 +75,7 @@ export default async function BlogIndexPage() {
             >
               GitHub
             </a>{" "}
-            or the{" "}
-            <Link href="/changelog">changelog</Link> for product updates.
+            or the <Link href="/changelog">changelog</Link> for product updates.
           </p>
         ) : (
           <ul className={styles.docsList}>

@@ -6,15 +6,16 @@ import { isGitlabConfigured } from "@/lib/gitlab";
 import { env } from "@/lib/env";
 import { BrandMark } from "@/components/app/ui";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 import { SiteChrome } from "../site-chrome";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Try hosted",
   description:
     "Sign in to the Coppergate hosted arena with GitHub or GitLab. Identity first — repository access comes later via SCM install.",
+  path: "/login",
   robots: { index: false, follow: false },
-  alternates: { canonical: "/login" },
-};
+});
 
 export default async function LoginPage() {
   const user = await currentUser();

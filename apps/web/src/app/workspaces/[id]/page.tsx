@@ -24,7 +24,8 @@ export async function generateMetadata({
   const { id } = await params;
   const access = await getWorkspaceForMember(db, id, user.id);
   const name = access?.workspace.name ?? "Workspace";
-  return { title: `Mission Control · ${name}` };
+  // Absolute: same-segment page skips the workspace layout template.
+  return { title: { absolute: `Mission Control · ${name} · Coppergate` } };
 }
 
 function parseMeta(raw: string | null): Record<string, unknown> | null {

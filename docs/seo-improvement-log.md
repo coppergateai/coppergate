@@ -56,3 +56,47 @@ Deployed via `main` → Vercel production (`coppergate-hd68yukub`, Ready).
 | `/blog` twitter:title | `Blog · Coppergate` (page-specific) |
 
 Note: homepage metadata can still stream after `</head>` under dynamic auth; with SVG titles removed the first title is correct. Child `og:image` inheritance still worth a follow-up if social debuggers miss the card.
+
+## 2026-10-24 — round 2 (code)
+
+### Verified remaining (production)
+
+| Issue | Severity | Evidence |
+| --- | --- | --- |
+| Duplicate homepage `<h1>` | High | Suspense fallback + resolved `HeroSection` both in HTML stream |
+| Child routes missing `og:image` | High | `/blog`+docs had twitter:image only; shallow `openGraph: { url }` dropped images |
+| Metadata after `</head>` on SiteChrome pages | Medium | Cookie auth in marketing chrome forced dynamic streaming |
+
+### Implemented
+
+- Static marketing chrome: session CTAs via client cookie detect (`HostedCtaLink` / header) — no `cookies()` on public shell
+- Homepage hero/final CTA no longer Suspense-wrapped (single H1 in HTML)
+- `publicPageMetadata()` helper always sets canonical + OG/Twitter images; applied across public routes + blog posts
+
+### Remaining
+
+- Deploy to confirm title-in-head + og:image on child routes
+- Search Console sitemap / URL inspection (ops)
+
+## 2026-10-24 — round 3 (code)
+
+### Verified
+
+| Issue | Severity | Evidence |
+| --- | --- | --- |
+| Blog posts thin (~330 words) + weak cross-links | Medium | Live word counts; few internal links between posts |
+| Blog Article JSON-LD missing `image` | Low | Schema incomplete for share/rich results |
+| Blog index lacked CollectionPage/ItemList | Low | Index only had BreadcrumbList |
+| `llms.txt` omitted individual post URLs | Low | AI crawlers could miss post entry points |
+
+### Implemented
+
+- Expanded three blog posts with accurate product detail + related-post links (no invented claims)
+- Article JSON-LD `image` → site OG image; blog index CollectionPage + ItemList
+- Related posts block on post pages; Blog link in docs nav
+- `llms.txt` lists each published post; SoftwareApplication description aligned with `SITE_DESCRIPTION`
+
+### Remaining
+
+- Deploy rounds 2–3 together
+- Search Console verification / sitemap submit (ops)

@@ -299,9 +299,8 @@ export function BillingPanel({ workspaceId, isOwner, checkoutFlag }: Props) {
 
             {state.paidPricingEnabled === false || state.plans.length === 0 ? (
               <p className={styles.note}>
-                Paid hosted plans (Starter / Pro) are not offered right now.
-                Community / self-host stays free. Usage above is for spend
-                visibility only.
+                Paid hosted plans are not offered right now. Community /
+                self-host stays free. Usage above is for spend visibility only.
               </p>
             ) : null}
 

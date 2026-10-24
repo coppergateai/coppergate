@@ -9,6 +9,7 @@ export {
   budgets,
   contenders,
   deliveryShareTokens,
+  consumedSignedStates,
   githubInstallations,
   githubWebhookDeliveries,
   integrationCredentials,
@@ -221,6 +222,10 @@ export {
   type RecordWebhookResult,
 } from "./webhooks.js";
 export {
+  tryConsumeSignedState,
+  type ConsumeSignedStateInput,
+} from "./signed-states.js";
+export {
   MVP_STACK,
   ProjectBindError,
   attachSecondaryRepo,
@@ -401,6 +406,7 @@ export {
   sortArenaProjectLanes,
   startWorkspaceArena,
   stopWorkspaceArena,
+  STALE_FAILURE_ATTENTION_MS,
   type ClassifyContenderRuntimeOptions,
   type WorkspaceArenaContenderRun,
   type WorkspaceArenaContenderView,
@@ -451,6 +457,7 @@ export {
   markRunValidating,
   markRunWaitingCi,
   promoteRunFromWaitingCi,
+  recoverDeliveredRun,
 } from "./run-events.js";
 export {
   containsSecretMaterial,
@@ -469,9 +476,14 @@ export {
   type RunCiFitness,
 } from "./ci-evidence.js";
 export {
+  buildDeliveryCheckpoint,
   buildDeliveryReport,
   buildDiffSummary,
+  getDeliveryCheckpoint,
+  parseDeliveryCheckpoint,
   persistDeliveryArtifacts,
+  persistDeliveryCheckpoint,
+  type DeliveryCheckpointBody,
   type DeliveryReportBody,
   type DiffFileSummary,
   type DiffSummaryBody,

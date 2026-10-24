@@ -4,7 +4,11 @@ import {
   establishSession,
   sessionCookieOptions,
 } from "@coppergate/auth";
-import { upsertScmInstallation, upsertScmUser } from "@coppergate/db";
+import {
+  tryConsumeSignedState,
+  upsertScmInstallation,
+  upsertScmUser,
+} from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 import {
   exchangeGitlabCode,
@@ -13,15 +17,17 @@ import {
 import { parseEncryptionKey, sealSecret } from "@coppergate/github";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { isSecureCookie } from "@/lib/auth";
+import { isSecureCookie, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import {
   GITLAB_INSTALL_STATE_COOKIE,
   gitlabOAuthConfig,
 } from "@/lib/gitlab";
+import { verifySignedWorkspaceStateClaims } from "@/lib/signed-workspace-state";
 import { correlationIdFrom, jsonError } from "@/lib/http";
 import { logger } from "@/lib/logger";
+import { requireWorkspaceOwner } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -57,9 +63,33 @@ export async function GET(request: Request) {
     const profile = await fetchGitlabProfile(config.baseUrl, accessToken);
 
     if (installExpected && installExpected === state) {
-      const workspaceId = state.split(".")[0];
-      if (!workspaceId) {
-        throw new ApiError("bad_request", "Malformed install state");
+      const claims = verifySignedWorkspaceStateClaims(
+        state,
+        env.SESSION_SECRET,
+      );
+      if (!claims) {
+        throw new ApiError(
+          "forbidden",
+          "Invalid or expired GitLab install state. Start install again from Settings.",
+        );
+      }
+      const workspaceId = claims.workspaceId;
+
+      // Cookie match alone is not enough — require an authenticated owner.
+      const user = await requireUser(request);
+      await requireWorkspaceOwner(db, workspaceId, user.id);
+
+      const consumed = await tryConsumeSignedState(db, {
+        jti: `gitlab_install:${claims.nonce}`,
+        kind: "gitlab_install",
+        workspaceId,
+        expiresAt: new Date(claims.exp * 1000),
+      });
+      if (!consumed) {
+        throw new ApiError(
+          "forbidden",
+          "Install state already used or no longer valid. Start the GitLab install again from Settings.",
+        );
       }
 
       const key = parseEncryptionKey(env.CREDENTIALS_ENCRYPTION_KEY);

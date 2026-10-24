@@ -1,4 +1,4 @@
-import type { MetadataRoute } from "next";
+import type { Metadata, MetadataRoute } from "next";
 import { getSiteUrl } from "./site-url";
 
 export const SITE_NAME = "Coppergate";
@@ -17,6 +17,45 @@ export const OG_IMAGE = {
 } as const;
 
 export const TWITTER_IMAGE = "/twitter-image";
+
+type PublicPageMetadataInput = {
+  path: string;
+  title?: string;
+  description?: string;
+  /** Merged into openGraph (e.g. article type + publishedTime). */
+  openGraph?: Metadata["openGraph"];
+  robots?: Metadata["robots"];
+};
+
+/**
+ * Canonical + share metadata for indexable marketing/docs pages.
+ * Always sets OG/Twitter images — child `openGraph: { url }` alone drops them.
+ */
+export function publicPageMetadata({
+  path,
+  title,
+  description,
+  openGraph,
+  robots,
+}: PublicPageMetadataInput): Metadata {
+  return {
+    ...(title ? { title } : {}),
+    ...(description ? { description } : {}),
+    ...(robots ? { robots } : {}),
+    alternates: { canonical: path },
+    openGraph: {
+      ...(title ? { title } : {}),
+      ...(description ? { description } : {}),
+      ...openGraph,
+      // Keep after spread so child openGraph cannot drop share cards.
+      url: path,
+      images: [OG_IMAGE],
+    },
+    twitter: {
+      images: [TWITTER_IMAGE],
+    },
+  };
+}
 
 /** Indexable marketing/docs paths (excludes blog posts and auth/app). */
 export const PUBLIC_STATIC_ROUTES: MetadataRoute.Sitemap = [

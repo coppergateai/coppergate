@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import {
   METADATA_IPV4,
   SandboxPolicyError,
@@ -8,8 +9,82 @@ import {
 const METADATA_HOST_RE =
   /metadata\.google\.internal|metadata\.goog(?:le)?(?:\.|$)|instance-data\.ec2\.internal|kubernetes\.default(?:\.svc)?/i;
 
-/** Block metadata / private / non-allowlisted hosts in command argv. */
+/** Network clients — blocked in sandbox (local shares host network). */
+const DENIED_NETWORK_BINARIES = new Set([
+  "curl",
+  "wget",
+  "nc",
+  "ncat",
+  "netcat",
+  "nmap",
+  "ssh",
+  "scp",
+  "sftp",
+  "ftp",
+  "telnet",
+  "dig",
+  "nslookup",
+  "host",
+]);
+
+const SHELL_BINARIES = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
+
+/** Interpreter eval flags that enable arbitrary code / hidden egress. */
+const INTERPRETER_EVAL_FLAGS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["node", new Set(["-e", "--eval", "-p", "--print"])],
+  ["nodejs", new Set(["-e", "--eval", "-p", "--print"])],
+  ["python", new Set(["-c"])],
+  ["python3", new Set(["-c"])],
+  ["ruby", new Set(["-e"])],
+  ["perl", new Set(["-e"])],
+  ["php", new Set(["-r"])],
+  ["lua", new Set(["-e"])],
+]);
+
+function commandBasename(command: readonly string[]): string {
+  const raw = command[0]?.trim() ?? "";
+  return basename(raw).toLowerCase();
+}
+
+/**
+ * Deny risky binaries / eval modes, then scan argv for metadata / private /
+ * non-allowlisted hosts.
+ */
 export function assertSandboxCommandArgs(command: readonly string[]): void {
+  if (!command.length) {
+    throw new SandboxPolicyError("invalid", "command required");
+  }
+
+  const bin = commandBasename(command);
+  if (DENIED_NETWORK_BINARIES.has(bin)) {
+    throw new SandboxPolicyError(
+      "egress_denied",
+      `Network tool ${bin} is blocked in sandbox`,
+    );
+  }
+
+  if (
+    SHELL_BINARIES.has(bin) &&
+    command.slice(1).some((a) => a === "-c" || a === "-lc")
+  ) {
+    throw new SandboxPolicyError(
+      "egress_denied",
+      "Shell -c is blocked in sandbox",
+    );
+  }
+
+  const evalFlags = INTERPRETER_EVAL_FLAGS.get(bin);
+  if (evalFlags) {
+    for (const arg of command.slice(1)) {
+      if (typeof arg === "string" && evalFlags.has(arg)) {
+        throw new SandboxPolicyError(
+          "egress_denied",
+          `Interpreter eval flag ${arg} is blocked in sandbox`,
+        );
+      }
+    }
+  }
+
   for (const arg of command) {
     if (typeof arg !== "string") continue;
     if (arg.includes(METADATA_IPV4) || /169\.254\.\d+\.\d+/.test(arg)) {
@@ -40,7 +115,7 @@ export function assertSandboxCommandArgs(command: readonly string[]): void {
         );
       }
     }
-    // Any http(s) URL in the arg (not only leading) — covers shell -c wrappers.
+    // Any http(s) URL in the arg (not only leading) — covers wrappers.
     for (const match of arg.matchAll(/https?:\/\/\[?([^\]/\s"'`]+)/gi)) {
       const host = match[1]?.split(":")[0]?.trim();
       if (host) assertEgressAllowed(host);

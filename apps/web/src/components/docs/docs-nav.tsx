@@ -15,6 +15,7 @@ export const DOCS_NAV: Array<{
   { href: "/docs/pricing", label: "Pricing" },
   { href: "/docs/recovery", label: "Recovery" },
   { href: "/security", label: "Security" },
+  { href: "/blog", label: "Blog" },
 ];
 
 export function DocsNav() {

@@ -22,9 +22,12 @@ Companion to product SECURITY posture. Pen-test sign-off lives in architecture D
 - [ ] Cross-tenant IDOR (signals, approvals, credentials) — remaining surfaces
 - [x] CI/fitness headSha attach scoped by workspaceId (no global SHA collision)
 - [x] Webhook secret bypass / replay — workspace-derived HMAC secret (not global root)
+- [x] GitHub App install state — TTL (10m) + HMAC always verified + single-use jti
+- [x] GitLab install state — signed TTL state + owner authz + single-use jti (no cookie-only bind)
 - [x] SSRF via preview smoke / notify / LLM models proxy / MCP — DNS-resolved checks
 - [x] Agent/sandbox path traversal — contained path writes + delivery reads
 - [x] Local sandbox argv egress — metadata hosts + private IPs (incl. shell -c)
+- [x] Local sandbox command deny — network clients, shell -c, interpreter eval flags
 - [x] Profile tool gate — FILE writes require `edit` in profileTools
 - [x] Browser hardening — CSP / HSTS / frame-ancestors in middleware
 - [x] Public share link TTL — default 7d (`DELIVERY_SHARE_TTL_DAYS`)

@@ -29,7 +29,7 @@ export function MarketingFooter() {
               />
             </Link>
             <p className={styles.footerLede}>
-              Set a budget. Agents war. Survivors ship.
+              Set a budget. Agents compete. Survivors ship.
             </p>
             <p className={styles.footerNote}>
               Actively building open-source pilot projects alongside Coppergate —

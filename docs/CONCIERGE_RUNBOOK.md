@@ -1,19 +1,22 @@
-# Concierge runbook (paid pilots)
+# Concierge runbook (design partners)
 
-Every pilot must finish with **PR + evidence + cost in-product**. Compliments ≠ demand.
+Every partner must finish with **PR + evidence + cost in-product**. Compliments ≠ demand.
 
-## Per-pilot checklist
+Public paid pricing is off (2026-10-24). Do not sell Starter/Pro SKUs; focus on
+one-session issue → verified PR and a booked second issue.
+
+## Per-partner checklist
 
 | Step | Done when | Record |
 |---|---|---|
-| 1. Redeem | Invite used; workspace exists | `pnpm ops:pilot-wtp -- CODE starter --redeem --name "…"` |
+| 1. Access | Workspace exists (invite or self-serve login) | — |
 | 2. GitHub App | Low-risk repo connected | — |
-| 3. Budget | Cap $25–50 active | `--budget` |
-| 4. Brief | Approved if required | — |
-| 5. First issue | Import → queue → PR → CI → Accept | `--first-pr` |
+| 3. Budget | Cap $25–50 active | — |
+| 4. Brief | Auto-seeded on existing_repo import, or approved | — |
+| 5. First issue | Import → queue → PR → CI → Accept | — |
 | 6. Share | Redacted report link shared | — |
-| 7. Second issue | Within 7 days; Accept | `--second-pr` |
-| 8. WTP | `starter` / `pro` / `deposit` | third argv to `ops:pilot-wtp` |
+| 7. Second issue | Within 7 days; Accept | — |
+| 8. Feedback | Qualitative notes only (no paid upsell) | — |
 
 Staging wedge proof (platform): [WEDGE.md](./WEDGE.md) — issue #4 → PR #5 on coppergate-staging-smoke.
 
@@ -23,7 +26,7 @@ Staging wedge proof (platform): [WEDGE.md](./WEDGE.md) — issue #4 → PR #5 on
 2. Import one **tiny** open issue (single file / clear acceptance).
 3. Watch worker → REVIEW_REQUIRED; explain Accept gate vs CI.
 4. Accept → DONE; show cost ledger.
-5. Book second issue in ≤7 days; ask Starter $99 vs deposit.
+5. Book second issue in ≤7 days (no paid upsell while public pricing is off).
 
 ## Failure recovery (self-serve)
 

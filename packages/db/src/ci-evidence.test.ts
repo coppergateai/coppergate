@@ -269,6 +269,55 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     assert.equal(row?.errorCode, null);
   });
 
+  it("WAITING_CI status alone is never accept-ready (even without pending event)", async () => {
+    const stamp = Date.now();
+    const sha = `waitci${stamp}`;
+    const plan = await generateProjectPlan(db, {
+      workspaceId,
+      projectId,
+      actor,
+      milestones: [
+        {
+          title: "M-waitci",
+          description: "",
+          tasks: [
+            {
+              key: `waitci-${stamp}`,
+              title: "Wait CI status",
+              goal: "g",
+              scope: "s",
+              allowedPaths: [],
+              acceptanceCriteria: ["ok"],
+              estimateMicros: 1000,
+              estimateComplexity: "S",
+              dependsOn: [],
+              priority: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const taskId = plan.milestones[0]!.tasks[0]!.task.id;
+    const { run } = await enqueueAgentRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      idempotencyKey: `ci-waitci-${stamp}`,
+    });
+    await db
+      .update(agentRuns)
+      .set({
+        headSha: sha,
+        status: "WAITING_CI",
+        updatedAt: new Date(),
+      })
+      .where(eq(agentRuns.id, run.id));
+
+    const fitness = await getRunCiFitness(db, run.id);
+    assert.equal(fitness.awaitingLive, true);
+    assert.equal(fitness.acceptReady, false);
+  });
+
   it("fitness pending without green CI is not accept-ready", async () => {
     const stamp = Date.now();
     const pendingSha = `pendingsha${stamp}`;

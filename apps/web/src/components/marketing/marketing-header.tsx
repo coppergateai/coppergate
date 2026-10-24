@@ -6,11 +6,13 @@ import { useEffect, useId, useState } from "react";
 import { LogoutButton } from "@/app/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { track } from "@/lib/ga";
+import { documentHasSessionCookie } from "@/lib/session-cookie";
 import { IconArrow, IconGithub } from "./icons";
 import styles from "./marketing.module.css";
 
 type Props = {
-  signedIn: boolean;
+  /** Optional override; when omitted, detects session cookie after mount. */
+  signedIn?: boolean;
 };
 
 const SELF_HOST =
@@ -26,12 +28,21 @@ const links = [
   { href: "/blog", label: "Blog" },
 ] as const;
 
-export function MarketingHeader({ signedIn }: Props) {
+export function MarketingHeader({ signedIn: signedInProp }: Props) {
   const pathname = usePathname();
   const onLogin = pathname === "/login";
+  const [signedIn, setSignedIn] = useState(Boolean(signedInProp));
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
+
+  useEffect(() => {
+    if (typeof signedInProp === "boolean") {
+      setSignedIn(signedInProp);
+      return;
+    }
+    setSignedIn(documentHasSessionCookie());
+  }, [signedInProp]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
