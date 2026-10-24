@@ -321,8 +321,8 @@ export function TaskDetailPanel({
       }
       if (code === "plan_limit") {
         return {
-          title: "Plan limit reached",
-          body: "Your plan’s concurrency or fan-out cap blocked enqueue. Upgrade in Settings → Billing, or wait for inflight runs to finish.",
+          title: "Concurrency limit reached",
+          body: "Workspace concurrency or fan-out capped this enqueue. Wait for in-flight runs to finish, or adjust limits under Settings → Billing.",
           href: `/workspaces/${workspaceId}/settings?tab=billing`,
         };
       }

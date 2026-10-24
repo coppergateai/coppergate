@@ -395,23 +395,21 @@ export function ByokPanel({ workspaceId, isOwner }: Props) {
             sealed — never shown again in plaintext.
           </p>
         </div>
-        <div className={styles.llmStats} aria-label="LLM summary">
-          <div className={styles.llmStat}>
-            <span className={styles.llmStatLabel}>Connections</span>
-            <span className={styles.llmStatValue}>{credentials.length}</span>
-          </div>
-          <div className={styles.llmStat}>
-            <span className={styles.llmStatLabel}>Default</span>
-            <span className={styles.llmStatValue}>
+        <div className={styles.summaryStrip} aria-label="LLM summary">
+          <p className={styles.summaryItem}>
+            <strong>{credentials.length}</strong> connections
+          </p>
+          <p className={styles.summaryItem}>
+            <strong>
               {defaultCred
-                ? defaultCred.model ?? vendorName(defaultCred.vendor)
-                : "Hosted fallback"}
-            </span>
-          </div>
-          <div className={styles.llmStat}>
-            <span className={styles.llmStatLabel}>Agents</span>
-            <span className={styles.llmStatValue}>{profiles.length}</span>
-          </div>
+                ? (defaultCred.model ?? vendorName(defaultCred.vendor))
+                : "Hosted"}
+            </strong>{" "}
+            default
+          </p>
+          <p className={styles.summaryItem}>
+            <strong>{profiles.length}</strong> agents
+          </p>
         </div>
       </header>
 
