@@ -1,10 +1,12 @@
 import { OAUTH_STATE_COOKIE, oauthStateCookieOptions } from "@coppergate/auth";
+import { ApiError } from "@coppergate/errors";
 import { gitlabAuthorizeUrl } from "@coppergate/gitlab";
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { isSecureCookie } from "@/lib/auth";
 import { gitlabOAuthConfig } from "@/lib/gitlab";
 import { correlationIdFrom, jsonError } from "@/lib/http";
+import { checkRateLimit, clientIpFromRequest } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const correlationId = correlationIdFrom(request);
   try {
+    const ip = clientIpFromRequest(request);
+    const limited = checkRateLimit(`auth-gitlab:${ip}`, {
+      limit: 20,
+      windowMs: 60_000,
+    });
+    if (!limited.ok) {
+      throw new ApiError("bad_request", "Too many requests", { status: 429 });
+    }
     const config = gitlabOAuthConfig();
     const state = randomBytes(24).toString("base64url");
     const url = gitlabAuthorizeUrl(config, state);

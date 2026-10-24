@@ -9,8 +9,11 @@ import {
   type DeliveryShareToken,
 } from "./schema.js";
 
+/** Default public share link lifetime (7 days). Override with DELIVERY_SHARE_TTL_DAYS. */
+export const DEFAULT_DELIVERY_SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export class ShareError extends Error {
-  readonly code: "not_found" | "revoked" | "invalid";
+  readonly code: "not_found" | "revoked" | "invalid" | "expired";
   constructor(code: ShareError["code"], message: string) {
     super(message);
     this.name = "ShareError";
@@ -20,6 +23,23 @@ export class ShareError extends Error {
 
 function randomToken(): string {
   return crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+}
+
+export function deliveryShareTtlMs(): number {
+  const raw = process.env.DELIVERY_SHARE_TTL_DAYS?.trim();
+  if (!raw) return DEFAULT_DELIVERY_SHARE_TTL_MS;
+  const days = Number(raw);
+  if (!Number.isFinite(days) || days <= 0) return DEFAULT_DELIVERY_SHARE_TTL_MS;
+  return Math.min(days, 365) * 24 * 60 * 60 * 1000;
+}
+
+/** True when a share is past TTL (createdAt + ttl). */
+export function isDeliveryShareExpired(
+  share: Pick<DeliveryShareToken, "createdAt">,
+  now = new Date(),
+  ttlMs = deliveryShareTtlMs(),
+): boolean {
+  return now.getTime() - share.createdAt.getTime() > ttlMs;
 }
 
 export async function createDeliveryShareToken(
@@ -107,6 +127,9 @@ export async function getPublicDeliveryShare(
     .limit(1);
   if (!share) throw new ShareError("not_found", "share not found");
   if (share.revokedAt) throw new ShareError("revoked", "share revoked");
+  if (isDeliveryShareExpired(share)) {
+    throw new ShareError("expired", "share expired");
+  }
 
   const run = await getAgentRunForWorkspace(db, share.workspaceId, share.runId);
   if (!run) throw new ShareError("not_found", "run missing");

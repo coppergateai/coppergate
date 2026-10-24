@@ -1,11 +1,25 @@
+import { ApiError } from "@coppergate/errors";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { jsonOk } from "@/lib/http";
+import { jsonError, jsonOk } from "@/lib/http";
+import { checkRateLimit, clientIpFromRequest } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-/** Public ops health for self-host (no secrets). */
-export async function GET() {
+/** Public ops health for self-host (no secrets), rate-limited. */
+export async function GET(request: Request) {
+  const ip = clientIpFromRequest(request);
+  const limited = checkRateLimit(`health:${ip}`, {
+    limit: 120,
+    windowMs: 60_000,
+  });
+  if (!limited.ok) {
+    return jsonError(
+      new ApiError("bad_request", "Too many requests", { status: 429 }),
+      "00000000-0000-0000-0000-000000000000",
+    );
+  }
+
   let dbOk = false;
   let migrateLatest: string | null = null;
   try {
