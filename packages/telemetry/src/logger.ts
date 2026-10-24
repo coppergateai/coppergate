@@ -1,3 +1,5 @@
+import { redactLogFields, redactLogString } from "./redact.js";
+
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export type LogFields = Record<string, unknown>;
@@ -27,17 +29,20 @@ export type CreateLoggerOptions = {
 
 export function createLogger(options: CreateLoggerOptions): Logger {
   const min = LEVEL_ORDER[options.level ?? "info"];
-  const write = options.write ?? ((line: string) => process.stdout.write(`${line}\n`));
+  const write =
+    options.write ?? ((line: string) => process.stdout.write(`${line}\n`));
   const base = { service: options.service, ...options.base };
 
   const log = (level: LogLevel, message: string, fields?: LogFields) => {
     if (LEVEL_ORDER[level] < min) return;
+    const safeFields = redactLogFields(fields);
+    const safeBase = redactLogFields(base);
     const entry = {
       ts: new Date().toISOString(),
       level,
-      msg: message,
-      ...base,
-      ...fields,
+      msg: redactLogString(message),
+      ...safeBase,
+      ...safeFields,
     };
     write(JSON.stringify(entry));
   };

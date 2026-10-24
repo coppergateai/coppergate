@@ -34,12 +34,12 @@ export function FinalCta({ signedInLogin = null }: Props) {
         <h2 id="final-title" className={styles.finalTitle}>
           Clone it. Arm the arena.
           <br />
-          Build what survives.
+          Ship what survives.
         </h2>
         <p className={styles.finalLede}>
           Coppergate is MIT-licensed. Self-host with Compose and your own keys,
-          or try the hosted instance. No invite gate for the community path —
-          bring a repo, set a spend cap, ship a verified PR.
+          or try the hosted instance. Bring a repo, set a spend cap, and review
+          a verified PR — no invite gate on the community path.
         </p>
 
         <div className={styles.finalActions}>

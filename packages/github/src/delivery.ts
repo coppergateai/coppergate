@@ -202,6 +202,17 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
       base: input.repo.defaultBranch,
     });
 
+    if (!pr.created) {
+      return {
+        branchName: pr.branchName ?? input.branchName,
+        headSha: pr.headSha ?? headSha,
+        prNumber: pr.number,
+        prUrl: pr.html_url,
+        created: false,
+        idempotencyKey: input.idempotencyKey,
+      };
+    }
+
     return {
       branchName: input.branchName,
       headSha,
@@ -221,7 +232,13 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
       `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&head=${owner}:${branch}`,
       { headers: this.headers() },
     );
-    if (!res.ok) return null;
+    // Fail closed: a list blip must not be treated as "no PR" (duplicate create risk).
+    if (!res.ok) {
+      throw new GithubDeliveryError(
+        "http",
+        `findPrByHead failed (${res.status})`,
+      );
+    }
     const list = (await res.json()) as Array<{
       number: number;
       html_url: string;
@@ -319,7 +336,13 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
     owner: string,
     repo: string,
     input: { title: string; body: string; head: string; base: string },
-  ): Promise<{ number: number; html_url: string }> {
+  ): Promise<{
+    number: number;
+    html_url: string;
+    created: boolean;
+    branchName?: string;
+    headSha?: string;
+  }> {
     if (input.head === input.base) {
       throw new GithubDeliveryError(
         "policy",
@@ -334,13 +357,31 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
         body: JSON.stringify(input),
       },
     );
+    if (res.status === 422) {
+      // Another worker / prior attempt already opened the PR — recover via list.
+      const existing = await this.findPrByHead(owner, repo, input.head);
+      if (existing) {
+        return {
+          number: existing.prNumber,
+          html_url: existing.prUrl,
+          created: false,
+          branchName: existing.branchName,
+          headSha: existing.headSha,
+        };
+      }
+      throw new GithubDeliveryError(
+        "http",
+        "createPr failed (422) and no existing PR found for head",
+      );
+    }
     if (!res.ok) {
       throw new GithubDeliveryError(
         "http",
         `createPr failed (${res.status})`,
       );
     }
-    return (await res.json()) as { number: number; html_url: string };
+    const body = (await res.json()) as { number: number; html_url: string };
+    return { ...body, created: true };
   }
 
   private headers(): Record<string, string> {

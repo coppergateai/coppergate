@@ -7,6 +7,7 @@ import {
   assertNoDockerSocket,
   assertNotPrivileged,
   assertSafeServerFetchUrl,
+  assertSafeServerFetchUrlResolved,
   isEgressAllowed,
   isLinkLocalOrMetadata,
   isSafeServerFetchUrl,
@@ -86,5 +87,25 @@ describe("sandbox policy", () => {
       (err: unknown) =>
         err instanceof SandboxPolicyError && err.code === "invalid",
     );
+  });
+
+  it("assertSafeServerFetchUrlResolved rejects DNS rebinding to private IPs", async () => {
+    await assert.rejects(
+      () =>
+        assertSafeServerFetchUrlResolved("https://evil.example/hook", {
+          requireHttps: true,
+          lookup: async () => [{ address: "10.0.0.8", family: 4 }],
+        }),
+      (err: unknown) =>
+        err instanceof SandboxPolicyError && err.code === "egress_denied",
+    );
+    const ok = await assertSafeServerFetchUrlResolved(
+      "https://hooks.slack.com/services/x",
+      {
+        requireHttps: true,
+        lookup: async () => [{ address: "8.8.8.8", family: 4 }],
+      },
+    );
+    assert.equal(ok.hostname, "hooks.slack.com");
   });
 });

@@ -8,10 +8,14 @@ import styles from "@/components/marketing/marketing.module.css";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "MIT self-host is free. Optional hosted plans may come later — community path stays open source.",
+    "MIT self-host is free. Optional hosted Starter and Pro when you want managed sandboxes — community path stays open source.",
   alternates: { canonical: "/docs/pricing" },
   openGraph: { url: "/docs/pricing" },
 };
+
+const SELF_HOST =
+  "https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md";
+const REPO = "https://github.com/coppergateai/coppergate";
 
 export default function PricingPage() {
   return (
@@ -23,70 +27,89 @@ export default function PricingPage() {
           { name: "Pricing", path: "/docs/pricing" },
         ]}
       />
-      <main className={styles.contentPage}>
+      <main className={`${styles.contentPage} ${styles.contentWide}`}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
         </Link>
-        <p className={styles.pageEyebrow}>Docs</p>
-        <h1 className={styles.pageTitle}>Pricing</h1>
-        <div className={styles.prose}>
-          <p>
-            Coppergate is <strong>open source (MIT)</strong>. Self-host and bring
-            your own keys — no license fee. Budget is selection pressure: weak
-            paths starve; survivors ship with a cost ledger.
-          </p>
+        <p className={styles.pageEyebrow}>Pricing</p>
+        <h1 className={styles.pageTitle}>Start free. Pay only if we run ops.</h1>
+        <p className={styles.pageLede}>
+          Coppergate is open source (MIT). Self-host with your own keys at $0.
+          Optional hosted plans exist when you want managed sandboxes — not as a
+          requirement to use the product.
+        </p>
 
-          <h2>Community (recommended)</h2>
-          <ul>
-            <li>
-              <strong>$0</strong> — self-host with Compose, BYOK, user-managed
-              sandboxes
-            </li>
-            <li>Full product source under MIT</li>
-            <li>
-              Guide:{" "}
+        <div className={styles.pricingGrid}>
+          <article className={`${styles.pricingCard} ${styles.pricingCardFeatured}`}>
+            <p className={styles.pricingEyebrow}>Recommended</p>
+            <h2 className={styles.pricingName}>Community</h2>
+            <p className={styles.pricingPrice}>
+              <span className={styles.pricingAmount}>$0</span>
+              <span className={styles.pricingPeriod}>forever</span>
+            </p>
+            <p className={styles.pricingBlurb}>
+              Full product source under MIT. Compose self-host, BYOK, and
+              user-managed sandboxes. Budget is selection pressure — weak paths
+              starve; survivors ship with a cost ledger.
+            </p>
+            <ul className={styles.pricingFeatures}>
+              <li>MIT-licensed source on GitHub</li>
+              <li>Self-host with Docker Compose</li>
+              <li>Bring your own LLM keys</li>
+              <li>Spend caps + kill-switch</li>
+              <li>Issue → verified PR arena</li>
+            </ul>
+            <div className={styles.pricingActions}>
               <a
-                href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+                className={styles.btnHeroPrimary}
+                href={REPO}
                 target="_blank"
                 rel="noreferrer"
               >
-                Self-host docs
+                View on GitHub
               </a>
-            </li>
-          </ul>
+              <a
+                className={styles.btnSecondary}
+                href={SELF_HOST}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Self-host guide
+              </a>
+            </div>
+          </article>
 
-          <h2>Hosted (optional, later)</h2>
-          <p>
-            A public hosted instance may offer managed sandboxes. Early stage is
-            free to try when seats are open — paid Starter/Pro below are{" "}
-            <em>optional</em> SKUs for when you want us to run ops, not a
-            requirement to use Coppergate.
-          </p>
           {HOSTED_PLANS.map((plan) => (
-            <div key={plan.id}>
-              <h3>
-                {plan.name} — ${plan.monthlyUsd}/mo + usage
-              </h3>
-              <p>{plan.blurb}</p>
-              <ul>
+            <article key={plan.id} className={styles.pricingCard}>
+              <p className={styles.pricingEyebrow}>Hosted · optional</p>
+              <h2 className={styles.pricingName}>{plan.name}</h2>
+              <p className={styles.pricingPrice}>
+                <span className={styles.pricingAmount}>${plan.monthlyUsd}</span>
+                <span className={styles.pricingPeriod}>/mo + usage</span>
+              </p>
+              <p className={styles.pricingBlurb}>{plan.blurb}</p>
+              <ul className={styles.pricingFeatures}>
                 {plan.features.map((f) => (
                   <li key={f}>{f}</li>
                 ))}
               </ul>
-            </div>
+              <div className={styles.pricingActions}>
+                <Link className={styles.btnSecondary} href="/login">
+                  Try hosted
+                </Link>
+              </div>
+            </article>
           ))}
+        </div>
 
+        <div className={styles.pricingFootnote}>
+          <p>
+            Hosted seats may open free during early stage. Paid SKUs are for when
+            you want us to run sandboxes and ops — the community path stays free.
+          </p>
           <p>
             Questions?{" "}
-            <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a> ·{" "}
-            <a
-              href="https://github.com/coppergateai/coppergate"
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub
-            </a>
-            .
+            <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>
           </p>
         </div>
       </main>

@@ -125,32 +125,9 @@ export function ProjectShell({
             ? configuration
             : overview;
 
-  const primaryChips = (
-    <>
-      <span className={styles.chip}>{repoFullName}</span>
-      <span
-        className={
-          budgetStatus === "paused"
-            ? `${styles.chip} ${styles.chipWarn}`
-            : styles.chip
-        }
-      >
-        {budgetStatus === "paused"
-          ? "Paused"
-          : pooled
-            ? `Workspace ${formatCap(availableMicros ?? 0, currency)} left`
-            : "Budget"}{" "}
-        {pooled
-          ? `· project ${formatCap(projectSpentMicros ?? 0, currency)}`
-          : formatCap(capMicros, currency)}
-      </span>
-      {pendingApprovals > 0 ? (
-        <span className={`${styles.chip} ${styles.chipWarn}`}>
-          {pendingApprovals} pending
-        </span>
-      ) : null}
-    </>
-  );
+  const availableLabel = pooled
+    ? `Available ${formatCap(availableMicros ?? 0, currency)}`
+    : formatCap(capMicros, currency);
 
   return (
     <main className={styles.shell}>
@@ -166,19 +143,44 @@ export function ProjectShell({
             ]}
           />
           <h1 className={styles.pageName}>{name}</h1>
-          <div className={styles.chips}>{primaryChips}</div>
+          <p className={styles.pageSub}>
+            {repoFullName}
+            <span aria-hidden> · </span>
+            {stack}
+            <span aria-hidden> · </span>
+            {autonomyLevel}
+          </p>
+          <div className={styles.chips}>
+            <span
+              className={
+                budgetStatus === "paused"
+                  ? `${styles.chip} ${styles.chipWarn}`
+                  : styles.chip
+              }
+            >
+              {budgetStatus === "paused" ? "Paused" : availableLabel}
+            </span>
+            {pendingApprovals > 0 ? (
+              <span className={`${styles.chip} ${styles.chipWarn}`}>
+                {pendingApprovals} pending
+              </span>
+            ) : null}
+          </div>
           <details className={styles.detailsMeta}>
             <summary>Details</summary>
             <div className={styles.chips}>
               <span className={styles.chip}>{mode}</span>
-              <span className={styles.chip}>{stack}</span>
-              <span className={styles.chip}>{autonomyLevel}</span>
               {lastRunStatus ? (
                 <span className={styles.chip}>Run {lastRunStatus}</span>
               ) : null}
               {stack !== "nextjs_ts" ? (
                 <span className={`${styles.chip} ${styles.chipMute}`}>
                   Agent best-effort
+                </span>
+              ) : null}
+              {!pooled && projectSpentMicros != null ? (
+                <span className={styles.chip}>
+                  Project spend {formatCap(projectSpentMicros, currency)}
                 </span>
               ) : null}
             </div>

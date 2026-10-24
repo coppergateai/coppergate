@@ -20,6 +20,7 @@
     "@coppergate/github": "workspace:*",
     "@coppergate/gitlab": "workspace:*",
     "@coppergate/llm": "workspace:*",
+    "@coppergate/sandbox": "workspace:*",
     "@coppergate/scm": "workspace:*",
     "@coppergate/signals": "workspace:*",
     "@coppergate/telemetry": "workspace:*",

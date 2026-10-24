@@ -655,6 +655,16 @@
   color: var(--mute);
 }
 
+.heroBrand {
+  margin: 0 0 0.9rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 3.4vw, 2.45rem);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--paper);
+}
+
 .trustList {
   list-style: none;
   margin: 1.15rem 0 0;
@@ -763,10 +773,10 @@
 .headline {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.35rem, 4.6vw, 3.6rem);
+  font-size: clamp(2.05rem, 3.8vw, 3.05rem);
   font-weight: 700;
   letter-spacing: -0.04em;
-  line-height: 1.04;
+  line-height: 1.06;
   color: var(--paper);
 }
 
@@ -1421,18 +1431,40 @@
   padding-right: max(var(--gutter), env(safe-area-inset-right));
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.75rem;
+  gap: 0;
 }
 
 .capItem {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  padding: 1.25rem 1.2rem;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: 0 1px 0 var(--line-soft);
+  padding: 1.15rem 0.35rem 1.15rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+@media (min-width: 900px) {
+  .capItem {
+    padding: 0.35rem 1.15rem 0.35rem 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .capItem:last-child {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  .capItem:first-child {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 899px) {
+  .capItem + .capItem {
+    border-top: 1px solid var(--line);
+  }
 }
 
 .capIcon {
@@ -2516,6 +2548,148 @@
   color: var(--mute-soft);
   font-size: 0.875rem;
   line-height: 1.5;
+}
+
+/* —— Pricing —— */
+.pricingGrid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2.25rem;
+}
+
+@media (min-width: 900px) {
+  .pricingGrid {
+    grid-template-columns: 1.15fr 1fr 1fr;
+    align-items: stretch;
+  }
+}
+
+.pricingCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.35rem 1.25rem 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.pricingCardFeatured {
+  border-color: var(--copper-border);
+  background:
+    linear-gradient(180deg, var(--copper-fill-soft), transparent 55%),
+    var(--surface);
+}
+
+.pricingEyebrow {
+  margin: 0;
+  color: var(--copper);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pricingName {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.pricingPrice {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.pricingAmount {
+  font-family: var(--font-display);
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--paper);
+}
+
+.pricingPeriod {
+  color: var(--mute);
+  font-size: 0.9rem;
+}
+
+.pricingBlurb {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.pricingFeatures {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1;
+}
+
+.pricingFeatures li {
+  position: relative;
+  padding-left: 1.1rem;
+  color: var(--mute-strong);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.pricingFeatures li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--copper);
+}
+
+.pricingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.pricingActions .btnHeroPrimary,
+.pricingActions .btnSecondary {
+  font-size: 0.875rem;
+  padding: 0.65rem 0.95rem;
+}
+
+.pricingFootnote {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  color: var(--mute);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.pricingFootnote p {
+  margin: 0;
+}
+
+.pricingFootnote a {
+  color: var(--copper-hot);
+  text-decoration: none;
+}
+
+.pricingFootnote a:hover {
+  color: var(--paper);
 }
 
 .changelogList {

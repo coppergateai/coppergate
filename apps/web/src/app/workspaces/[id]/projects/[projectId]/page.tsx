@@ -56,7 +56,6 @@ export async function generateMetadata({
   return { title: bound?.project.name ?? "Project" };
 }
 
-
 export default async function ProjectDetailPage({
   params,
   searchParams,
@@ -214,50 +213,71 @@ export default async function ProjectDetailPage({
             {stackHint ? (
               <p className={styles.stackHint}>{stackHint}</p>
             ) : null}
-            <NextActionStrip
-              workspaceId={workspaceId}
-              projectId={projectId}
-              step={nextStep}
-              reviewTaskId={reviewTask?.id}
-              reviewTaskTitle={reviewTask?.title}
-            />
-            <BudgetPanel
-              workspaceId={workspaceId}
-              projectId={projectId}
-              initialUsage={{
-                capMicros: usage.capMicros,
-                spentMicros: usage.spentMicros,
-                reservedMicros: usage.reservedMicros,
-                availableMicros: usage.availableMicros,
-                currency: usage.currency,
-                budgetStatus: usage.budgetStatus,
-                pooled: usage.pooled,
-                projectSpentMicros: usage.projectSpentMicros,
-              }}
-              isOwner={isOwner}
-            />
-            <CostExplorerStrip
-              workspaceId={workspaceId}
-              projectId={projectId}
-            />
-            <div id="issues">
+            <div className={styles.overviewPrimary}>
+              <NextActionStrip
+                workspaceId={workspaceId}
+                projectId={projectId}
+                step={nextStep}
+                reviewTaskId={reviewTask?.id}
+                reviewTaskTitle={reviewTask?.title}
+              />
+              <BudgetPanel
+                workspaceId={workspaceId}
+                projectId={projectId}
+                initialUsage={{
+                  capMicros: usage.capMicros,
+                  spentMicros: usage.spentMicros,
+                  reservedMicros: usage.reservedMicros,
+                  availableMicros: usage.availableMicros,
+                  currency: usage.currency,
+                  budgetStatus: usage.budgetStatus,
+                  pooled: usage.pooled,
+                  projectSpentMicros: usage.projectSpentMicros,
+                }}
+                isOwner={isOwner}
+              />
+            </div>
+            <details className={styles.overviewFold} open>
+              <summary className={styles.overviewFoldSummary}>
+                Spend detail
+              </summary>
+              <CostExplorerStrip
+                workspaceId={workspaceId}
+                projectId={projectId}
+              />
+            </details>
+            <details
+              className={styles.overviewFold}
+              open={nextStep === "issue"}
+            >
+              <summary className={styles.overviewFoldSummary}>
+                Start from GitHub
+              </summary>
               <IssuesPanel
                 workspaceId={workspaceId}
                 projectId={projectId}
                 isOwner={isOwner}
               />
-            </div>
-            <BriefPanel
-              workspaceId={workspaceId}
-              projectId={projectId}
-              initialBrief={initialBrief}
-              isOwner={isOwner}
-            />
-            <PullsPanel
-              workspaceId={workspaceId}
-              projectId={projectId}
-              isOwner={isOwner}
-            />
+            </details>
+            <details
+              className={styles.overviewFold}
+              open={!!initialBrief}
+            >
+              <summary className={styles.overviewFoldSummary}>
+                Vision &amp; PRs
+              </summary>
+              <BriefPanel
+                workspaceId={workspaceId}
+                projectId={projectId}
+                initialBrief={initialBrief}
+                isOwner={isOwner}
+              />
+              <PullsPanel
+                workspaceId={workspaceId}
+                projectId={projectId}
+                isOwner={isOwner}
+              />
+            </details>
           </>
         }
         delivery={

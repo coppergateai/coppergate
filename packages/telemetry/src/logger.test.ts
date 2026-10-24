@@ -23,6 +23,26 @@ describe("createLogger", () => {
     assert.equal(parsed.correlationId, "cid-1");
     assert.equal(parsed.path, "/health");
   });
+
+  it("redacts tokens from message and fields", () => {
+    const lines: string[] = [];
+    const log = createLogger({
+      service: "test",
+      level: "info",
+      write: (line) => lines.push(line),
+    });
+    log.info("got ghp_abcdefghijklmnopqrstuvwxyz012345", {
+      authorization: "Bearer supersecretvalue123456",
+      apiKey: "sk-abcdefghijklmnopqrstuvwxyz",
+      path: "app/page.tsx",
+    });
+    const line = lines[0]!;
+    assert.ok(!line.includes("ghp_"));
+    assert.ok(!line.includes("sk-abcdefgh"));
+    assert.ok(!line.includes("supersecretvalue"));
+    assert.ok(line.includes("[REDACTED]"));
+    assert.ok(line.includes("app/page.tsx"));
+  });
 });
 
 describe("resolveCorrelationId", () => {

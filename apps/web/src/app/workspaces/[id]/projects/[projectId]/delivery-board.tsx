@@ -54,6 +54,39 @@ const COLUMNS: { key: string; label: string; match: (s: string) => boolean }[] =
     },
   ];
 
+function statusLabel(status: string): string {
+  switch (status) {
+    case "DRAFT":
+      return "Draft";
+    case "READY_FOR_APPROVAL":
+      return "Needs approval";
+    case "QUEUED":
+      return "Queued";
+    case "RUNNING":
+      return "Running";
+    case "VALIDATING":
+      return "Validating";
+    case "REVIEW_REQUIRED":
+      return "In review";
+    case "ACCEPTED":
+      return "Accepted";
+    case "DONE":
+      return "Done";
+    case "FAILED":
+      return "Failed";
+    case "BLOCKED":
+      return "Blocked";
+    case "CANCELLED":
+      return "Cancelled";
+    case "EXPIRED":
+      return "Expired";
+    case "NEEDS_REPLAN":
+      return "Needs replan";
+    default:
+      return status;
+  }
+}
+
 export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
   return (
     <section
@@ -72,13 +105,13 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
       {tasks.length === 0 ? (
         <EmptyState
           title="Waiting for the autonomous loop"
-          body="Press Start on Agents. Coppergate detects the next feature or fix, runs the tournament, opens a PR, and merges when CI is green."
+          body="Press Start in Arena. Coppergate detects the next feature or fix, runs the tournament, opens a PR, and merges when CI is green."
           action={
             <Link
               href={`/workspaces/${workspaceId}/projects/${projectId}?tab=arena`}
               className={styles.linkCta}
             >
-              Go to Agents → Start
+              Open Arena → Start
             </Link>
           }
         />
@@ -99,8 +132,8 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
                         href={`/workspaces/${workspaceId}/projects/${projectId}/tasks/${t.id}`}
                       >
                         <div className={styles.boardCardTitle}>{t.title}</div>
-                        <div className={styles.boardCardMeta}>
-                          {t.milestoneTitle} · {t.status}
+                        <div className={styles.boardCardMeta} title={t.status}>
+                          {t.milestoneTitle} · {statusLabel(t.status)}
                           {t.estimateMicros != null
                             ? ` · $${(t.estimateMicros / 1_000_000).toFixed(2)}`
                             : ""}
