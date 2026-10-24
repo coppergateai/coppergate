@@ -70,7 +70,7 @@ export {
   isStubOrToyDelivery,
   isToyPrTitle,
 } from "./stub-detect.js";
-export { parseFileBlocks } from "./openai-compatible.js";
+export { findDuplicateFilePath, parseFileBlocks } from "./openai-compatible.js";
 export {
   isPathAllowed,
   isEditToolAllowed,

@@ -52,8 +52,9 @@ export default function PrivacyPage() {
                 product.
               </li>
               <li>
-                <strong>Billing:</strong> if you subscribe to an optional hosted
-                plan, payment processor metadata needed to manage the
+                <strong>Billing:</strong> paid hosted plans are not offered
+                right now. If paid tiers return and you subscribe later, we may
+                process payment-provider metadata needed to manage that
                 subscription (we do not store full card numbers).
               </li>
               <li>

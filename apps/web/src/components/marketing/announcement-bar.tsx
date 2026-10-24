@@ -36,16 +36,18 @@ export function AnnouncementBar() {
       <div className={styles.announceInner}>
         <div className={styles.announceLeft}>
           <span className={styles.announceDot} aria-hidden="true" />
-          <p className={styles.announceText}>Open source · MIT · free to self-host</p>
+          <p className={styles.announceText}>
+            Open source · MIT · Community $0 to self-host
+          </p>
         </div>
         <div className={styles.announceRight}>
           <a
             className={styles.announceLink}
-            href="https://github.com/coppergateai/coppergate"
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
             target="_blank"
             rel="noreferrer"
           >
-            GitHub
+            Self-host
           </a>
           <button
             type="button"

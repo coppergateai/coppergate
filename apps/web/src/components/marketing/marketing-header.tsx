@@ -144,17 +144,23 @@ export function MarketingHeader({ signedIn: signedInProp }: Props) {
             </a>
           ) : (
             <>
-              <Link className={styles.navGhost} href="/login">
-                Sign in
-              </Link>
               <Link
-                className={styles.btnPrimary}
+                className={styles.navGhost}
                 href="/login"
-                onClick={() => track("cta_open_workspaces", { location: "nav" })}
+                onClick={() => track("cta_try_hosted", { location: "nav" })}
               >
                 Try hosted
-                <IconArrow />
               </Link>
+              <a
+                className={styles.btnPrimary}
+                href="https://github.com/coppergateai/coppergate"
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => track("cta_github", { location: "nav_primary" })}
+              >
+                Start on GitHub
+                <IconArrow />
+              </a>
             </>
           )}
 
@@ -215,16 +221,26 @@ export function MarketingHeader({ signedIn: signedInProp }: Props) {
               </a>
             ) : (
               <>
-                <Link href="/login" onClick={closeMenu}>
-                  Sign in
-                </Link>
-                <Link
-                  className={styles.drawerCta}
-                  href="/login"
+                <a
+                  href={SELF_HOST}
+                  target="_blank"
+                  rel="noreferrer"
                   onClick={closeMenu}
                 >
+                  Self-host guide
+                </a>
+                <Link href="/login" onClick={closeMenu}>
                   Try hosted
                 </Link>
+                <a
+                  className={styles.drawerCta}
+                  href="https://github.com/coppergateai/coppergate"
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={closeMenu}
+                >
+                  Start on GitHub
+                </a>
               </>
             )}
           </nav>

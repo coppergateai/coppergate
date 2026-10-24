@@ -178,6 +178,16 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       return;
     }
 
+    const dupPath = findDuplicateFilePath(files);
+    if (dupPath) {
+      yield {
+        kind: "error",
+        message: `Duplicate FILE path in model output: ${dupPath}`,
+        payload: { code: "duplicate_file_path", path: dupPath },
+      };
+      return;
+    }
+
     if (
       !isEditToolAllowed({
         toolAllowlist: input.toolAllowlist,
@@ -340,7 +350,7 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
           );
         }
 
-        const json = (await res.json()) as {
+        let json: {
           choices?: Array<{ message?: { content?: string } }>;
           usage?: {
             total_tokens?: number;
@@ -348,6 +358,20 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
             completion_tokens?: number;
           };
         };
+        try {
+          json = (await res.json()) as typeof json;
+        } catch (parseErr) {
+          const msg =
+            parseErr instanceof Error ? parseErr.message : String(parseErr);
+          lastError = new AgentPolicyError(
+            `LLM response JSON malformed: ${msg.slice(0, 200)}`,
+          );
+          if (attempt < this.maxRetries) {
+            await sleep(backoffMs(attempt));
+            continue;
+          }
+          throw lastError;
+        }
         const content = json.choices?.[0]?.message?.content?.trim() || "(empty)";
         const usageTotal = json.usage?.total_tokens;
         const summed =
@@ -363,7 +387,9 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
         lastError = err;
         const msg = err instanceof Error ? err.message : String(err);
         const maybeTransient =
-          /ECONNRESET|ETIMEDOUT|fetch failed|network/i.test(msg);
+          /ECONNRESET|ETIMEDOUT|fetch failed|network|JSON malformed|Unexpected token|is not valid JSON/i.test(
+            msg,
+          );
         if (maybeTransient && attempt < this.maxRetries) {
           await sleep(backoffMs(attempt));
           continue;
@@ -461,6 +487,19 @@ export function parseFileBlocks(text: string): ParsedFile[] {
     if (path && content.trim()) files.push({ path, content });
   }
   return files;
+}
+
+/** First path that appears more than once (case-sensitive, normalized). */
+export function findDuplicateFilePath(
+  files: Array<{ path: string }>,
+): string | null {
+  const seen = new Set<string>();
+  for (const f of files) {
+    const key = f.path.replace(/\\/g, "/");
+    if (seen.has(key)) return key;
+    seen.add(key);
+  }
+  return null;
 }
 
 function backoffMs(attempt: number): number {

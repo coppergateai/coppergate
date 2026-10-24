@@ -133,7 +133,15 @@ export default function ChangelogPage() {
             target="_blank"
             rel="noreferrer"
           >
-            Star on GitHub
+            View on GitHub
+          </a>
+          <a
+            className={styles.btnSecondary}
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Self-host guide
           </a>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted
