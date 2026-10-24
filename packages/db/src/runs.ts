@@ -656,7 +656,7 @@ export async function countClaimableRuns(db: Database): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
-/** Inflight runs for plan concurrency enforcement. */
+/** Inflight runs for plan concurrency enforcement (queued + active work). */
 export async function countInflightRunsForWorkspace(
   db: Database,
   workspaceId: string,
@@ -669,7 +669,7 @@ export async function countInflightRunsForWorkspace(
     .where(
       and(
         eq(agentRuns.workspaceId, workspaceId),
-        sql`${agentRuns.status} in ('RUNNING', 'VALIDATING')`,
+        sql`${agentRuns.status} in ('QUEUED', 'RUNNING', 'VALIDATING', 'WAITING_CI')`,
       ),
     );
   return Number(row?.n ?? 0);

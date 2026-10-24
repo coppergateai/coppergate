@@ -89,3 +89,51 @@ export function clampTournamentFanout(
   const max = limitsForPlan(plan).maxTournamentFanout;
   return Math.max(1, Math.min(requested, max));
 }
+
+/** How many new runs can start given current inflight and plan cap. */
+export function remainingConcurrencySlots(
+  inflight: number,
+  maxConcurrentRuns: number,
+): number {
+  return Math.max(0, maxConcurrentRuns - Math.max(0, inflight));
+}
+
+/**
+ * Cap fan-out by concurrency slots and affordable estimate units.
+ * Returns 0 when nothing can be started.
+ */
+export function clampFanoutToCapacity(input: {
+  requested: number;
+  concurrencySlots: number;
+  availableMicros: number;
+  perRunMicros: number;
+}): number {
+  const requested = Math.max(0, Math.floor(input.requested));
+  if (requested < 1) return 0;
+  const bySlots = Math.min(requested, input.concurrencySlots);
+  if (bySlots < 1) return 0;
+  if (input.perRunMicros <= 0) return bySlots;
+  const affordable = Math.floor(
+    Math.max(0, input.availableMicros) / input.perRunMicros,
+  );
+  return Math.min(bySlots, Math.max(0, affordable));
+}
+
+export async function getWorkspaceConcurrency(
+  db: Database,
+  workspaceId: string,
+): Promise<{
+  plan: BillingPlan;
+  limits: PlanLimits;
+  inflight: number;
+  slots: number;
+}> {
+  const { plan, limits } = await resolveWorkspacePlanLimits(db, workspaceId);
+  const inflight = await countInflightRunsForWorkspace(db, workspaceId);
+  return {
+    plan,
+    limits,
+    inflight,
+    slots: remainingConcurrencySlots(inflight, limits.maxConcurrentRuns),
+  };
+}
