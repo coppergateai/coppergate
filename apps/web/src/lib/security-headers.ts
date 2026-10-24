@@ -17,6 +17,7 @@ export function buildContentSecurityPolicy(): string {
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com",
+    // DotLottie WASM is governed by script-src (wasm-src is not a standard CSP directive).
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
