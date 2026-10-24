@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   description:
     "What’s new in Coppergate — open-source progress on delivery, gates, and evidence.",
   alternates: { canonical: "/changelog" },
+  openGraph: { url: "/changelog" },
 };
 
 const entries = [

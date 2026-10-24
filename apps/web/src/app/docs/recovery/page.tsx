@@ -1,16 +1,27 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import styles from "@/components/marketing/marketing.module.css";
+import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
+import styles from "@/components/marketing/marketing.module.css";
 
-export const metadata = {
-  title: "Recovery · Coppergate Docs",
+export const metadata: Metadata = {
+  title: "Recovery",
   description:
     "Self-serve recovery when arena runs fail — cancel, retry, CI Accept gate, budget, and kill-switch.",
+  alternates: { canonical: "/docs/recovery" },
+  openGraph: { url: "/docs/recovery" },
 };
 
 export default function RecoveryPage() {
   return (
     <DocsShell>
+      <DocsBreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Docs", path: "/docs" },
+          { name: "Recovery", path: "/docs/recovery" },
+        ]}
+      />
       <main className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs

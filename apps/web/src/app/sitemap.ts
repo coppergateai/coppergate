@@ -1,17 +1,23 @@
 import type { MetadataRoute } from "next";
+import { listBlogPosts } from "@/lib/blog";
+import { getSiteUrl } from "@/lib/site-url";
 
-const siteUrl =
-  process.env.APP_URL?.replace(/\/$/, "") || "https://www.coppergate.ai";
-
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const siteUrl = getSiteUrl();
   const lastModified = new Date();
 
-  return [
+  const staticEntries: MetadataRoute.Sitemap = [
     {
       url: siteUrl,
       lastModified,
       changeFrequency: "weekly",
       priority: 1,
+    },
+    {
+      url: `${siteUrl}/blog`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.7,
     },
     {
       url: `${siteUrl}/docs`,
@@ -68,4 +74,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.3,
     },
   ];
+
+  const posts = await listBlogPosts();
+  const blogEntries: MetadataRoute.Sitemap = posts.map((post) => ({
+    url: `${siteUrl}/blog/${post.slug}`,
+    lastModified: new Date(`${post.date}T00:00:00.000Z`),
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }));
+
+  return [...staticEntries, ...blogEntries];
 }

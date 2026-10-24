@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import styles from "../../workspaces/[id]/inbox/inbox.module.css";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Health · Coppergate",
+export const metadata: Metadata = {
+  title: "Health",
+  robots: { index: false, follow: false },
 };
 
 type HealthBody = {

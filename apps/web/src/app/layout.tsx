@@ -5,6 +5,7 @@ import { Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { DeferredGoogleAnalytics } from "@/components/deferred-google-analytics";
 import { GA_MEASUREMENT_ID } from "@/lib/ga";
+import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -26,8 +27,8 @@ export const viewport: Viewport = {
 
 const themeInitScript = `(function(){try{var t=localStorage.getItem("cg-theme");if(t!=="light"&&t!=="dark")t="light";document.documentElement.setAttribute("data-theme",t);document.documentElement.style.colorScheme=t;}catch(e){document.documentElement.setAttribute("data-theme","light");document.documentElement.style.colorScheme="light";}})();`;
 
-const siteUrl =
-  process.env.APP_URL?.replace(/\/$/, "") || "https://www.coppergate.ai";
+const siteUrl = getSiteUrl();
+const googleVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim();
 
 const title = "Coppergate — Set a budget. Agents war. Survivors ship.";
 const description =
@@ -53,9 +54,6 @@ export const metadata: Metadata = {
   authors: [{ name: "Coppergate", url: siteUrl }],
   creator: "Coppergate",
   publisher: "Coppergate",
-  alternates: {
-    canonical: "/",
-  },
   robots: {
     index: true,
     follow: true,
@@ -67,7 +65,6 @@ export const metadata: Metadata = {
   openGraph: {
     title,
     description,
-    url: "/",
     siteName: "Coppergate",
     locale: "en_US",
     type: "website",
@@ -87,6 +84,9 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
+  ...(googleVerification
+    ? { verification: { google: googleVerification } }
+    : {}),
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

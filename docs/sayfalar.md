@@ -21,6 +21,11 @@ Web uygulamasındaki (`apps/web`) route’ların sayfa sayfa özeti. Auth gerekt
 - Tarihli release notları (billing, signal adapters, Arena thesis, marketing, product core)
 - GitHub + contact linkleri
 
+### `/blog` — Blog
+- İngilizce product notları (arena vs chat, budget/kill-switch, fitness gates)
+- `/blog/[slug]` — article metadata + Article / BreadcrumbList JSON-LD
+- Kaynak: `apps/web/content/blog/*.md`
+
 ### `/security` — Güvenlik
 - Fitness gate, GitHub identity vs App, evidence before merge
 - Least privilege, spend caps, kill-switch anlatımı
@@ -113,7 +118,7 @@ Header: repo, stack, autonomy, budget, pending approvals, last run status.
 - Canlı operasyon özeti: Running / Awaiting CI / Needs attention / Idle
 - Proje satırları özet; expand ile agent grid + execution phase
 - Semantic agent state (role / mode / runtime ayrı); yalnızca Running’de pulse
-- Sağ panel Agent Inspector: görev, maliyet, PR, recent run events
+- Sağ panel Agent Inspector: Overview / Logs / Artifacts (run events + inline evidence)
 - Owner kontrolleri: Resume all / Pause all (soft) / Stop all (hard kill)
 - `?focus=` ile proje odaklama + expand
 
@@ -122,10 +127,13 @@ Header: repo, stack, autonomy, budget, pending approvals, last run status.
 - Approval seçimi (`?a=`), owner approve/reject
 - Yakın zamanda karar verilenler
 
-### `/workspaces/[id]/activity` — Activity
-- Audit event feed (brief/task/run/signal/merge/arena/…)
-- Ardışık aynı action gruplama
-- Proje/task/settings deep-link
+### `/workspaces/[id]/activity` — Activity (Agent Operations Timeline)
+- Metrikler: Events today, Active agents (arena contenders), Needs review + health chip
+- Human-readable event başlıkları; ham action teknik metadata olarak kalır
+- Tournament create/fanout/resolve → tek execution grubu (alt adımlar açılır)
+- Filtre sekmeleri (All / Executions / Decisions / Agent / System) + arama (⌘K)
+- Sağ event inspector: Overview / Details / Evidence / Raw — kanıt yoksa uydurma metin yok
+- Klavye: J/K gezinme, Enter aç, Esc kapat
 
 ### `/workspaces/[id]/settings` — Settings
 Sekmeler (`?tab=`):
@@ -160,6 +168,7 @@ Sekmeler (`?tab=`):
 /                          Landing
 /login                     Auth
 /changelog                 Release notes
+/blog /blog/[slug]         Blog (EN)
 /security /privacy /terms  Trust & legal
 /docs/*                    Documentation
 /profile                   Account

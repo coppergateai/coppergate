@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description:
     "How Coppergate keeps autonomy accountable — GitHub identity, fitness gates, spend caps, and a kill-switch.",
   alternates: { canonical: "/security" },
+  openGraph: { url: "/security" },
 };
 
 export default function SecurityPage() {

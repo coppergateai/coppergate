@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description:
     "Terms of use for the Coppergate private beta — early access, arena policy, and acceptable use.",
   alternates: { canonical: "/terms" },
+  openGraph: { url: "/terms" },
 };
 
 export default function TermsPage() {

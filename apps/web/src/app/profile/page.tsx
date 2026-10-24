@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listWorkspacesForUser } from "@coppergate/db";
@@ -7,6 +8,11 @@ import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ProfileForm } from "./profile-form";
 import styles from "./profile.module.css";
+
+export const metadata: Metadata = {
+  title: "Profile",
+  robots: { index: false, follow: false },
+};
 
 function formatWhen(d: Date | null | undefined) {
   if (!d) return "—";
