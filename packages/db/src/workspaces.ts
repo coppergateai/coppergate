@@ -1,5 +1,6 @@
 import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
+import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox";
 import type { Database } from "./client.js";
 import {
   agentProfiles,
@@ -240,6 +241,24 @@ export function workspaceListBlurb(slug: string): string {
 }
 
 /**
+ * Active (non-deleted) workspace by id — for webhook / system paths without a member.
+ * Callers that act on behalf of a user must use getWorkspaceForMember instead.
+ */
+export async function getActiveWorkspaceById(
+  db: Database,
+  workspaceId: string,
+): Promise<typeof workspaces.$inferSelect | undefined> {
+  const [row] = await db
+    .select()
+    .from(workspaces)
+    .where(
+      and(eq(workspaces.id, workspaceId), ne(workspaces.status, "deleted")),
+    )
+    .limit(1);
+  return row;
+}
+
+/**
  * Membership-scoped workspace lookup. Returns undefined when the user is not
  * a member or the workspace is deleted — callers must treat as not found (IDOR-safe).
  */
@@ -297,8 +316,14 @@ export async function updateWorkspaceForOwner(
   }
   if (input.notifyWebhookUrl !== undefined) {
     const url = input.notifyWebhookUrl?.trim() || null;
-    if (url && !/^https:\/\//i.test(url)) {
-      throw new Error("notifyWebhookUrl must be https");
+    if (url) {
+      try {
+        await assertSafeServerFetchUrlResolved(url, { requireHttps: true });
+      } catch {
+        throw new Error(
+          "notifyWebhookUrl must be a public https URL (no private/metadata hosts)",
+        );
+      }
     }
     patch.notifyWebhookUrl = url;
   }

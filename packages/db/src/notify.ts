@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { assertSafeServerFetchUrl } from "@coppergate/sandbox";
+import { assertSafeServerFetchUrlResolved } from "@coppergate/sandbox";
 import type { Database } from "./client.js";
 import { createEmailProvider, renderNotifyEmail } from "./email.js";
 import { redactPayload } from "./redact.js";
@@ -155,7 +155,7 @@ export async function notifyWorkspace(
     const url = ws.notifyWebhookUrl.trim();
     const body = formatNotifyBody(url, input, safe);
     try {
-      assertSafeServerFetchUrl(url, { requireHttps: true });
+      await assertSafeServerFetchUrlResolved(url, { requireHttps: true });
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -218,7 +218,7 @@ export async function updateWorkspaceNotifySettings(
     const url = input.notifyWebhookUrl?.trim() || null;
     if (url) {
       try {
-        assertSafeServerFetchUrl(url, { requireHttps: true });
+        await assertSafeServerFetchUrlResolved(url, { requireHttps: true });
       } catch {
         throw new Error(
           "notifyWebhookUrl must be a public https URL (no private/metadata hosts)",

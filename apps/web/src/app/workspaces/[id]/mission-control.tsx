@@ -104,12 +104,24 @@ export function MissionControl({ data, recentEvents }: Props) {
   const opsWarn = needsAttention || budgetPaused || arenaHot;
   const recent = groupActivityEvents(recentEvents).slice(0, 8);
 
+  const concurrencyItem = attention.find((a) => a.kind === "concurrency");
+  const humanGates = metrics.needsApproval;
+  const attentionHref =
+    humanGates > 0
+      ? `/workspaces/${data.workspaceId}/inbox`
+      : concurrencyItem || arenaHot
+        ? `/workspaces/${data.workspaceId}/arena`
+        : `/workspaces/${data.workspaceId}/inbox`;
+
   const statusLine = (() => {
     if (budgetPaused) {
       return "Budget envelope paused — executions are frozen until you raise the cap.";
     }
+    if (concurrencyItem) {
+      return concurrencyItem.detail;
+    }
     if (arenaHot) {
-      return `${metrics.arenaNeedsAttention} agent${metrics.arenaNeedsAttention === 1 ? "" : "s"} need attention in Arena${needsAttention ? ` · ${attention.length} item${attention.length === 1 ? "" : "s"} queued for you` : ""}.`;
+      return `${metrics.arenaNeedsAttention} agent${metrics.arenaNeedsAttention === 1 ? "" : "s"} need attention in Arena${humanGates > 0 ? ` · ${humanGates} inbox gate${humanGates === 1 ? "" : "s"}` : ""}.`;
     }
     if (needsAttention) {
       return `${attention.length} item${attention.length === 1 ? "" : "s"} need your review.`;
@@ -168,10 +180,7 @@ export function MissionControl({ data, recentEvents }: Props) {
               : ""}
           </p>
         </Link>
-        <Link
-          href={`/workspaces/${data.workspaceId}/inbox`}
-          className={styles.metric}
-        >
+        <Link href={attentionHref} className={styles.metric}>
           <div className={styles.metricTop}>
             <p className={styles.metricLabel}>Needs attention</p>
             <span className={styles.metricIcon} aria-hidden>
@@ -182,9 +191,10 @@ export function MissionControl({ data, recentEvents }: Props) {
             {pad2(metrics.needsApproval + metrics.arenaNeedsAttention)}
           </p>
           <p className={styles.metricMeta}>
-            {metrics.needsApproval} approval
+            {metrics.needsApproval} inbox
             {metrics.needsApproval === 1 ? "" : "s"} ·{" "}
             {metrics.arenaNeedsAttention} arena
+            {concurrencyItem ? " · pause first" : ""}
           </p>
         </Link>
         <Link
@@ -269,19 +279,40 @@ export function MissionControl({ data, recentEvents }: Props) {
               </div>
             ) : (
               <ul className={styles.list}>
-                {attention.map((item) => (
-                  <li key={item.id}>
-                    <Link href={item.href} className={styles.attentionRow}>
-                      <p className={styles.rowTitle}>
-                        {item.title}
-                        {item.priority === "high" ? (
-                          <span className={styles.priority}>High</span>
-                        ) : null}
-                      </p>
-                      <p className={styles.rowDetail}>{item.detail}</p>
-                    </Link>
-                  </li>
-                ))}
+                {attention.map((item) => {
+                  const isCrisis = item.kind === "concurrency";
+                  return (
+                    <li key={item.id}>
+                      <Link
+                        href={item.href}
+                        className={`${styles.attentionRow} ${
+                          isCrisis ? styles.attentionCrisis : ""
+                        }`}
+                      >
+                        <div className={styles.attentionTop}>
+                          <p className={styles.rowTitle}>
+                            {item.title}
+                            {item.priority === "high" ? (
+                              <span className={styles.priority}>High</span>
+                            ) : null}
+                          </p>
+                          {item.ctaLabel ? (
+                            <span
+                              className={
+                                isCrisis
+                                  ? styles.attentionCtaPrimary
+                                  : styles.attentionCta
+                              }
+                            >
+                              {item.ctaLabel} →
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className={styles.rowDetail}>{item.detail}</p>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -437,15 +468,27 @@ export function MissionControl({ data, recentEvents }: Props) {
               </h2>
             </div>
             <div className={styles.actions}>
-              <Link
-                href={`/workspaces/${data.workspaceId}/arena`}
-                className={styles.action}
-              >
-                <span className={styles.actionIcon} aria-hidden>
-                  ◆
-                </span>
-                <span className={styles.actionLabel}>Open Arena</span>
-              </Link>
+              {concurrencyItem ? (
+                <Link
+                  href={concurrencyItem.href}
+                  className={`${styles.action} ${styles.actionPrimary}`}
+                >
+                  <span className={styles.actionIcon} aria-hidden>
+                    ■
+                  </span>
+                  <span className={styles.actionLabel}>Pause Arena</span>
+                </Link>
+              ) : (
+                <Link
+                  href={`/workspaces/${data.workspaceId}/arena`}
+                  className={styles.action}
+                >
+                  <span className={styles.actionIcon} aria-hidden>
+                    ◆
+                  </span>
+                  <span className={styles.actionLabel}>Open Arena</span>
+                </Link>
+              )}
               {metrics.needsApproval > 0 ? (
                 <Link
                   href={`/workspaces/${data.workspaceId}/inbox`}
@@ -466,7 +509,9 @@ export function MissionControl({ data, recentEvents }: Props) {
                   <span className={styles.actionIcon} aria-hidden>
                     ▷
                   </span>
-                  <span className={styles.actionLabel}>Run a task</span>
+                  <span className={styles.actionLabel}>
+                    Import issue → queue
+                  </span>
                 </Link>
               )}
               <Link

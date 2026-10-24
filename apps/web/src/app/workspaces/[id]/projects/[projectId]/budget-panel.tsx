@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./project-detail.module.css";
@@ -103,6 +104,11 @@ export function BudgetPanel({
     cap > 0 ? Math.min(100 - spentPct, (usage.reservedMicros / cap) * 100) : 0;
   const paused = usage.budgetStatus === "paused";
   const projectSpent = usage.projectSpentMicros ?? usage.spentMicros;
+  const reservedShare = cap > 0 ? usage.reservedMicros / cap : 0;
+  const availableShare = cap > 0 ? usage.availableMicros / cap : 1;
+  const showReserveAlert =
+    cap > 0 && !paused && (reservedShare > 0.5 || availableShare < 0.15);
+  const hasCap = usage.capMicros > 0;
 
   return (
     <section
@@ -126,9 +132,26 @@ export function BudgetPanel({
       </div>
       <p className={styles.sectionLede}>
         {pooled
-          ? `Workspace $${dollars(usage.availableMicros)} left · this project $${dollars(projectSpent)} this period`
+          ? `$${dollars(usage.availableMicros)} available · this project $${dollars(projectSpent)} this period`
           : "Hard stop for agent spend. Pause blocks new worker claims."}
       </p>
+
+      {showReserveAlert ? (
+        <p className={styles.budgetAlert} role="status">
+          Most of your cap is <strong>reserved</strong> by queued or running
+          work.{" "}
+          <strong>
+            ${dollars(usage.availableMicros)} {usage.currency} available
+          </strong>{" "}
+          for new tasks.{" "}
+          <Link
+            href={`/workspaces/${workspaceId}/projects/${projectId}?tab=delivery#board`}
+            className={styles.budgetAlertLink}
+          >
+            Review delivery
+          </Link>
+        </p>
+      ) : null}
 
       <div className={styles.meterBlock}>
         <div className={styles.meterTrack} aria-hidden>
@@ -141,6 +164,17 @@ export function BudgetPanel({
             style={{ width: `${reservedPct}%`, left: `${spentPct}%` }}
           />
         </div>
+        <p className={styles.meterLegend} aria-hidden>
+          <span>
+            <i className={styles.legendSpent} /> Spent
+          </span>
+          <span>
+            <i className={styles.legendReserved} /> Reserved
+          </span>
+          <span>
+            <i className={styles.legendFree} /> Free
+          </span>
+        </p>
         <div className={styles.meterStats}>
           <div>
             <span className={styles.meterStatLabel}>
@@ -180,80 +214,155 @@ export function BudgetPanel({
             </span>
           </div>
         </div>
+        {pooled && usage.reservedMicros > 0 ? (
+          <p className={styles.meterNote}>
+            Reserved ${dollars(usage.reservedMicros)} across the workspace
+            envelope (queued / in-flight claims).
+          </p>
+        ) : null}
       </div>
 
       {isOwner ? (
-        <div className={styles.panel}>
-          <div className={styles.btnRow}>
-            <label className={styles.field}>
-              {pooled ? "Workspace cap (USD / mo)" : "Cap (USD)"}
-              <input
-                className={styles.inputNarrow}
-                value={capDollars}
-                onChange={(e) => setCapDollars(e.target.value)}
-                inputMode="decimal"
+        hasCap && !paused ? (
+          <details className={styles.editEnvelope}>
+            <summary>Edit envelope</summary>
+            <div className={styles.panel}>
+              <OwnerControls
+                pooled={pooled}
+                capDollars={capDollars}
+                setCapDollars={setCapDollars}
+                pending={pending}
+                paused={paused}
+                usage={usage}
+                workspaceId={workspaceId}
+                save={save}
+                setCapDollarsState={setCapDollars}
+                setPending={setPending}
+                setError={setError}
+                reloadUsage={reloadUsage}
+                router={router}
               />
-            </label>
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              disabled={pending}
-              onClick={() => void save()}
-            >
-              {pending ? "Saving…" : pooled ? "Save envelope" : "Save cap"}
-            </button>
-            {!pooled || usage.capMicros === 0 ? (
-              <button
-                type="button"
-                className={styles.ghostBtn}
-                disabled={pending}
-                onClick={() => {
-                  setCapDollars("100.00");
-                  setPending(true);
-                  setError(null);
-                  void fetch(`/api/workspaces/${workspaceId}/budget`, {
-                    method: "PUT",
-                    credentials: "same-origin",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      capMicros: 100_000_000,
-                      period: "monthly",
-                      status: "active",
-                    }),
-                  })
-                    .then(async (res) => {
-                      const body = (await res.json()) as {
-                        error?: { message: string };
-                      };
-                      if (!res.ok) {
-                        throw new Error(body.error?.message ?? "Save failed");
-                      }
-                      await reloadUsage();
-                      router.refresh();
-                    })
-                    .catch((err: unknown) =>
-                      setError(
-                        err instanceof Error ? err.message : "Save failed",
-                      ),
-                    )
-                    .finally(() => setPending(false));
-                }}
-              >
-                Set $100 envelope
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className={styles.ghostBtn}
-              disabled={pending}
-              onClick={() => void save(paused ? "active" : "paused")}
-            >
-              {paused ? "Resume spend" : "Pause spend"}
-            </button>
+            </div>
+          </details>
+        ) : (
+          <div className={styles.panel}>
+            <OwnerControls
+              pooled={pooled}
+              capDollars={capDollars}
+              setCapDollars={setCapDollars}
+              pending={pending}
+              paused={paused}
+              usage={usage}
+              workspaceId={workspaceId}
+              save={save}
+              setCapDollarsState={setCapDollars}
+              setPending={setPending}
+              setError={setError}
+              reloadUsage={reloadUsage}
+              router={router}
+            />
           </div>
-        </div>
+        )
       ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}
     </section>
+  );
+}
+
+function OwnerControls({
+  pooled,
+  capDollars,
+  setCapDollars,
+  pending,
+  paused,
+  usage,
+  workspaceId,
+  save,
+  setCapDollarsState,
+  setPending,
+  setError,
+  reloadUsage,
+  router,
+}: {
+  pooled: boolean;
+  capDollars: string;
+  setCapDollars: (v: string) => void;
+  pending: boolean;
+  paused: boolean;
+  usage: Usage;
+  workspaceId: string;
+  save: (status?: "active" | "paused") => Promise<void>;
+  setCapDollarsState: (v: string) => void;
+  setPending: (v: boolean) => void;
+  setError: (v: string | null) => void;
+  reloadUsage: () => Promise<void>;
+  router: { refresh: () => void };
+}) {
+  return (
+    <div className={styles.btnRow}>
+      <label className={styles.field}>
+        {pooled ? "Workspace cap (USD / mo)" : "Cap (USD)"}
+        <input
+          className={styles.inputNarrow}
+          value={capDollars}
+          onChange={(e) => setCapDollars(e.target.value)}
+          inputMode="decimal"
+        />
+      </label>
+      <button
+        type="button"
+        className={styles.primaryBtn}
+        disabled={pending}
+        onClick={() => void save()}
+      >
+        {pending ? "Saving…" : pooled ? "Save envelope" : "Save cap"}
+      </button>
+      {!pooled || usage.capMicros === 0 ? (
+        <button
+          type="button"
+          className={styles.ghostBtn}
+          disabled={pending}
+          onClick={() => {
+            setCapDollarsState("100.00");
+            setPending(true);
+            setError(null);
+            void fetch(`/api/workspaces/${workspaceId}/budget`, {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                capMicros: 100_000_000,
+                period: "monthly",
+                status: "active",
+              }),
+            })
+              .then(async (res) => {
+                const body = (await res.json()) as {
+                  error?: { message: string };
+                };
+                if (!res.ok) {
+                  throw new Error(body.error?.message ?? "Save failed");
+                }
+                await reloadUsage();
+                router.refresh();
+              })
+              .catch((err: unknown) =>
+                setError(err instanceof Error ? err.message : "Save failed"),
+              )
+              .finally(() => setPending(false));
+          }}
+        >
+          Set $100 envelope
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className={styles.ghostBtn}
+        disabled={pending}
+        onClick={() => void save(paused ? "active" : "paused")}
+      >
+        {paused ? "Resume spend" : "Pause spend"}
+      </button>
+    </div>
   );
 }

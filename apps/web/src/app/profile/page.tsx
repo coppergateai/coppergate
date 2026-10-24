@@ -95,16 +95,6 @@ export default async function ProfilePage() {
                 <div className={styles.heroCopy}>
                   <h2 className={styles.heroName}>{displayName}</h2>
                   <p className={styles.heroLogin}>@{user.login}</p>
-                  <div className={styles.badges}>
-                    <span className={styles.badge}>
-                      {providerLabel(user.authProvider)}
-                    </span>
-                    {user.email ? (
-                      <span className={styles.badge}>{user.email}</span>
-                    ) : (
-                      <span className={styles.badge}>No email on file</span>
-                    )}
-                  </div>
                 </div>
               </section>
 

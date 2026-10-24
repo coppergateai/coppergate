@@ -95,7 +95,7 @@ export function PullsPanel({ workspaceId, projectId, isOwner }: Props) {
       </h2>
       <p className={styles.sectionLede}>
         Optional: import an existing open PR for review. The autonomous loop
-        opens its own PRs from Agents → Start.
+        opens its own PRs from Arena → Start.
         {repo ? ` · ${repo}` : null}
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}

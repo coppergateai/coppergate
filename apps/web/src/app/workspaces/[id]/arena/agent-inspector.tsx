@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { displayTaskTitle } from "@coppergate/db";
 import styles from "./arena-mission.module.css";
 
 export type InspectorRun = {
@@ -296,7 +297,9 @@ export function AgentInspector({
         <>
           <section className={styles.inspectorSection}>
             <h3 className={styles.inspectorSectionTitle}>Current task</h3>
-            <p className={styles.inspectorTask}>{run.taskTitle}</p>
+            <p className={styles.inspectorTask}>
+              {displayTaskTitle(run.taskTitle) || run.taskTitle}
+            </p>
             <p className={styles.inspectorMeta}>
               Status {run.status.replace(/_/g, " ")}
               {" · "}
