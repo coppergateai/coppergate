@@ -280,12 +280,12 @@ export async function getWorkspaceMissionControl(
       id: `review-${t.id}`,
       kind: "review_required",
       title: t.prUrl
-        ? `Review delivery · ${title}`
-        : `Review required · ${title}`,
-      detail: `${t.projectName} · Evidence ready for Accept`,
-      href: `/workspaces/${workspaceId}/projects/${t.projectId}/tasks/${t.id}`,
+        ? `Accept delivery · ${title}`
+        : `Accept ready · ${title}`,
+      detail: `${t.projectName} · Evidence Center — gates clear for Accept`,
+      href: `/workspaces/${workspaceId}/projects/${t.projectId}?tab=evidence`,
       priority: "high",
-      ctaLabel: "Review evidence",
+      ctaLabel: "Open Evidence",
     });
   }
 
@@ -432,6 +432,7 @@ export async function getWorkspaceMissionControl(
       activeRuns,
       activeRunProjects,
       needsApproval: pendingApprovals.length,
+      needsEvidenceAccept: reviewTasks.length,
       highPriorityApprovals,
       verifiedPrsThisMonth: Number(verifiedRows[0]?.n ?? 0),
       budgetSpentMicros: spend?.spentMicros ?? 0,

@@ -109,13 +109,19 @@ export function MissionControl({ data, recentEvents }: Props) {
   const recent = groupActivityEvents(recentEvents).slice(0, 8);
 
   const concurrencyItem = attention.find((a) => a.kind === "concurrency");
+  const evidenceItem = attention.find((a) => a.kind === "review_required");
   const humanGates = metrics.needsApproval;
+  const evidenceGates = metrics.needsEvidenceAccept;
+  const attentionTotal =
+    humanGates + evidenceGates + metrics.arenaNeedsAttention;
   const attentionHref =
     humanGates > 0
       ? `/workspaces/${data.workspaceId}/inbox`
-      : concurrencyItem || arenaHot
-        ? `/workspaces/${data.workspaceId}/arena`
-        : `/workspaces/${data.workspaceId}/inbox`;
+      : evidenceItem
+        ? evidenceItem.href
+        : concurrencyItem || arenaHot
+          ? `/workspaces/${data.workspaceId}/arena`
+          : `/workspaces/${data.workspaceId}/inbox`;
 
   const statusLine = (() => {
     if (budgetPaused) {
@@ -124,8 +130,11 @@ export function MissionControl({ data, recentEvents }: Props) {
     if (concurrencyItem) {
       return concurrencyItem.detail;
     }
+    if (evidenceGates > 0 && !arenaHot) {
+      return `${evidenceGates} deliver${evidenceGates === 1 ? "y" : "ies"} ready to Accept in Evidence${humanGates > 0 ? ` · ${humanGates} inbox` : ""}.`;
+    }
     if (arenaHot) {
-      return `${metrics.arenaNeedsAttention} agent${metrics.arenaNeedsAttention === 1 ? "" : "s"} need attention in Arena${humanGates > 0 ? ` · ${humanGates} inbox gate${humanGates === 1 ? "" : "s"}` : ""}.`;
+      return `${metrics.arenaNeedsAttention} agent${metrics.arenaNeedsAttention === 1 ? "" : "s"} need attention in Arena${evidenceGates > 0 ? ` · ${evidenceGates} Accept` : ""}${humanGates > 0 ? ` · ${humanGates} inbox` : ""}.`;
     }
     if (needsAttention) {
       return `${attention.length} item${attention.length === 1 ? "" : "s"} need your review.`;
@@ -191,12 +200,9 @@ export function MissionControl({ data, recentEvents }: Props) {
               ◇
             </span>
           </div>
-          <p className={styles.metricValue}>
-            {pad2(metrics.needsApproval + metrics.arenaNeedsAttention)}
-          </p>
+          <p className={styles.metricValue}>{pad2(attentionTotal)}</p>
           <p className={styles.metricMeta}>
-            {metrics.needsApproval} inbox
-            {metrics.needsApproval === 1 ? "" : "s"} ·{" "}
+            {humanGates} inbox · {evidenceGates} evidence ·{" "}
             {metrics.arenaNeedsAttention} arena
             {concurrencyItem ? " · pause first" : ""}
           </p>
@@ -503,6 +509,15 @@ export function MissionControl({ data, recentEvents }: Props) {
                   </span>
                   <span className={styles.actionLabel}>
                     Review inbox ({metrics.needsApproval})
+                  </span>
+                </Link>
+              ) : evidenceItem ? (
+                <Link href={evidenceItem.href} className={styles.action}>
+                  <span className={styles.actionIcon} aria-hidden>
+                    ✓
+                  </span>
+                  <span className={styles.actionLabel}>
+                    Accept evidence ({evidenceGates})
                   </span>
                 </Link>
               ) : (
