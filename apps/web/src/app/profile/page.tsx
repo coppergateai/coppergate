@@ -165,7 +165,7 @@ export default async function ProfilePage() {
                     <li key={ws.id} className={styles.wsItem}>
                       <div>
                         <Link
-                          href={`/workspaces/${ws.id}/projects`}
+                          href={`/workspaces/${ws.id}`}
                           className={styles.wsName}
                         >
                           {ws.name}

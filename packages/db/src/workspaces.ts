@@ -4,6 +4,7 @@ import type { Database } from "./client.js";
 import {
   agentProfiles,
   agentRuns,
+  approvals,
   memberships,
   projects,
   users,
@@ -25,6 +26,7 @@ export type WorkspaceListStats = {
   agentCount: number;
   runCount: number;
   memberCount: number;
+  pendingApprovalCount: number;
 };
 
 export type WorkspaceWithRoleAndStats = WorkspaceWithRole & WorkspaceListStats;
@@ -154,42 +156,59 @@ export async function listWorkspacesForUserWithStats(
 
   const ids = base.map((row) => row.workspace.id);
 
-  const [projectRows, agentRows, runRows, memberRows] = await Promise.all([
-    db
-      .select({
-        workspaceId: projects.workspaceId,
-        n: count(),
-      })
-      .from(projects)
-      .where(inArray(projects.workspaceId, ids))
-      .groupBy(projects.workspaceId),
-    db
-      .select({
-        workspaceId: agentProfiles.workspaceId,
-        n: count(),
-      })
-      .from(agentProfiles)
-      .where(
-        and(inArray(agentProfiles.workspaceId, ids), isNotNull(agentProfiles.workspaceId)),
-      )
-      .groupBy(agentProfiles.workspaceId),
-    db
-      .select({
-        workspaceId: agentRuns.workspaceId,
-        n: count(),
-      })
-      .from(agentRuns)
-      .where(inArray(agentRuns.workspaceId, ids))
-      .groupBy(agentRuns.workspaceId),
-    db
-      .select({
-        workspaceId: memberships.workspaceId,
-        n: count(),
-      })
-      .from(memberships)
-      .where(inArray(memberships.workspaceId, ids))
-      .groupBy(memberships.workspaceId),
-  ]);
+  const [projectRows, agentRows, runRows, memberRows, approvalRows] =
+    await Promise.all([
+      db
+        .select({
+          workspaceId: projects.workspaceId,
+          n: count(),
+        })
+        .from(projects)
+        .where(inArray(projects.workspaceId, ids))
+        .groupBy(projects.workspaceId),
+      db
+        .select({
+          workspaceId: agentProfiles.workspaceId,
+          n: count(),
+        })
+        .from(agentProfiles)
+        .where(
+          and(
+            inArray(agentProfiles.workspaceId, ids),
+            isNotNull(agentProfiles.workspaceId),
+          ),
+        )
+        .groupBy(agentProfiles.workspaceId),
+      db
+        .select({
+          workspaceId: agentRuns.workspaceId,
+          n: count(),
+        })
+        .from(agentRuns)
+        .where(inArray(agentRuns.workspaceId, ids))
+        .groupBy(agentRuns.workspaceId),
+      db
+        .select({
+          workspaceId: memberships.workspaceId,
+          n: count(),
+        })
+        .from(memberships)
+        .where(inArray(memberships.workspaceId, ids))
+        .groupBy(memberships.workspaceId),
+      db
+        .select({
+          workspaceId: approvals.workspaceId,
+          n: count(),
+        })
+        .from(approvals)
+        .where(
+          and(
+            inArray(approvals.workspaceId, ids),
+            eq(approvals.status, "pending"),
+          ),
+        )
+        .groupBy(approvals.workspaceId),
+    ]);
 
   const toMap = (rows: { workspaceId: string | null; n: number }[]) => {
     const map = new Map<string, number>();
@@ -203,6 +222,7 @@ export async function listWorkspacesForUserWithStats(
   const agentsByWs = toMap(agentRows);
   const runsByWs = toMap(runRows);
   const membersByWs = toMap(memberRows);
+  const pendingByWs = toMap(approvalRows);
 
   return base.map((row) => ({
     ...row,
@@ -210,6 +230,7 @@ export async function listWorkspacesForUserWithStats(
     agentCount: agentsByWs.get(row.workspace.id) ?? 0,
     runCount: runsByWs.get(row.workspace.id) ?? 0,
     memberCount: membersByWs.get(row.workspace.id) ?? 0,
+    pendingApprovalCount: pendingByWs.get(row.workspace.id) ?? 0,
   }));
 }
 

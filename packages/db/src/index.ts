@@ -493,6 +493,13 @@ export {
   type RetentionSnapshot,
 } from "./analytics.js";
 export {
+  getWorkspaceMissionControl,
+  type MissionControlAttentionItem,
+  type MissionControlAttentionKind,
+  type MissionControlExecution,
+  type WorkspaceMissionControl,
+} from "./mission-control.js";
+export {
   persistReviewFindings,
   scoreWithRulesReviewer,
   type ReviewFinding,

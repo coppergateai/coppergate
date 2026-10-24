@@ -16,6 +16,7 @@ export type WorkspaceCardData = {
   agentCount: number;
   runCount: number;
   memberCount: number;
+  pendingApprovalCount: number;
 };
 
 type Props = {
@@ -34,10 +35,7 @@ export function WorkspaceCard({ workspace, layout }: Props) {
 
   return (
     <li className={layout === "grid" ? styles.cardGridItem : styles.cardListItem}>
-      <Link
-        href={`/workspaces/${workspace.id}/projects`}
-        className={styles.card}
-      >
+      <Link href={`/workspaces/${workspace.id}`} className={styles.card}>
         <div className={styles.cardIcon} aria-hidden>
           <span>&gt;_</span>
         </div>
@@ -71,13 +69,25 @@ export function WorkspaceCard({ workspace, layout }: Props) {
           </div>
           <div className={styles.stat}>
             <CubeIcon />
-            <span className={styles.statValue}>{workspace.agentCount}</span>
-            <span className={styles.statLabel}>Agents</span>
+            <span
+              className={
+                workspace.pendingApprovalCount > 0
+                  ? `${styles.statValue} ${styles.statValueWarn}`
+                  : styles.statValue
+              }
+            >
+              {workspace.pendingApprovalCount}
+            </span>
+            <span className={styles.statLabel}>Decisions</span>
           </div>
           <div className={styles.stat}>
             <PlayIcon />
             <span className={styles.statValue}>{workspace.runCount}</span>
-            <span className={styles.statLabel}>Runs</span>
+            <span className={styles.statLabel}>
+              {workspace.runCount > 0 || workspace.agentCount > 0
+                ? "Healthy"
+                : "Setup"}
+            </span>
           </div>
         </div>
       </Link>

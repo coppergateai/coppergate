@@ -1,0 +1,264 @@
+.main {
+  padding: 1.5rem 1.25rem 3rem;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.head {
+  margin-bottom: 1.75rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute-soft);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 3vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--paper);
+  line-height: 1.15;
+}
+
+.lede {
+  margin: 0.45rem 0 0;
+  max-width: 36rem;
+  font-size: 0.95rem;
+  color: var(--mute);
+  line-height: 1.45;
+}
+
+.opsChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mute-strong);
+  background: var(--surface);
+}
+
+.opsDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.opsDotWarn {
+  background: var(--warn);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.metric {
+  padding: 1.15rem 1.25rem 1.25rem;
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+
+.metric:last-child {
+  border-right: none;
+}
+
+.metricLabel {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--mute);
+}
+
+.metricValue {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--paper);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.metricMeta {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--mute-soft);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 2.25rem 2.5rem;
+  align-items: start;
+}
+
+.sectionTitle {
+  margin: 0 0 0.15rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+}
+
+.sectionMeta {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  color: var(--mute-soft);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  display: block;
+  padding: 0.95rem 0;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.12s ease;
+}
+
+.row:hover {
+  background: var(--overlay);
+}
+
+.rowTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 550;
+  color: var(--paper);
+  letter-spacing: -0.01em;
+}
+
+.rowDetail {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: var(--mute);
+}
+
+.priority {
+  display: inline-block;
+  margin-left: 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+.execHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.15rem;
+}
+
+.execProject {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--copper);
+  letter-spacing: 0.02em;
+}
+
+.execPhase {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--mute-soft);
+}
+
+.empty {
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 550;
+  color: var(--paper);
+}
+
+.emptyBody {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--mute);
+  line-height: 1.45;
+}
+
+.emptyBody a {
+  color: var(--copper);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric:nth-child(2) {
+    border-right: none;
+  }
+
+  .metric:nth-child(1),
+  .metric:nth-child(2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .columns {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .metric {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .metric:last-child {
+    border-bottom: none;
+  }
+
+  .metric:nth-child(1),
+  .metric:nth-child(2) {
+    border-bottom: 1px solid var(--line);
+  }
+}
