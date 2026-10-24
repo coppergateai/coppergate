@@ -1,18 +1,13 @@
 import Link from "next/link";
+import { HostedCtaLink } from "./hosted-cta-link";
 import { IconArrow } from "./icons";
 import { MarketingLottie } from "./marketing-lottie";
 import styles from "./marketing.module.css";
 
-type Props = {
-  signedInLogin?: string | null;
-};
-
 const REPO = "https://github.com/coppergateai/coppergate";
 const SELF_HOST = `${REPO}/blob/main/docs/SELF_HOST.md`;
 
-export function FinalCta({ signedInLogin = null }: Props) {
-  const signedIn = Boolean(signedInLogin);
-
+export function FinalCta() {
   return (
     <section
       id="get-started"
@@ -60,27 +55,16 @@ export function FinalCta({ signedInLogin = null }: Props) {
           >
             View on GitHub
           </a>
-          <Link
-            className={styles.btnSecondary}
-            href={signedIn ? "/workspaces" : "/login"}
-          >
-            {signedIn ? "Open workspaces" : "Try hosted"}
-          </Link>
+          <HostedCtaLink className={styles.btnSecondary} />
         </div>
 
         <p id="early-access" className={styles.finalNote}>
-          {signedIn
-            ? `Signed in as @${signedInLogin}. Open workspaces above to continue.`
-            : (
-              <>
-                Free forever to self-host.{" "}
-                <Link href="/docs/pricing">Pricing</Link>
-                {" · "}
-                <Link href="/docs/limitations">Limitations</Link>
-                {" · "}
-                hello@coppergate.ai
-              </>
-            )}
+          Free forever to self-host.{" "}
+          <Link href="/docs/pricing">Pricing</Link>
+          {" · "}
+          <Link href="/docs/limitations">Limitations</Link>
+          {" · "}
+          hello@coppergate.ai
         </p>
       </div>
     </section>

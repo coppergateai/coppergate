@@ -22,7 +22,10 @@ type Props = {
   projectSpentMicros?: number;
   pooled?: boolean;
   currency: string;
-  taskCount: number;
+  /** In-flight delivery work (excludes draft / done / cancelled noise). */
+  deliveryCount: number;
+  /** Deliveries waiting on human Accept / gate review. */
+  evidenceCount: number;
   pendingApprovals: number;
   lastRunStatus: string | null;
   initialTab: ProjectTab;
@@ -52,15 +55,35 @@ function formatCap(micros: number, currency: string): string {
   return `${dollars.toFixed(2)} ${currency}`;
 }
 
+function formatStack(stack: string): string {
+  const map: Record<string, string> = {
+    nextjs_ts: "Next.js",
+    node: "Node",
+    python: "Python",
+    go: "Go",
+    ruby: "Ruby",
+    shell: "Shell",
+    html: "HTML",
+    unknown: "Unknown",
+  };
+  return map[stack.toLowerCase()] ?? stack.replace(/_/g, " ");
+}
+
+function formatMode(mode: string): string {
+  if (mode === "existing_repo") return "Existing repo";
+  if (mode === "new_product") return "New product";
+  return mode.replace(/_/g, " ");
+}
+
 const TABS: Array<{
   id: ProjectTab;
   label: string;
-  countKey?: "tasks";
+  countKey?: "delivery" | "evidence";
 }> = [
   { id: "overview", label: "Overview" },
-  { id: "delivery", label: "Delivery", countKey: "tasks" },
+  { id: "delivery", label: "Delivery", countKey: "delivery" },
   { id: "arena", label: "Arena" },
-  { id: "evidence", label: "Evidence" },
+  { id: "evidence", label: "Evidence", countKey: "evidence" },
   { id: "configuration", label: "Configuration" },
 ];
 
@@ -78,7 +101,8 @@ export function ProjectShell({
   projectSpentMicros,
   pooled,
   currency,
-  taskCount,
+  deliveryCount,
+  evidenceCount,
   pendingApprovals,
   lastRunStatus,
   initialTab,
@@ -146,7 +170,7 @@ export function ProjectShell({
           <p className={styles.pageSub}>
             {repoFullName}
             <span aria-hidden> · </span>
-            {stack}
+            {formatStack(stack)}
             <span aria-hidden> · </span>
             {autonomyLevel}
           </p>
@@ -169,7 +193,7 @@ export function ProjectShell({
           <details className={styles.detailsMeta}>
             <summary>Details</summary>
             <div className={styles.chips}>
-              <span className={styles.chip}>{mode}</span>
+              <span className={styles.chip}>{formatMode(mode)}</span>
               {lastRunStatus ? (
                 <span className={styles.chip}>Run {lastRunStatus}</span>
               ) : null}
@@ -191,7 +215,11 @@ export function ProjectShell({
       <div className={styles.tabs} role="tablist" aria-label="Project sections">
         {TABS.map(({ id, label, countKey }) => {
           const count =
-            countKey === "tasks" && taskCount > 0 ? taskCount : null;
+            countKey === "delivery" && deliveryCount > 0
+              ? deliveryCount
+              : countKey === "evidence" && evidenceCount > 0
+                ? evidenceCount
+                : null;
           return (
             <button
               key={id}

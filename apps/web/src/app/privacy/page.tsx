@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 import { SiteChrome } from "../site-chrome";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Privacy",
   description:
     "How Coppergate handles authentication, product data, and analytics for the open-source Survivor arena and hosted instance.",
-  alternates: { canonical: "/privacy" },
-  openGraph: { url: "/privacy" },
-};
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

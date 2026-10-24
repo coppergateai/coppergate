@@ -6,6 +6,7 @@ import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld"
 import { JsonLdScript } from "@/components/seo/json-ld-script";
 import styles from "@/components/marketing/marketing.module.css";
 import { getBlogPost, listBlogPosts } from "@/lib/blog";
+import { absoluteUrl, publicPageMetadata } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -25,18 +26,16 @@ export async function generateMetadata({
   }
 
   const path = `/blog/${post.slug}`;
-  return {
+  return publicPageMetadata({
     title: post.title,
     description: post.description,
-    alternates: { canonical: path },
+    path,
     openGraph: {
       type: "article",
-      url: path,
-      title: post.title,
-      description: post.description,
       publishedTime: `${post.date}T00:00:00.000Z`,
+      modifiedTime: `${post.date}T00:00:00.000Z`,
     },
-  };
+  });
 }
 
 function formatDate(iso: string) {
@@ -56,6 +55,11 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   const siteUrl = getSiteUrl();
   const path = `/blog/${post.slug}`;
+  const related = (await listBlogPosts())
+    .filter((p) => p.slug !== post.slug)
+    .slice(0, 3);
+  const ogImage = absoluteUrl("/opengraph-image");
+
   const articleLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -64,6 +68,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     datePublished: `${post.date}T00:00:00.000Z`,
     dateModified: `${post.date}T00:00:00.000Z`,
     mainEntityOfPage: `${siteUrl}${path}`,
+    image: [ogImage],
     author: {
       "@type": "Organization",
       name: "Coppergate",
@@ -102,6 +107,20 @@ export default async function BlogPostPage({ params }: PageProps) {
           className={styles.prose}
           dangerouslySetInnerHTML={{ __html: post.html }}
         />
+
+        {related.length > 0 ? (
+          <section className={styles.prose} aria-labelledby="related-posts">
+            <h2 id="related-posts">Related posts</h2>
+            <ul>
+              {related.map((item) => (
+                <li key={item.slug}>
+                  <Link href={`/blog/${item.slug}`}>{item.title}</Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <div className={styles.docsCtaRow}>
           <a
             className={styles.btnHeroPrimary}

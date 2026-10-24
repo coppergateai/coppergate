@@ -4,14 +4,14 @@ import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld"
 import { DocsShell } from "@/components/docs/docs-shell";
 import { IconArrow } from "@/components/marketing/icons";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Docs",
   description:
     "Open-source docs for the Coppergate Survivor arena — stack, self-host, limitations, recovery.",
-  alternates: { canonical: "/docs" },
-  openGraph: { url: "/docs" },
-};
+  path: "/docs",
+});
 
 const REPO = "https://github.com/coppergateai/coppergate";
 const SELF_HOST = `${REPO}/blob/main/docs/SELF_HOST.md`;

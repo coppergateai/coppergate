@@ -30,6 +30,7 @@ function runStub(
     prUrl: null,
     prNumber: null,
     errorCode: null,
+    tournamentResult: null,
     updatedAt: new Date().toISOString(),
     ...overrides,
   };
@@ -115,11 +116,80 @@ describe("classifyContenderRuntime", () => {
     );
   });
 
-  it("flags exhausted budget as needsAttention even when arena is stopped", () => {
+  it("treats exhausted budget alone as idle (selection, not ops fire)", () => {
+    assert.equal(
+      classifyContenderRuntime(null, 0, { arenaLive: true }),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "SUCCEEDED" }), 0, {
+        arenaLive: true,
+      }),
+      "idle",
+    );
+    // Live failure still escalates even when budget is gone.
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "FAILED" }), 0, {
+        arenaLive: true,
+      }),
+      "needsAttention",
+    );
     assert.equal(
       classifyContenderRuntime(runStub({ status: "FAILED" }), 0, {
         arenaLive: false,
       }),
+      "idle",
+    );
+  });
+
+  it("quiets tournament losers, stub delivery, eliminated, and stale failures", () => {
+    const now = Date.parse("2026-10-24T19:00:00.000Z");
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "FAILED", tournamentResult: "LOSER" }),
+        1,
+        { arenaLive: true, nowMs: now },
+      ),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "FAILED", errorCode: "stub_delivery" }),
+        1,
+        { arenaLive: true, nowMs: now },
+      ),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(runStub({ status: "FAILED" }), 1, {
+        arenaLive: true,
+        contenderStatus: "ELIMINATED",
+        nowMs: now,
+      }),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({
+          status: "FAILED",
+          errorCode: "incomplete",
+          updatedAt: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+        }),
+        1,
+        { arenaLive: true, nowMs: now },
+      ),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({
+          status: "FAILED",
+          errorCode: "incomplete",
+          updatedAt: new Date(now - 30 * 60 * 1000).toISOString(),
+        }),
+        1,
+        { arenaLive: true, nowMs: now },
+      ),
       "needsAttention",
     );
   });

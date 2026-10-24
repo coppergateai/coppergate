@@ -15,11 +15,13 @@ import {
   assertSecondaryRepoAllowed,
   assertSufficientBudget,
   attachSandboxToRun,
+  buildDeliveryCheckpoint,
   buildDeliveryReport,
   buildDiffSummary,
   createArtifact,
   effectivePlan,
   getContenderById,
+  getDeliveryCheckpoint,
   getEffectiveAgentProfile,
   getProjectForWorkspace,
   getSignalEventForTask,
@@ -39,6 +41,7 @@ import {
   parseJsonArray,
   parseSkillKeysJson,
   persistDeliveryArtifacts,
+  persistDeliveryCheckpoint,
   persistReviewFindings,
   renewRunLease,
   RunError,
@@ -1040,16 +1043,33 @@ export async function executeClaimedRun(
       filesChanged: completion.filesChanged,
       runId: run.id,
     }));
-  const delivery = await github.deliverPullRequest({
-    repo,
-    branchName: completion.branchName,
-    baseSha,
-    commitMessage: `Coppergate: ${task.title}`,
-    prTitle: `Coppergate: ${task.title}`,
-    prBody: `Task \`${task.id}\` · run \`${run.id}\` · repo \`${repo.owner}/${repo.repo}\`${issueLine}`,
-    files: prepared.files,
-    idempotencyKey: `task:${task.id}:run:${run.id}`,
-  });
+  const awaitLiveCi = deliveryMode === "http";
+
+  // Resume: durable checkpoint means PR already exists — do not re-deliver.
+  const existingCheckpoint = await getDeliveryCheckpoint(
+    db,
+    run.workspaceId,
+    run.id,
+  );
+  const delivery = existingCheckpoint
+    ? {
+        prUrl: existingCheckpoint.prUrl,
+        prNumber: existingCheckpoint.prNumber,
+        headSha: existingCheckpoint.headSha,
+        branchName: existingCheckpoint.branchName,
+        created: false,
+        idempotencyKey: `task:${task.id}:run:${run.id}`,
+      }
+    : await github.deliverPullRequest({
+        repo,
+        branchName: completion.branchName,
+        baseSha,
+        commitMessage: `Coppergate: ${task.title}`,
+        prTitle: `Coppergate: ${task.title}`,
+        prBody: `Task \`${task.id}\` · run \`${run.id}\` · repo \`${repo.owner}/${repo.repo}\`${issueLine}`,
+        files: prepared.files,
+        idempotencyKey: `task:${task.id}:run:${run.id}`,
+      });
 
   // Honest preview: real PREVIEW_BASE_URL + Pro plan, else explicit unavailable.
   const sub = await getWorkspaceSubscription(db, run.workspaceId);
@@ -1060,20 +1080,83 @@ export async function executeClaimedRun(
     runId: run.id,
     prNumber: delivery.prNumber,
   });
-  const previewUrl = preview.previewUrl;
-  const previewError = preview.previewError;
+  const previewUrl =
+    existingCheckpoint?.previewUrl ?? preview.previewUrl;
+  const previewError = existingCheckpoint ? null : preview.previewError;
+
+  // Checkpoint BEFORE status finalize so lease loss can recover a shipped PR.
+  if (!existingCheckpoint) {
+    await persistDeliveryCheckpoint(db, {
+      workspaceId: run.workspaceId,
+      projectId: run.projectId,
+      taskId: task.id,
+      runId: run.id,
+      checkpoint: buildDeliveryCheckpoint({
+        taskId: task.id,
+        runId: run.id,
+        prUrl: delivery.prUrl,
+        prNumber: delivery.prNumber,
+        branchName: delivery.branchName,
+        headSha: delivery.headSha,
+        actualCostMicros: actualCost,
+        awaitLiveCi,
+        previewUrl,
+      }),
+    });
+  }
+
+  // Leave VALIDATING immediately — minimizes validating_lease_expired after ship.
+  const awaiting = awaitLiveCi
+    ? await markRunWaitingCi(db, {
+        runId: run.id,
+        workerId,
+        branchName: delivery.branchName,
+        headSha: delivery.headSha,
+        prNumber: delivery.prNumber,
+        prUrl: delivery.prUrl,
+        actualCostMicros: actualCost,
+        previewUrl,
+      })
+    : await markRunAwaitingReview(db, {
+        runId: run.id,
+        workerId,
+        branchName: delivery.branchName,
+        headSha: delivery.headSha,
+        prNumber: delivery.prNumber,
+        prUrl: delivery.prUrl,
+        actualCostMicros: actualCost,
+        previewUrl,
+      });
+
+  await applyTaskTransition(db, {
+    workspaceId: run.workspaceId,
+    taskId: task.id,
+    toStatus: awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED",
+    actor: `worker:${workerId}`,
+    reason: awaitLiveCi
+      ? "PR delivered — awaiting live CI"
+      : "validation passed — human review required",
+  }).catch((err: unknown) => {
+    log.warn("task post-delivery transition skipped", {
+      error: err instanceof Error ? err.message : String(err),
+      toStatus: awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED",
+    });
+  });
 
   await appendRunEvent(db, {
     runId: run.id,
     workspaceId: run.workspaceId,
     kind: "evidence",
     payload: {
-      message: "Pull request delivered",
+      message: existingCheckpoint
+        ? "Pull request resumed from delivery checkpoint"
+        : "Pull request delivered",
       prUrl: delivery.prUrl,
       prNumber: delivery.prNumber,
       headSha: delivery.headSha,
       branchName: delivery.branchName,
       created: delivery.created,
+      resumed: Boolean(existingCheckpoint),
       repo: `${repo.owner}/${repo.repo}`,
       repoRole: "primary",
     },
@@ -1128,6 +1211,7 @@ export async function executeClaimedRun(
     meta: {
       prNumber: delivery.prNumber,
       created: delivery.created,
+      resumed: Boolean(existingCheckpoint),
     },
   });
 
@@ -1158,44 +1242,6 @@ export async function executeClaimedRun(
       previewError,
     }),
   });
-
-  const awaitLiveCi = deliveryMode === "http";
-  await applyTaskTransition(db, {
-    workspaceId: run.workspaceId,
-    taskId: task.id,
-    toStatus: awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED",
-    actor: `worker:${workerId}`,
-    reason: awaitLiveCi
-      ? "PR delivered — awaiting live CI"
-      : "validation passed — human review required",
-  }).catch((err: unknown) => {
-    log.warn("task post-delivery transition skipped", {
-      error: err instanceof Error ? err.message : String(err),
-      toStatus: awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED",
-    });
-  });
-
-  const awaiting = awaitLiveCi
-    ? await markRunWaitingCi(db, {
-        runId: run.id,
-        workerId,
-        branchName: delivery.branchName,
-        headSha: delivery.headSha,
-        prNumber: delivery.prNumber,
-        prUrl: delivery.prUrl,
-        actualCostMicros: actualCost,
-        previewUrl,
-      })
-    : await markRunAwaitingReview(db, {
-        runId: run.id,
-        workerId,
-        branchName: delivery.branchName,
-        headSha: delivery.headSha,
-        prNumber: delivery.prNumber,
-        prUrl: delivery.prUrl,
-        actualCostMicros: actualCost,
-        previewUrl,
-      });
 
   // TASK042 — independent reviewer findings (never auto-merges).
   await persistReviewFindings(db, {

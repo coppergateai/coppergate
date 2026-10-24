@@ -4,7 +4,7 @@ import {
   fetchInstallation,
   sealSecret,
 } from "@coppergate/github";
-import { upsertGithubInstallation } from "@coppergate/db";
+import { tryConsumeSignedState, upsertGithubInstallation } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -16,7 +16,7 @@ import {
   credentialsKey,
   githubAppConfig,
   isSecureCookie,
-  verifyInstallState,
+  verifyInstallStateClaims,
 } from "@/lib/github-install";
 import {
   appOrigin,
@@ -61,17 +61,16 @@ export async function GET(request: Request) {
     }
 
     // HMAC-signed state is authoritative (cookie often missing after GitHub → app).
+    // Always verify MAC + expiry — never trust workspaceId from an unverified cookie match.
     // Resolve workspace before requireUser so a localhost Setup URL can 307 to
     // hosted without needing a local session cookie.
     const jar = await cookies();
     const cookieState =
       jar.get(INSTALL_STATE_COOKIE)?.value ??
       cookieValue(request.headers.get("cookie"), INSTALL_STATE_COOKIE);
-    const workspaceId =
-      (cookieState && cookieState === state ? state.split(".")[0] : null) ??
-      verifyInstallState(state, env.SESSION_SECRET);
+    const claims = verifyInstallStateClaims(state, env.SESSION_SECRET);
 
-    if (!workspaceId) {
+    if (!claims) {
       const hosted = hostedFallbackInstallRedirect(request.url, env.APP_URL);
       if (hosted) {
         logger.info("github install callback hosted fallback", {
@@ -83,8 +82,30 @@ export async function GET(request: Request) {
       throw new ApiError("forbidden", installStateErrorMessage(env.APP_URL));
     }
 
+    if (cookieState && cookieState !== state) {
+      logger.warn("github install state cookie mismatch; using signed state", {
+        correlationId,
+        workspaceId: claims.workspaceId,
+      });
+    }
+
+    const workspaceId = claims.workspaceId;
+
     const user = await requireUser(request);
     await requireWorkspaceOwner(db, workspaceId, user.id);
+
+    const consumed = await tryConsumeSignedState(db, {
+      jti: `github_install:${claims.nonce}`,
+      kind: "github_install",
+      workspaceId,
+      expiresAt: new Date(claims.exp * 1000),
+    });
+    if (!consumed) {
+      throw new ApiError(
+        "forbidden",
+        "Install state already used or no longer valid. Start the GitHub install again from Settings.",
+      );
+    }
 
     if (setupAction === "request") {
       // Org install pending approval — still record nothing sensitive.

@@ -32,6 +32,15 @@ export {
 } from "./create-agent.js";
 export { FailoverCodingAgent } from "./failover.js";
 export {
+  flagsPromptInjectionPhrases,
+  guardPromptFields,
+  truncateUntrusted,
+  wrapUntrustedBlock,
+  PROMPT_ISOLATION_SYSTEM_RULES,
+  MAX_UNTRUSTED_FIELD_CHARS,
+  MAX_UNTRUSTED_TOTAL_CHARS,
+} from "./prompt-guard.js";
+export {
   CONTENDER_STRATEGIES,
   isContenderStrategy,
   strategyGuidance,

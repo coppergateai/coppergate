@@ -38,14 +38,28 @@ Date: 2026-10-24
 - Hard cancel for `WAITING_CI` (no worker lease) → immediate `CANCELLED`
 - Worker reaper fails matching tasks for all `failedRuns` (poison / validating / waiting_ci)
 
+## Cycle 7
+- **Delivery checkpoint**: persist `delivery_checkpoint` immediately after PR open; skip re-deliver on resume
+- **Early finalize**: `markRunWaitingCi` / `markRunAwaitingReview` right after checkpoint (leave VALIDATING before artifacts/notifications)
+- **Reaper recovery**: expired VALIDATING with checkpoint → `recoverDeliveredRun` (not `validating_lease_expired`); worker aligns task status
+- Legacy `delivery_report` parse fail-closes to `awaitLiveCi: true` (never open Accept early)
+
+## Cycle 8
+- **WAITING_CI accept fail-closed**: `getRunCiFitness` treats run status `WAITING_CI` as never `acceptReady` (even if `fitness:pending` event missing after crash)
+- `markRunWaitingCi` / `recoverDeliveredRun` write `fitness:pending` with the status transition
+- `decideTaskReview(accept)` rejects latest run still `WAITING_CI` and requires `acceptReady`
+- **Prompt isolation**: untrusted goal/scope/context wrapped in `<UNTRUSTED_DATA>`; size budgets; injection-phrase flag; system rules ignore data-plane directives
+
 ## Tests
-- `@coppergate/agents` — path/tool gates, abort, failover
+- `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt isolation (41 pass)
 - `delivery.test.ts` — fake idempotency, list fail-closed, 422 recovery, CAS conflict
+- `delivery-artifacts.test.ts` — checkpoint build/parse + legacy fail-closed
 - `runs.reaper-policy.test.ts` — reclaim parse + WAITING_CI timeout env
-- `runs.claim.test.ts` — poison / WAITING_CI / VALIDATING reaper (needs `DATABASE_URL`)
+- `ci-evidence.test.ts` — WAITING_CI status alone not accept-ready (needs `DATABASE_URL`)
 - DB claim/execute suites need `DATABASE_URL`
 
 ## Remaining risks
-- No durable checkpoint/resume of agent progress mid-run (agent is largely single-shot today)
+- Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly
 - Failover doubles spend only on thrown provider failures; operators should size fallback model cost intentionally
+- Prompt isolation is defense-in-depth, not a guarantee against model compliance failures

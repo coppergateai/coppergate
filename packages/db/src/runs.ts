@@ -543,6 +543,10 @@ export type ReapStaleRunsResult = {
   failedValidating: number;
   /** WAITING_CI past wall-clock without CI accept-ready. */
   failedWaitingCi: number;
+  /** VALIDATING recovered via delivery_checkpoint (PR already shipped). */
+  recoveredDelivered: number;
+  /** Runs recovered from checkpoint — caller should align task status. */
+  recoveredDeliveredRuns: ReapedFailedRun[];
   /** Runs failed by reaper — caller should fail matching tasks when still in-flight. */
   failedRuns: ReapedFailedRun[];
   /** @deprecated use failedRuns filtered by validating_lease_expired */
@@ -649,6 +653,55 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
     RETURNING id, error_code, error_message
   `;
 
+  // VALIDATING with a delivery checkpoint: promote instead of fail (PR already open).
+  const expiredValidating = await db.$client<FailedRow[]>`
+    SELECT id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
+    FROM agent_runs
+    WHERE status = 'VALIDATING'
+      AND cancel_requested_at IS NULL
+      AND (
+        (lease_until IS NOT NULL AND lease_until < now())
+        OR (
+          lease_until IS NULL
+          AND updated_at < ${wallCutoff}::timestamptz
+        )
+      )
+  `;
+
+  const recoveredDeliveredRuns: ReapedFailedRun[] = [];
+  if (expiredValidating.length > 0) {
+    const { getDeliveryCheckpoint } = await import("./delivery-artifacts.js");
+    const { recoverDeliveredRun } = await import("./run-events.js");
+    for (const row of expiredValidating) {
+      const runId = String(row.id);
+      const workspaceId = String(row.workspace_id);
+      const checkpoint = await getDeliveryCheckpoint(db, workspaceId, runId);
+      if (!checkpoint) continue;
+      const recovered = await recoverDeliveredRun(db, {
+        runId,
+        branchName: checkpoint.branchName,
+        headSha: checkpoint.headSha,
+        prNumber: checkpoint.prNumber,
+        prUrl: checkpoint.prUrl,
+        actualCostMicros: checkpoint.actualCostMicros,
+        awaitLiveCi: checkpoint.awaitLiveCi,
+        previewUrl: checkpoint.previewUrl,
+      });
+      if (recovered) {
+        recoveredDeliveredRuns.push({
+          id: runId,
+          taskId: String(row.task_id),
+          workspaceId,
+          projectId: String(row.project_id),
+          estimatedCostMicros: Number(row.estimated_cost_micros ?? 0),
+          errorCode: checkpoint.awaitLiveCi
+            ? "recovered_waiting_ci"
+            : "recovered_review_required",
+        });
+      }
+    }
+  }
+
   const failedValidatingRows = await db.$client<FailedRow[]>`
     UPDATE agent_runs
     SET
@@ -707,6 +760,8 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
     failedPoison: failedPoison.length,
     failedValidating: failedValidatingRuns.length,
     failedWaitingCi: failedWaitingCi.length,
+    recoveredDelivered: recoveredDeliveredRuns.length,
+    recoveredDeliveredRuns,
     failedRuns,
     failedValidatingRuns,
   };

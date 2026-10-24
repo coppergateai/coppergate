@@ -3,14 +3,14 @@ import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
 import styles from "@/components/marketing/marketing.module.css";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Limitations",
   description:
     "Current-release limitations for the Coppergate Survivor arena — wedge vs north star.",
-  alternates: { canonical: "/docs/limitations" },
-  openGraph: { url: "/docs/limitations" },
-};
+  path: "/docs/limitations",
+});
 
 export default function LimitationsPage() {
   return (

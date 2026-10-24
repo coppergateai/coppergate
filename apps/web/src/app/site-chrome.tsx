@@ -1,5 +1,4 @@
-import { Suspense, type ReactNode } from "react";
-import { currentUser } from "@/lib/auth";
+import type { ReactNode } from "react";
 import {
   AnnouncementBar,
   MarketingFooter,
@@ -7,14 +6,9 @@ import {
 } from "@/components/marketing";
 import styles from "@/components/marketing/marketing.module.css";
 
-async function AuthAwareHeader() {
-  const user = await currentUser();
-  return <MarketingHeader signedIn={Boolean(user)} />;
-}
-
 /**
- * Marketing chrome. Auth is Suspense-bound so cookie reads do not delay
- * streamed document metadata into the body (critical for SEO).
+ * Static marketing chrome (no cookie reads). Auth CTAs resolve client-side so
+ * document metadata can flush into <head> without waiting on the session.
  */
 export function SiteChrome({ children }: { children: ReactNode }) {
   return (
@@ -28,9 +22,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
       </div>
 
       <AnnouncementBar />
-      <Suspense fallback={<MarketingHeader signedIn={false} />}>
-        <AuthAwareHeader />
-      </Suspense>
+      <MarketingHeader />
 
       <main id="main-content" className={styles.main}>
         {children}

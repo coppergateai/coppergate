@@ -204,6 +204,13 @@
       "when": 1729400000000,
       "tag": "0028_agent_platform",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1729500000000,
+      "tag": "0029_signed_states",
+      "breakpoints": true
     }
   ]
 }

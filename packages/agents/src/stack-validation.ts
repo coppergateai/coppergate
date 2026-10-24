@@ -1,4 +1,4 @@
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { FakeCompletionPayload } from "./types.js";
 import {
@@ -131,7 +131,12 @@ export async function runStackValidation(
   }
 
   if (stack === "nextjs_ts" || stack === "unknown" || stack.startsWith("node")) {
-    const lint = await runNpmScript(input.exec, "lint", 120_000);
+    const lint = await runNpmScript(
+      input.workdir,
+      input.exec,
+      "lint",
+      120_000,
+    );
     checks.push({
       name: "npm_lint",
       passed: lint.skipped || lint.exitCode === 0,
@@ -142,7 +147,12 @@ export async function runStackValidation(
           : (lint.stderr || lint.stdout).slice(0, 400),
     });
 
-    const test = await runNpmScript(input.exec, "test", 180_000);
+    const test = await runNpmScript(
+      input.workdir,
+      input.exec,
+      "test",
+      180_000,
+    );
     checks.push({
       name: "npm_test",
       passed: test.skipped || test.exitCode === 0,
@@ -172,6 +182,7 @@ export async function runStackValidation(
 }
 
 async function runNpmScript(
+  workdir: string,
   exec: NonNullable<StackValidationInput["exec"]>,
   script: "lint" | "test",
   timeoutMs: number,
@@ -181,25 +192,26 @@ async function runNpmScript(
   stderr: string;
   skipped: boolean;
 }> {
-  // Detect script via node -e to avoid failing the whole run on missing script.
-  const detect = await exec(
-    [
-      "node",
-      "-e",
-      `const p=require('./package.json'); process.exit(p.scripts&&p.scripts[${JSON.stringify(script)}]?0:2)`,
-    ],
-    { timeoutMs: 15_000 },
-  );
-  if (detect.exitCode === 2) {
-    return { exitCode: 0, stdout: "", stderr: "", skipped: true };
-  }
-  if (detect.exitCode !== 0) {
+  // Read package.json from the host-side workdir — avoids sandbox `node -e`
+  // (blocked by command policy as interpreter eval).
+  let hasScript = false;
+  try {
+    const raw = await readFile(join(workdir, "package.json"), "utf8");
+    const pkg = JSON.parse(raw) as { scripts?: Record<string, unknown> };
+    hasScript = Boolean(pkg.scripts && typeof pkg.scripts[script] === "string");
+  } catch (err) {
     return {
-      exitCode: detect.exitCode,
-      stdout: detect.stdout,
-      stderr: detect.stderr || "failed to read package.json scripts",
+      exitCode: 1,
+      stdout: "",
+      stderr:
+        err instanceof Error
+          ? err.message.slice(0, 200)
+          : "failed to read package.json scripts",
       skipped: false,
     };
+  }
+  if (!hasScript) {
+    return { exitCode: 0, stdout: "", stderr: "", skipped: true };
   }
 
   const result = await exec(["npm", "run", script, "--if-present"], {

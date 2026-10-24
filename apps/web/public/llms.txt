@@ -22,6 +22,12 @@ Contact: hello@coppergate.ai
 - [Privacy](https://www.coppergate.ai/privacy): Privacy policy
 - [Terms](https://www.coppergate.ai/terms): Terms of use
 
+## Blog posts
+
+- [Multi-agent arena vs coding chat agents](https://www.coppergate.ai/blog/multi-agent-arena-vs-chat)
+- [Budget caps and kill-switches for agent spend](https://www.coppergate.ai/blog/agent-budget-caps-kill-switch)
+- [Fitness gates — evidence before merge](https://www.coppergate.ai/blog/fitness-gates-evidence-before-merge)
+
 ## Self-host
 
 - [SELF_HOST.md](https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md)

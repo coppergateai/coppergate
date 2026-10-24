@@ -856,6 +856,24 @@ export const workspaceSubscriptions = pgTable(
   ],
 );
 
+/** Single-use ledger for signed OAuth / install state (jti). */
+export const consumedSignedStates = pgTable(
+  "consumed_signed_states",
+  {
+    jti: text("jti").primaryKey(),
+    kind: text("kind").notNull(),
+    workspaceId: uuid("workspace_id"),
+    consumedAt: timestamp("consumed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index("consumed_signed_states_expires_at_idx").on(t.expiresAt),
+    index("consumed_signed_states_kind_idx").on(t.kind),
+  ],
+);
+
 /** Idempotent GitHub webhook delivery log — TASK006. */
 export const githubWebhookDeliveries = pgTable(
   "github_webhook_deliveries",

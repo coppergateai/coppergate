@@ -259,14 +259,38 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           reaped.requeued > 0 ||
           reaped.failedValidating > 0 ||
           reaped.failedPoison > 0 ||
-          reaped.failedWaitingCi > 0
+          reaped.failedWaitingCi > 0 ||
+          reaped.recoveredDelivered > 0
         ) {
           log.info("reaped stale runs", {
             requeued: reaped.requeued,
             failedValidating: reaped.failedValidating,
             failedPoison: reaped.failedPoison,
             failedWaitingCi: reaped.failedWaitingCi,
+            recoveredDelivered: reaped.recoveredDelivered,
           });
+        }
+        for (const recovered of reaped.recoveredDeliveredRuns) {
+          const toStatus =
+            recovered.errorCode === "recovered_waiting_ci"
+              ? "WAITING_CI"
+              : "REVIEW_REQUIRED";
+          try {
+            await applyTaskTransition(db, {
+              workspaceId: recovered.workspaceId,
+              taskId: recovered.taskId,
+              toStatus,
+              actor: `worker:${workerId}`,
+              reason: "delivery_checkpoint_recovery",
+            });
+          } catch (err) {
+            log.warn("task status align after delivery recovery skipped", {
+              taskId: recovered.taskId,
+              runId: recovered.id,
+              toStatus,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
         }
         for (const stale of reaped.failedRuns) {
           try {

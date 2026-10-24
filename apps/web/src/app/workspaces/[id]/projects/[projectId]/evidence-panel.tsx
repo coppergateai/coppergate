@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { displayTaskTitle } from "@/lib/display-title";
 import { EmptyState } from "@/components/app/ui";
 import { gateStatusLabel, type GateStatus } from "@/lib/hard-gates";
@@ -79,6 +79,24 @@ function formatWhen(iso: string): string {
   }
 }
 
+/** Lower = higher in Evidence Center (actionable first). */
+function evidenceRank(d: DeliveryRow): number {
+  if (d.status === "REVIEW_REQUIRED" && d.acceptReady) return 0;
+  if (d.status === "FAILED") return 1;
+  if (d.status === "REVIEW_REQUIRED") return 2;
+  if (d.status === "WAITING_CI" || d.status === "VALIDATING") return 3;
+  if (d.status === "ACCEPTED" || d.status === "DONE") return 5;
+  return 4;
+}
+
+function sortDeliveries(rows: DeliveryRow[]): DeliveryRow[] {
+  return [...rows].sort((a, b) => {
+    const rank = evidenceRank(a) - evidenceRank(b);
+    if (rank !== 0) return rank;
+    return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+  });
+}
+
 /**
  * Evidence Center — why a delivery is acceptable (gates + deep-link to review).
  */
@@ -93,6 +111,9 @@ export function EvidencePanel({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [gatesByTask, setGatesByTask] = useState<Record<string, Gate[]>>({});
   const [error, setError] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const ordered = useMemo(() => sortDeliveries(deliveries), [deliveries]);
 
   const load = useCallback(async () => {
     const res = await fetch(
@@ -143,6 +164,50 @@ export function EvidencePanel({
     }
   }
 
+  async function retryFailed(taskId: string): Promise<void> {
+    setRetryingId(taskId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/retry`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      const body = (await res.json()) as { error?: { message?: string } };
+      if (!res.ok) {
+        throw new Error(body.error?.message ?? "Retry failed");
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRetryingId(null);
+    }
+  }
+
+  async function acceptDelivery(taskId: string): Promise<void> {
+    setAcceptingId(taskId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/review`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId, decision: "accept" }),
+      });
+      const body = (await res.json()) as { error?: { message?: string } };
+      if (!res.ok) {
+        throw new Error(body.error?.message ?? "Accept failed");
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAcceptingId(null);
+    }
+  }
+
   return (
     <section className={styles.section} aria-labelledby="evidence-heading">
       <div className={styles.sectionHead}>
@@ -156,7 +221,7 @@ export function EvidencePanel({
       </p>
       {error ? <p className={styles.stackWarn}>{error}</p> : null}
 
-      {deliveries.length === 0 ? (
+      {ordered.length === 0 ? (
         <EmptyState
           title="No deliveries yet"
           body="Primary path: Import → queue an issue, then review gates here before Accept. Arena Start can invent work under the same spend envelope."
@@ -167,8 +232,39 @@ export function EvidencePanel({
           }
         />
       ) : (
+        <>
+        <p className={styles.evidenceSummary} aria-label="Evidence summary">
+          <span>
+            <strong>
+              {
+                ordered.filter(
+                  (d) => d.status === "REVIEW_REQUIRED" && d.acceptReady,
+                ).length
+              }
+            </strong>{" "}
+            accept ready
+          </span>
+          <span>
+            <strong>
+              {
+                ordered.filter((d) => d.status === "FAILED").length
+              }
+            </strong>{" "}
+            failed
+          </span>
+          <span>
+            <strong>
+              {
+                ordered.filter(
+                  (d) => d.status === "ACCEPTED" || d.status === "DONE",
+                ).length
+              }
+            </strong>{" "}
+            verified
+          </span>
+        </p>
         <ul className={styles.evidenceList}>
-          {deliveries.map((d) => {
+          {ordered.map((d) => {
             const gates = gatesByTask[d.taskId] ?? [];
             const open = expandedId === d.taskId;
             const tone = statusTone(d.status, d.acceptReady);
@@ -203,7 +299,7 @@ export function EvidencePanel({
                     {statusHint(d.status, d.acceptReady)}
                     {d.prUrl ? " · PR attached" : ""}
                     {d.updatedAt ? ` · ${formatWhen(d.updatedAt)}` : ""}
-                    {!open ? " · Gates" : ""}
+                    {!open ? " · Expand gates" : ""}
                   </p>
                   {open && gates.length > 0 ? (
                     <ul className={styles.gateList}>
@@ -233,19 +329,37 @@ export function EvidencePanel({
                   ) : null}
                 </div>
                 <div className={styles.evidenceActions}>
+                  {d.status === "REVIEW_REQUIRED" && d.acceptReady ? (
+                    <button
+                      type="button"
+                      className={styles.primaryBtn}
+                      disabled={acceptingId === d.taskId}
+                      onClick={() => void acceptDelivery(d.taskId)}
+                    >
+                      {acceptingId === d.taskId ? "Accepting…" : "Accept"}
+                    </button>
+                  ) : null}
+                  {d.status === "FAILED" ? (
+                    <button
+                      type="button"
+                      className={styles.primaryBtn}
+                      disabled={retryingId === d.taskId}
+                      onClick={() => void retryFailed(d.taskId)}
+                    >
+                      {retryingId === d.taskId ? "Retrying…" : "Retry"}
+                    </button>
+                  ) : null}
                   <Link
                     href={`${base}/tasks/${d.taskId}`}
-                    className={
-                      d.status === "REVIEW_REQUIRED" && d.acceptReady
-                        ? styles.primaryBtn
-                        : styles.ghostBtn
-                    }
+                    className={styles.ghostBtn}
                   >
                     {d.status === "REVIEW_REQUIRED" && d.acceptReady
-                      ? "Accept delivery"
+                      ? "Details"
                       : d.status === "REVIEW_REQUIRED"
                         ? "Review gates"
-                        : "Review"}
+                        : d.status === "FAILED"
+                          ? "Details"
+                          : "Review"}
                   </Link>
                   {d.prUrl ? (
                     <a
@@ -262,6 +376,7 @@ export function EvidencePanel({
             );
           })}
         </ul>
+        </>
       )}
     </section>
   );

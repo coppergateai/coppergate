@@ -9,6 +9,7 @@ export { FitnessSection } from "./fitness-section";
 export { HeroArenaStory } from "./hero-arena-story";
 export { HeroMissionMock } from "./hero-mission-mock";
 export { HeroSection } from "./hero-section";
+export { HostedCtaLink } from "./hosted-cta-link";
 export { MarketingFooter } from "./marketing-footer";
 export { MarketingHeader } from "./marketing-header";
 export { MarketingLottie } from "./marketing-lottie";

@@ -1,13 +1,14 @@
-import { randomBytes } from "node:crypto";
 import { gitlabAuthorizeUrl } from "@coppergate/gitlab";
 import { ApiError } from "@coppergate/errors";
 import { requireUser, isSecureCookie } from "@/lib/auth";
 import { requireCsrf } from "@/lib/csrf";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import {
   GITLAB_INSTALL_STATE_COOKIE,
   gitlabInstallOAuthConfig,
 } from "@/lib/gitlab";
+import { createSignedWorkspaceState } from "@/lib/signed-workspace-state";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
 import { requireWorkspaceOwner } from "@/lib/workspace";
 
@@ -31,8 +32,10 @@ export async function POST(request: Request) {
 
     await requireWorkspaceOwner(db, body.workspaceId, user.id);
     const config = gitlabInstallOAuthConfig();
-    const nonce = randomBytes(16).toString("base64url");
-    const state = `${body.workspaceId}.${nonce}`;
+    const state = createSignedWorkspaceState(
+      body.workspaceId,
+      env.SESSION_SECRET,
+    );
     const url = gitlabAuthorizeUrl(config, state);
 
     const res = jsonOk({ url }, { correlationId });

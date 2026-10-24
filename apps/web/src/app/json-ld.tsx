@@ -38,8 +38,7 @@ export function JsonLd() {
         applicationCategory: "DeveloperApplication",
         operatingSystem: "Web",
         url: siteUrl,
-        description:
-          "Set a budget. Agents war. Survivors ship. Weak agents lose budget and get eliminated; strong agents win, ship, and improve. Selection pressure optimizes agent cost efficiency.",
+        description: SITE_DESCRIPTION,
         offers: {
           "@type": "Offer",
           price: "0",

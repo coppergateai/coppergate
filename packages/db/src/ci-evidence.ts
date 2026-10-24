@@ -258,10 +258,17 @@ export async function getRunCiFitness(
   const blocking = checks.some((c) => c.blocksAccept);
   const passed = checks.some((c) => c.passed && !c.blocksAccept);
 
-  let awaitingLive = false;
+  const [run] = await db
+    .select({ status: agentRuns.status })
+    .from(agentRuns)
+    .where(eq(agentRuns.id, runId))
+    .limit(1);
+  const statusAwaitingCi = run?.status === "WAITING_CI";
+
+  let eventAwaitingLive = false;
   try {
     const events = await listRunEvents(db, runId);
-    awaitingLive = events.some((e) => {
+    eventAwaitingLive = events.some((e) => {
       try {
         const payload = JSON.parse(e.payload) as {
           fitness?: unknown;
@@ -272,10 +279,14 @@ export async function getRunCiFitness(
       }
     });
   } catch {
-    awaitingLive = false;
+    eventAwaitingLive = false;
   }
 
-  const acceptReady = !blocking && (!awaitingLive || passed);
+  // Run status is source of truth — do not rely solely on fitness:pending events
+  // (worker can crash after markRunWaitingCi before the evidence event is written).
+  const awaitingLive = statusAwaitingCi || eventAwaitingLive;
+  const acceptReady =
+    !statusAwaitingCi && !blocking && (!awaitingLive || passed);
 
   return { checks, blocking, passed, awaitingLive, acceptReady };
 }

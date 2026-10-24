@@ -187,6 +187,81 @@ export async function markRunWaitingCi(
       "Cannot enter WAITING_CI — not owner or not RUNNING/VALIDATING",
     );
   }
+  // Durable accept gate — must land with status, not as a later best-effort event.
+  await appendRunEvent(db, {
+    runId: updated.id,
+    workspaceId: updated.workspaceId,
+    kind: "evidence",
+    payload: {
+      message: "Awaiting live CI evidence",
+      fitness: "pending",
+      headSha: input.headSha,
+      prNumber: input.prNumber,
+      prUrl: input.prUrl,
+    },
+  }).catch(() => undefined);
+  return updated;
+}
+
+/**
+ * Recover VALIDATING → WAITING_CI / REVIEW_REQUIRED after a durable delivery
+ * checkpoint when the worker lost its lease mid-finalize (no owner required).
+ */
+export async function recoverDeliveredRun(
+  db: Database,
+  input: {
+    runId: string;
+    branchName: string;
+    headSha: string;
+    prNumber: number;
+    prUrl: string;
+    actualCostMicros: number;
+    awaitLiveCi: boolean;
+    previewUrl?: string | null;
+  },
+): Promise<AgentRun | null> {
+  const now = new Date();
+  const status = input.awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED";
+  const [updated] = await db
+    .update(agentRuns)
+    .set({
+      status,
+      branchName: input.branchName,
+      headSha: input.headSha,
+      prNumber: input.prNumber,
+      prUrl: input.prUrl,
+      actualCostMicros: input.actualCostMicros,
+      previewUrl: input.previewUrl ?? null,
+      errorCode: null,
+      errorMessage: null,
+      leaseOwner: null,
+      leaseUntil: null,
+      finishedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(eq(agentRuns.id, input.runId), eq(agentRuns.status, "VALIDATING")),
+    )
+    .returning();
+
+  if (!updated) return null;
+  if (!input.awaitLiveCi) {
+    await releaseRunEstimate(db, updated);
+  } else {
+    await appendRunEvent(db, {
+      runId: updated.id,
+      workspaceId: updated.workspaceId,
+      kind: "evidence",
+      payload: {
+        message: "Awaiting live CI evidence (delivery checkpoint recovery)",
+        fitness: "pending",
+        headSha: input.headSha,
+        prNumber: input.prNumber,
+        prUrl: input.prUrl,
+        recovered: true,
+      },
+    }).catch(() => undefined);
+  }
   return updated;
 }
 
