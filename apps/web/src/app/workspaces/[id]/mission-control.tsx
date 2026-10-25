@@ -206,10 +206,25 @@ export function MissionControl({ data, recentEvents }: Props) {
     });
   } else {
     attentionRows.push(
-      ...replanItems.map((item) => ({
-        ...item,
-        detail: humanizeOpsDetail(item.detail),
-      })),
+      ...replanItems.map((item) => {
+        const detail = humanizeOpsDetail(item.detail);
+        const capacityWait =
+          item.priority === "normal" ||
+          /Waiting on capacity/i.test(item.title) ||
+          /already in flight/i.test(detail);
+        return {
+          ...item,
+          title: capacityWait
+            ? item.title.replace(/^Replan queue failed/i, "Waiting on capacity")
+            : item.title,
+          detail,
+          href: capacityWait
+            ? `/workspaces/${data.workspaceId}/arena`
+            : item.href,
+          ctaLabel: capacityWait ? "Open Arena" : item.ctaLabel,
+          priority: capacityWait ? "normal" : item.priority,
+        };
+      }),
     );
   }
   attentionRows.push(
