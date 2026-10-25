@@ -207,7 +207,18 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     title: "Replan queue failed",
     category: "execution",
     outcome: "failed",
-    summary: (m) => str(m, "error") ?? "Could not enqueue the next draft task",
+    summary: (m) => {
+      const err = str(m, "error");
+      if (!err) return "Could not enqueue the next draft task";
+      if (
+        /concurrent run/i.test(err) ||
+        /in flight on this project/i.test(err) ||
+        /community plan allows/i.test(err)
+      ) {
+        return "Another run is already in flight — wait or pause Arena, then retry";
+      }
+      return err.length > 140 ? `${err.slice(0, 137)}…` : err;
+    },
   },
   "maintainer.release": {
     title: "Release published",

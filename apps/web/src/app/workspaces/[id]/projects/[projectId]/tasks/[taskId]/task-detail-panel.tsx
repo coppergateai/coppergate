@@ -474,16 +474,28 @@ export function TaskDetailPanel({
       : ciFitness.acceptReady && !validationFailed && !policyFailed;
   // Prefer visible gate rows over a stale API acceptReady flag.
   const acceptReady = acceptReadyRaw && !hardIncomplete;
+  const taskTerminal = [
+    "FAILED",
+    "CANCELLED",
+    "EXPIRED",
+    "BLOCKED",
+    "DONE",
+    "ACCEPTED",
+  ].includes(task.status);
   const acceptBlockedReason = computeAcceptBlocked({
     acceptReady,
     // Pending hard gates are incomplete — not a CI failure (avoid false "CI failed").
     ciBlocking: ciFitness.blocking,
-    ciAwaitingLive: ciFitness.awaitingLive || hardIncomplete,
+    ciAwaitingLive:
+      !taskTerminal && (ciFitness.awaitingLive || hardIncomplete),
     ciPassed: ciFitness.passed && !hardIncomplete,
     validationFailed,
     policyFailed,
+    deliveryFailed: task.status === "FAILED",
+    // Never treat a terminal task as “still validating” even if the run row lags.
     stillValidating:
-      task.status === "VALIDATING" || selected?.status === "VALIDATING",
+      !taskTerminal &&
+      (task.status === "VALIDATING" || selected?.status === "VALIDATING"),
   });
   const gateBannerTitle = acceptReady
     ? HARD_GATE_COPY.allHardPassed
@@ -499,7 +511,9 @@ export function TaskDetailPanel({
   const activeStageId =
     task.status === "REVIEW_REQUIRED" || task.status === "ACCEPTED"
       ? "review"
-      : task.status === "VALIDATING" || task.status === "WAITING_CI"
+      : task.status === "VALIDATING" ||
+          task.status === "WAITING_CI" ||
+          task.status === "FAILED"
         ? "verification"
         : task.status === "RUNNING" || task.status === "QUEUED"
           ? "execution"
@@ -507,11 +521,39 @@ export function TaskDetailPanel({
             ? "delivery"
             : "scope";
 
+  const taskStatusLabel = (() => {
+    switch (task.status) {
+      case "FAILED":
+        return "Failed";
+      case "VALIDATING":
+        return "Validating";
+      case "WAITING_CI":
+        return "Awaiting CI";
+      case "RUNNING":
+        return "Running";
+      case "QUEUED":
+        return "Queued";
+      case "REVIEW_REQUIRED":
+        return "In review";
+      case "ACCEPTED":
+        return "Accepted";
+      case "DONE":
+        return "Done";
+      case "CANCELLED":
+        return "Cancelled";
+      case "BLOCKED":
+        return "Blocked";
+      default:
+        return task.status
+          .replaceAll("_", " ")
+          .toLowerCase()
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+  })();
+
   return (
     <div className={styles.root}>
-      <p className={styles.kicker}>
-        Delivery · {task.status.replaceAll("_", " ")}
-      </p>
+      <p className={styles.kicker}>Delivery · {taskStatusLabel}</p>
       <p className={styles.meta}>
         Attempt {task.attemptCount}/{task.maxAttempts}
         {task.prUrl ? (

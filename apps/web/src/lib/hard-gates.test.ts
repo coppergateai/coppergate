@@ -51,4 +51,18 @@ describe("acceptBlockedReason", () => {
       HARD_GATE_COPY.ciFailed,
     );
   });
+
+  it("prefers delivery failed over still validating", () => {
+    assert.equal(
+      acceptBlockedReason({
+        acceptReady: false,
+        ciBlocking: false,
+        ciAwaitingLive: true,
+        ciPassed: false,
+        stillValidating: true,
+        deliveryFailed: true,
+      }),
+      HARD_GATE_COPY.deliveryFailed,
+    );
+  });
 });
