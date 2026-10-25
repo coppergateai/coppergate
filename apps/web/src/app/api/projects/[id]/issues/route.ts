@@ -47,12 +47,34 @@ export async function GET(request: Request, context: RouteContext) {
     if (!workspaceId) throw new ApiError("bad_request", "workspaceId required");
     await requireWorkspaceMember(db, workspaceId, user.id);
     const ctx = await resolveRepoContext(workspaceId, projectId);
-    const issues = await listOpenIssues({
-      token: ctx.token,
-      owner: ctx.owner,
-      repo: ctx.name,
-    });
-    return jsonOk({ issues, repo: ctx.fullName }, { correlationId });
+    try {
+      const issues = await listOpenIssues({
+        token: ctx.token,
+        owner: ctx.owner,
+        repo: ctx.name,
+      });
+      return jsonOk({ issues, repo: ctx.fullName }, { correlationId });
+    } catch (err) {
+      // Private/empty/forbidden repos should not 500 the project Overview.
+      const status =
+        err && typeof err === "object" && "status" in err
+          ? Number((err as { status?: number }).status)
+          : NaN;
+      if (status === 403 || status === 404 || status === 410 || status === 451) {
+        return jsonOk(
+          {
+            issues: [],
+            repo: ctx.fullName,
+            warning: `GitHub issues unavailable (${status})`,
+          },
+          { correlationId },
+        );
+      }
+      throw new ApiError(
+        "not_ready",
+        err instanceof Error ? err.message : "GitHub issues unavailable",
+      );
+    }
   } catch (err) {
     return jsonError(err, correlationId);
   }

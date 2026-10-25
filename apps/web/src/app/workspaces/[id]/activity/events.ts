@@ -925,15 +925,52 @@ function buildMergeAttemptGroup(events: ActivityEvent[]): ActivityGroup {
   return group;
 }
 
+function buildArenaControlGroup(events: ActivityEvent[]): ActivityGroup {
+  const sorted = [...events].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  const latest = sorted[0]!;
+  if (sorted.length === 1) {
+    return buildSingle(latest);
+  }
+  const children = sorted.map((e) => annotate(e));
+  return {
+    key: "arena.control",
+    kind: "collapse",
+    title: "Arena control",
+    summary: arenaControlSummary(children),
+    technicalLabel: `control ×${sorted.length}`,
+    category: "decision",
+    outcome: children.some((c) => c.outcome === "review")
+      ? "review"
+      : children.some((c) => c.outcome === "running")
+        ? "running"
+        : "completed",
+    count: sorted.length,
+    actor: latest.actor,
+    action: "arena.control",
+    createdAt: latest.createdAt,
+    href: latest.href,
+    meta: latest.meta,
+    targetType: latest.targetType,
+    targetId: latest.targetId,
+    eventId: latest.id,
+    children,
+  };
+}
+
 /**
  * Group raw audit events (newest-first) into timeline groups.
  * - Tournament create/fanout/resolve with same tournament id → one execution
  * - merge.attempt storms per project → one collapse (even when interleaved)
+ * - arena.start/stop/pause storms → one Arena control collapse
  * - Consecutive identical actions (same target) → collapsed with count
  */
 export function groupActivityEvents(events: ActivityEvent[]): ActivityGroup[] {
   const tournamentBuckets = new Map<string, ActivityEvent[]>();
   const mergeBuckets = new Map<string, ActivityEvent[]>();
+  const arenaControlEvents: ActivityEvent[] = [];
   const remainder: ActivityEvent[] = [];
 
   for (const event of events) {
@@ -951,6 +988,10 @@ export function groupActivityEvents(events: ActivityEvent[]): ActivityGroup[] {
       mergeBuckets.set(mk, bucket);
       continue;
     }
+    if (isArenaControlAction(event.action)) {
+      arenaControlEvents.push(event);
+      continue;
+    }
     remainder.push(event);
   }
 
@@ -965,7 +1006,12 @@ export function groupActivityEvents(events: ActivityEvent[]): ActivityGroup[] {
     mergeGroups.push(buildMergeAttemptGroup(bucket));
   }
 
-  // Collapse consecutive identical / arena-control storms (already newest-first)
+  const arenaGroups: ActivityGroup[] = [];
+  if (arenaControlEvents.length > 0) {
+    arenaGroups.push(buildArenaControlGroup(arenaControlEvents));
+  }
+
+  // Collapse consecutive identical storms (already newest-first)
   const collapsed: ActivityGroup[] = [];
   for (const event of remainder) {
     const prev = collapsed[collapsed.length - 1];
@@ -998,27 +1044,20 @@ export function groupActivityEvents(events: ActivityEvent[]): ActivityGroup[] {
         prev.children.push(annotate(event));
         prev.count = prev.children.length;
         prev.kind = "collapse";
-        if (prevKey === "arena.control") {
-          prev.title = "Arena control";
-          prev.action = "arena.control";
-          prev.technicalLabel = `control ×${prev.count}`;
-          prev.summary = arenaControlSummary(prev.children);
-          prev.outcome = prev.children.some((c) => c.outcome === "review")
-            ? "review"
-            : prev.children.some((c) => c.outcome === "running")
-              ? "running"
-              : "completed";
-        } else {
-          prev.technicalLabel = `${technicalLabel(prev.action)} ×${prev.count}`;
-          prev.summary = summaryFor(prev.action, prev.meta, prev.count);
-        }
+        prev.technicalLabel = `${technicalLabel(prev.action)} ×${prev.count}`;
+        prev.summary = summaryFor(prev.action, prev.meta, prev.count);
         continue;
       }
     }
     collapsed.push(buildSingle(event));
   }
 
-  const all = [...tournamentGroups, ...mergeGroups, ...collapsed];
+  const all = [
+    ...tournamentGroups,
+    ...mergeGroups,
+    ...arenaGroups,
+    ...collapsed,
+  ];
   all.sort(
     (a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
