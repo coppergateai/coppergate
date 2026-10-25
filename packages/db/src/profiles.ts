@@ -165,6 +165,11 @@ export const DEFAULT_SPAWN_MATRIX: Record<string, string[]> = {
   github_issue: ["engineer", "proposer"],
   vision_replan: ["proposer", "engineer"],
   maintainer: ["engineer", "reviewer"],
+  product_gap: ["proposer", "engineer"],
+  ux_audit: ["qa", "engineer"],
+  seo_audit: ["docs", "engineer"],
+  landing_audit: ["engineer", "docs"],
+  reliability: ["fixer", "reviewer"],
   codeql: ["security", "fixer"],
   semgrep: ["security", "fixer"],
   dependabot: ["security"],
@@ -199,12 +204,23 @@ export async function ensureSystemAgentProfiles(
   const out: AgentProfile[] = [];
   for (const seed of SYSTEM_PROFILE_SEEDS) {
     const hit = byKey.get(seed.key);
+    const skillKeys = DEFAULT_PROFILE_SKILL_KEYS[seed.key] ?? [];
+    const skillKeysJson = JSON.stringify(skillKeys);
     if (hit) {
-      out.push(hit);
+      // Keep locked system profiles aligned with DEFAULT_PROFILE_SKILL_KEYS.
+      if (hit.locked && hit.skillKeysJson !== skillKeysJson) {
+        const [updated] = await db
+          .update(agentProfiles)
+          .set({ skillKeysJson, updatedAt: now })
+          .where(eq(agentProfiles.id, hit.id))
+          .returning();
+        out.push(updated ?? hit);
+      } else {
+        out.push(hit);
+      }
       continue;
     }
     const temperament = seed.temperament;
-    const skillKeys = DEFAULT_PROFILE_SKILL_KEYS[seed.key] ?? [];
     const [created] = await db
       .insert(agentProfiles)
       .values({
@@ -216,7 +232,7 @@ export async function ensureSystemAgentProfiles(
         toolAllowlistJson: JSON.stringify(seed.toolAllowlist),
         strategyDefault: seed.strategyDefault,
         temperament,
-        skillKeysJson: JSON.stringify(skillKeys),
+        skillKeysJson,
         maxSpendMicros: seed.maxSpendMicros,
         locked: true,
         createdAt: now,
