@@ -32,6 +32,7 @@ import {
   setWorkspaceBudget,
   startProjectArena,
   updateInstallationToken,
+  updateMaintainerPolicy,
   workspaces,
 } from "../packages/db/src/index.ts";
 import {
@@ -168,6 +169,19 @@ try {
     });
   }
 
+  await updateMaintainerPolicy(db, {
+    workspaceId,
+    projectId,
+    actor,
+    patch: {
+      enabled: false,
+      monthlyBudgetMicros: budgetMicros,
+      maxTournamentN: 1,
+      architectureRepo: process.env.ARCHITECTURE_REPO,
+      architecturePaths: process.env.ARCHITECTURE_PATHS,
+    },
+  });
+
   const { arena, contenders } = await ensureArenaForProject(db, {
     workspaceId,
     projectId,
@@ -211,7 +225,11 @@ try {
       token = minted.token;
     }
     const md = token
-      ? await fetchArchitectureBacklogMarkdown(token)
+      ? await fetchArchitectureBacklogMarkdown({
+          token,
+          repo: process.env.ARCHITECTURE_REPO,
+          paths: process.env.ARCHITECTURE_PATHS,
+        })
       : "";
     const tasks = parseArchitectureOpenTasks(md);
     const next = pickNextArchitectureTask(tasks);
