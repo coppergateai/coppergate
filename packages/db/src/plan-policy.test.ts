@@ -29,6 +29,8 @@ describe("plan policy", () => {
   it("Community and Pro share the raised concurrency cap", () => {
     assert.equal(PLAN_LIMITS.community.maxConcurrentRuns, 20);
     assert.equal(PLAN_LIMITS.pro.maxConcurrentRuns, 20);
+    assert.equal(PLAN_LIMITS.community.maxConcurrentRunsPerProject, 3);
+    assert.equal(PLAN_LIMITS.pro.maxConcurrentRunsPerProject, 3);
   });
 
   it("remainingConcurrencySlots never goes negative", () => {

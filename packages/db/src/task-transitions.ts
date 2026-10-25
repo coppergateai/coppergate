@@ -165,7 +165,11 @@ export async function enqueueQueuedTask(
     reason: string;
   },
 ): Promise<Task> {
-  await assertPlanConcurrency(db, input.workspaceId);
+  await assertPlanConcurrency(
+    db,
+    input.workspaceId,
+    input.task.projectId,
+  );
   const { limits } = await resolveWorkspacePlanLimits(db, input.workspaceId);
 
   const nextAttempt = input.task.attemptCount + 1;

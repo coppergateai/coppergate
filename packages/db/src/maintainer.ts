@@ -1932,11 +1932,21 @@ export async function runVisionReplan(
     process.env.ARCHITECTURE_BACKLOG_MD?.trim() ||
     (await fetchArchitectureBacklogMarkdown(input.architectureToken)) ||
     "";
+  const excludeIds = await listInFlightArchitectureIds(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    architectureToken: input.architectureToken,
+  });
   const archTask = pickNextArchitectureTask(
     parseArchitectureOpenTasks(roadmapMd),
+    { excludeIds },
   );
   // No architecture Open ID → do not invent scaffold/generic ship tasks.
   if (!archTask) {
+    const reason =
+      excludeIds.length > 0
+        ? "architecture_ids_in_flight"
+        : "no_architecture_open_id";
     await recordMaintainerEvent(db, {
       workspaceId: input.workspaceId,
       projectId: input.projectId,
@@ -1947,7 +1957,8 @@ export async function runVisionReplan(
         queued: 0,
         autoQueue,
         skipped: true,
-        reason: "no_architecture_open_id",
+        reason,
+        excludeIds,
       },
     });
     await recordAuditEvent(db, {
@@ -1961,7 +1972,8 @@ export async function runVisionReplan(
         taskCount: 0,
         queued: 0,
         skipped: true,
-        reason: "no_architecture_open_id",
+        reason,
+        excludeIds,
       },
     });
     await db

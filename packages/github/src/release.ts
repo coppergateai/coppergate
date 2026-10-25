@@ -44,6 +44,36 @@ export async function createGithubRelease(input: {
   );
   if (!res.ok) {
     const errBody = await res.text().catch(() => "");
+    // Tag/release already shipped — treat as success so maintainer stops retrying.
+    if (res.status === 422 && /already_exists/i.test(errBody)) {
+      const existing = await fetchImpl(
+        `https://api.github.com/repos/${input.owner}/${input.repo}/releases/tags/${encodeURIComponent(input.tagName)}`,
+        {
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${input.token}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        },
+      );
+      if (existing.ok) {
+        const body = (await existing.json()) as {
+          id: number;
+          html_url: string;
+          tag_name: string;
+        };
+        return {
+          id: body.id,
+          htmlUrl: body.html_url,
+          tagName: body.tag_name,
+        };
+      }
+      return {
+        id: 0,
+        htmlUrl: `https://github.com/${input.owner}/${input.repo}/releases/tag/${encodeURIComponent(input.tagName)}`,
+        tagName: input.tagName,
+      };
+    }
     throw new Error(
       `createGithubRelease failed (${res.status}): ${errBody.slice(0, 200)}`,
     );

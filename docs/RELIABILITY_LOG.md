@@ -75,6 +75,13 @@ Date: 2026-10-24
 - **Roster strip**: Arena snapshot excludes ELIMINATED contenders (was showing 1000+ “idle” after spawn cycles)
 - **Activity**: collapse `fitness.score` storms like debit/eliminate
 
+## Cycle 13
+- **Architecture ID dedupe**: replan + community scout exclude in-flight Open IDs (open tasks + open Coppergate PRs)
+- **Auto-accept WAITING_CI tasks**: sync task → REVIEW_REQUIRED when run is accept-ready
+- **Per-project concurrency**: Community/Pro `maxConcurrentRunsPerProject: 3`
+- **Terminal task skip**: no VALIDATING/WAITING_CI transitions when task already FAILED/CANCELLED/DONE
+- **Release already_exists**: 422 tag collision treated as success
+
 ## Tests
 - `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt, duplicate FILE, JSON retry
 - `delivery.test.ts` — fake idempotency, list fail-closed, 422 recovery, CAS conflict

@@ -1,10 +1,15 @@
 import type { BillingPlan } from "./schema.js";
 import type { Database } from "./client.js";
 import { effectivePlan, getWorkspaceSubscription } from "./billing.js";
-import { countInflightRunsForWorkspace } from "./runs.js";
+import {
+  countInflightRunsForProject,
+  countInflightRunsForWorkspace,
+} from "./runs.js";
 
 export type PlanLimits = {
   maxConcurrentRuns: number;
+  /** Soft cap so one project cannot consume the whole workspace envelope. */
+  maxConcurrentRunsPerProject: number;
   maxTournamentFanout: number;
   previewEnabled: boolean;
   arenaEnabled: boolean;
@@ -14,6 +19,7 @@ export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
   /** Self-host / unpaid — full catalog arena; no hosted preview. */
   community: {
     maxConcurrentRuns: 20,
+    maxConcurrentRunsPerProject: 3,
     maxTournamentFanout: 11,
     previewEnabled: false,
     arenaEnabled: true,
@@ -21,18 +27,21 @@ export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
   /** Hosted Starter — modest concurrency (SKU promise). */
   starter: {
     maxConcurrentRuns: 1,
+    maxConcurrentRunsPerProject: 1,
     maxTournamentFanout: 1,
     previewEnabled: false,
     arenaEnabled: false,
   },
   pro: {
     maxConcurrentRuns: 20,
+    maxConcurrentRunsPerProject: 3,
     maxTournamentFanout: 11,
     previewEnabled: true,
     arenaEnabled: true,
   },
   team: {
     maxConcurrentRuns: 16,
+    maxConcurrentRunsPerProject: 4,
     maxTournamentFanout: 11,
     previewEnabled: true,
     arenaEnabled: true,
@@ -64,11 +73,17 @@ export async function resolveWorkspacePlanLimits(
   return { plan, limits: limitsForPlan(plan) };
 }
 
-/** Fail closed when workspace is at concurrency cap. */
+/** Fail closed when workspace (and optional project) is at concurrency cap. */
 export async function assertPlanConcurrency(
   db: Database,
   workspaceId: string,
-): Promise<{ plan: BillingPlan; limits: PlanLimits; inflight: number }> {
+  projectId?: string,
+): Promise<{
+  plan: BillingPlan;
+  limits: PlanLimits;
+  inflight: number;
+  projectInflight: number;
+}> {
   const { plan, limits } = await resolveWorkspacePlanLimits(db, workspaceId);
   const inflight = await countInflightRunsForWorkspace(db, workspaceId);
   if (inflight >= limits.maxConcurrentRuns) {
@@ -78,7 +93,22 @@ export async function assertPlanConcurrency(
       `${plan} plan allows ${limits.maxConcurrentRuns} concurrent run(s); ${inflight} in flight — upgrade or wait`,
     );
   }
-  return { plan, limits, inflight };
+  let projectInflight = 0;
+  if (projectId) {
+    projectInflight = await countInflightRunsForProject(
+      db,
+      workspaceId,
+      projectId,
+    );
+    if (projectInflight >= limits.maxConcurrentRunsPerProject) {
+      throw new PlanLimitError(
+        "maxConcurrentRunsPerProject",
+        plan,
+        `${plan} plan allows ${limits.maxConcurrentRunsPerProject} concurrent run(s) per project; ${projectInflight} in flight on this project — wait or pause Arena`,
+      );
+    }
+  }
+  return { plan, limits, inflight, projectInflight };
 }
 
 /** Clamp tournament width to plan. */
@@ -122,18 +152,34 @@ export function clampFanoutToCapacity(input: {
 export async function getWorkspaceConcurrency(
   db: Database,
   workspaceId: string,
+  projectId?: string,
 ): Promise<{
   plan: BillingPlan;
   limits: PlanLimits;
   inflight: number;
+  projectInflight: number;
   slots: number;
 }> {
   const { plan, limits } = await resolveWorkspacePlanLimits(db, workspaceId);
   const inflight = await countInflightRunsForWorkspace(db, workspaceId);
+  const projectInflight = projectId
+    ? await countInflightRunsForProject(db, workspaceId, projectId)
+    : 0;
+  const workspaceSlots = remainingConcurrencySlots(
+    inflight,
+    limits.maxConcurrentRuns,
+  );
+  const projectSlots = projectId
+    ? remainingConcurrencySlots(
+        projectInflight,
+        limits.maxConcurrentRunsPerProject,
+      )
+    : workspaceSlots;
   return {
     plan,
     limits,
     inflight,
-    slots: remainingConcurrencySlots(inflight, limits.maxConcurrentRuns),
+    projectInflight,
+    slots: Math.min(workspaceSlots, projectSlots),
   };
 }

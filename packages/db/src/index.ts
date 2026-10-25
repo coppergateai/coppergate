@@ -343,6 +343,7 @@ export {
   type WorkspaceSpendSummary,
 } from "./budgets.js";
 export {
+  architectureIdsFromTitles,
   parseArchitectureOpenTasks,
   extractArchitectureIdFromTitle,
   isToyArchitectureTitle,
@@ -370,6 +371,7 @@ export {
   clearMergeBlockedForProject,
   DEFAULT_ARCHITECTURE_PATHS,
   fetchArchitectureBacklogMarkdown,
+  listInFlightArchitectureIds,
   requeueOrphanQueuedTasks,
   shouldReplanVision,
   MIN_REPLAN_AVAILABLE_MICROS,
@@ -432,6 +434,7 @@ export {
   claimRunById,
   countClaimableRuns,
   countInflightRunsForWorkspace,
+  countInflightRunsForProject,
   createTaskRun,
   enqueueAgentRun,
   getAgentRun,
