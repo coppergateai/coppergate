@@ -46,7 +46,9 @@ export function GithubPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showAllConnected, setShowAllConnected] = useState(false);
+  const [showAllAvailable, setShowAllAvailable] = useState(false);
   const CONNECTED_PREVIEW = 5;
+  const AVAILABLE_PREVIEW = 8;
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${workspaceId}/github`, {
@@ -250,59 +252,88 @@ export function GithubPanel({
         {canManage && selectable.length > 0 ? (
           <div className={styles.subBlock}>
             <h3 className={styles.subTitle}>Available on installation</h3>
-            <ul className={styles.list}>
-              {selectable.map((repo) => {
-                const already = connectedIds.has(repo.fullName.toLowerCase());
+            {(() => {
+              const open = selectable.filter(
+                (repo) => !connectedIds.has(repo.fullName.toLowerCase()),
+              );
+              if (open.length === 0) {
                 return (
-                  <li key={repo.id} className={styles.row}>
-                    <span>
-                      {repo.fullName}
-                      {repo.private ? (
-                        <span className={styles.repoMeta}>private</span>
-                      ) : null}
-                    </span>
+                  <p className={styles.muted}>
+                    Every installation repo is already connected.
+                  </p>
+                );
+              }
+              const shown = showAllAvailable
+                ? open
+                : open.slice(0, AVAILABLE_PREVIEW);
+              return (
+                <>
+                  <ul className={styles.list}>
+                    {shown.map((repo) => (
+                      <li key={repo.id} className={styles.row}>
+                        <span>
+                          {repo.fullName}
+                          {repo.private ? (
+                            <span className={styles.repoMeta}>private</span>
+                          ) : null}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.linkBtn}
+                          disabled={busy}
+                          onClick={() => {
+                            setBusy(true);
+                            void fetch(
+                              `/api/workspaces/${workspaceId}/github/repos`,
+                              {
+                                method: "POST",
+                                credentials: "same-origin",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({ githubRepoId: repo.id }),
+                              },
+                            )
+                              .then(async (res) => {
+                                if (!res.ok) {
+                                  const body = (await res.json()) as {
+                                    error?: { message: string };
+                                  };
+                                  throw new Error(
+                                    body.error?.message ?? "Connect failed",
+                                  );
+                                }
+                                await refresh();
+                              })
+                              .catch((err: unknown) => {
+                                setError(
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Connect failed",
+                                );
+                              })
+                              .finally(() => setBusy(false));
+                          }}
+                        >
+                          Connect
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {open.length > AVAILABLE_PREVIEW ? (
                     <button
                       type="button"
                       className={styles.linkBtn}
-                      disabled={already || busy}
-                      onClick={() => {
-                        setBusy(true);
-                        void fetch(
-                          `/api/workspaces/${workspaceId}/github/repos`,
-                          {
-                            method: "POST",
-                            credentials: "same-origin",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ githubRepoId: repo.id }),
-                          },
-                        )
-                          .then(async (res) => {
-                            if (!res.ok) {
-                              const body = (await res.json()) as {
-                                error?: { message: string };
-                              };
-                              throw new Error(
-                                body.error?.message ?? "Connect failed",
-                              );
-                            }
-                            await refresh();
-                          })
-                          .catch((err: unknown) => {
-                            setError(
-                              err instanceof Error
-                                ? err.message
-                                : "Connect failed",
-                            );
-                          })
-                          .finally(() => setBusy(false));
-                      }}
+                      onClick={() => setShowAllAvailable((v) => !v)}
                     >
-                      {already ? "Connected" : "Connect"}
+                      {showAllAvailable
+                        ? "Show fewer"
+                        : `Show all ${open.length} available`}
                     </button>
-                  </li>
-                );
-              })}
-            </ul>
+                  ) : null}
+                </>
+              );
+            })()}
           </div>
         ) : null}
       </div>

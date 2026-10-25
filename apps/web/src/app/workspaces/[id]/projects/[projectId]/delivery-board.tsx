@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { EmptyState } from "@/components/app/ui";
 import styles from "./project-detail.module.css";
 
@@ -59,6 +60,8 @@ const COLUMNS: { key: string; label: string; match: (s: string) => boolean }[] =
     },
   ];
 
+const BLOCKED_PREVIEW = 3;
+
 function statusLabel(status: string): string {
   switch (status) {
     case "DRAFT":
@@ -92,7 +95,37 @@ function statusLabel(status: string): string {
   }
 }
 
+function BoardCard({
+  workspaceId,
+  projectId,
+  task: t,
+}: {
+  workspaceId: string;
+  projectId: string;
+  task: BoardTask;
+}) {
+  const href =
+    t.status === "REVIEW_REQUIRED"
+      ? `/workspaces/${workspaceId}/projects/${projectId}?tab=evidence`
+      : `/workspaces/${workspaceId}/projects/${projectId}/tasks/${t.id}`;
+  return (
+    <li className={styles.boardCard}>
+      <Link href={href}>
+        <div className={styles.boardCardTitle}>{t.title}</div>
+        <div className={styles.boardCardMeta} title={t.status}>
+          {t.milestoneTitle} · {statusLabel(t.status)}
+          {t.estimateMicros != null
+            ? ` · $${(t.estimateMicros / 1_000_000).toFixed(2)}`
+            : ""}
+        </div>
+      </Link>
+    </li>
+  );
+}
+
 export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
+  const [showAllBlocked, setShowAllBlocked] = useState(false);
+
   return (
     <section
       id="board"
@@ -124,6 +157,12 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
         <div className={styles.boardGrid}>
           {COLUMNS.map((col) => {
             const items = tasks.filter((t) => col.match(t.status));
+            const isBlocked = col.key === "blocked";
+            const visible =
+              isBlocked && !showAllBlocked
+                ? items.slice(0, BLOCKED_PREVIEW)
+                : items;
+            const hidden = isBlocked ? items.length - visible.length : 0;
             return (
               <div key={col.key} className={styles.boardCol}>
                 <div className={styles.boardHead}>
@@ -131,26 +170,26 @@ export function DeliveryBoard({ workspaceId, projectId, tasks }: Props) {
                   <span className={styles.boardCount}> {items.length}</span>
                 </div>
                 <ul className={styles.taskList}>
-                  {items.map((t) => {
-                    const href =
-                      t.status === "REVIEW_REQUIRED"
-                        ? `/workspaces/${workspaceId}/projects/${projectId}?tab=evidence`
-                        : `/workspaces/${workspaceId}/projects/${projectId}/tasks/${t.id}`;
-                    return (
-                      <li key={t.id} className={styles.boardCard}>
-                        <Link href={href}>
-                          <div className={styles.boardCardTitle}>{t.title}</div>
-                          <div className={styles.boardCardMeta} title={t.status}>
-                            {t.milestoneTitle} · {statusLabel(t.status)}
-                            {t.estimateMicros != null
-                              ? ` · $${(t.estimateMicros / 1_000_000).toFixed(2)}`
-                              : ""}
-                          </div>
-                        </Link>
-                      </li>
-                    );
-                  })}
+                  {visible.map((t) => (
+                    <BoardCard
+                      key={t.id}
+                      workspaceId={workspaceId}
+                      projectId={projectId}
+                      task={t}
+                    />
+                  ))}
                 </ul>
+                {isBlocked && items.length > BLOCKED_PREVIEW ? (
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    onClick={() => setShowAllBlocked((v) => !v)}
+                  >
+                    {showAllBlocked
+                      ? "Show fewer"
+                      : `Show ${hidden} more failed`}
+                  </button>
+                ) : null}
               </div>
             );
           })}
