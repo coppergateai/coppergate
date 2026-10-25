@@ -15,6 +15,9 @@ import {
   robotsHost,
 } from "./seo";
 
+// CI sets APP_URL=http://localhost:3000 — pin production origin for SEO asserts.
+process.env.APP_URL = "https://www.coppergate.ai";
+
 describe("seo helpers", () => {
   it("builds absolute URLs without double slashes", () => {
     assert.equal(absoluteUrl("/"), "https://www.coppergate.ai");
