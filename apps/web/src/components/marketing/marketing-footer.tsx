@@ -32,8 +32,8 @@ export function MarketingFooter() {
               Set a budget. Agents compete. Survivors ship.
             </p>
             <p className={styles.footerNote}>
-              Actively building open-source pilot projects alongside Coppergate —
-              including kprompt.
+              Coppergate is built by Coppergate — and ships adjacent open-source
+              pilots like kprompt.
             </p>
             <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
               hello@coppergate.ai
@@ -62,14 +62,35 @@ export function MarketingFooter() {
                   className={styles.footerProject}
                 >
                   <span className={styles.footerProjectRow}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      className={styles.footerProjectLogo}
-                      src={p.logoSrc}
-                      alt=""
-                      width={20}
-                      height={22}
-                    />
+                    {p.logoSrcDark ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          className={`${styles.footerProjectLogo} ${styles.brandImgOnDark}`}
+                          src={p.logoSrcDark}
+                          alt=""
+                          width={20}
+                          height={22}
+                        />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          className={`${styles.footerProjectLogo} ${styles.brandImgOnLight}`}
+                          src={p.logoSrc}
+                          alt=""
+                          width={20}
+                          height={22}
+                        />
+                      </>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        className={styles.footerProjectLogo}
+                        src={p.logoSrc}
+                        alt=""
+                        width={20}
+                        height={22}
+                      />
+                    )}
                     <span className={styles.footerProjectName}>{p.name}</span>
                   </span>
                   <span className={styles.footerProjectBlurb}>{p.blurb}</span>
@@ -124,7 +145,7 @@ export function MarketingFooter() {
 
         <div className={styles.footerBottom}>
           <p>© {year} Coppergate</p>
-          <p>MIT · Open source · Also shipping kprompt</p>
+          <p>MIT · Open source · Dogfood + kprompt</p>
         </div>
       </div>
     </footer>
