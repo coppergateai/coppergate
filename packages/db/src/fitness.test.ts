@@ -8,6 +8,7 @@ import {
 import { createArtifact } from "./artifacts.js";
 import { closeDb, createDb } from "./client.js";
 import { approveBrief, createBriefDraft } from "./briefs.js";
+import { upsertWorkspaceSubscription } from "./billing.js";
 import { setProjectBudget } from "./budgets.js";
 import {
   scoreAndResolveTournament,
@@ -87,6 +88,11 @@ describe("scoreAndResolveTournament", { skip: !url }, () => {
         ownerUserId: user.id,
       })
     ).workspace.id;
+    await upsertWorkspaceSubscription(db, {
+      workspaceId,
+      plan: "team",
+      status: "active",
+    });
 
     const install = await upsertGithubInstallation(db, {
       workspaceId,

@@ -177,14 +177,9 @@ describe("task transitions persistence", { skip: !url }, () => {
   });
 
   it("blocks child until predecessor DONE", async () => {
-    await submitTaskForApproval(db, {
-      workspaceId,
-      taskId: childTaskId,
-      actor,
-    });
     await assert.rejects(
       () =>
-        approveTask(db, {
+        submitTaskForApproval(db, {
           workspaceId,
           taskId: childTaskId,
           actor,
