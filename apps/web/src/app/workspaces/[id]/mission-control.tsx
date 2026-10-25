@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { WorkspaceMissionControl } from "@coppergate/db";
+import { humanizeOpsDetail } from "@/lib/humanize-ops";
 import {
   type ActivityEvent,
   type ActivityGroup,
@@ -171,7 +172,12 @@ export function MissionControl({ data, recentEvents }: Props) {
       priority: "high",
     });
   } else {
-    attentionRows.push(...arenaItems);
+    attentionRows.push(
+      ...arenaItems.map((item) => ({
+        ...item,
+        detail: humanizeOpsDetail(item.detail),
+      })),
+    );
   }
   if (replanItems.length > 1) {
     attentionRows.push({
@@ -186,9 +192,19 @@ export function MissionControl({ data, recentEvents }: Props) {
       priority: "high",
     });
   } else {
-    attentionRows.push(...replanItems);
+    attentionRows.push(
+      ...replanItems.map((item) => ({
+        ...item,
+        detail: humanizeOpsDetail(item.detail),
+      })),
+    );
   }
-  attentionRows.push(...otherAttention);
+  attentionRows.push(
+    ...otherAttention.map((item) => ({
+      ...item,
+      detail: humanizeOpsDetail(item.detail),
+    })),
+  );
 
   return (
     <main className={styles.main}>

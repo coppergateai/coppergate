@@ -6,6 +6,7 @@ export const HARD_GATE_COPY = {
   ciFailed: "CI checks failed — Accept disabled",
   ciPending: "Awaiting live CI evidence — Accept disabled",
   stillValidating: "Delivery still validating — Accept disabled",
+  deliveryFailed: "Delivery failed — Retry or re-scope",
   validationFailed: "Sandbox validation failed — fix scope or Retry",
   policyFailed: "Policy blocked this delivery — Accept disabled",
   allHardPassed: "All required gates passed",
@@ -36,10 +37,13 @@ export function acceptBlockedReason(input: {
   policyFailed?: boolean;
   /** Run/task still in VALIDATING — not a CI failure. */
   stillValidating?: boolean;
+  /** Task already failed — never call this “still validating”. */
+  deliveryFailed?: boolean;
 }): string | null {
   if (input.acceptReady) return null;
   if (input.policyFailed) return HARD_GATE_COPY.policyFailed;
   if (input.validationFailed) return HARD_GATE_COPY.validationFailed;
+  if (input.deliveryFailed) return HARD_GATE_COPY.deliveryFailed;
   if (input.stillValidating) return HARD_GATE_COPY.stillValidating;
   if (input.ciBlocking) return HARD_GATE_COPY.ciFailed;
   if (input.ciAwaitingLive && !input.ciPassed) return HARD_GATE_COPY.ciPending;
