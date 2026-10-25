@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { OpenIdBadge } from "@/components/app/ui";
 import { displayTaskTitle } from "@/lib/display-title";
 import styles from "./project-detail.module.css";
 
@@ -222,6 +223,7 @@ export function PlanPanel({
                         href={`/workspaces/${workspaceId}/projects/${projectId}/tasks/${t.id}`}
                         className={styles.taskTitle}
                       >
+                        <OpenIdBadge title={t.title} />{" "}
                         {displayTaskTitle(t.title) || t.title}
                       </Link>
                     </div>

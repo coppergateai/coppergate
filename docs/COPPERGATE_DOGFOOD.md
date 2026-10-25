@@ -42,6 +42,26 @@ export MAINTAINER_BUDGET_MICROS=8000000
 export DOGFOOD_BUDGET_MICROS=8000000
 ```
 
+## Open Program Runtime
+
+Self-pilot proves **Contracted Autonomy**:
+
+- Maintainer `architectureRepo` / `architecturePaths` bind the program → **Spend License** (no Open ID → no reserve).
+- Evidence / task rows show an **Open ID** badge.
+- **Accept → Ship Receipt** at  
+  `/workspaces/{id}/projects/{projectId}/tasks/{taskId}/receipt`  
+  (spend, fitness, CI, winner profile, human touches, writeback note).
+- Docs: `/docs/open-program-runtime`. Public pricing stays Community **$0**.
+
+### Prove Ship Receipt (after Accept)
+
+```bash
+DATABASE_URL="$DATABASE_URL" \
+  WORKSPACE_SLUG=coppergate \
+  pnpm --filter @coppergate/db exec node --import tsx \
+    ../../packages/db/scripts/dogfood-prove-ship-receipt.ts
+```
+
 ## Steps
 
 ### 1. Boot (budget + brief + arena + Open IDs)
@@ -87,6 +107,8 @@ Day-to-day: project Arena **Start** / **Stop** only. Keep kprompt paused.
 ### 4. Prove loop checklist
 
 - [ ] One Open ID → survivor PR → CI → Accept → architecture writeback **Done**
+- [ ] Accept opens a visible **Ship Receipt** (Open ID + spend + fitness + CI)
+- [ ] `ships_with_open_id / total_accepts` = 100%; `spend_without_open_id` = 0
 - [ ] Second Open ID auto-queues under continuous backlog
 - [ ] Inflight ≤6 and ≤1/project
 - [ ] No `using workspace BYOK` storms while paused

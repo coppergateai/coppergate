@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Coppergate",
     short_name: "Coppergate",
     description:
-      "Set a budget. Agents compete. Survivors ship. Selection pressure for agent cost efficiency.",
+      "Autonomy under contract. Only what’s on the program ships. Open Program Runtime with Spend License and Ship Receipt.",
     start_url: "/",
     display: "standalone",
     background_color: "#090a0c",

@@ -305,11 +305,12 @@ export function MissionControl({ data, recentEvents }: Props) {
                 </span>
                 <p className={styles.emptyTitle}>You&apos;re all caught up</p>
                 <p className={styles.emptyBody}>
-                  No approvals, failed arena runs, or blockers.{" "}
-                  <Link href={`/workspaces/${data.workspaceId}/projects`}>
-                    Open projects
+                  No approvals, failed arena runs, or blockers. Next spend needs
+                  an Open Program ID —{" "}
+                  <Link href={`/workspaces/${data.workspaceId}/arena`}>
+                    Arena
                   </Link>{" "}
-                  to start the next verified delivery.
+                  cannot reserve without one when the program is bound.
                 </p>
               </div>
             ) : (
@@ -442,11 +443,11 @@ export function MissionControl({ data, recentEvents }: Props) {
               <div className={styles.emptyCatch}>
                 <p className={styles.emptyTitle}>No active executions</p>
                 <p className={styles.emptyBody}>
-                  Import an issue or open{" "}
+                  No Open ID, no spend. Bind an Open Program line, then open{" "}
                   <Link href={`/workspaces/${data.workspaceId}/arena`}>
                     Arena
                   </Link>{" "}
-                  when you are ready to run agents.
+                  to license the next reserve.
                 </p>
               </div>
             ) : (

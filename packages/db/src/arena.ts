@@ -15,6 +15,10 @@ import {
 } from "./plan-policy.js";
 import { enqueueAgentRun } from "./runs.js";
 import {
+  assertSpendLicenseForTask,
+  SpendLicenseError,
+} from "./spend-license.js";
+import {
   agentRuns,
   arenas,
   auditEvents,
@@ -622,6 +626,19 @@ export async function startTournamentFanout(
     );
   }
 
+  try {
+    await assertSpendLicenseForTask(db, {
+      workspaceId: input.workspaceId,
+      projectId: task.projectId,
+      taskTitle: task.title,
+    });
+  } catch (err) {
+    if (err instanceof SpendLicenseError) {
+      throw new ArenaError("invalid", err.message);
+    }
+    throw err;
+  }
+
   const existingTournament = await getOpenTournamentForTask(db, {
     workspaceId: input.workspaceId,
     taskId: task.id,
@@ -765,7 +782,8 @@ export async function startTournamentFanout(
       attempt,
       tournamentId: tournament.id,
       contenderId: contender.id,
-      branchName: `cg/t/${shortT}/c/${shortC}`,
+      // Conventional type/slug so repos with branch-name CI (e.g. kprompt) pass validate.
+      branchName: `chore/cg-t-${shortT}-c-${shortC}`,
       baseSha: task.baseSha ?? undefined,
     });
     if (!created) {

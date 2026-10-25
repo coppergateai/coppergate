@@ -23,6 +23,11 @@ import {
   resolveWorkspacePlanLimits,
 } from "./plan-policy.js";
 import { enqueueAgentRun, listRunsForTask } from "./runs.js";
+import { persistShipReceipt } from "./ship-receipt.js";
+import {
+  assertSpendLicenseForTask,
+  SpendLicenseError,
+} from "./spend-license.js";
 import {
   githubInstallations,
   projects,
@@ -171,6 +176,20 @@ export async function enqueueQueuedTask(
     input.task.projectId,
   );
   const { limits } = await resolveWorkspacePlanLimits(db, input.workspaceId);
+
+  // Contracted Autonomy: program-bound projects refuse spend without Open ID.
+  try {
+    await assertSpendLicenseForTask(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.task.projectId,
+      taskTitle: input.task.title,
+    });
+  } catch (err) {
+    if (err instanceof SpendLicenseError) {
+      throw new TaskTransitionError("policy", err.message);
+    }
+    throw err;
+  }
 
   const nextAttempt = input.task.attemptCount + 1;
   const arena = await getArenaForProject(db, {
@@ -675,6 +694,29 @@ export async function decideTaskReview(
       targetId: task.id,
       meta: { note: input.note ?? null, runId: latest?.id ?? null },
     });
+
+    try {
+      const { receipt } = await persistShipReceipt(db, {
+        workspaceId: input.workspaceId,
+        task: done.task,
+        actor: input.actor,
+        runId: latest?.id ?? null,
+      });
+      await recordAuditEvent(db, {
+        workspaceId: input.workspaceId,
+        actor: input.actor,
+        action: "task.ship_receipt",
+        targetType: "task",
+        targetId: task.id,
+        meta: {
+          openId: receipt.openId,
+          spendMicros: receipt.spendMicros,
+          runId: receipt.runId,
+        },
+      });
+    } catch {
+      // Receipt must not roll back Accept — surface via audit absence.
+    }
 
     try {
       await resolvePendingApproval(db, {

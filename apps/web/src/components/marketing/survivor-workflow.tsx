@@ -5,23 +5,23 @@ import styles from "./marketing.module.css";
 const steps = [
   {
     n: "01",
-    title: "Define the task",
-    body: "Start from an engineering brief or a supported external signal. Bind the repository, set budget and policy boundaries before work begins.",
+    title: "Bind the Open Program",
+    body: "Point the workspace at a living program file. Agents may spend only against Open IDs — freestyle autonomy is refused when the program is bound.",
   },
   {
     n: "02",
-    title: "Run the competition",
-    body: "Multiple contenders attempt the same objective with controlled execution. Each path spends against the shared budget.",
+    title: "License the spend",
+    body: "Each Arena reserve and fan-out carries an Open ID. Contenders race inside the budget; no Open ID means no spend.",
   },
   {
     n: "03",
-    title: "Verify and select",
-    body: "Coppergate evaluates results against quality checks, fitness criteria, and spend. Only qualifying contenders compete on efficiency.",
+    title: "Verify with evidence",
+    body: "Fitness, CI, and spend travel with the survivor path. Efficiency ranking selects among qualifying contenders.",
   },
   {
     n: "04",
-    title: "Review the delivery",
-    body: "Inspect the selected implementation, validation evidence, and pull request before approval. Production writes stay policy-gated.",
+    title: "Accept → Ship Receipt",
+    body: "You Accept once. Coppergate writes the program line Done and issues a Ship Receipt — spend, fitness, CI, writeback — not a chat log.",
   },
 ] as const;
 
@@ -43,12 +43,12 @@ export function SurvivorWorkflow() {
             <p className={styles.sectionEyebrow}>How it works</p>
           </div>
           <h2 id="how-title" className={styles.sectionTitle}>
-            From task to verified PR.
+            From program line to Ship Receipt.
           </h2>
           <p className={styles.sectionLede}>
-            Four steps for engineering teams: bind a repo, run a bounded
-            competition, verify with evidence, then review the survivor PR.
-            You keep the kill-switch and merge control.
+            Contracted Autonomy: Open Program → Spend License → Survivor
+            evidence → Accept + Receipt. You keep the kill-switch and merge
+            control. Community stays $0.
           </p>
         </header>
 

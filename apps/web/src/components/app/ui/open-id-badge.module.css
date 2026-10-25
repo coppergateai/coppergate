@@ -1,0 +1,15 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--cg-ink, #1a1a1a) 22%, transparent);
+  color: var(--cg-ink, #1a1a1a);
+  background: color-mix(in srgb, var(--cg-ink, #1a1a1a) 6%, transparent);
+  border-radius: 2px;
+  white-space: nowrap;
+  vertical-align: middle;
+}

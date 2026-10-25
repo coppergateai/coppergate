@@ -27,14 +27,14 @@ export function FinalCta() {
           />
         </div>
         <h2 id="final-title" className={styles.finalTitle}>
-          Ready to run the arena
+          Ready for autonomy
           <br />
-          on your terms.
+          under contract.
         </h2>
         <p className={styles.finalLede}>
-          Start with the MIT source and a spend cap — or open the hosted
-          instance to explore. Either path ends in a reviewable PR, not a chat
-          transcript. Community pricing stays $0.
+          Bind an Open Program, set a spend cap, and let survivors earn Accept
+          — with a Ship Receipt, not a chat transcript. Community pricing stays
+          $0.
         </p>
 
         <div className={styles.finalActions}>

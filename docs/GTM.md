@@ -2,7 +2,10 @@
 
 > **Current posture (2026-10):** OSS-first. Public MIT repo; discovery via GitHub + self-host + Show HN/IH. Paid pilots / cold outreach are **optional later** — do not block product work. Community path stays free.
 
-Operator playbook for an optional commercial wedge later. Product north star remains the Survivor arena; if/when monetizing, revenue path is **hosted** Starter/Pro (MIT self-host = awareness).
+Operator playbook for an optional commercial wedge later. Product north star is
+**Open Program Runtime** (Contracted Autonomy: program-bound spend → Survivor →
+Accept → Ship Receipt). If/when monetizing later, revenue path is **hosted**
+Starter/Pro (MIT self-host = awareness) — public paid tiers stay deferred.
 
 **Phase 0 master checklist (optional):** [PHASE0_OPS.md](./PHASE0_OPS.md).
 

@@ -11,15 +11,18 @@ export function HeroSection() {
           <p className={styles.heroBrand}>Coppergate</p>
 
           <h1 id="hero-title" className={styles.headline}>
-            Set a budget. Agents compete.
+            Autonomy under contract.
             <br />
-            <span className={styles.headlineAccent}> Survivors ship.</span>
+            <span className={styles.headlineAccent}>
+              {" "}
+              Only what&apos;s on the program ships.
+            </span>
           </h1>
 
           <p className={styles.lede}>
-            For engineering teams who want agents that ship pull requests — not
-            chat transcripts. Contenders compete inside a spend cap; fitness and
-            evidence decide; you review what survives.
+            Open Program Runtime binds spend, Survivor Arena, and Accept to a
+            living program line — not a chat session. No Open ID, no spend;
+            Accept writes Done plus a Ship Receipt you can audit.
           </p>
 
           <div className={styles.ctaRow}>
@@ -37,8 +40,8 @@ export function HeroSection() {
 
           <ul className={styles.trustList}>
             <li>MIT · Community $0</li>
-            <li>Bring your own LLM</li>
-            <li>Issue → verified PR</li>
+            <li>Program-bound spend</li>
+            <li>Accept → Ship Receipt</li>
           </ul>
         </div>
 

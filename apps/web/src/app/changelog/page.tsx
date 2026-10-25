@@ -15,6 +15,16 @@ export const metadata: Metadata = publicPageMetadata({
 const entries = [
   {
     date: "2026-10-25",
+    title: "Open Program Runtime",
+    items: [
+      "Positioning: Autonomy under contract — only what’s on the program ships",
+      "Spend License: program-bound projects refuse Arena reserve without Open ID",
+      "Accept → Ship Receipt (spend, fitness, CI, writeback) + `/docs/open-program-runtime`",
+      "Community $0 unchanged — no paid hosted SKUs",
+    ],
+  },
+  {
+    date: "2026-10-25",
     title: "Coppergate is built by Coppergate",
     items: [
       "Pilot section: Coppergate dogfood + kprompt listed as open pilots",

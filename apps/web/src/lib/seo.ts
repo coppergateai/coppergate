@@ -4,10 +4,10 @@ import { getSiteUrl } from "./site-url";
 export const SITE_NAME = "Coppergate";
 
 export const SITE_TITLE =
-  "Coppergate — Set a budget. Agents compete. Survivors ship.";
+  "Coppergate — Autonomy under contract. Only what’s on the program ships.";
 
 export const SITE_DESCRIPTION =
-  "MIT open-source Survivor arena for engineering teams: agents compete inside a spend cap from issue to verified GitHub/GitLab PR. Self-host free or try hosted — fitness and evidence decide; you review what ships.";
+  "Open Program Runtime: agents spend only against Open Program lines, compete under a budget, and ship with Accept → Ship Receipt. MIT · Community $0 self-host or try hosted — no freestyle autonomy when the program is bound.";
 
 export const OG_IMAGE = {
   url: "/opengraph-image",

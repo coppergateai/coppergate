@@ -1,4 +1,9 @@
-import { PlanLimitError, TaskTransitionError } from "@coppergate/db";
+import {
+  extractArchitectureIdFromTitle,
+  PlanLimitError,
+  SpendLicenseError,
+  TaskTransitionError,
+} from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 import type { Task, TaskStatusTransition } from "@coppergate/db";
 
@@ -10,6 +15,7 @@ export function serializeTask(task: Task) {
     milestoneId: task.milestoneId,
     briefId: task.briefId,
     title: task.title,
+    openId: extractArchitectureIdFromTitle(task.title),
     goal: task.goal,
     scope: task.scope,
     status: task.status,
@@ -40,6 +46,11 @@ export function mapTaskTransitionError(err: unknown): never {
   if (err instanceof PlanLimitError) {
     throw new ApiError("conflict", err.message, {
       details: { code: "plan_limit", limit: err.limit, plan: err.plan },
+    });
+  }
+  if (err instanceof SpendLicenseError) {
+    throw new ApiError("conflict", err.message, {
+      details: { code: "spend_license", license: err.code },
     });
   }
   if (err instanceof TaskTransitionError) {

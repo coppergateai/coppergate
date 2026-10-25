@@ -352,6 +352,19 @@ export {
   type ArchitectureOpenTask,
 } from "./architecture-backlog.js";
 export {
+  assertSpendLicenseForTask,
+  openIdFromTaskTitle,
+  SpendLicenseError,
+  type SpendLicense,
+} from "./spend-license.js";
+export {
+  SHIP_RECEIPT_KIND,
+  buildShipReceipt,
+  getShipReceiptForTask,
+  persistShipReceipt,
+  type ShipReceiptBody,
+} from "./ship-receipt.js";
+export {
   formatCommunityIssueBody,
   isCommunityScoutDue,
   proposeCommunityIssues,
