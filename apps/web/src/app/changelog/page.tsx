@@ -14,6 +14,14 @@ export const metadata: Metadata = publicPageMetadata({
 
 const entries = [
   {
+    date: "2026-10-25",
+    title: "Coppergate is built by Coppergate",
+    items: [
+      "Pilot section: Coppergate dogfood + kprompt listed as open pilots",
+      "Landing hook: Coppergate is built by Coppergate under a real spend cap",
+    ],
+  },
+  {
     date: "2026-10-24",
     title: "Mid-page conversion exits",
     items: [
