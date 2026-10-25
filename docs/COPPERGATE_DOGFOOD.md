@@ -13,6 +13,17 @@ Role prompts (`product.txt`, `designer.txt`, `landing.txt`, `seo.txt`, `qa.txt`,
 - Fly deploy / secrets / OpenAI limit changes: **human**.
 - Public pricing stays Community / self-host **$0** only.
 
+## Workspace
+
+| Item | Value |
+| --- | --- |
+| Workspace | `coppergate` · `/coppergate` |
+| Workspace id | `2c894510-810e-46cc-8ff0-652f63870639` |
+| Monthly envelope | **$8** (set in Settings → General) |
+| kprompt Arena | Keep **paused** (`Resume all` only) |
+
+**GitHub App note:** Hosted kprompt today installs against the **kprompt** GitHub org only. For this pilot, open Settings → Connections on the **coppergate** workspace → **Install GitHub App** → select the **coppergateai** org (and repos `coppergate` + `coppergate-architecture`). `github_installation_id` is unique per workspace, so this is a separate install from kprompt’s.
+
 ## Repo map
 
 | Role | Repo |

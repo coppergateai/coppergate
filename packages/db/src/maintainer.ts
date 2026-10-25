@@ -172,6 +172,10 @@ export type MaintainerPolicy = {
   continuousBacklog: boolean;
   /** daily = maintainer-YYYY-MM-DD; semver_patch = v0.YYYYMMDD.N */
   releaseTagStyle: "daily" | "semver_patch";
+  /** Override ARCHITECTURE_REPO for this project (owner/name). */
+  architectureRepo: string | null;
+  /** Override ARCHITECTURE_PATHS (comma-separated) for this project. */
+  architecturePaths: string | null;
 };
 
 export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
@@ -198,6 +202,8 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   maxAutoQueuePerReplan: 2,
   continuousBacklog: true,
   releaseTagStyle: "daily",
+  architectureRepo: null,
+  architecturePaths: null,
 };
 
 /** Open delivery statuses that keep the autonomous board "busy". */
@@ -329,6 +335,16 @@ export function parseMaintainerPolicy(
           : DEFAULT_MAINTAINER_POLICY.shipRollbackOnCiFail,
       releaseTagStyle:
         v.releaseTagStyle === "semver_patch" ? "semver_patch" : "daily",
+      architectureRepo:
+        typeof v.architectureRepo === "string" &&
+        /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(v.architectureRepo.trim())
+          ? v.architectureRepo.trim()
+          : DEFAULT_MAINTAINER_POLICY.architectureRepo,
+      architecturePaths:
+        typeof v.architecturePaths === "string" &&
+        v.architecturePaths.trim().length > 0
+          ? v.architecturePaths.trim().slice(0, 500)
+          : DEFAULT_MAINTAINER_POLICY.architecturePaths,
     };
   } catch {
     return { ...DEFAULT_MAINTAINER_POLICY, enabled: false };
@@ -2018,7 +2034,11 @@ export async function runVisionReplan(
   const roadmapMd =
     input.roadmapMarkdown?.trim() ||
     process.env.ARCHITECTURE_BACKLOG_MD?.trim() ||
-    (await fetchArchitectureBacklogMarkdown(input.architectureToken)) ||
+    (await fetchArchitectureBacklogMarkdown({
+      token: input.architectureToken,
+      repo: policy.architectureRepo,
+      paths: policy.architecturePaths,
+    })) ||
     "";
   const excludeIds = await listInFlightArchitectureIds(db, {
     workspaceId: input.workspaceId,
@@ -2669,27 +2689,41 @@ export async function listInFlightArchitectureIds(
 
 /**
  * Best-effort load of architecture Open tasks from GitHub.
- * ARCHITECTURE_REPO=owner/repo (default kprompt/kprompt-architecture)
- * ARCHITECTURE_PATHS=comma list of markdown files
- * Pass `token` (installation) when env tokens are absent — worker path.
+ * Prefer per-project MaintainerPolicy.architectureRepo / architecturePaths,
+ * then ARCHITECTURE_REPO / ARCHITECTURE_PATHS env, then kprompt defaults.
  */
 export async function fetchArchitectureBacklogMarkdown(
-  tokenOverride?: string | null,
+  tokenOrOpts?:
+    | string
+    | null
+    | {
+        token?: string | null;
+        repo?: string | null;
+        paths?: string | null;
+      },
 ): Promise<string> {
+  const opts =
+    typeof tokenOrOpts === "string" || tokenOrOpts == null
+      ? { token: tokenOrOpts }
+      : tokenOrOpts;
   const token =
-    tokenOverride?.trim() ||
+    opts.token?.trim() ||
     process.env.ARCHITECTURE_GITHUB_TOKEN?.trim() ||
     process.env.GITHUB_TOKEN?.trim() ||
     process.env.GH_TOKEN?.trim();
   if (!token) return "";
 
   const repo =
-    process.env.ARCHITECTURE_REPO?.trim() || "kprompt/kprompt-architecture";
+    opts.repo?.trim() ||
+    process.env.ARCHITECTURE_REPO?.trim() ||
+    "kprompt/kprompt-architecture";
   const [owner, name] = repo.split("/");
   if (!owner || !name) return "";
 
   const paths = (
-    process.env.ARCHITECTURE_PATHS?.trim() || DEFAULT_ARCHITECTURE_PATHS
+    opts.paths?.trim() ||
+    process.env.ARCHITECTURE_PATHS?.trim() ||
+    DEFAULT_ARCHITECTURE_PATHS
   )
     .split(",")
     .map((p) => p.trim())
