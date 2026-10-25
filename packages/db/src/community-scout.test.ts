@@ -47,4 +47,20 @@ describe("community scout propose", () => {
     });
     assert.equal(proposed.length, 0);
   });
+
+  it("honors excludeIds for in-flight architecture work", () => {
+    const md = `
+| ID | Title | Status |
+| P-10 | Add unit test for slugify helper | Open |
+| W-03 | Fix typo in README quickstart | Open |
+`;
+    const proposed = proposeCommunityIssues({
+      openIssues: [],
+      architectureMarkdown: md,
+      max: 5,
+      excludeIds: ["P-10"],
+    });
+    assert.ok(!proposed.some((p) => /P-10/i.test(p.title)));
+    assert.ok(proposed.some((p) => /W-03/i.test(p.title)));
+  });
 });

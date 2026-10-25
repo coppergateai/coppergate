@@ -6,6 +6,7 @@ import {
   getProjectSpendSummary,
   importGithubIssueAsTask,
   isCommunityScoutDue,
+  listInFlightArchitectureIds,
   listReposForProject,
   parseMaintainerPolicy,
   proposeCommunityIssues,
@@ -72,6 +73,11 @@ export async function runCommunityScoutForProject(
   }
 
   const markdown = await fetchArchitectureBacklogMarkdown(input.token);
+  const excludeIds = await listInFlightArchitectureIds(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.project.id,
+    architectureToken: input.token,
+  });
   const created: Array<{
     repo: string;
     number: number;
@@ -121,6 +127,7 @@ export async function runCommunityScoutForProject(
       openIssues,
       architectureMarkdown: markdown,
       max: maxForRepo,
+      excludeIds,
     });
 
     for (const c of candidates) {

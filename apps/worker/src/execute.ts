@@ -738,17 +738,30 @@ export async function executeClaimedRun(
       return sawCancel ? "cancelled" : "failed";
     }
 
-    await applyTaskTransition(db, {
-      workspaceId: run.workspaceId,
-      taskId: task.id,
-      toStatus: "VALIDATING",
-      actor: `worker:${workerId}`,
-      reason: "agent completed",
-    }).catch((err: unknown) => {
-      log.warn("task VALIDATING transition skipped", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
+    {
+      const latestTask = (await getTaskById(db, task.id)) ?? task;
+      if (
+        latestTask.status === "FAILED" ||
+        latestTask.status === "CANCELLED" ||
+        latestTask.status === "DONE"
+      ) {
+        log.warn("task VALIDATING transition skipped", {
+          error: `task already ${latestTask.status}`,
+        });
+      } else {
+        await applyTaskTransition(db, {
+          workspaceId: run.workspaceId,
+          taskId: task.id,
+          toStatus: "VALIDATING",
+          actor: `worker:${workerId}`,
+          reason: "agent completed",
+        }).catch((err: unknown) => {
+          log.warn("task VALIDATING transition skipped", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
+    }
 
     await markRunValidating(db, { runId: run.id, workerId });
     await renewRunLease(db, run.id, workerId, leaseMs);
@@ -1150,20 +1163,35 @@ export async function executeClaimedRun(
         previewUrl,
       });
 
-  await applyTaskTransition(db, {
-    workspaceId: run.workspaceId,
-    taskId: task.id,
-    toStatus: awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED",
-    actor: `worker:${workerId}`,
-    reason: awaitLiveCi
-      ? "PR delivered — awaiting live CI"
-      : "validation passed — human review required",
-  }).catch((err: unknown) => {
-    log.warn("task post-delivery transition skipped", {
-      error: err instanceof Error ? err.message : String(err),
-      toStatus: awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED",
-    });
-  });
+  {
+    const latestTask = (await getTaskById(db, task.id)) ?? task;
+    const toStatus = awaitLiveCi ? "WAITING_CI" : "REVIEW_REQUIRED";
+    if (
+      latestTask.status === "FAILED" ||
+      latestTask.status === "CANCELLED" ||
+      latestTask.status === "DONE"
+    ) {
+      log.warn("task post-delivery transition skipped", {
+        error: `task already ${latestTask.status}`,
+        toStatus,
+      });
+    } else {
+      await applyTaskTransition(db, {
+        workspaceId: run.workspaceId,
+        taskId: task.id,
+        toStatus,
+        actor: `worker:${workerId}`,
+        reason: awaitLiveCi
+          ? "PR delivered — awaiting live CI"
+          : "validation passed — human review required",
+      }).catch((err: unknown) => {
+        log.warn("task post-delivery transition skipped", {
+          error: err instanceof Error ? err.message : String(err),
+          toStatus,
+        });
+      });
+    }
+  }
 
   await appendRunEvent(db, {
     runId: run.id,

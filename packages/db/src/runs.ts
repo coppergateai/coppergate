@@ -956,3 +956,24 @@ export async function countInflightRunsForWorkspace(
     );
   return Number(row?.n ?? 0);
 }
+
+/** Inflight runs for a single project (per-project soft cap). */
+export async function countInflightRunsForProject(
+  db: Database,
+  workspaceId: string,
+  projectId: string,
+): Promise<number> {
+  const [row] = await db
+    .select({
+      n: sql<number>`count(*)::int`,
+    })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.workspaceId, workspaceId),
+        eq(agentRuns.projectId, projectId),
+        sql`${agentRuns.status} in ('QUEUED', 'RUNNING', 'VALIDATING', 'WAITING_CI')`,
+      ),
+    );
+  return Number(row?.n ?? 0);
+}

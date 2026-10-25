@@ -683,11 +683,20 @@ export async function startTournamentFanout(
   const { plan } = await resolveWorkspacePlanLimits(db, input.workspaceId);
   const requested = input.n ?? arena.defaultContenderN;
   const planCapped = clampTournamentFanout(requested, plan);
-  const concurrency = await getWorkspaceConcurrency(db, input.workspaceId);
+  const concurrency = await getWorkspaceConcurrency(
+    db,
+    input.workspaceId,
+    task.projectId,
+  );
   if (concurrency.slots < 1) {
+    const perProjectHit =
+      concurrency.projectInflight >=
+      concurrency.limits.maxConcurrentRunsPerProject;
     throw new ArenaError(
       "insufficient",
-      `${concurrency.plan} plan allows ${concurrency.limits.maxConcurrentRuns} concurrent run(s); ${concurrency.inflight} in flight — wait or pause Arena`,
+      perProjectHit
+        ? `${concurrency.plan} plan allows ${concurrency.limits.maxConcurrentRunsPerProject} concurrent run(s) per project; ${concurrency.projectInflight} in flight on this project — wait or pause Arena`
+        : `${concurrency.plan} plan allows ${concurrency.limits.maxConcurrentRuns} concurrent run(s); ${concurrency.inflight} in flight — wait or pause Arena`,
     );
   }
   const spend = await getProjectSpendSummary(
