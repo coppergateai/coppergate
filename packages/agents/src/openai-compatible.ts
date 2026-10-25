@@ -1,7 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { AgentPolicyError } from "./fake.js";
-import { buildFakeCompletion } from "./fake.js";
+import {
+  AgentPolicyError,
+  buildFakeCompletion,
+  isLlmProviderQuotaFailure,
+} from "./fake.js";
 import {
   isEditToolAllowed,
   isPathAllowed,
@@ -112,6 +115,17 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
           kind: "error",
           message: "LLM request aborted",
           payload: { code: "aborted" },
+        };
+        return;
+      }
+      if (
+        err instanceof AgentPolicyError &&
+        err.reason === "provider_quota"
+      ) {
+        yield {
+          kind: "error",
+          message: err.message,
+          payload: { code: "provider_quota" },
         };
         return;
       }
@@ -337,6 +351,12 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
 
         if (!res.ok) {
           const body = await res.text().catch(() => "");
+          if (isLlmProviderQuotaFailure(res.status, body)) {
+            throw new AgentPolicyError(
+              `LLM provider quota exhausted (${res.status}): ${body.slice(0, 200)}`,
+              "provider_quota",
+            );
+          }
           const transient = res.status === 429 || res.status >= 500;
           if (transient && attempt < this.maxRetries) {
             lastError = new AgentPolicyError(

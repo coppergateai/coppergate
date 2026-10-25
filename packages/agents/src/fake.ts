@@ -11,11 +11,39 @@ import type {
 
 export class AgentPolicyError extends Error {
   readonly code = "policy" as const;
+  /** Stable machine reason when known (e.g. provider_quota). */
+  readonly reason?: string;
 
-  constructor(message: string) {
+  constructor(message: string, reason?: string) {
     super(message);
     this.name = "AgentPolicyError";
+    this.reason = reason;
   }
+}
+
+/** OpenAI / compatible billing hard-stop — do not retry. */
+export function isLlmProviderQuotaFailure(
+  status: number,
+  body: string,
+): boolean {
+  if (
+    /insufficient_quota|billing_hard_limit|exceeded your current quota|quota.?exceeded|payment.?required|billing.?limit/i.test(
+      body,
+    )
+  ) {
+    return true;
+  }
+  return status === 402;
+}
+
+export function isLlmProviderQuotaError(err: unknown): boolean {
+  if (err instanceof AgentPolicyError && err.reason === "provider_quota") {
+    return true;
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return /insufficient_quota|billing_hard_limit|exceeded your current quota|provider_quota/i.test(
+    msg,
+  );
 }
 
 function shortId(id: string): string {

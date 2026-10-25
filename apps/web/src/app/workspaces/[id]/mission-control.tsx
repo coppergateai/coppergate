@@ -113,6 +113,8 @@ export function MissionControl({ data, recentEvents }: Props) {
   const recent = groupActivityEvents(recentEvents).slice(0, 8);
 
   const concurrencyItem = attention.find((a) => a.kind === "concurrency");
+  const providerQuotaItem = attention.find((a) => a.kind === "provider_quota");
+  const crisisItem = concurrencyItem || providerQuotaItem;
   const evidenceItem = attention.find((a) => a.kind === "review_required");
   const humanGates = metrics.needsApproval;
   const evidenceGates = metrics.needsEvidenceAccept;
@@ -123,13 +125,16 @@ export function MissionControl({ data, recentEvents }: Props) {
       ? `/workspaces/${data.workspaceId}/inbox`
       : evidenceItem
         ? evidenceItem.href
-        : concurrencyItem || arenaHot
+        : crisisItem || arenaHot
           ? `/workspaces/${data.workspaceId}/arena`
           : `/workspaces/${data.workspaceId}/inbox`;
 
   const statusLine = (() => {
     if (budgetPaused) {
       return "Budget envelope paused — executions are frozen until you raise the cap.";
+    }
+    if (providerQuotaItem) {
+      return providerQuotaItem.detail;
     }
     if (concurrencyItem) {
       return concurrencyItem.detail;
@@ -138,7 +143,7 @@ export function MissionControl({ data, recentEvents }: Props) {
       return `${evidenceGates} deliver${evidenceGates === 1 ? "y" : "ies"} ready to Accept in Evidence${humanGates > 0 ? ` · ${humanGates} inbox` : ""}.`;
     }
     if (arenaHot) {
-      return `${metrics.arenaNeedsAttention} agent${metrics.arenaNeedsAttention === 1 ? "" : "s"} need attention in Arena${evidenceGates > 0 ? ` · ${evidenceGates} Accept` : ""}${humanGates > 0 ? ` · ${humanGates} inbox` : ""}.`;
+      return `${metrics.arenaNeedsAttention} agent${metrics.arenaNeedsAttention === 1 ? "" : "s"} ${metrics.arenaNeedsAttention === 1 ? "needs" : "need"} attention in Arena${evidenceGates > 0 ? ` · ${evidenceGates} Accept` : ""}${humanGates > 0 ? ` · ${humanGates} inbox` : ""}.`;
     }
     if (needsAttention) {
       return `${attention.length} item${attention.length === 1 ? "" : "s"} need your review.`;
@@ -310,7 +315,9 @@ export function MissionControl({ data, recentEvents }: Props) {
             ) : (
               <ul className={styles.list}>
                 {attentionRows.map((item) => {
-                  const isCrisis = item.kind === "concurrency";
+                  const isCrisis =
+                    item.kind === "concurrency" ||
+                    item.kind === "provider_quota";
                   return (
                     <li key={item.id}>
                       <Link
@@ -500,15 +507,17 @@ export function MissionControl({ data, recentEvents }: Props) {
               </h2>
             </div>
             <div className={styles.actions}>
-              {concurrencyItem ? (
+              {crisisItem ? (
                 <Link
-                  href={concurrencyItem.href}
+                  href={crisisItem.href}
                   className={`${styles.action} ${styles.actionPrimary}`}
                 >
                   <span className={styles.actionIcon} aria-hidden>
                     ■
                   </span>
-                  <span className={styles.actionLabel}>Pause Arena</span>
+                  <span className={styles.actionLabel}>
+                    {providerQuotaItem ? "Open Arena" : "Pause Arena"}
+                  </span>
                 </Link>
               ) : (
                 <Link

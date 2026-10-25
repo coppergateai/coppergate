@@ -11,6 +11,8 @@ export {
   FakeCodingAgent,
   buildFakeCompletion,
   isFakeCompletionPayload,
+  isLlmProviderQuotaError,
+  isLlmProviderQuotaFailure,
 } from "./fake.js";
 export {
   runFakeValidation,

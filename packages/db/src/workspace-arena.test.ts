@@ -83,18 +83,18 @@ describe("classifyContenderRuntime", () => {
     );
   });
 
-  it("flags stuck VALIDATING as needsAttention when arena is not live", () => {
+  it("quiets mid-flight CI while arena is paused/stopped", () => {
     assert.equal(
       classifyContenderRuntime(runStub({ status: "VALIDATING" }), 1_000_000, {
         arenaLive: false,
       }),
-      "needsAttention",
+      "idle",
     );
     assert.equal(
       classifyContenderRuntime(runStub({ status: "WAITING_CI" }), 1_000_000, {
         arenaLive: false,
       }),
-      "needsAttention",
+      "idle",
     );
     assert.equal(
       classifyContenderRuntime(

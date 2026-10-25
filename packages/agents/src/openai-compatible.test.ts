@@ -450,6 +450,54 @@ describe("buildPrompt isolation", () => {
   });
 });
 
+describe("OpenAiCompatibleCodingAgent quota", () => {
+  it("does not retry insufficient_quota and emits provider_quota", async () => {
+    let calls = 0;
+    const agent = new OpenAiCompatibleCodingAgent({
+      apiKey: "sk-test",
+      maxRetries: 2,
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: "You exceeded your current quota",
+              type: "insufficient_quota",
+              code: "insufficient_quota",
+            },
+          }),
+          { status: 429 },
+        );
+      },
+    });
+
+    const events = [];
+    for await (const ev of agent.run({
+      runId: "r1",
+      taskId: "t1",
+      workspaceId: "w1",
+      projectId: "p1",
+      goal: "Add button",
+      scope: "Landing",
+      allowedPaths: ["app/page.tsx"],
+      acceptanceCriteria: ["Works"],
+      baseSha: "abc",
+      toolAllowlist: [],
+      spendCapMicros: 1_000_000,
+    })) {
+      events.push(ev);
+    }
+
+    assert.equal(calls, 1);
+    assert.ok(
+      events.some(
+        (e) => e.kind === "error" && e.payload?.code === "provider_quota",
+      ),
+    );
+    assert.ok(!events.some((e) => e.kind === "completion"));
+  });
+});
+
 describe("createCodingAgent", () => {
   it("defaults to FakeCodingAgent without key", () => {
     const prev = process.env.LLM_API_KEY;

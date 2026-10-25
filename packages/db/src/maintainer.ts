@@ -65,10 +65,74 @@ import {
   setProjectMultiRepoPolicy,
 } from "./projects.js";
 
-/** Canonical micro-budget: $5/mo = 5_000_000 micros. */
-/** Default monthly envelope for maintainer mode ($50). */
-/** Default workspace pooled envelope: $100/mo. */
-export const DEFAULT_MONTHLY_BUDGET_MICROS = 100_000_000;
+/** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
+export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
+
+/** Below this available project budget, spawn engineer+reviewer only (not FULL_ARENA). */
+export const LEAN_ROSTER_AVAILABLE_MICROS = 2_000_000;
+
+/** Minimal spend-safe arena roster. */
+export const LEAN_ARENA_PROFILE_KEYS = ["engineer", "reviewer"] as const;
+
+/** Pick FULL vs lean roster from remaining project micros. */
+export function rosterKeysForAvailableBudget(
+  availableMicros: number,
+): string[] {
+  if (availableMicros < LEAN_ROSTER_AVAILABLE_MICROS) {
+    return [...LEAN_ARENA_PROFILE_KEYS];
+  }
+  return [...FULL_ARENA_PROFILE_KEYS];
+}
+
+/**
+ * Fail-closed when the LLM provider reports billing/quota exhaustion.
+ * Pauses the project arena so claims stop burning the last dollars.
+ */
+export async function pauseArenaForProviderQuota(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+    detail?: string;
+  },
+): Promise<{ paused: boolean; arenaId: string | null }> {
+  const arena = await getArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+  });
+  if (!arena) {
+    return { paused: false, arenaId: null };
+  }
+  if (arena.status !== "PAUSED") {
+    await pauseArena(db, {
+      workspaceId: input.workspaceId,
+      arenaId: arena.id,
+      actor: input.actor,
+    });
+  }
+  await recordMaintainerEvent(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    kind: "provider_quota",
+    payload: {
+      arenaId: arena.id,
+      detail: input.detail?.slice(0, 400) ?? null,
+    },
+  });
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.pause_provider_quota",
+    targetType: "project",
+    targetId: input.projectId,
+    meta: {
+      arenaId: arena.id,
+      detail: input.detail?.slice(0, 400) ?? null,
+    },
+  });
+  return { paused: true, arenaId: arena.id };
+}
 
 export type MaintainerPolicy = {
   enabled: boolean;
@@ -127,7 +191,7 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   coordinatedMultiRepo: false,
   allowedSignalProviders: ["*", "ci_failure", "sentry", "dependabot", "codeql"],
   pathAllowlist: [],
-  maxTournamentN: 2,
+  maxTournamentN: 1,
   visionBriefId: null,
   replanIntervalDays: 7,
   autoQueueReplanTasks: true,
@@ -217,7 +281,7 @@ export function parseMaintainerPolicy(
       maxTournamentN:
         typeof v.maxTournamentN === "number" && v.maxTournamentN >= 1
           ? Math.min(3, Math.floor(v.maxTournamentN))
-          : 2,
+          : DEFAULT_MAINTAINER_POLICY.maxTournamentN,
       replanIntervalDays:
         typeof v.replanIntervalDays === "number" && v.replanIntervalDays >= 1
           ? Math.floor(v.replanIntervalDays)
@@ -434,7 +498,7 @@ export async function enableMaintainerMode(
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
-    defaultContenderN: Math.min(2, policy.maxTournamentN),
+    defaultContenderN: Math.min(1, policy.maxTournamentN),
     minHuman: true,
   });
   if (!arena.minHuman) {
@@ -717,13 +781,24 @@ export async function startProjectArena(
 
   // Arm + resume BEFORE vision replan. If backlog boots while PAUSED,
   // min_human is skipped and a zombie Inbox approval is created.
-  const rosterN = FULL_ARENA_PROFILE_KEYS.length;
+  let rosterKeys = [...FULL_ARENA_PROFILE_KEYS];
+  try {
+    const spend = await getProjectSpendSummary(
+      db,
+      input.workspaceId,
+      input.projectId,
+    );
+    rosterKeys = rosterKeysForAvailableBudget(spend.availableMicros);
+  } catch {
+    /* keep full roster if spend lookup fails */
+  }
+  const rosterN = Math.max(1, rosterKeys.length);
   let { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
     minHuman: true,
-    defaultContenderN: rosterN,
+    defaultContenderN: Math.min(rosterN, 1),
     contenderCount: rosterN,
   });
   try {
@@ -731,7 +806,7 @@ export async function startProjectArena(
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       actor: input.actor,
-      profileKeys: FULL_ARENA_PROFILE_KEYS,
+      profileKeys: rosterKeys,
     });
   } catch {
     // spawn best-effort — tick continues
@@ -1788,6 +1863,18 @@ export async function maybeSelfImproveProfile(
       }
     }
     if (!alreadyArmed) {
+      let availableMicros = Number.POSITIVE_INFINITY;
+      try {
+        const spend = await getProjectSpendSummary(
+          db,
+          input.workspaceId,
+          input.projectId,
+        );
+        availableMicros = spend.availableMicros;
+      } catch {
+        /* allow meta when spend unknown */
+      }
+      if (availableMicros >= LEAN_ROSTER_AVAILABLE_MICROS) {
       const flip =
         base.strategyDefault === "blitz"
           ? "fortress"
@@ -1824,6 +1911,7 @@ export async function maybeSelfImproveProfile(
           challengerStrategy: flip,
         },
       });
+      }
     }
   }
 
@@ -2029,13 +2117,18 @@ export async function runVisionReplan(
       .where(eq(milestones.id, m.milestone.id));
   }
 
-  // Arm full bounded roster for the autonomous backlog cycle
+  // Arm roster — lean when project budget headroom is tight (BYOK spend guard).
   try {
+    const spend = await getProjectSpendSummary(
+      db,
+      input.workspaceId,
+      input.projectId,
+    );
     await applySpawnProfilesToArena(db, {
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       actor: input.actor,
-      profileKeys: FULL_ARENA_PROFILE_KEYS,
+      profileKeys: rosterKeysForAvailableBudget(spend.availableMicros),
     });
   } catch {
     // arena may not exist yet — tick/enable creates it
@@ -2069,6 +2162,7 @@ export async function runVisionReplan(
             targetId: tv.task.id,
             meta: {
               projectId: input.projectId,
+              projectName: project?.name ?? null,
               taskId: tv.task.id,
               error: err instanceof Error ? err.message : String(err),
             },
