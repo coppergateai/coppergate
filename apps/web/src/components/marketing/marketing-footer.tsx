@@ -29,7 +29,7 @@ export function MarketingFooter() {
               />
             </Link>
             <p className={styles.footerLede}>
-              Set a budget. Agents compete. Survivors ship.
+              Autonomy under contract. Only what&apos;s on the program ships.
             </p>
             <p className={styles.footerNote}>
               Coppergate is built by Coppergate — and ships adjacent open-source
@@ -101,6 +101,7 @@ export function MarketingFooter() {
             <nav className={styles.footerCol} aria-label="Resources">
               <p className={styles.footerColTitle}>Resources</p>
               <Link href="/docs">Documentation</Link>
+              <Link href="/docs/open-program-runtime">Open Program Runtime</Link>
               <Link href="/docs/pricing">Pricing</Link>
               <Link href="/blog">Blog</Link>
               <a

@@ -10,6 +10,7 @@ export const DOCS_NAV: Array<{
   exact?: boolean;
 }> = [
   { href: "/docs", label: "Overview", exact: true },
+  { href: "/docs/open-program-runtime", label: "Open Program Runtime" },
   { href: "/docs/supported-stack", label: "Supported stack" },
   { href: "/docs/limitations", label: "Limitations" },
   { href: "/docs/pricing", label: "Pricing" },

@@ -261,8 +261,22 @@ export async function getRunCiFitness(
   runId: string,
 ): Promise<RunCiFitness> {
   const checks = await listRunCiChecks(db, runId);
-  const blocking = checks.some((c) => c.blocksAccept);
-  const passed = checks.some((c) => c.passed && !c.blocksAccept);
+  // Only required contexts block accept (default: branch-protection "test").
+  // Helper jobs (branch-name validate, auto-merge enable) often fail without gating merge.
+  const requiredNames = new Set(
+    (process.env.CI_REQUIRED_CHECK_NAMES ?? "test")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  const isRequired = (name: string) =>
+    requiredNames.size === 0 || requiredNames.has(name);
+  const requiredReported = checks.filter((c) => isRequired(c.name));
+  const blocking = requiredReported.some((c) => c.blocksAccept);
+  const passed =
+    requiredReported.length === 0
+      ? checks.some((c) => c.passed && !c.blocksAccept) || checks.length === 0
+      : requiredReported.some((c) => c.passed) && !blocking;
 
   const [run] = await db
     .select({ status: agentRuns.status })
@@ -271,31 +285,11 @@ export async function getRunCiFitness(
     .limit(1);
   const statusAwaitingCi = run?.status === "WAITING_CI";
 
-  let eventAwaitingLive = false;
-  try {
-    const events = await listRunEvents(db, runId);
-    eventAwaitingLive = events.some((e) => {
-      try {
-        const payload = JSON.parse(e.payload) as {
-          fitness?: unknown;
-        };
-        return payload.fitness === "pending";
-      } catch {
-        return false;
-      }
-    });
-  } catch {
-    eventAwaitingLive = false;
-  }
-
-  // Run status is source of truth — do not rely solely on fitness:pending events
-  // (worker can crash after markRunWaitingCi before the evidence event is written).
-  const awaitingLive = statusAwaitingCi || eventAwaitingLive;
-  // Green (or vacuous no-CI) evidence clears the gate even while still WAITING_CI.
+  // Run status is source of truth — ignore stale fitness:pending events after promote.
+  const awaitingLive = statusAwaitingCi;
   const ciSatisfied = !blocking && passed;
   // Accept stays fail-closed until promoted out of WAITING_CI.
-  const acceptReady =
-    !statusAwaitingCi && !blocking && (!awaitingLive || passed);
+  const acceptReady = !statusAwaitingCi && !blocking && passed;
 
   return {
     checks,

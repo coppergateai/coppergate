@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Coppergate — Set a budget. Agents compete. Survivors ship.";
+export const alt =
+  "Coppergate — Autonomy under contract. Only what’s on the program ships.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -60,7 +61,7 @@ export default function OpenGraphImage() {
               maxWidth: 900,
             }}
           >
-            Set a budget. Agents compete. Survivors ship.
+            Autonomy under contract. Only what is on the program ships.
           </div>
           <div
             style={{
@@ -71,7 +72,7 @@ export default function OpenGraphImage() {
               lineHeight: 1.35,
             }}
           >
-            Losers get eliminated. Winners ship and improve. Selection
+            Open Program → Spend License → Survivor → Ship Receipt. Selection
             pressure is the cost optimizer.
           </div>
         </div>

@@ -174,7 +174,7 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
       assert.equal(run.taskId, taskId);
       assert.equal(run.tournamentId, first.tournament.id);
       assert.ok(run.contenderId);
-      assert.ok(run.branchName?.startsWith("cg/t/"));
+      assert.ok(run.branchName?.startsWith("chore/cg-t-"));
       assert.equal(run.status, "QUEUED");
       // Contender profile tools may replace task path allowlist on enqueue.
       assert.ok(

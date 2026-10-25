@@ -206,7 +206,7 @@ export function buildFakeCompletion(
   actualCostMicros: number,
 ): FakeCompletionPayload {
   const slug = shortId(input.taskId);
-  const branchName = `coppergate/task-${slug}`;
+  const branchName = `chore/cg-task-${slug}`;
   const headSha = `fake${shortId(input.runId)}${shortId(input.baseSha)}`.slice(
     0,
     40,

@@ -21,25 +21,26 @@ export function EvidenceSection() {
     >
       <div className={styles.sectionInner}>
         <header className={styles.workflowHead}>
-          <p className={styles.sectionEyebrow}>Verification evidence</p>
+          <p className={styles.sectionEyebrow}>Ship Receipt</p>
           <h2 id="evidence-title" className={styles.sectionTitle}>
-            Every winner comes with evidence.
+            Accept leaves a receipt, not a chat log.
           </h2>
           <p className={styles.sectionLede}>
-            Merge decisions need signal, not vibes: CI, fitness, spend, and a
-            selection reason travel with the survivor path.
+            Open ID, spend, fitness, CI, and writeback travel with every Accept
+            — accounting for Contracted Autonomy.
           </p>
         </header>
 
         <article className={styles.deliveryReport}>
           <header className={styles.deliveryHead}>
             <div>
-              <p className={styles.deliveryKicker}>Delivery report</p>
+              <p className={styles.deliveryKicker}>Ship Receipt</p>
               <h3 className={styles.deliveryTitle}>
-                {ILLUSTRATIVE_ARENA.task}
+                AG-011 · {ILLUSTRATIVE_ARENA.task}
               </h3>
               <p className={styles.deliverySub}>
-                Survivor · {winner.name} · PR #{ILLUSTRATIVE_ARENA.prNumber}
+                Open ID · Survivor {winner.name} · PR #
+                {ILLUSTRATIVE_ARENA.prNumber}
               </p>
             </div>
             <span className={styles.statusPillWin}>Selected</span>

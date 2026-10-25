@@ -9,7 +9,7 @@ import { publicPageMetadata } from "@/lib/seo";
 export const metadata: Metadata = publicPageMetadata({
   title: "Docs",
   description:
-    "Open-source docs for the Coppergate Survivor arena — stack, self-host, limitations, recovery.",
+    "Open Program Runtime docs — Contracted Autonomy, stack, self-host, limitations, recovery. Community $0.",
   path: "/docs",
 });
 
@@ -18,6 +18,11 @@ const SELF_HOST = `${REPO}/blob/main/docs/SELF_HOST.md`;
 
 const items = [
   {
+    href: "/docs/open-program-runtime",
+    title: "Open Program Runtime",
+    detail: "Contracted Autonomy — Spend License, Accept → Ship Receipt",
+  },
+  {
     href: "/docs/supported-stack",
     title: "Supported stack",
     detail: "SCM delivery, signals, fitness evidence, and BYOK paths",
@@ -25,7 +30,7 @@ const items = [
   {
     href: "/docs/limitations",
     title: "Limitations & non-goals",
-    detail: "Wedge limits vs Survivor north star — what we will not do",
+    detail: "Wedge limits vs program-bound ship runtime — what we will not do",
   },
   {
     href: "/docs/pricing",
@@ -57,9 +62,10 @@ export default function DocsIndexPage() {
         <p className={styles.pageEyebrow}>Open source</p>
         <h1 className={styles.pageTitle}>Documentation</h1>
         <p className={styles.pageLede}>
-          Coppergate is MIT-licensed. North star is the Survivor arena; the
-          practical wedge is <strong>issue → verified PR</strong> (GitHub or
-          GitLab) with spend caps and a kill-switch.
+          Coppergate is MIT-licensed. North star is{" "}
+          <strong>Open Program Runtime</strong> — autonomy under contract. The
+          practical wedge is Open ID → Survivor → Accept → Ship Receipt (GitHub
+          or GitLab) with spend caps and a kill-switch. Community stays $0.
         </p>
 
         <div className={styles.docsCtaRow}>

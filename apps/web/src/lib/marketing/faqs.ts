@@ -7,11 +7,15 @@ export type FaqItem = {
 export const LANDING_FAQS: readonly FaqItem[] = [
   {
     q: "What does Coppergate do?",
-    a: "For engineering teams: you give it a task, multiple AI agents compete to solve it, and Coppergate verifies each attempt, prices spend, and prepares the strongest qualifying result as a pull request for your review.",
+    a: "Open Program Runtime: agents only spend against living Open Program lines. Contenders compete under a budget; fitness and CI decide; you Accept. Success is Done writeback plus a Ship Receipt — not a chat transcript.",
+  },
+  {
+    q: "What is Contracted Autonomy?",
+    a: "Autonomy licensed by the Open Program. When a project binds an architecture program, every Arena reserve requires an Open ID. No Open ID → no spend. Accept writes the line Done and issues a Ship Receipt with spend, fitness, CI, and writeback links.",
   },
   {
     q: "How is this different from a coding chat agent?",
-    a: "Chat agents help you write code in a thread. Coppergate runs a bounded competition with budgets, validation evidence, and efficiency ranking. The output is a survivor path with a PR — not a paste buffer.",
+    a: "Chat agents help you write code in a thread. Coppergate binds spend to a program line, runs a bounded competition with evidence, and ships a survivor PR with a receipt you can audit — not a paste buffer.",
   },
   {
     q: "Why competing agents instead of one?",

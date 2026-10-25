@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app";
+import { OpenIdBadge } from "@/components/app/ui";
 import { displayTaskTitle } from "@/lib/display-title";
 import {
   acceptBlockedReason as computeAcceptBlocked,
@@ -115,7 +116,7 @@ function parseInlineBody(meta: Record<string, unknown>): unknown {
 
 export function TaskDetailPanel({
   workspaceId,
-  projectId: _projectId,
+  projectId,
   taskId,
   initialTask,
   isOwner,
@@ -261,6 +262,16 @@ export function TaskDetailPanel({
           status: data.task!.status,
           attemptCount: data.task!.attemptCount ?? t.attemptCount,
         }));
+      }
+      const accepted =
+        body.decision === "accept" &&
+        (data.task?.status === "DONE" || data.task?.status === "ACCEPTED");
+      if (accepted) {
+        toast.push("Ship Receipt ready", "success");
+        router.push(
+          `/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/receipt`,
+        );
+        return;
       }
       toast.push("Updated", "success");
       await refreshRuns();
@@ -520,8 +531,18 @@ export function TaskDetailPanel({
             : null}
       </p>
       <h1 className={styles.title}>
+        <OpenIdBadge title={task.title} />{" "}
         {displayTaskTitle(task.title) || task.title}
       </h1>
+      {task.status === "DONE" || task.status === "ACCEPTED" ? (
+        <p className={styles.meta}>
+          <a
+            href={`/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/receipt`}
+          >
+            Open Ship Receipt →
+          </a>
+        </p>
+      ) : null}
 
       <nav className={styles.stageNav} aria-label="Delivery review stages">
         {stages.map((s) => (

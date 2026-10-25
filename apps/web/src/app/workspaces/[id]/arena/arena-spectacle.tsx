@@ -537,8 +537,8 @@ export function ArenaSpectacle({
           </div>
         ) : ordered.length === 0 ? (
           <p className={styles.empty}>
-            No active projects yet. Bind a repo, then Resume the workspace
-            arena.
+            No Open ID, no spend. Bind a repo and an Open Program path, then
+            Resume — Arena reserves only against program lines.
           </p>
         ) : (
           <div className={styles.lanes} role="list">

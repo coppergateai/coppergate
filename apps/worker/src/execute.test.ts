@@ -168,7 +168,7 @@ describe("executeClaimedRun + FakeCodingAgent", { skip: !url }, () => {
     const run = await getAgentRun(db, runId);
     assert.equal(run?.status, "REVIEW_REQUIRED");
     assert.ok(run?.prUrl);
-    assert.ok(run?.branchName?.startsWith("coppergate/task-"));
+    assert.ok(run?.branchName?.startsWith("chore/cg-task-"));
     assert.notEqual(run?.status, "DONE");
 
     const task = await getTaskById(db, taskId);

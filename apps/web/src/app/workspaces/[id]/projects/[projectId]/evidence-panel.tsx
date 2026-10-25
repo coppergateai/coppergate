@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { displayTaskTitle } from "@/lib/display-title";
-import { EmptyState } from "@/components/app/ui";
+import { EmptyState, OpenIdBadge } from "@/components/app/ui";
 import { gateStatusLabel, type GateStatus } from "@/lib/hard-gates";
 import styles from "./project-detail.module.css";
 
@@ -200,10 +200,9 @@ export function EvidencePanel({
       if (!res.ok) {
         throw new Error(body.error?.message ?? "Accept failed");
       }
-      await load();
+      window.location.assign(`${base}/tasks/${taskId}/receipt`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
       setAcceptingId(null);
     }
   }
@@ -216,18 +215,18 @@ export function EvidencePanel({
         </h2>
       </div>
       <p className={styles.sectionLede}>
-        CI, validation, diff, findings, and policy — hard gates must clear
-        before Accept.
+        CI, validation, diff, and policy must clear before Accept. Accept
+        writes a Ship Receipt against the Open Program ID.
       </p>
       {error ? <p className={styles.stackWarn}>{error}</p> : null}
 
       {ordered.length === 0 ? (
         <EmptyState
-          title="No deliveries yet"
-          body="Primary path: Import → queue an issue, then review gates here before Accept. Arena Start can invent work under the same spend envelope."
+          title="No Open ID deliveries yet"
+          body="No Open ID, no spend. Bind an Open Program line, queue against that ID, then Accept here for a Ship Receipt — freestyle Arena invent is refused when the program is bound."
           action={
-            <Link href={`${base}?tab=overview#issues`} className={styles.linkCta}>
-              Import issue →
+            <Link href={`/docs/open-program-runtime`} className={styles.linkCta}>
+              Open Program Runtime →
             </Link>
           }
         />
@@ -286,6 +285,7 @@ export function EvidencePanel({
                     >
                       {statusPillLabel(d.status, d.acceptReady)}
                     </span>
+                    <OpenIdBadge title={d.title} />
                     <button
                       type="button"
                       className={styles.evidenceTitle}
@@ -361,6 +361,14 @@ export function EvidencePanel({
                           ? "Details"
                           : "Review"}
                   </Link>
+                  {d.status === "ACCEPTED" || d.status === "DONE" ? (
+                    <Link
+                      href={`${base}/tasks/${d.taskId}/receipt`}
+                      className={styles.ghostBtn}
+                    >
+                      Ship Receipt
+                    </Link>
+                  ) : null}
                   {d.prUrl ? (
                     <a
                       href={d.prUrl}
