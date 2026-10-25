@@ -458,7 +458,13 @@ const ACTION_DEFS: Record<string, ActionDef> = {
   "merge.attempt": {
     title: "Merge attempted",
     category: "execution",
-    outcome: "running",
+    outcome: "neutral",
+    summary: (m, count) => {
+      if (count > 1) {
+        return `${count} merge attempts`;
+      }
+      return str(m, "message") ?? str(m, "cta");
+    },
   },
   "merge.blocked": {
     title: "Merge blocked",
@@ -688,14 +694,38 @@ export function categoryLabel(category: ActivityCategory): string {
   }
 }
 
+function mergeAttemptOutcome(
+  meta: Record<string, unknown> | null,
+): ActivityOutcome {
+  if (meta?.merged === true) return "completed";
+  const message = (str(meta, "message") ?? "").toLowerCase();
+  if (message.includes("not mergeable") || message.includes("mergeable")) {
+    return "review";
+  }
+  if (meta?.blocked === true || message.includes("fail")) return "failed";
+  return "review";
+}
+
+function mergeAttemptTitle(meta: Record<string, unknown> | null): string {
+  if (meta?.merged === true) return "PR merged";
+  const message = (str(meta, "message") ?? "").toLowerCase();
+  if (message.includes("not mergeable")) return "Merge not ready";
+  return "Merge attempted";
+}
+
 function annotate(event: ActivityEvent, count = 1): ActivityChildEvent {
+  const isMergeAttempt = event.action === "merge.attempt";
   return {
     ...event,
-    title: humanTitle(event.action),
+    title: isMergeAttempt
+      ? mergeAttemptTitle(event.meta)
+      : humanTitle(event.action),
     summary: summaryFor(event.action, event.meta, count),
     technicalLabel: technicalLabel(event.action),
     category: categoryFor(event.action),
-    outcome: outcomeFor(event.action),
+    outcome: isMergeAttempt
+      ? mergeAttemptOutcome(event.meta)
+      : outcomeFor(event.action),
   };
 }
 
@@ -740,6 +770,12 @@ function collapseKey(event: ActivityEvent): string {
   }
   if (isArenaControlAction(event.action)) {
     return "arena.control";
+  }
+  // Merge storms: collapse per project (or task) so “not mergeable” spam folds.
+  if (event.action === "merge.attempt") {
+    const projectId =
+      typeof event.meta?.projectId === "string" ? event.meta.projectId : "";
+    return `merge.attempt|${projectId || event.targetId || "workspace"}`;
   }
   const projectId =
     typeof event.meta?.projectId === "string" ? event.meta.projectId : "";
@@ -905,9 +941,35 @@ export function groupActivityEvents(events: ActivityEvent[]): ActivityGroup[] {
             : prev.children.some((c) => c.outcome === "running")
               ? "running"
               : "completed";
+        } else if (prevKey.startsWith("merge.attempt|")) {
+          const merged = prev.children.filter(
+            (c) => c.meta?.merged === true,
+          ).length;
+          const notReady = prev.children.length - merged;
+          prev.title =
+            merged > 0 && notReady === 0
+              ? "PRs merged"
+              : merged > 0
+                ? "Merge activity"
+                : "Merge not ready";
+          prev.technicalLabel = `attempt ×${prev.count}`;
+          prev.summary =
+            merged > 0
+              ? `${merged} merged${notReady > 0 ? ` · ${notReady} not ready` : ""}`
+              : `${notReady} not mergeable`;
+          prev.outcome =
+            merged > 0 && notReady === 0
+              ? "completed"
+              : merged > 0
+                ? "review"
+                : "review";
         } else {
           prev.technicalLabel = `${technicalLabel(prev.action)} ×${prev.count}`;
           prev.summary = summaryFor(prev.action, prev.meta, prev.count);
+          if (prev.action === "merge.attempt") {
+            prev.title = mergeAttemptTitle(prev.meta);
+            prev.outcome = mergeAttemptOutcome(prev.meta);
+          }
         }
         continue;
       }

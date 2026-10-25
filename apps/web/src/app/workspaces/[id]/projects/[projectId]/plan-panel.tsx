@@ -42,6 +42,39 @@ type Props = {
   isOwner: boolean;
 };
 
+function taskStatusLabel(status: string): string {
+  switch (status) {
+    case "DRAFT":
+      return "Draft";
+    case "READY_FOR_APPROVAL":
+      return "Needs approval";
+    case "QUEUED":
+      return "Queued";
+    case "RUNNING":
+      return "Running";
+    case "VALIDATING":
+      return "Validating";
+    case "REVIEW_REQUIRED":
+      return "In review";
+    case "ACCEPTED":
+      return "Accepted";
+    case "DONE":
+      return "Done";
+    case "FAILED":
+      return "Failed";
+    case "BLOCKED":
+      return "Blocked";
+    case "CANCELLED":
+      return "Cancelled";
+    case "EXPIRED":
+      return "Expired";
+    case "NEEDS_REPLAN":
+      return "Needs replan";
+    default:
+      return status.replace(/_/g, " ");
+  }
+}
+
 export function PlanPanel({
   workspaceId,
   projectId,
@@ -160,7 +193,7 @@ export function PlanPanel({
                       {t.estimateMicros != null
                         ? `$${(t.estimateMicros / 1_000_000).toFixed(2)}`
                         : "no estimate"}{" "}
-                      · {t.status}
+                      · {taskStatusLabel(t.status)}
                       {t.dependsOnTaskIds.length
                         ? ` · waits on ${t.dependsOnTaskIds.length} predecessor${t.dependsOnTaskIds.length === 1 ? "" : "s"}`
                         : ""}

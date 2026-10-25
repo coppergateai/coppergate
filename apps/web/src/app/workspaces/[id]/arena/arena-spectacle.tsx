@@ -143,7 +143,7 @@ function projectRuntime(lane: ProjectLane): RuntimeState {
   if (states.includes("needsAttention")) return "needsAttention";
   if (states.includes("running")) return "running";
   if (states.includes("awaitingCi")) return "awaitingCi";
-  if (arenaLive) return "running";
+  // Armed/live with no hot agents is idle roster — not an active run.
   return "idle";
 }
 
@@ -154,7 +154,8 @@ function projectStatusLabel(lane: ProjectLane): string {
   const runtime = projectRuntime(lane);
   if (runtime === "awaitingCi") return "Awaiting CI";
   if (runtime === "needsAttention") return "Needs attention";
-  if (isLiveStatus(lane.arenaStatus)) return "Running";
+  if (runtime === "running") return "Running";
+  if (isLiveStatus(lane.arenaStatus)) return "Live";
   return lane.arenaStatus;
 }
 
@@ -570,8 +571,10 @@ export function ArenaSpectacle({
                       </div>
                       <p className={styles.laneRepo}>
                         {lane.repoFullName}
-                        {lane.lastRun
-                          ? ` · Last run: ${lane.lastRun.status.replace(/_/g, " ")}`
+                        {lane.lastRun &&
+                        laneRuntime !== "running" &&
+                        laneRuntime !== "awaitingCi"
+                          ? ` · Last ${lane.lastRun.status.replace(/_/g, " ").toLowerCase()}`
                           : ""}
                       </p>
                     </div>
