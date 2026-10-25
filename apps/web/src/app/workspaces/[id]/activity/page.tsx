@@ -166,7 +166,7 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
             : recentMergeBlocked
               ? "Merge blocked"
               : recentReplanFail
-                ? "Replan failing"
+                ? "Replan queue failed"
                 : "Needs attention",
       }}
     />
