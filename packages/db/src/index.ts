@@ -384,6 +384,10 @@ export {
   rollbackProfileEvolution,
   runVisionReplan,
   isMergeProtectionBlock,
+  isTerminalMergeSkip,
+  isTransientNotMergeable,
+  resolveAutoMergeSkipPrs,
+  AUTO_MERGE_RETRY_COOLDOWN_MS,
   selectAutoAcceptRun,
   serializeMaintainerPolicy,
   shouldRollbackProfileForFitness,
@@ -419,6 +423,7 @@ export {
 } from "./workspace-arena.js";
 export {
   DEFAULT_LEASE_MS,
+  DEFAULT_VALIDATING_STUCK_MS,
   DEFAULT_WAITING_CI_TIMEOUT_MS,
   MAX_LEASE_RECLAIMS,
   MAX_RUN_WALL_MS,
@@ -440,6 +445,7 @@ export {
   releaseRunClaim,
   renewRunLease,
   requestCancelRun,
+  resolveValidatingStuckMs,
   resolveWaitingCiTimeoutMs,
   attachSandboxToRun,
   setTaskPrUrl,

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  architectureIdsFromTitles,
   extractArchitectureIdFromTitle,
   markArchitectureIdDoneInMarkdown,
   parseArchitectureOpenTasks,
@@ -25,6 +26,30 @@ describe("architecture-backlog", () => {
     assert.ok(!ids.includes("P-006"));
     const next = pickNextArchitectureTask(tasks);
     assert.equal(next?.id, "P-007");
+  });
+
+  it("pickNextArchitectureTask honors excludeIds", () => {
+    const tasks = parseArchitectureOpenTasks(`
+- [ ] P-007: Refresh stale default models
+- [ ] P-008: Amazon Bedrock compat path
+`);
+    const next = pickNextArchitectureTask(tasks, { excludeIds: ["P-007"] });
+    assert.equal(next?.id, "P-008");
+    const none = pickNextArchitectureTask(tasks, {
+      excludeIds: ["P-007", "P-008"],
+    });
+    assert.equal(none, null);
+  });
+
+  it("architectureIdsFromTitles extracts program IDs", () => {
+    assert.deepEqual(
+      architectureIdsFromTitles([
+        "Coppergate: P-008: Bedrock",
+        "good first issue: P-007: models",
+        "unrelated",
+      ]).sort(),
+      ["P-007", "P-008"],
+    );
   });
 
   it("marks Open table rows Done for writeback", () => {

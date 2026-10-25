@@ -60,6 +60,21 @@ Date: 2026-10-24
 - **Vacuous no-CI**: CI refresh ingests synthetic `no_required_checks` after 5m grace when GitHub returns empty check-runs/statuses — frees slots + unblocks auto-accept on repos without CI
 - **Concurrency bump**: Community/Pro `maxConcurrentRuns` 12 → 20
 
+## Cycle 11
+- **Auto-merge backoff**: skip already-merged / blocked / terminal PRs; 30m cooldown on “not mergeable” so maintainer ticks stop flooding Activity
+- **Activity merge storms**: bucket `merge.attempt` per project (interleaved-safe) with honest outcomes (merged / not ready)
+- **Mission Control strip**: show Arena running + awaiting CI (not raw inflight) so it matches Arena spectacle
+- **Activity “agents hot”**: count running/awaiting-CI contenders, not the full ACTIVE roster
+- **Delivery lease cap**: stop heartbeat before GitHub delivery; renew once (≥5m) so hung http cannot pin VALIDATING forever
+- **VALIDATING stuck**: null-lease VALIDATING fails after 15m (`VALIDATING_STUCK_MS`) instead of the 45m RUNNING wall
+- **Evidence banner**: pending hard gates / VALIDATING no longer mislabeled as “CI checks failed”
+- **Activity project tags**: resolve projectName from `targetType=project` and include `projectId` on replan audits
+
+## Cycle 12
+- **Quiet reaper failures**: `waiting_ci_timeout` / `validating_lease_expired` / `lease_expired_poison` no longer inflate Arena Needs attention
+- **Roster strip**: Arena snapshot excludes ELIMINATED contenders (was showing 1000+ “idle” after spawn cycles)
+- **Activity**: collapse `fitness.score` storms like debit/eliminate
+
 ## Tests
 - `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt, duplicate FILE, JSON retry
 - `delivery.test.ts` — fake idempotency, list fail-closed, 422 recovery, CAS conflict

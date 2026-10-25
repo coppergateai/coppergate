@@ -54,8 +54,19 @@ export type WorkspaceArenaLastRun = {
   id: string;
   status: string;
   profileKey: string | null;
+  errorCode: string | null;
   updatedAt: string;
 };
+
+/** Expected terminal failures — do not elevate lane severity. */
+function isQuietFailureErrorCode(errorCode: string | null | undefined): boolean {
+  return (
+    errorCode === "stub_delivery" ||
+    errorCode === "waiting_ci_timeout" ||
+    errorCode === "validating_lease_expired" ||
+    errorCode === "lease_expired_poison"
+  );
+}
 
 export type WorkspaceArenaProjectLane = {
   projectId: string;
@@ -142,7 +153,7 @@ export function classifyContenderRuntime(
     if (!arenaLive) return "idle";
     // Tournament losers and simulated-delivery stubs are expected outcomes.
     if (latestRun.tournamentResult === "LOSER") return "idle";
-    if (latestRun.errorCode === "stub_delivery") return "idle";
+    if (isQuietFailureErrorCode(latestRun.errorCode)) return "idle";
     // Stale failures linger on the contender until the next fan-out — don't scream.
     if (isStaleFailureTimestamp(latestRun.updatedAt, nowMs)) return "idle";
     return "needsAttention";
@@ -164,6 +175,8 @@ function deriveSummary(
   for (const lane of lanes) {
     const arenaLive = isLiveArenaStatus(lane.arenaStatus);
     for (const c of lane.contenders) {
+      // Historical eliminations are not part of the live roster strip.
+      if (c.status === "ELIMINATED") continue;
       const bucket = classifyContenderRuntime(
         c.latestRun,
         c.budgetMicrosRemaining,
@@ -249,15 +262,19 @@ function contenderViews(
   temperamentByKey: Map<string, string>,
   runsByContender: Map<string, WorkspaceArenaContenderRun>,
 ): WorkspaceArenaContenderView[] {
-  return pool.map((c) => ({
-    id: c.id,
-    profileKey: c.profileKey,
-    strategy: c.strategy,
-    status: c.status,
-    temperament: temperamentByKey.get(c.profileKey) ?? null,
-    budgetMicrosRemaining: c.budgetMicrosRemaining,
-    latestRun: runsByContender.get(c.id) ?? null,
-  }));
+  // Spectacle / Mission Control only need the live roster — eliminated history
+  // was inflating "1313 idle" after repeated spawn/eliminate cycles.
+  return pool
+    .filter((c) => c.status !== "ELIMINATED")
+    .map((c) => ({
+      id: c.id,
+      profileKey: c.profileKey,
+      strategy: c.strategy,
+      status: c.status,
+      temperament: temperamentByKey.get(c.profileKey) ?? null,
+      budgetMicrosRemaining: c.budgetMicrosRemaining,
+      latestRun: runsByContender.get(c.id) ?? null,
+    }));
 }
 
 async function lastRunForProject(
@@ -270,6 +287,7 @@ async function lastRunForProject(
       id: agentRuns.id,
       status: agentRuns.status,
       agentProfileKey: agentRuns.agentProfileKey,
+      errorCode: agentRuns.errorCode,
       updatedAt: agentRuns.updatedAt,
     })
     .from(agentRuns)
@@ -286,6 +304,7 @@ async function lastRunForProject(
     id: run.id,
     status: run.status,
     profileKey: run.agentProfileKey ?? null,
+    errorCode: run.errorCode ?? null,
     updatedAt: run.updatedAt.toISOString(),
   };
 }
@@ -316,6 +335,7 @@ function laneSeverity(lane: WorkspaceArenaProjectLane): number {
       lane.lastRun?.status === "BLOCKED" ||
       lane.lastRun?.status === "EXPIRED") &&
     lane.lastRun.updatedAt &&
+    !isQuietFailureErrorCode(lane.lastRun.errorCode) &&
     !isStaleFailureTimestamp(lane.lastRun.updatedAt)
   ) {
     worst = Math.max(worst, 3);

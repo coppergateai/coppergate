@@ -142,7 +142,7 @@ describe("classifyContenderRuntime", () => {
     );
   });
 
-  it("quiets tournament losers, stub delivery, eliminated, and stale failures", () => {
+  it("quiets tournament losers, stub delivery, reaper timeouts, eliminated, and stale failures", () => {
     const now = Date.parse("2026-10-24T19:00:00.000Z");
     assert.equal(
       classifyContenderRuntime(
@@ -155,6 +155,22 @@ describe("classifyContenderRuntime", () => {
     assert.equal(
       classifyContenderRuntime(
         runStub({ status: "FAILED", errorCode: "stub_delivery" }),
+        1,
+        { arenaLive: true, nowMs: now },
+      ),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "FAILED", errorCode: "waiting_ci_timeout" }),
+        1,
+        { arenaLive: true, nowMs: now },
+      ),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "FAILED", errorCode: "validating_lease_expired" }),
         1,
         { arenaLive: true, nowMs: now },
       ),

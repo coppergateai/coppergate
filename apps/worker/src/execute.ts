@@ -793,6 +793,20 @@ export async function executeClaimedRun(
     return "failed";
   }
 
+  // Stop heartbeat before delivery — hung GitHub calls must not renew forever
+  // or VALIDATING holds concurrency slots indefinitely.
+  clearInterval(heartbeat);
+  const deliveryLeaseMs = Math.max(leaseMs, 5 * 60_000);
+  try {
+    await renewRunLease(db, run.id, workerId, deliveryLeaseMs);
+  } catch (err) {
+    if (err instanceof RunError && err.code === "not_owner") {
+      log.warn("lost ownership before delivery; skipping", { runId: run.id });
+      return "failed";
+    }
+    throw err;
+  }
+
   try {
   if (!completion || !validationReport) {
     await markRunFailed(db, {

@@ -48,6 +48,7 @@ type ProjectLane = {
     id: string;
     status: string;
     profileKey: string | null;
+    errorCode?: string | null;
     updatedAt: string;
   } | null;
 };
@@ -116,6 +117,13 @@ function classifyRuntime(
     if (!arenaLive) return "idle";
     if (run.tournamentResult === "LOSER") return "idle";
     if (run.errorCode === "stub_delivery") return "idle";
+    if (
+      run.errorCode === "waiting_ci_timeout" ||
+      run.errorCode === "validating_lease_expired" ||
+      run.errorCode === "lease_expired_poison"
+    ) {
+      return "idle";
+    }
     if (isStaleFailure(run.updatedAt)) return "idle";
     return "needsAttention";
   }
