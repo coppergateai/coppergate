@@ -1,9 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  DEFAULT_VALIDATING_STUCK_MS,
   DEFAULT_WAITING_CI_TIMEOUT_MS,
   MAX_LEASE_RECLAIMS,
+  MAX_RUN_WALL_MS,
   parseReclaimCount,
+  resolveValidatingStuckMs,
   resolveWaitingCiTimeoutMs,
 } from "./runs.js";
 
@@ -33,6 +36,19 @@ describe("reaper policy helpers", () => {
     assert.equal(
       resolveWaitingCiTimeoutMs({ WAITING_CI_TIMEOUT_MS: "nope" }),
       DEFAULT_WAITING_CI_TIMEOUT_MS,
+    );
+  });
+
+  it("resolves VALIDATING stuck timeout shorter than wall-clock", () => {
+    assert.equal(resolveValidatingStuckMs({}), DEFAULT_VALIDATING_STUCK_MS);
+    assert.ok(DEFAULT_VALIDATING_STUCK_MS < MAX_RUN_WALL_MS);
+    assert.equal(
+      resolveValidatingStuckMs({ VALIDATING_STUCK_MS: "120000" }),
+      120_000,
+    );
+    assert.equal(
+      resolveValidatingStuckMs({ VALIDATING_STUCK_MS: "100" }),
+      DEFAULT_VALIDATING_STUCK_MS,
     );
   });
 });

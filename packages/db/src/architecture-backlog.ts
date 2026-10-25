@@ -91,18 +91,34 @@ export function isToyArchitectureTitle(title: string): boolean {
 
 export function pickNextArchitectureTask(
   tasks: ArchitectureOpenTask[],
-  opts?: { excludeTitleSubstrings?: string[] },
+  opts?: { excludeTitleSubstrings?: string[]; excludeIds?: string[] },
 ): ArchitectureOpenTask | null {
   const exclude = (opts?.excludeTitleSubstrings ?? []).map((s) =>
     s.toLowerCase(),
   );
+  const excludeIds = new Set(
+    (opts?.excludeIds ?? []).map((id) => id.toUpperCase()).filter(Boolean),
+  );
   for (const t of tasks) {
+    if (excludeIds.has(t.id.toUpperCase())) continue;
     const hay = t.title.toLowerCase();
     if (exclude.some((e) => e && hay.includes(e))) continue;
     if (isToyArchitectureTitle(t.title)) continue;
     return t;
   }
   return null;
+}
+
+/** Collect program IDs already present in open task/PR/issue titles. */
+export function architectureIdsFromTitles(
+  titles: Array<string | null | undefined>,
+): string[] {
+  const ids = new Set<string>();
+  for (const title of titles) {
+    const id = extractArchitectureIdFromTitle(title);
+    if (id) ids.add(id);
+  }
+  return [...ids];
 }
 
 /** Pull program ID from a Coppergate task/PR title (`P-007: …`). */

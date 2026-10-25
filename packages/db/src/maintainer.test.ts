@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  AUTO_MERGE_RETRY_COOLDOWN_MS,
   DEFAULT_MAINTAINER_POLICY,
   DEFAULT_MONTHLY_BUDGET_MICROS,
   MIN_REPLAN_AVAILABLE_MICROS,
   buildMaintainerReleaseTag,
+  isMergeProtectionBlock,
+  isTerminalMergeSkip,
+  isTransientNotMergeable,
   parseMaintainerPolicy,
   pickMetaTournamentChallenger,
+  resolveAutoMergeSkipPrs,
   selectAutoAcceptRun,
   serializeMaintainerPolicy,
   shouldReplanVision,
@@ -233,5 +238,72 @@ describe("monthly budget period", () => {
   it("does not roll within same month window", () => {
     const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     assert.equal(shouldRollMonthlyPeriod(recent), false);
+  });
+});
+
+describe("auto-merge skip / backoff", () => {
+  it("classifies protection, terminal, and transient messages", () => {
+    assert.equal(isMergeProtectionBlock("Review is required"), true);
+    assert.equal(isTerminalMergeSkip("Pull request is closed"), true);
+    assert.equal(
+      isTransientNotMergeable("Pull Request is not mergeable"),
+      true,
+    );
+    assert.equal(isTransientNotMergeable("ok to merge"), false);
+  });
+
+  it("skips merged and blocked PRs permanently", () => {
+    const skip = resolveAutoMergeSkipPrs([
+      {
+        kind: "auto_merge",
+        createdAt: new Date(),
+        payload: { prNumber: 1, merged: true, message: "merged" },
+      },
+      {
+        kind: "merge_blocked",
+        createdAt: new Date(),
+        payload: { prNumber: 2, merged: false, blocked: true, message: "owners" },
+      },
+    ]);
+    assert.ok(skip.has(1));
+    assert.ok(skip.has(2));
+  });
+
+  it("backs off not-mergeable within cooldown, then allows retry", () => {
+    const now = Date.UTC(2026, 9, 25, 12, 0, 0);
+    const recent = new Date(now - 5 * 60_000);
+    const stale = new Date(now - AUTO_MERGE_RETRY_COOLDOWN_MS - 60_000);
+
+    const skipRecent = resolveAutoMergeSkipPrs(
+      [
+        {
+          kind: "auto_merge",
+          createdAt: recent,
+          payload: {
+            prNumber: 10,
+            merged: false,
+            message: "Pull Request is not mergeable",
+          },
+        },
+      ],
+      now,
+    );
+    assert.ok(skipRecent.has(10));
+
+    const skipStale = resolveAutoMergeSkipPrs(
+      [
+        {
+          kind: "auto_merge",
+          createdAt: stale,
+          payload: {
+            prNumber: 10,
+            merged: false,
+            message: "Pull Request is not mergeable",
+          },
+        },
+      ],
+      now,
+    );
+    assert.equal(skipStale.has(10), false);
   });
 });

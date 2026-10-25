@@ -32,6 +32,12 @@ export const MAX_RUN_WALL_MS = 45 * 60_000;
  */
 export const DEFAULT_WAITING_CI_TIMEOUT_MS = 6 * 60 * 60_000;
 
+/**
+ * VALIDATING with a null lease fails closed after this age (shorter than
+ * MAX_RUN_WALL_MS). Override: VALIDATING_STUCK_MS.
+ */
+export const DEFAULT_VALIDATING_STUCK_MS = 15 * 60_000;
+
 const RECLAIM_PREFIX = "reclaim:";
 
 /** Parse reclaim counter stored in error_message as `reclaim:N`. */
@@ -53,6 +59,16 @@ export function resolveWaitingCiTimeoutMs(
   if (!raw) return DEFAULT_WAITING_CI_TIMEOUT_MS;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 60_000) return DEFAULT_WAITING_CI_TIMEOUT_MS;
+  return Math.floor(n);
+}
+
+export function resolveValidatingStuckMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const raw = env.VALIDATING_STUCK_MS?.trim();
+  if (!raw) return DEFAULT_VALIDATING_STUCK_MS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 60_000) return DEFAULT_VALIDATING_STUCK_MS;
   return Math.floor(n);
 }
 
@@ -595,10 +611,14 @@ async function releaseFailedEstimates(
  * - expired RUNNING + reclaim budget / wall-clock OK → QUEUED (increment reclaim count)
  * - expired RUNNING + poison (max reclaims or wall-clock) → FAILED
  * - expired VALIDATING → FAILED (fail closed; not safe to re-queue mid-validation)
+ * - null-lease VALIDATING older than VALIDATING_STUCK_MS → FAILED (faster than wall)
  * - WAITING_CI older than timeout (finished_at) → FAILED (CI never accept-ready)
  */
 export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> {
   const wallCutoff = new Date(Date.now() - MAX_RUN_WALL_MS).toISOString();
+  const validatingStuckCutoff = new Date(
+    Date.now() - resolveValidatingStuckMs(),
+  ).toISOString();
   const waitingCiCutoff = new Date(
     Date.now() - resolveWaitingCiTimeoutMs(),
   ).toISOString();
@@ -664,7 +684,7 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
         (lease_until IS NOT NULL AND lease_until < now())
         OR (
           lease_until IS NULL
-          AND updated_at < ${wallCutoff}::timestamptz
+          AND updated_at < ${validatingStuckCutoff}::timestamptz
         )
       )
   `;
@@ -711,7 +731,7 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
       error_message = CASE
         WHEN lease_until IS NOT NULL AND lease_until < now()
           THEN 'VALIDATING lease expired — worker lost ownership before delivery completed'
-        ELSE 'VALIDATING exceeded wall-clock without a live lease — fail closed'
+        ELSE 'VALIDATING stuck without a live lease — fail closed'
       END,
       lease_owner = NULL,
       lease_until = NULL,
@@ -723,7 +743,7 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
         (lease_until IS NOT NULL AND lease_until < now())
         OR (
           lease_until IS NULL
-          AND updated_at < ${wallCutoff}::timestamptz
+          AND updated_at < ${validatingStuckCutoff}::timestamptz
         )
       )
     RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code

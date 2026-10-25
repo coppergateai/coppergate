@@ -74,12 +74,19 @@ export function proposeCommunityIssues(input: {
   openIssues: OpenIssueRef[];
   architectureMarkdown?: string | null;
   max: number;
+  /** Skip architecture IDs already in flight (open tasks/PRs). */
+  excludeIds?: string[];
 }): CommunityIssueCandidate[] {
   const max = Math.max(0, Math.min(10, Math.floor(input.max)));
   if (max === 0) return [];
 
+  const excludeIds = new Set(
+    (input.excludeIds ?? []).map((id) => id.toUpperCase()).filter(Boolean),
+  );
+
   const tasks = parseArchitectureOpenTasks(input.architectureMarkdown ?? "")
     .filter(isCommunityFriendly)
+    .filter((t) => !excludeIds.has(t.id.toUpperCase()))
     .slice(0, 40);
 
   const out: CommunityIssueCandidate[] = [];

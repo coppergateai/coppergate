@@ -55,6 +55,8 @@ import { listRunsForTask } from "./runs.js";
 import { armSignalEvent, listSignalEvents } from "./signals.js";
 import { generateProjectPlan } from "./plans.js";
 import {
+  architectureIdsFromTitles,
+  extractArchitectureIdFromTitle,
   parseArchitectureOpenTasks,
   pickNextArchitectureTask,
 } from "./architecture-backlog.js";
@@ -141,7 +143,15 @@ const OPEN_DELIVERY_STATUSES = [
   "QUEUED",
   "RUNNING",
   "VALIDATING",
+  "WAITING_CI",
   "REVIEW_REQUIRED",
+  "BLOCKED",
+] as const;
+
+/** Statuses that mean an architecture ID is already in flight on the board. */
+const IN_FLIGHT_ARCH_TASK_STATUSES = [
+  ...OPEN_DELIVERY_STATUSES,
+  "ACCEPTED",
 ] as const;
 
 /** Minimum residual budget (micros) before inventing a new cycle. */
@@ -1344,7 +1354,8 @@ export async function tickMaintainerProject(
     );
   }
 
-  // Auto-accept REVIEW_REQUIRED when CI green AND tournament WINNER (or solo)
+  // Auto-accept when CI green AND tournament WINNER (or solo).
+  // Include WAITING_CI tasks whose run already promoted to REVIEW_REQUIRED.
   if (policy.autoMerge) {
     try {
       const pending = await db
@@ -1354,7 +1365,7 @@ export async function tickMaintainerProject(
           and(
             eq(tasks.projectId, input.projectId),
             eq(tasks.workspaceId, input.workspaceId),
-            eq(tasks.status, "REVIEW_REQUIRED"),
+            inArray(tasks.status, ["REVIEW_REQUIRED", "WAITING_CI"]),
           ),
         )
         .limit(20);
@@ -1374,6 +1385,18 @@ export async function tickMaintainerProject(
         if (!fitness.acceptReady) continue;
 
         try {
+          if (
+            task.status === "WAITING_CI" &&
+            candidate.status === "REVIEW_REQUIRED"
+          ) {
+            await applyTaskTransition(db, {
+              workspaceId: input.workspaceId,
+              taskId: task.id,
+              toStatus: "REVIEW_REQUIRED",
+              actor,
+              reason: "run accept-ready — sync task out of WAITING_CI",
+            });
+          }
           await decideTaskReview(db, {
             workspaceId: input.workspaceId,
             taskId: task.id,
@@ -2033,6 +2056,8 @@ export async function runVisionReplan(
             targetType: "task",
             targetId: tv.task.id,
             meta: {
+              projectId: input.projectId,
+              taskId: tv.task.id,
               error: err instanceof Error ? err.message : String(err),
             },
           });
@@ -2063,7 +2088,12 @@ export async function runVisionReplan(
     action: "maintainer.replan",
     targetType: "project",
     targetId: input.projectId,
-    meta: { briefId: brief.id, taskCount, queued },
+    meta: {
+      projectId: input.projectId,
+      briefId: brief.id,
+      taskCount,
+      queued,
+    },
   });
 
   return { taskCount, queued };
@@ -2267,6 +2297,88 @@ export function isMergeProtectionBlock(message: string): boolean {
   );
 }
 
+/** PR already done / closed — never retry. */
+export function isTerminalMergeSkip(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("already merged") ||
+    m.includes("pull request is closed") ||
+    m.includes("pr is closed") ||
+    (m.includes("closed") && m.includes("merged"))
+  );
+}
+
+/**
+ * GitHub says the PR isn't mergeable yet (conflicts, dirty, pending checks).
+ * Transient — retry after cooldown, not every maintainer tick.
+ */
+export function isTransientNotMergeable(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("not mergeable") ||
+    m.includes("is not mergeable") ||
+    m.includes("merge conflict") ||
+    (m.includes("dirty") && m.includes("merge"))
+  );
+}
+
+/** Back off failed "not mergeable" retries so Activity isn't flooded. */
+export const AUTO_MERGE_RETRY_COOLDOWN_MS = 30 * 60_000;
+
+export type AutoMergeOutcomeRow = {
+  kind: string;
+  createdAt: Date | string;
+  payload: {
+    prNumber?: number;
+    merged?: boolean;
+    message?: string;
+    blocked?: boolean;
+  };
+};
+
+/**
+ * PRs that should not be merge-attempted on this tick.
+ * - permanently: merged, blocked, protection, already closed
+ * - temporarily: recent "not mergeable" within cooldown
+ */
+export function resolveAutoMergeSkipPrs(
+  rows: AutoMergeOutcomeRow[],
+  nowMs = Date.now(),
+  cooldownMs = AUTO_MERGE_RETRY_COOLDOWN_MS,
+): Set<number> {
+  const skip = new Set<number>();
+  // Newest-first: first decision for a PR wins.
+  const seen = new Set<number>();
+  for (const row of rows) {
+    const pr = row.payload.prNumber;
+    if (typeof pr !== "number" || seen.has(pr)) continue;
+    seen.add(pr);
+
+    if (row.kind === "merge_blocked" || row.payload.blocked === true) {
+      skip.add(pr);
+      continue;
+    }
+    if (row.payload.merged === true) {
+      skip.add(pr);
+      continue;
+    }
+
+    const message =
+      typeof row.payload.message === "string" ? row.payload.message : "";
+    if (isMergeProtectionBlock(message) || isTerminalMergeSkip(message)) {
+      skip.add(pr);
+      continue;
+    }
+    if (row.payload.merged === false && isTransientNotMergeable(message)) {
+      const created = new Date(row.createdAt).getTime();
+      if (Number.isFinite(created) && nowMs - created < cooldownMs) {
+        skip.add(pr);
+      }
+    }
+  }
+  return skip;
+}
+
 /** Tasks that still need GitHub merge after auto-accept (worker). */
 export async function listAutoMergeCandidates(
   db: Database,
@@ -2296,32 +2408,21 @@ export async function listAutoMergeCandidates(
     .orderBy(desc(maintainerEvents.createdAt))
     .limit(80);
 
-  const blockedPrs = new Set<number>();
+  const outcomeRows: AutoMergeOutcomeRow[] = [];
   for (const row of blockRows) {
-    let payload: {
-      prNumber?: number;
-      merged?: boolean;
-      message?: string;
-      blocked?: boolean;
-    } = {};
+    let payload: AutoMergeOutcomeRow["payload"] = {};
     try {
-      payload = JSON.parse(row.payload) as typeof payload;
+      payload = JSON.parse(row.payload) as AutoMergeOutcomeRow["payload"];
     } catch {
       continue;
     }
-    if (typeof payload.prNumber !== "number") continue;
-    if (row.kind === "merge_blocked" || payload.blocked === true) {
-      blockedPrs.add(payload.prNumber);
-      continue;
-    }
-    if (
-      payload.merged === false &&
-      typeof payload.message === "string" &&
-      isMergeProtectionBlock(payload.message)
-    ) {
-      blockedPrs.add(payload.prNumber);
-    }
+    outcomeRows.push({
+      kind: row.kind,
+      createdAt: row.createdAt,
+      payload,
+    });
   }
+  const skipPrs = resolveAutoMergeSkipPrs(outcomeRows);
 
   const out: Array<{ task: Task; prNumber: number; runId: string }> = [];
   const seenPr = new Set<number>();
@@ -2333,7 +2434,7 @@ export async function listAutoMergeCandidates(
       continue;
     }
     if (!payload.taskId || !payload.prNumber || !payload.runId) continue;
-    if (blockedPrs.has(payload.prNumber) || seenPr.has(payload.prNumber)) {
+    if (skipPrs.has(payload.prNumber) || seenPr.has(payload.prNumber)) {
       continue;
     }
     const [task] = await db
@@ -2382,6 +2483,83 @@ export async function markAutoMerged(
 /** Default architecture markdown paths (primary-capable Open IDs first). */
 export const DEFAULT_ARCHITECTURE_PATHS =
   "PROVIDER-TASKS.md,RUNTIME-TASKS.md,AGENT-TASKS.md,APP-TASKS.md,WEBSITE-TASKS.md,CONTENT-PLAN.md";
+
+/**
+ * Architecture IDs already represented by open board work or open Coppergate PRs.
+ * Used to stop every project from re-arming the same Open roadmap ID.
+ */
+export async function listInFlightArchitectureIds(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    architectureToken?: string | null;
+  },
+): Promise<string[]> {
+  const openTasks = await db
+    .select({ title: tasks.title })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.workspaceId, input.workspaceId),
+        eq(tasks.projectId, input.projectId),
+        inArray(tasks.status, [...IN_FLIGHT_ARCH_TASK_STATUSES]),
+      ),
+    )
+    .limit(100);
+
+  const ids = new Set(architectureIdsFromTitles(openTasks.map((t) => t.title)));
+
+  const token = input.architectureToken?.trim();
+  if (token) {
+    try {
+      const bound = await getProjectForWorkspace(
+        db,
+        input.workspaceId,
+        input.projectId,
+      );
+      const full = bound?.repository.baseRepoFullName;
+      const [owner, name] = full?.split("/") ?? [];
+      if (owner && name) {
+        const res = await fetch(
+          `https://api.github.com/repos/${owner}/${name}/pulls?state=open&per_page=50`,
+          {
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: `Bearer ${token}`,
+              "User-Agent": "coppergate-maintainer",
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
+          },
+        );
+        if (res.ok) {
+          const rows = (await res.json()) as Array<{
+            title?: string;
+            head?: { ref?: string };
+            user?: { login?: string; type?: string };
+          }>;
+          for (const pr of rows) {
+            const title = pr.title ?? "";
+            const head = pr.head?.ref ?? "";
+            const login = pr.user?.login ?? "";
+            const coppergateOwned =
+              /^coppergate:/i.test(title) ||
+              head.startsWith("coppergate/") ||
+              head.startsWith("cg/") ||
+              /coppergate/i.test(login);
+            if (!coppergateOwned) continue;
+            const id = extractArchitectureIdFromTitle(title);
+            if (id) ids.add(id);
+          }
+        }
+      }
+    } catch {
+      /* best-effort — task titles alone still dedupe the board */
+    }
+  }
+
+  return [...ids];
+}
 
 /**
  * Best-effort load of architecture Open tasks from GitHub.
