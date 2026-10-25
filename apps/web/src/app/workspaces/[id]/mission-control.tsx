@@ -180,16 +180,29 @@ export function MissionControl({ data, recentEvents }: Props) {
     );
   }
   if (replanItems.length > 1) {
+    const allCapacityWait = replanItems.every(
+      (item) =>
+        item.priority === "normal" ||
+        /Waiting on capacity/i.test(item.title) ||
+        /in flight/i.test(item.detail),
+    );
     attentionRows.push({
       id: "replan-digest",
       kind: "replan_failed",
-      title: `Replan queue failed · ${replanItems.length} projects`,
-      detail: "Maintainer could not queue the next task.",
-      href:
-        replanItems[0]?.href ??
-        `/workspaces/${data.workspaceId}/projects`,
-      ctaLabel: replanItems[0]?.ctaLabel ?? "Open project",
-      priority: "high",
+      title: allCapacityWait
+        ? `Waiting on capacity · ${replanItems.length} projects`
+        : `Replan queue failed · ${replanItems.length} projects`,
+      detail: allCapacityWait
+        ? "Other runs are already in flight — wait or pause Arena."
+        : "Maintainer could not queue the next task.",
+      href: allCapacityWait
+        ? `/workspaces/${data.workspaceId}/arena`
+        : (replanItems[0]?.href ??
+          `/workspaces/${data.workspaceId}/projects`),
+      ctaLabel: allCapacityWait
+        ? "Open Arena"
+        : (replanItems[0]?.ctaLabel ?? "Open project"),
+      priority: allCapacityWait ? "normal" : "high",
     });
   } else {
     attentionRows.push(
