@@ -52,12 +52,12 @@ try {
   const sealed = sealSecret(minted.token, key);
   const now = new Date();
 
-  let [installByGh] = await db
+  const [installByGh] = await db
     .select()
     .from(githubInstallations)
     .where(eq(githubInstallations.githubInstallationId, GH_INSTALLATION_ID))
     .limit(1);
-  let [installByWs] = await db
+  const [installByWs] = await db
     .select()
     .from(githubInstallations)
     .where(eq(githubInstallations.workspaceId, COPPERGATE_WS))
