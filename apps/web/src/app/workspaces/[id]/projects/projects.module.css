@@ -530,7 +530,7 @@
     minmax(7rem, 1.1fr)
     minmax(8rem, 1.2fr)
     7.5rem
-    4.5rem
+    5.75rem
     6.5rem
     2.2rem;
   gap: 0.55rem;
@@ -554,10 +554,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--mute-soft);
-  font-size: 0.68rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   text-decoration: none;
 }
 
@@ -598,12 +597,11 @@
 .stateReady,
 .stateSetup {
   justify-self: start;
-  padding: 0.1rem 0.45rem;
+  padding: 0.12rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.62rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .stateReady {

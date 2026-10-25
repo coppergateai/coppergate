@@ -48,7 +48,11 @@ export default async function WorkspaceInboxPage({
 
   const pending = pendingRows.map((r) => serializeApproval(r, id));
   const recent = recentRows.map((r) => serializeApproval(r, id));
-  const initialTab = parseTab(sp.tab);
+  // Quiet inbox: land on Recent so decided gates aren't hidden behind an empty Pending.
+  const initialTab =
+    sp.tab === undefined && pending.length === 0 && recent.length > 0
+      ? "recent"
+      : parseTab(sp.tab);
   const initialSelectedId =
     typeof sp.a === "string" && sp.a.length > 0 ? sp.a : null;
   const evidenceAttention = mission.attention.find(
