@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { displayTaskTitle } from "@/lib/display-title";
 import styles from "./project-detail.module.css";
@@ -41,6 +41,14 @@ type Props = {
   hasApprovedBrief: boolean;
   isOwner: boolean;
 };
+
+const DONE_STATUSES = new Set([
+  "ACCEPTED",
+  "DONE",
+  "CANCELLED",
+  "EXPIRED",
+  "FAILED",
+]);
 
 function taskStatusLabel(status: string): string {
   switch (status) {
@@ -112,11 +120,33 @@ export function PlanPanel({
   }
 
   const arenaHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
-  const doneStatuses = new Set(["ACCEPTED", "DONE", "CANCELLED", "EXPIRED"]);
+  const [showOlderMilestones, setShowOlderMilestones] = useState(false);
+  const MILESTONE_PREVIEW = 3;
+
   const openMilestoneId =
     plan?.milestones.find((m) =>
-      m.tasks.some((t) => !doneStatuses.has(t.status)),
+      m.tasks.some((t) => !DONE_STATUSES.has(t.status)),
     )?.id ?? plan?.milestones[0]?.id;
+
+  const orderedMilestones = useMemo(() => {
+    if (!plan) return [];
+    // Prefer open work first, then closed cycles — keeps the board above the fold.
+    const open = plan.milestones.filter((m) =>
+      m.tasks.some((t) => !DONE_STATUSES.has(t.status)),
+    );
+    const closed = plan.milestones.filter(
+      (m) => !m.tasks.some((t) => !DONE_STATUSES.has(t.status)),
+    );
+    return [...open, ...closed];
+  }, [plan]);
+
+  const visibleMilestones = showOlderMilestones
+    ? orderedMilestones
+    : orderedMilestones.slice(0, MILESTONE_PREVIEW);
+  const hiddenMilestoneCount = Math.max(
+    0,
+    orderedMilestones.length - visibleMilestones.length,
+  );
 
   return (
     <section id="plan" className={styles.section} aria-labelledby="plan-heading">
@@ -159,7 +189,7 @@ export function PlanPanel({
             {plan.milestones.reduce((n, m) => n + m.tasks.length, 0)} tasks ·{" "}
             {plan.dependencyCount} dependencies
           </p>
-          {plan.milestones.map((m) => (
+          {visibleMilestones.map((m) => (
             <details
               key={m.id}
               className={styles.milestoneDetails}
@@ -220,6 +250,17 @@ export function PlanPanel({
               </ul>
             </details>
           ))}
+          {hiddenMilestoneCount > 0 ? (
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              onClick={() => setShowOlderMilestones((v) => !v)}
+            >
+              {showOlderMilestones
+                ? "Show fewer milestones"
+                : `Show ${hiddenMilestoneCount} older milestone${hiddenMilestoneCount === 1 ? "" : "s"}`}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </section>

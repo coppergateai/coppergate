@@ -21,6 +21,7 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [repo, setRepo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [pending, setPending] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -30,15 +31,18 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
     const data = (await res.json()) as {
       issues?: Issue[];
       repo?: string;
+      warning?: string;
       error?: { message?: string };
     };
     if (!res.ok) {
+      setWarning(null);
       setError(data.error?.message ?? "Failed to load issues");
       return;
     }
     setIssues(data.issues ?? []);
     setRepo(data.repo ?? null);
     setError(null);
+    setWarning(data.warning ?? null);
   }, [projectId, workspaceId]);
 
   useEffect(() => {
@@ -102,12 +106,15 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
         {repo ? ` · ${repo}` : null}
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
+      {warning && !error ? <p className={styles.muted}>{warning}</p> : null}
       <ul className={styles.arenaList}>
         {issues.length === 0 ? (
           <li className={styles.muted}>
-            {repo
-              ? `No open issues on ${repo}. Open a small scoped issue on GitHub, or use Arena Start under budget.`
-              : "Connect GitHub under Workspace settings → Connections to list issues."}
+            {error || warning
+              ? "Issues could not be listed from GitHub right now. Retry later, or use Arena Start under budget."
+              : repo
+                ? `No open issues on ${repo}. Open a small scoped issue on GitHub, or use Arena Start under budget.`
+                : "Connect GitHub under Workspace settings → Connections to list issues."}
           </li>
         ) : (
           issues.map((issue) => (

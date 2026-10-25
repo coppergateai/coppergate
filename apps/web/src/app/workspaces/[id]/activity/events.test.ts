@@ -189,4 +189,35 @@ describe("activity events", () => {
     assert.match(merge.summary ?? "", /1 merged/);
     assert.ok(groups.some((g) => g.action === "task.enqueue"));
   });
+
+  it("collapses interleaved arena control into one group", () => {
+    const groups = groupActivityEvents([
+      evt({
+        id: "a1",
+        action: "arena.pause",
+        createdAt: "2026-10-25T19:17:03.000Z",
+      }),
+      evt({
+        id: "x",
+        action: "task.enqueue",
+        createdAt: "2026-10-25T19:17:02.000Z",
+      }),
+      evt({
+        id: "a2",
+        action: "arena.stop",
+        createdAt: "2026-10-25T19:17:01.000Z",
+      }),
+      evt({
+        id: "a3",
+        action: "arena.start",
+        createdAt: "2026-10-25T19:17:00.000Z",
+      }),
+    ]);
+    const control = groups.find((g) => g.action === "arena.control");
+    assert.ok(control);
+    assert.equal(control.count, 3);
+    assert.equal(control.title, "Arena control");
+    assert.match(control.summary ?? "", /pause/);
+    assert.ok(groups.some((g) => g.action === "task.enqueue"));
+  });
 });

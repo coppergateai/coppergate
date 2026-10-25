@@ -25,7 +25,11 @@ export async function listOpenIssues(input: {
     },
   );
   if (!res.ok) {
-    throw new Error(`listOpenIssues failed (${res.status})`);
+    const err = new Error(`listOpenIssues failed (${res.status})`) as Error & {
+      status?: number;
+    };
+    err.status = res.status;
+    throw err;
   }
   const rows = (await res.json()) as Array<{
     number: number;
