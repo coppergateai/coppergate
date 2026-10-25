@@ -62,6 +62,10 @@ function taskStatusLabel(status: string): string {
       return "Running";
     case "VALIDATING":
       return "Validating";
+    case "WAITING_CI":
+      return "Awaiting CI";
+    case "IN_REVIEW":
+      return "In review";
     case "REVIEW_REQUIRED":
       return "In review";
     case "ACCEPTED":
@@ -79,7 +83,10 @@ function taskStatusLabel(status: string): string {
     case "NEEDS_REPLAN":
       return "Needs replan";
     default:
-      return status.replace(/_/g, " ");
+      return status
+        .replace(/_/g, " ")
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 }
 
