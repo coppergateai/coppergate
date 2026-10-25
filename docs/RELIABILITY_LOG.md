@@ -87,6 +87,7 @@ Date: 2026-10-24
 - **Grammar**: “1 agent needs attention”
 - **Replan attention**: collapse per project; surface error + project name
 - **Evidence attention**: title includes project so duplicate P-00N rows are distinguishable
+- **Issues API**: GitHub 403/404 no longer 500 the project Overview issues panel
 
 ## Tests
 - `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt, duplicate FILE, JSON retry
