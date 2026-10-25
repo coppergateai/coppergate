@@ -222,8 +222,15 @@ export function MissionControl({ data, recentEvents }: Props) {
             href={`/workspaces/${data.workspaceId}/arena`}
             className={styles.summaryLink}
           >
-            <strong>{metrics.activeRuns}</strong> active runs
+            <strong>{metrics.arenaRunning}</strong> running
           </Link>
+          <span className={styles.summaryMute}>
+            · {metrics.arenaAwaitingCi} awaiting CI
+            {metrics.activeRuns >
+            metrics.arenaRunning + metrics.arenaAwaitingCi
+              ? ` · ${metrics.activeRuns} slots`
+              : ""}
+          </span>
         </p>
         <p className={styles.summaryItem}>
           <Link href={attentionHref} className={styles.summaryLink}>
@@ -419,7 +426,9 @@ export function MissionControl({ data, recentEvents }: Props) {
                 Active executions
               </h2>
               <p className={styles.sectionMeta}>
-                {executions.length} in flight
+                {executions.length === 0
+                  ? "Idle"
+                  : `${executions.length} in pipeline`}
               </p>
             </div>
             {executions.length === 0 ? (

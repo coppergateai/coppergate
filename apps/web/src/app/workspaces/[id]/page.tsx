@@ -66,7 +66,10 @@ export default async function WorkspaceOverviewPage({ params }: PageProps) {
   );
 
   const recentEvents: ActivityEvent[] = auditRows.map((r) => {
-    const meta = withProjectName(parseMeta(r.meta), projectNameById);
+    const meta = withProjectName(parseMeta(r.meta), projectNameById, {
+      targetType: r.targetType,
+      targetId: r.targetId,
+    });
     return {
       id: r.id,
       actor: r.actor,
