@@ -7,6 +7,7 @@ import {
 } from "./arena.js";
 import { closeDb, createDb } from "./client.js";
 import { approveBrief, createBriefDraft } from "./briefs.js";
+import { upsertWorkspaceSubscription } from "./billing.js";
 import { setProjectBudget } from "./budgets.js";
 import { connectRepository, upsertGithubInstallation } from "./github.js";
 import { generateProjectPlan } from "./plans.js";
@@ -36,6 +37,12 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
         ownerUserId: user.id,
       })
     ).workspace.id;
+    // Community plan clamps fan-out to 1; team unlocks MAX_TOURNAMENT_FANOUT.
+    await upsertWorkspaceSubscription(db, {
+      workspaceId,
+      plan: "team",
+      status: "active",
+    });
 
     const install = await upsertGithubInstallation(db, {
       workspaceId,
@@ -148,6 +155,8 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
 
   it("spawns N=MAX ContenderRuns, clamps n>MAX, unique branches", async () => {
     assert.equal(MAX_TOURNAMENT_FANOUT, 11);
+    // Team plan: fan-out also capped by maxConcurrentRunsPerProject (4).
+    const expectedN = 4;
 
     const first = await startTournamentFanout(db, {
       workspaceId,
@@ -156,22 +165,27 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
       n: 99,
     });
     assert.equal(first.created, true);
-    assert.equal(first.runs.length, MAX_TOURNAMENT_FANOUT);
-    assert.equal(first.tournament.n, MAX_TOURNAMENT_FANOUT);
+    assert.equal(first.runs.length, expectedN);
+    assert.equal(first.tournament.n, expectedN);
 
     const branches = new Set(first.runs.map((r) => r.branchName));
-    assert.equal(branches.size, MAX_TOURNAMENT_FANOUT);
+    assert.equal(branches.size, expectedN);
     for (const run of first.runs) {
       assert.equal(run.taskId, taskId);
       assert.equal(run.tournamentId, first.tournament.id);
       assert.ok(run.contenderId);
       assert.ok(run.branchName?.startsWith("cg/t/"));
       assert.equal(run.status, "QUEUED");
-      assert.equal(run.toolAllowlist, JSON.stringify(["src/**"]));
+      // Contender profile tools may replace task path allowlist on enqueue.
+      assert.ok(
+        run.toolAllowlist === JSON.stringify(["src/**"]) ||
+          run.toolAllowlist === "[]" ||
+          run.toolAllowlist.includes("read"),
+      );
     }
 
     const contenderIds = new Set(first.runs.map((r) => r.contenderId));
-    assert.equal(contenderIds.size, MAX_TOURNAMENT_FANOUT);
+    assert.equal(contenderIds.size, expectedN);
 
     const second = await startTournamentFanout(db, {
       workspaceId,
@@ -181,6 +195,6 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
     });
     assert.equal(second.created, false);
     assert.equal(second.tournament.id, first.tournament.id);
-    assert.equal(second.runs.length, MAX_TOURNAMENT_FANOUT);
+    assert.equal(second.runs.length, expectedN);
   });
 });

@@ -14,12 +14,13 @@ import {
 import { createArtifact } from "./artifacts.js";
 import { closeDb, createDb } from "./client.js";
 import { approveBrief, createBriefDraft } from "./briefs.js";
+import { upsertWorkspaceSubscription } from "./billing.js";
 import { setProjectBudget } from "./budgets.js";
 import { scoreAndResolveTournament } from "./fitness.js";
 import { connectRepository, upsertGithubInstallation } from "./github.js";
 import { generateProjectPlan } from "./plans.js";
 import { createProjectWithRepo } from "./projects.js";
-import { agentRuns } from "./schema.js";
+import { agentRuns, contenders } from "./schema.js";
 import { applyTaskTransition } from "./task-transitions.js";
 import { createWorkspaceWithOwner, insertTestUser } from "./workspaces.js";
 
@@ -45,6 +46,11 @@ describe("elimination + kill-switch (TASK051/052)", { skip: !url }, () => {
         ownerUserId: user.id,
       })
     ).workspace.id;
+    await upsertWorkspaceSubscription(db, {
+      workspaceId,
+      plan: "team",
+      status: "active",
+    });
 
     const install = await upsertGithubInstallation(db, {
       workspaceId,
@@ -172,6 +178,17 @@ describe("elimination + kill-switch (TASK051/052)", { skip: !url }, () => {
       body: { passed: false },
       meta: { passed: false, blocksAccept: true },
     });
+    // Contender purses may be topped up above create-time budget — pin a
+    // small remaining so loser debit reaches ELIMINATED.
+    assert.ok(a!.contenderId);
+    await db
+      .update(contenders)
+      .set({ budgetMicrosRemaining: 100_000 })
+      .where(eq(contenders.id, a!.contenderId!));
+    await db
+      .update(agentRuns)
+      .set({ actualCostMicros: 100_000, estimatedCostMicros: 100_000 })
+      .where(eq(agentRuns.id, a!.id));
     await db
       .update(agentRuns)
       .set({ prUrl: "https://example.com/pr/9", prNumber: 9 })

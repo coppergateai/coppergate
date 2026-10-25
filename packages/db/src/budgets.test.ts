@@ -212,6 +212,21 @@ describe("project budgets", { skip: !url }, () => {
       status: "active",
       actor,
     });
+    // Suite shares one task — clear leftover reserve from prior cases.
+    const prior = await outstandingEstimateReserveForTask(db, {
+      workspaceId,
+      projectId,
+      taskId,
+    });
+    if (prior > 0) {
+      await releaseEstimateForRun(db, {
+        workspaceId,
+        projectId,
+        taskId,
+        runId: crypto.randomUUID(),
+        amountMicros: prior,
+      });
+    }
     await reserveEstimateForTask(db, {
       workspaceId,
       projectId,
