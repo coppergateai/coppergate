@@ -571,11 +571,25 @@ export function ArenaSpectacle({
                       </div>
                       <p className={styles.laneRepo}>
                         {lane.repoFullName}
-                        {lane.lastRun &&
-                        laneRuntime !== "running" &&
-                        laneRuntime !== "awaitingCi"
-                          ? ` · Last ${lane.lastRun.status.replace(/_/g, " ").toLowerCase()}`
-                          : ""}
+                        {(() => {
+                          if (
+                            !lane.lastRun ||
+                            laneRuntime === "running" ||
+                            laneRuntime === "awaitingCi"
+                          ) {
+                            return "";
+                          }
+                          // Live + idle: current state is enough — skip stale
+                          // FAILED/CANCELLED captions that fight the Live badge.
+                          if (
+                            isLiveStatus(lane.arenaStatus) &&
+                            (lane.lastRun.status === "FAILED" ||
+                              lane.lastRun.status === "CANCELLED")
+                          ) {
+                            return "";
+                          }
+                          return ` · Last ${lane.lastRun.status.replace(/_/g, " ").toLowerCase()}`;
+                        })()}
                       </p>
                     </div>
                     {!isExpanded ? (
