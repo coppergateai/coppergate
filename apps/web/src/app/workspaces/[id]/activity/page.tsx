@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
+  classifyContenderRuntime,
   getTaskForWorkspace,
   getWorkspaceForMember,
   getWorkspaceMissionControl,
+  isLiveArenaStatus,
   listAuditEventsForWorkspace,
   listProjectsForWorkspace,
   listWorkspaceArenaSnapshot,
@@ -73,11 +75,13 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
   }));
 
   const taskIdsNeedingProject = parsed
-    .map(({ meta }) => {
-      const taskId = typeof meta?.taskId === "string" ? meta.taskId : null;
+    .map(({ row, meta }) => {
       const projectId =
         typeof meta?.projectId === "string" ? meta.projectId : null;
-      return taskId && !projectId ? taskId : null;
+      if (projectId) return null;
+      if (typeof meta?.taskId === "string") return meta.taskId;
+      if (row.targetType === "task" && row.targetId) return row.targetId;
+      return null;
     })
     .filter((x): x is string => Boolean(x));
 
@@ -85,16 +89,24 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
 
   const events: ActivityEvent[] = parsed.map(({ row: r, meta: rawMeta }) => {
     let meta = rawMeta;
-    const taskId = typeof meta?.taskId === "string" ? meta.taskId : null;
     const projectId =
       typeof meta?.projectId === "string" ? meta.projectId : null;
+    const taskId =
+      typeof meta?.taskId === "string"
+        ? meta.taskId
+        : r.targetType === "task"
+          ? r.targetId
+          : null;
     if (taskId && !projectId) {
       const resolved = taskProjectMap.get(taskId);
       if (resolved) {
-        meta = { ...(meta ?? {}), projectId: resolved };
+        meta = { ...(meta ?? {}), projectId: resolved, taskId };
       }
     }
-    meta = withProjectName(meta, projectNameById);
+    meta = withProjectName(meta, projectNameById, {
+      targetType: r.targetType,
+      targetId: r.targetId,
+    });
     return {
       id: r.id,
       actor: r.actor,
@@ -107,11 +119,21 @@ export default async function WorkspaceActivityPage({ params }: PageProps) {
     };
   });
 
-  const activeAgents = arena.projects.reduce(
-    (sum, lane) =>
-      sum + lane.contenders.filter((c) => c.status === "ACTIVE").length,
-    0,
-  );
+  // Hot = running or awaiting CI — not the full ACTIVE roster (often hundreds idle).
+  const activeAgents = arena.projects.reduce((sum, lane) => {
+    const arenaLive = isLiveArenaStatus(lane.arenaStatus);
+    return (
+      sum +
+      lane.contenders.filter((c) => {
+        const state = classifyContenderRuntime(
+          c.latestRun,
+          c.budgetMicrosRemaining,
+          { arenaLive, contenderStatus: c.status },
+        );
+        return state === "running" || state === "awaitingCi";
+      }).length
+    );
+  }, 0);
 
   const needsReview =
     mission.metrics.needsApproval +

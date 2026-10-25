@@ -25,4 +25,15 @@ describe("withProjectName", () => {
     });
     assert.equal(withProjectName(null, new Map()), null);
   });
+
+  it("resolves projectName from targetType=project targetId", () => {
+    const names = new Map([["p1", "kprompt-api"]]);
+    assert.deepEqual(
+      withProjectName({ briefId: "b1" }, names, {
+        targetType: "project",
+        targetId: "p1",
+      }),
+      { briefId: "b1", projectId: "p1", projectName: "kprompt-api" },
+    );
+  });
 });

@@ -465,11 +465,14 @@ export function TaskDetailPanel({
   const acceptReady = acceptReadyRaw && !hardIncomplete;
   const acceptBlockedReason = computeAcceptBlocked({
     acceptReady,
-    ciBlocking: ciFitness.blocking || hardIncomplete,
+    // Pending hard gates are incomplete — not a CI failure (avoid false "CI failed").
+    ciBlocking: ciFitness.blocking,
     ciAwaitingLive: ciFitness.awaitingLive || hardIncomplete,
     ciPassed: ciFitness.passed && !hardIncomplete,
     validationFailed,
     policyFailed,
+    stillValidating:
+      task.status === "VALIDATING" || selected?.status === "VALIDATING",
   });
   const gateBannerTitle = acceptReady
     ? HARD_GATE_COPY.allHardPassed

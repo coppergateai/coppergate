@@ -9,14 +9,27 @@ import { authStatePath, baseUrl, loadE2eEnv } from "../helpers/env.js";
 
 loadE2eEnv();
 
+const ws = "1cf1a253-cbcd-4b5f-b1b2-39c5e182e99a";
 const pages = [
   {
+    id: "spot-activity",
+    path: `/workspaces/${ws}/activity`,
+  },
+  {
+    id: "spot-arena",
+    path: `/workspaces/${ws}/arena`,
+  },
+  {
     id: "spot-project-overview",
-    path: "/workspaces/1cf1a253-cbcd-4b5f-b1b2-39c5e182e99a/projects/1cf9259c-3ee3-439e-b6f5-d76ce775eea3",
+    path: `/workspaces/${ws}/projects/1cf9259c-3ee3-439e-b6f5-d76ce775eea3`,
+  },
+  {
+    id: "spot-delivery",
+    path: `/workspaces/${ws}/projects/1cf9259c-3ee3-439e-b6f5-d76ce775eea3?tab=delivery`,
   },
   {
     id: "spot-task-detail",
-    path: "/workspaces/1cf1a253-cbcd-4b5f-b1b2-39c5e182e99a/projects/3a045149-ae58-4321-a4f2-2099f89fd720/tasks/ff2e0570-d8bd-4478-876e-b2adb0367610",
+    path: `/workspaces/${ws}/projects/3a045149-ae58-4321-a4f2-2099f89fd720/tasks/ff2e0570-d8bd-4478-876e-b2adb0367610`,
   },
 ];
 

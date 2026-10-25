@@ -303,7 +303,7 @@ export function ActivityShell({
               <strong>{metrics.eventsToday}</strong> events today
             </p>
             <p className={styles.summaryItem}>
-              <strong>{metrics.activeAgents}</strong> agents live
+              <strong>{metrics.activeAgents}</strong> in flight
             </p>
             <p className={styles.summaryItem}>
               {metrics.needsReview > 0 ? (

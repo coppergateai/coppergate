@@ -50,7 +50,10 @@ export async function GET(request: Request, context: RouteContext) {
     return jsonOk(
       {
         events: rows.map((r) => {
-          const meta = withProjectName(parseMeta(r.meta), projectNameById);
+          const meta = withProjectName(parseMeta(r.meta), projectNameById, {
+            targetType: r.targetType,
+            targetId: r.targetId,
+          });
           return {
             id: r.id,
             actor: r.actor,
