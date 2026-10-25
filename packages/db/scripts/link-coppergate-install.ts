@@ -25,7 +25,8 @@ import {
 
 const COPPERGATE_WS = "2c894510-810e-46cc-8ff0-652f63870639";
 const KPROMPT_WS = "1cf1a253-cbcd-4b5f-b1b2-39c5e182e99a";
-const STAGING_INSTALL = "1f54e25d-efbc-4e66-a46a-884a1855a7ce";
+/** Live coppergateai org App install (gh api orgs/coppergateai/installations). */
+const GH_INSTALLATION_ID = "172191459";
 const PRIMARY_FULL = "coppergateai/coppergate";
 const actor = "script:link-coppergate-install";
 
@@ -38,32 +39,6 @@ if (!url) {
 const db = createDb(url, { max: 1 });
 
 try {
-  const [install] = await db
-    .select()
-    .from(githubInstallations)
-    .where(eq(githubInstallations.id, STAGING_INSTALL))
-    .limit(1);
-  if (!install) throw new Error("staging coppergateai install missing");
-  if (install.accountLogin !== "coppergateai") {
-    throw new Error(`unexpected account ${install.accountLogin}`);
-  }
-
-  await db
-    .update(repositoryConnections)
-    .set({ projectId: null, updatedAt: new Date() })
-    .where(eq(repositoryConnections.installationId, STAGING_INSTALL));
-
-  if (install.workspaceId !== COPPERGATE_WS) {
-    await db
-      .update(githubInstallations)
-      .set({ workspaceId: COPPERGATE_WS, updatedAt: new Date() })
-      .where(eq(githubInstallations.id, STAGING_INSTALL));
-  }
-  await db
-    .update(repositoryConnections)
-    .set({ workspaceId: COPPERGATE_WS, updatedAt: new Date() })
-    .where(eq(repositoryConnections.installationId, STAGING_INSTALL));
-
   const jwt = await createAppJwt({
     appId: process.env.GITHUB_APP_ID,
     slug: process.env.GITHUB_APP_SLUG,
@@ -71,18 +46,105 @@ try {
   });
   const minted = await createInstallationAccessToken(
     jwt,
-    Number(install.githubInstallationId),
+    Number(GH_INSTALLATION_ID),
   );
   const key = parseEncryptionKey(process.env.CREDENTIALS_ENCRYPTION_KEY!);
-  await updateInstallationToken(
-    db,
-    STAGING_INSTALL,
-    sealSecret(minted.token, key),
-    minted.expiresAt,
-  );
+  const sealed = sealSecret(minted.token, key);
+  const now = new Date();
+
+  let [installByGh] = await db
+    .select()
+    .from(githubInstallations)
+    .where(eq(githubInstallations.githubInstallationId, GH_INSTALLATION_ID))
+    .limit(1);
+  let [installByWs] = await db
+    .select()
+    .from(githubInstallations)
+    .where(eq(githubInstallations.workspaceId, COPPERGATE_WS))
+    .limit(1);
+
+  let install = installByGh ?? installByWs ?? null;
+
+  if (installByGh && installByGh.workspaceId !== COPPERGATE_WS) {
+    // Live GH install row lives on another workspace — move it.
+    if (installByWs && installByWs.id !== installByGh.id) {
+      await db
+        .update(repositoryConnections)
+        .set({ installationId: installByGh.id, updatedAt: now })
+        .where(eq(repositoryConnections.installationId, installByWs.id));
+      await db
+        .delete(githubInstallations)
+        .where(eq(githubInstallations.id, installByWs.id));
+    }
+    await db
+      .update(repositoryConnections)
+      .set({ projectId: null, updatedAt: now })
+      .where(eq(repositoryConnections.installationId, installByGh.id));
+    await db
+      .update(githubInstallations)
+      .set({
+        workspaceId: COPPERGATE_WS,
+        accountLogin: "coppergateai",
+        status: "active",
+        encryptedToken: sealed,
+        tokenExpiresAt: minted.expiresAt,
+        updatedAt: now,
+      })
+      .where(eq(githubInstallations.id, installByGh.id));
+    await db
+      .update(repositoryConnections)
+      .set({ workspaceId: COPPERGATE_WS, updatedAt: now })
+      .where(eq(repositoryConnections.installationId, installByGh.id));
+    install = installByGh;
+  } else if (installByWs && installByWs.githubInstallationId !== GH_INSTALLATION_ID) {
+    // Workspace has a stale GH install id — rebind to the live org install.
+    await db
+      .update(githubInstallations)
+      .set({
+        githubInstallationId: GH_INSTALLATION_ID,
+        accountLogin: "coppergateai",
+        accountType: "Organization",
+        status: "active",
+        encryptedToken: sealed,
+        tokenExpiresAt: minted.expiresAt,
+        updatedAt: now,
+      })
+      .where(eq(githubInstallations.id, installByWs.id));
+    install = { ...installByWs, githubInstallationId: GH_INSTALLATION_ID };
+  } else if (!install) {
+    const installId = crypto.randomUUID();
+    await db.insert(githubInstallations).values({
+      id: installId,
+      workspaceId: COPPERGATE_WS,
+      provider: "github",
+      githubInstallationId: GH_INSTALLATION_ID,
+      accountLogin: "coppergateai",
+      accountType: "Organization",
+      status: "active",
+      encryptedToken: sealed,
+      tokenExpiresAt: minted.expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    });
+    install = (
+      await db
+        .select()
+        .from(githubInstallations)
+        .where(eq(githubInstallations.id, installId))
+        .limit(1)
+    )[0]!;
+  } else {
+    await updateInstallationToken(
+      db,
+      install.id,
+      sealed,
+      minted.expiresAt,
+    );
+  }
+
+  if (!install) throw new Error("failed to bind github installation");
 
   const repos = await listInstallationRepos(minted.token);
-  const now = new Date();
   const upserted: Array<{ id: string; full: string; created: boolean }> = [];
   for (const repo of repos) {
     const [existing] = await db
@@ -99,6 +161,7 @@ try {
       await db
         .update(repositoryConnections)
         .set({
+          installationId: install.id,
           owner: repo.owner.login,
           name: repo.name,
           defaultBranch: repo.default_branch,
@@ -115,7 +178,7 @@ try {
     await db.insert(repositoryConnections).values({
       id,
       workspaceId: COPPERGATE_WS,
-      installationId: STAGING_INSTALL,
+      installationId: install.id,
       provider: "github",
       githubRepoId: String(repo.id),
       owner: repo.owner.login,
@@ -167,9 +230,9 @@ try {
         mode: "existing_repo",
         stack: "nextjs_ts",
         autonomyLevel: "L1",
-        actor,
       });
       project = created.project;
+      void actor;
     }
   }
 
@@ -230,7 +293,7 @@ try {
         byok,
         next:
           project == null
-            ? "Grant coppergateai/coppergate to App install 170733192, re-run"
+            ? "Grant coppergateai/coppergate to App install 172191459, re-run"
             : "dogfood-coppergate-boot.mjs --start",
       },
       null,

@@ -61,11 +61,13 @@ const budgetMicros = Number(
 );
 const actor = process.env.DOGFOOD_ACTOR ?? "script:dogfood-coppergate-boot";
 
+// Fly worker may still carry kprompt ARCHITECTURE_* secrets — force coppergate
+// dogfood defaults unless DOGFOOD_ARCHITECTURE_REPO / _PATHS are set.
 process.env.ARCHITECTURE_REPO =
-  process.env.ARCHITECTURE_REPO?.trim() ||
+  process.env.DOGFOOD_ARCHITECTURE_REPO?.trim() ||
   "coppergateai/coppergate-architecture";
 process.env.ARCHITECTURE_PATHS =
-  process.env.ARCHITECTURE_PATHS?.trim() || "docs/OPEN_PROGRAM.md";
+  process.env.DOGFOOD_ARCHITECTURE_PATHS?.trim() || "docs/OPEN_PROGRAM.md";
 
 const url = process.env.DATABASE_URL;
 if (!url) {

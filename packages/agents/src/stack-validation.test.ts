@@ -50,8 +50,35 @@ describe("runStackValidation", () => {
     assert.equal(report.passed, true);
   });
 
+  it("skips npm lint/test when node_modules missing", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "cg-stack-nodeps-"));
+    await writeFile(
+      join(workdir, "package.json"),
+      JSON.stringify({ scripts: { lint: "echo ok", test: "echo ok" } }),
+      "utf8",
+    );
+    const calls: string[][] = [];
+    const report = await runStackValidation({
+      goal: "ship it",
+      acceptanceCriteria: ["ok"],
+      completion,
+      workdir,
+      stack: "nextjs_ts",
+      forceFake: false,
+      exec: async (command) => {
+        calls.push(command);
+        return { exitCode: 1, stdout: "", stderr: "should not run", durationMs: 1 };
+      },
+    });
+    assert.equal(report.passed, true);
+    assert.equal(calls.length, 0);
+    assert.ok(report.checks.some((c) => c.name === "npm_deps" && c.passed));
+  });
+
   it("runs lint when package.json has lint script", async () => {
     const workdir = await mkdtemp(join(tmpdir(), "cg-stack-"));
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(join(workdir, "node_modules"), { recursive: true });
     await writeFile(
       join(workdir, "package.json"),
       JSON.stringify({ scripts: { lint: "echo ok" } }),
