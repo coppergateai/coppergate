@@ -74,6 +74,10 @@ function statusLabel(status: string): string {
       return "Running";
     case "VALIDATING":
       return "Validating";
+    case "WAITING_CI":
+      return "Awaiting CI";
+    case "IN_REVIEW":
+      return "In review";
     case "REVIEW_REQUIRED":
       return "In review";
     case "ACCEPTED":
