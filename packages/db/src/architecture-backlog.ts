@@ -75,7 +75,8 @@ export function parseArchitectureOpenTasks(
         "Docs/CHANGELOG updated when user-visible",
         "PR title describes the capability (not scaffold/typo)",
       ],
-      estimateComplexity: id.startsWith("SEC") || id.startsWith("AG") ? "L" : "M",
+      // Thin self-pilot: keep AG/SEC at S so $8 envelopes are not one-shot by L=$5.
+      estimateComplexity: "S",
     });
   }
 

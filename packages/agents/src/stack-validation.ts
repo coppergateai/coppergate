@@ -131,37 +131,56 @@ export async function runStackValidation(
   }
 
   if (stack === "nextjs_ts" || stack === "unknown" || stack.startsWith("node")) {
-    const lint = await runNpmScript(
-      input.workdir,
-      input.exec,
-      "lint",
-      120_000,
-    );
-    checks.push({
-      name: "npm_lint",
-      passed: lint.skipped || lint.exitCode === 0,
-      detail: lint.skipped
-        ? "lint script not defined — skipped"
-        : lint.exitCode === 0
-          ? undefined
-          : (lint.stderr || lint.stdout).slice(0, 400),
-    });
+    // Local/git sandboxes clone without install. Full monorepo `pnpm install`
+    // OOMs small workers; GitHub CI is the real gate after http PR delivery.
+    let hasNodeModules = false;
+    try {
+      await access(join(input.workdir, "node_modules"));
+      hasNodeModules = true;
+    } catch {
+      hasNodeModules = false;
+    }
 
-    const test = await runNpmScript(
-      input.workdir,
-      input.exec,
-      "test",
-      180_000,
-    );
-    checks.push({
-      name: "npm_test",
-      passed: test.skipped || test.exitCode === 0,
-      detail: test.skipped
-        ? "test script not defined — skipped"
-        : test.exitCode === 0
-          ? undefined
-          : (test.stderr || test.stdout).slice(0, 400),
-    });
+    if (!hasNodeModules) {
+      checks.push({
+        name: "npm_deps",
+        passed: true,
+        detail:
+          "node_modules missing in sandbox — skipped lint/test; GitHub CI remains the merge gate",
+      });
+    } else {
+      const lint = await runNpmScript(
+        input.workdir,
+        input.exec,
+        "lint",
+        120_000,
+      );
+      checks.push({
+        name: "npm_lint",
+        passed: lint.skipped || lint.exitCode === 0,
+        detail: lint.skipped
+          ? "lint script not defined — skipped"
+          : lint.exitCode === 0
+            ? undefined
+            : (lint.stderr || lint.stdout).slice(0, 400),
+      });
+
+      const test = await runNpmScript(
+        input.workdir,
+        input.exec,
+        "test",
+        180_000,
+      );
+      checks.push({
+        name: "npm_test",
+        passed: test.skipped || test.exitCode === 0,
+        detail: test.skipped
+          ? "test script not defined — skipped"
+          : test.exitCode === 0
+            ? undefined
+            : (test.stderr || test.stdout).slice(0, 400),
+      });
+    }
   } else {
     checks.push({
       name: "stack_supported",

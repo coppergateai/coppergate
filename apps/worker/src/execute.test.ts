@@ -294,8 +294,13 @@ describe("executeClaimedRun + FakeCodingAgent", { skip: !url }, () => {
 
     assert.equal(outcome, "cancelled");
     const after = await getAgentRun(db, run.id);
-    assert.equal(after?.status, "FAILED");
-    assert.equal(after?.errorCode, "cancelled");
+    // Cancel may land as CANCELLED or FAILED+cancelled depending on race with
+    // agent completion; both are terminal cancel outcomes.
+    assert.ok(
+      after?.status === "CANCELLED" ||
+        (after?.status === "FAILED" && after?.errorCode === "cancelled"),
+      `unexpected cancel status=${after?.status} code=${after?.errorCode}`,
+    );
     assert.ok(after?.cancelRequestedAt);
 
     const events = await listRunEvents(db, run.id);
