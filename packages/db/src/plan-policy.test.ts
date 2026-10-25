@@ -9,34 +9,37 @@ import {
 } from "./plan-policy.js";
 
 describe("plan policy", () => {
-  it("Starter is stricter than Pro on concurrency and fanout", () => {
+  it("Starter is stricter than Pro on concurrency; both solo fan-out", () => {
     const starter = limitsForPlan("starter");
     const pro = limitsForPlan("pro");
     assert.ok(starter.maxConcurrentRuns < pro.maxConcurrentRuns);
-    assert.ok(starter.maxTournamentFanout < pro.maxTournamentFanout);
+    assert.equal(starter.maxTournamentFanout, 1);
+    assert.equal(pro.maxTournamentFanout, 1);
     assert.equal(starter.previewEnabled, false);
     assert.equal(pro.previewEnabled, true);
   });
 
-  it("Starter clamps fan-out; Community/Pro keep arena width", () => {
+  it("Starter / Community / Pro solo fan-out under BYOK throttle", () => {
     assert.equal(clampTournamentFanout(3, "starter"), 1);
-    assert.equal(clampTournamentFanout(11, "community"), 11);
-    assert.equal(clampTournamentFanout(11, "pro"), 11);
-    assert.equal(clampTournamentFanout(99, "community"), 11);
+    assert.equal(clampTournamentFanout(11, "community"), 1);
+    assert.equal(clampTournamentFanout(11, "pro"), 1);
+    assert.equal(clampTournamentFanout(99, "team"), 11);
     assert.equal(PLAN_LIMITS.starter.maxConcurrentRuns, 1);
   });
 
-  it("Community and Pro share the raised concurrency cap", () => {
-    assert.equal(PLAN_LIMITS.community.maxConcurrentRuns, 20);
-    assert.equal(PLAN_LIMITS.pro.maxConcurrentRuns, 20);
-    assert.equal(PLAN_LIMITS.community.maxConcurrentRunsPerProject, 3);
-    assert.equal(PLAN_LIMITS.pro.maxConcurrentRunsPerProject, 3);
+  it("Community and Pro share the BYOK-throttled concurrency cap", () => {
+    assert.equal(PLAN_LIMITS.community.maxConcurrentRuns, 6);
+    assert.equal(PLAN_LIMITS.pro.maxConcurrentRuns, 6);
+    assert.equal(PLAN_LIMITS.community.maxConcurrentRunsPerProject, 1);
+    assert.equal(PLAN_LIMITS.pro.maxConcurrentRunsPerProject, 1);
+    assert.equal(PLAN_LIMITS.community.maxTournamentFanout, 1);
+    assert.equal(PLAN_LIMITS.pro.maxTournamentFanout, 1);
   });
 
   it("remainingConcurrencySlots never goes negative", () => {
-    assert.equal(remainingConcurrencySlots(0, 20), 20);
-    assert.equal(remainingConcurrencySlots(20, 20), 0);
-    assert.equal(remainingConcurrencySlots(25, 20), 0);
+    assert.equal(remainingConcurrencySlots(0, 6), 6);
+    assert.equal(remainingConcurrencySlots(6, 6), 0);
+    assert.equal(remainingConcurrencySlots(10, 6), 0);
   });
 
   it("clampFanoutToCapacity respects slots and available budget", () => {
@@ -52,7 +55,7 @@ describe("plan policy", () => {
     assert.equal(
       clampFanoutToCapacity({
         requested: 11,
-        concurrencySlots: 20,
+        concurrencySlots: 6,
         availableMicros: 5_000_000,
         perRunMicros: 2_000_000,
       }),
@@ -61,7 +64,7 @@ describe("plan policy", () => {
     assert.equal(
       clampFanoutToCapacity({
         requested: 11,
-        concurrencySlots: 20,
+        concurrencySlots: 6,
         availableMicros: 1_000_000,
         perRunMicros: 2_000_000,
       }),

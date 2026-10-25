@@ -108,8 +108,8 @@ function classifyRuntime(
   if (st === "RUNNING" || st === "QUEUED") return "running";
   if (st === "REVIEW_REQUIRED") return "awaitingCi";
   if (st === "VALIDATING" || st === "WAITING_CI") {
-    // Mid-flight validation while the arena is stopped is stuck debt, not "awaiting".
-    if (!arenaLive) return "needsAttention";
+    // Pause/Stop drains the queue — mid-flight CI is not an ops fire until Resume.
+    if (!arenaLive) return "idle";
     return "awaitingCi";
   }
   if (st === "FAILED" || st === "BLOCKED" || st === "EXPIRED") {

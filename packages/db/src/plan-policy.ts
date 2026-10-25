@@ -16,11 +16,14 @@ export type PlanLimits = {
 };
 
 export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
-  /** Self-host / unpaid — full catalog arena; no hosted preview. */
+  /**
+   * Self-host / unpaid — arena on, but capped for typical BYOK org spend
+   * limits (~$10/mo OpenAI hobby). Prefer solo fan-out over tournaments.
+   */
   community: {
-    maxConcurrentRuns: 20,
-    maxConcurrentRunsPerProject: 3,
-    maxTournamentFanout: 11,
+    maxConcurrentRuns: 6,
+    maxConcurrentRunsPerProject: 1,
+    maxTournamentFanout: 1,
     previewEnabled: false,
     arenaEnabled: true,
   },
@@ -33,9 +36,9 @@ export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
     arenaEnabled: false,
   },
   pro: {
-    maxConcurrentRuns: 20,
-    maxConcurrentRunsPerProject: 3,
-    maxTournamentFanout: 11,
+    maxConcurrentRuns: 6,
+    maxConcurrentRunsPerProject: 1,
+    maxTournamentFanout: 1,
     previewEnabled: true,
     arenaEnabled: true,
   },

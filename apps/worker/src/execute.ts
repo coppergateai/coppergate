@@ -2,6 +2,7 @@ import {
   FakeCodingAgent,
   isContenderStrategy,
   isFakeCompletionPayload,
+  isLlmProviderQuotaError,
   isStubOrToyDelivery,
   runStackValidation,
   strategyGuidance,
@@ -40,6 +41,7 @@ import {
   notifyWorkspace,
   parseJsonArray,
   parseSkillKeysJson,
+  pauseArenaForProviderQuota,
   persistDeliveryArtifacts,
   persistDeliveryCheckpoint,
   persistReviewFindings,
@@ -671,16 +673,20 @@ export async function executeClaimedRun(
         return "failed";
       }
       const message = err instanceof Error ? err.message : String(err);
+      const quota = isLlmProviderQuotaError(err);
       await appendRunEvent(db, {
         runId: run.id,
         workspaceId: run.workspaceId,
         kind: "error",
-        payload: { message },
+        payload: {
+          message,
+          ...(quota ? { code: "provider_quota" } : {}),
+        },
       });
       await markRunFailed(db, {
         runId: run.id,
         workerId,
-        errorCode: "agent_error",
+        errorCode: quota ? "provider_quota" : "agent_error",
         errorMessage: message.slice(0, 500),
       }).catch((markErr) => {
         if (markErr instanceof RunError && markErr.code === "not_owner") {
@@ -690,6 +696,15 @@ export async function executeClaimedRun(
         throw markErr;
       });
       if (lostOwnership) return "failed";
+      if (quota) {
+        await failClosedOnProviderQuota(db, {
+          workspaceId: run.workspaceId,
+          projectId: run.projectId,
+          workerId,
+          detail: message,
+          log,
+        });
+      }
       await safeTaskTransition(db, task, "FAILED", workerId, log);
       void notifyWorkspace(db, {
         event: "run_failed",
@@ -718,6 +733,15 @@ export async function executeClaimedRun(
           errorMessage: "Run cancelled",
         });
       } else {
+        if (lastAgentErrorCode === "provider_quota") {
+          await failClosedOnProviderQuota(db, {
+            workspaceId: run.workspaceId,
+            projectId: run.projectId,
+            workerId,
+            detail: lastAgentErrorMessage ?? "provider_quota",
+            log,
+          });
+        }
         await markRunFailed(db, {
           runId: run.id,
           workerId,
@@ -1481,6 +1505,45 @@ async function attachSyntheticSignalFitness(
   } catch (err) {
     input.log.warn("synthetic signal fitness skipped", {
       runId: input.runId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function failClosedOnProviderQuota(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    workerId: string;
+    detail: string;
+    log: Logger;
+  },
+): Promise<void> {
+  try {
+    const result = await pauseArenaForProviderQuota(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor: `worker:${input.workerId}`,
+      detail: input.detail,
+    });
+    input.log.warn("paused arena after provider quota", {
+      projectId: input.projectId,
+      paused: result.paused,
+      arenaId: result.arenaId,
+    });
+    if (result.paused) {
+      void notifyWorkspace(db, {
+        event: "run_failed",
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        message:
+          "LLM provider quota exhausted — Arena paused to stop further spend",
+      }).catch(() => undefined);
+    }
+  } catch (err) {
+    input.log.warn("provider quota pause failed", {
+      projectId: input.projectId,
       error: err instanceof Error ? err.message : String(err),
     });
   }

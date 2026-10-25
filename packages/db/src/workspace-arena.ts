@@ -144,8 +144,9 @@ export function classifyContenderRuntime(
   if (st === "RUNNING" || st === "QUEUED") return "running";
   if (st === "REVIEW_REQUIRED") return "awaitingCi";
   if (st === "VALIDATING" || st === "WAITING_CI") {
-    // Mid-flight validation while the arena is stopped is stuck debt, not "awaiting".
-    if (!arenaLive) return "needsAttention";
+    // Pause/Stop is an intentional drain — don't turn mid-flight CI into ops fires.
+    // Reaper still fails truly stuck VALIDATING/WAITING_CI by wall-clock.
+    if (!arenaLive) return "idle";
     return "awaitingCi";
   }
   if (st === "FAILED" || st === "BLOCKED" || st === "EXPIRED") {

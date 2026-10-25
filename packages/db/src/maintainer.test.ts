@@ -4,6 +4,8 @@ import {
   AUTO_MERGE_RETRY_COOLDOWN_MS,
   DEFAULT_MAINTAINER_POLICY,
   DEFAULT_MONTHLY_BUDGET_MICROS,
+  LEAN_ARENA_PROFILE_KEYS,
+  LEAN_ROSTER_AVAILABLE_MICROS,
   MIN_REPLAN_AVAILABLE_MICROS,
   buildMaintainerReleaseTag,
   isMergeProtectionBlock,
@@ -12,12 +14,14 @@ import {
   parseMaintainerPolicy,
   pickMetaTournamentChallenger,
   resolveAutoMergeSkipPrs,
+  rosterKeysForAvailableBudget,
   selectAutoAcceptRun,
   serializeMaintainerPolicy,
   shouldReplanVision,
   shouldRollbackProfileForFitness,
   taskMatchesPathAllowlist,
 } from "./maintainer.js";
+import { FULL_ARENA_PROFILE_KEYS } from "./profiles.js";
 import { shouldRollMonthlyPeriod } from "./budgets.js";
 
 describe("maintainer policy", () => {
@@ -25,11 +29,24 @@ describe("maintainer policy", () => {
     const p = parseMaintainerPolicy(null);
     assert.equal(p.enabled, false);
     assert.equal(p.monthlyBudgetMicros, DEFAULT_MONTHLY_BUDGET_MICROS);
+    assert.equal(DEFAULT_MONTHLY_BUDGET_MICROS, 8_000_000);
+    assert.equal(p.maxTournamentN, 1);
     assert.equal(p.autoMerge, true);
     assert.equal(p.autoQueueReplanTasks, true);
     assert.equal(p.maxAutoQueuePerReplan, 2);
     assert.equal(p.continuousBacklog, true);
     assert.equal(p.releaseTagStyle, "daily");
+  });
+
+  it("uses lean arena roster when available budget is tight", () => {
+    assert.deepEqual(
+      rosterKeysForAvailableBudget(LEAN_ROSTER_AVAILABLE_MICROS - 1),
+      [...LEAN_ARENA_PROFILE_KEYS],
+    );
+    assert.deepEqual(
+      rosterKeysForAvailableBudget(LEAN_ROSTER_AVAILABLE_MICROS),
+      [...FULL_ARENA_PROFILE_KEYS],
+    );
   });
 
   it("refills backlog when idle under budget (continuous)", () => {

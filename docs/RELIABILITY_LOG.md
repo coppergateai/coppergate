@@ -82,6 +82,12 @@ Date: 2026-10-24
 - **Terminal task skip**: no VALIDATING/WAITING_CI transitions when task already FAILED/CANCELLED/DONE
 - **Release already_exists**: 422 tag collision treated as success
 
+## Cycle 14
+- **Pause quiet**: VALIDATING/WAITING_CI while arena paused/stopped no longer Needs attention
+- **Grammar**: “1 agent needs attention”
+- **Replan attention**: collapse per project; surface error + project name
+- **Evidence attention**: title includes project so duplicate P-00N rows are distinguishable
+
 ## Tests
 - `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt, duplicate FILE, JSON retry
 - `delivery.test.ts` — fake idempotency, list fail-closed, 422 recovery, CAS conflict

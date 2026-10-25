@@ -33,6 +33,7 @@ export type MissionControlAttentionKind =
   | "approval"
   | "budget_paused"
   | "budget_reserved"
+  | "provider_quota"
   | "review_required"
   | "arena_failed"
   | "replan_failed"
@@ -248,6 +249,22 @@ export async function getWorkspaceMissionControl(
     });
   }
 
+  const quotaPause = recentAudit.find(
+    (e) => e.action === "arena.pause_provider_quota",
+  );
+  if (quotaPause) {
+    attention.push({
+      id: `provider-quota-${quotaPause.id}`,
+      kind: "provider_quota",
+      title: "LLM provider quota exhausted",
+      detail:
+        "Arena paused after billing/quota error — raise the provider limit or wait for reset before Resume",
+      href: `/workspaces/${workspaceId}/arena`,
+      priority: "high",
+      ctaLabel: "Open Arena",
+    });
+  }
+
   if (spend?.budgetStatus === "paused") {
     attention.push({
       id: "budget-paused",
@@ -283,11 +300,11 @@ export async function getWorkspaceMissionControl(
       id: `review-${t.id}`,
       kind: "review_required",
       title: acceptReady
-        ? `Accept delivery · ${title}`
-        : `Review gates · ${title}`,
+        ? `Accept · ${t.projectName} · ${title}`
+        : `Review · ${t.projectName} · ${title}`,
       detail: acceptReady
-        ? `${t.projectName} · Gates clear — Accept in Evidence`
-        : `${t.projectName} · Evidence open — hard gates still blocking Accept`,
+        ? `Gates clear — Accept in Evidence`
+        : `Evidence open — hard gates still blocking Accept`,
       href: `/workspaces/${workspaceId}/projects/${t.projectId}?tab=evidence`,
       priority: "high",
       ctaLabel: acceptReady ? "Accept in Evidence" : "Open Evidence",
@@ -310,7 +327,7 @@ export async function getWorkspaceMissionControl(
       // Prefer agent count — lastRun can be RUNNING while a peer contender failed.
       const detail =
         hotCount > 0
-          ? `${hotCount} agent${hotCount === 1 ? "" : "s"} need attention · Open Arena`
+          ? `${hotCount} agent${hotCount === 1 ? "" : "s"} ${hotCount === 1 ? "needs" : "need"} attention · Open Arena`
           : `Last run ${lane.lastRun?.status ?? "attention"} · Open Arena`;
       attention.push({
         id: `arena-${lane.projectId}`,
@@ -323,29 +340,55 @@ export async function getWorkspaceMissionControl(
       });
     }
 
-    const replanFails = recentAudit
-      .filter((e) => e.action === "maintainer.replan_queue_failed")
-      .slice(0, 2);
+    const replanFails = recentAudit.filter(
+      (e) => e.action === "maintainer.replan_queue_failed",
+    );
+    const seenReplanProjects = new Set<string>();
     for (const ev of replanFails) {
       let projectId: string | null = null;
+      let projectName: string | null = null;
+      let error: string | null = null;
       if (ev.meta) {
         try {
-          const meta = JSON.parse(ev.meta) as { projectId?: string };
-          projectId = typeof meta.projectId === "string" ? meta.projectId : null;
+          const meta = JSON.parse(ev.meta) as {
+            projectId?: string;
+            projectName?: string;
+            error?: string;
+          };
+          projectId =
+            typeof meta.projectId === "string" ? meta.projectId : null;
+          projectName =
+            typeof meta.projectName === "string" ? meta.projectName : null;
+          error = typeof meta.error === "string" ? meta.error : null;
         } catch {
-          projectId = null;
+          /* ignore */
         }
       }
+      const dedupeKey = projectId ?? ev.id;
+      if (seenReplanProjects.has(dedupeKey)) continue;
+      seenReplanProjects.add(dedupeKey);
+      if (seenReplanProjects.size > 3) break;
+
+      const projectLabel =
+        projectName ??
+        (projectId
+          ? (arena.projects.find((p) => p.projectId === projectId)
+              ?.projectName ?? null)
+          : null);
       const href = projectId
         ? `/workspaces/${workspaceId}/projects/${projectId}`
         : `/workspaces/${workspaceId}/activity`;
+      const errBit = error ? error.replace(/\s+/g, " ").slice(0, 120) : null;
       attention.push({
-        id: `replan-${ev.id}`,
+        id: `replan-${dedupeKey}`,
         kind: "replan_failed",
-        title: "Replan queue failed",
-        detail: "Maintainer could not queue the next task",
+        title: projectLabel
+          ? `Replan queue failed · ${projectLabel}`
+          : "Replan queue failed",
+        detail: errBit ?? "Maintainer could not queue the next task",
         href,
         priority: "high",
+        ctaLabel: "Open project",
       });
     }
 
@@ -393,9 +436,12 @@ export async function getWorkspaceMissionControl(
   }
 
   attention.sort((a, b) => {
-    // Concurrency crisis always leads — one decision before triage noise.
-    if (a.kind === "concurrency" && b.kind !== "concurrency") return -1;
-    if (b.kind === "concurrency" && a.kind !== "concurrency") return 1;
+    // Concurrency / provider quota crisis leads — stop burn before triage.
+    const rank = (k: MissionControlAttentionKind) =>
+      k === "concurrency" || k === "provider_quota" ? 0 : 1;
+    const ra = rank(a.kind);
+    const rb = rank(b.kind);
+    if (ra !== rb) return ra - rb;
     if (a.priority === b.priority) return 0;
     return a.priority === "high" ? -1 : 1;
   });
