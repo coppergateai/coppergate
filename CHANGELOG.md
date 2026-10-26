@@ -1,7 +1,11 @@
+# Changelog
+
 ## [Unreleased]
 
 ### Added
-- P-104: Program Runtime (Contracted Autonomy) Spend License capability
-- ID badges for program identity and validation
-- Accept → Ship Receipt flow for spend license authorization
-- Landing and writeback of spend license state for audit and reconciliation
+- P-104: Implemented Program Runtime (Contracted Autonomy) Spend License management with $8 monthly envelope.
+- Added ID badge issuance for runtime operations.
+- Added Accept → Ship Receipt flow to confirm runtime operations.
+- Added landing and writeback process under `/docs/-program-runtime`.
+- Added tests covering spend license, ID badges, acceptance, and landing.
+- Added user-facing documentation for Program Runtime feature.
