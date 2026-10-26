@@ -4,99 +4,82 @@ import (
 	"testing"
 )
 
-func TestLicenseManager_ReserveLicense(t *testing.T) {
+func TestLicenseReserveAcceptFlow(t *testing.T) {
 	lm := NewLicenseManager()
 
-	// Reserve valid license
-	lic, err := lm.ReserveLicense("lic1", 3.0)
+	// Reserve a license for $3
+	license, err := lm.Reserve(3)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Reserve failed: %v", err)
 	}
-	if lic.Amount != 3.0 {
-		t.Errorf("expected amount 3.0, got %v", lic.Amount)
+	if license.Amount != 3 {
+		t.Errorf("Expected amount 3, got %d", license.Amount)
 	}
-
-	// Reserve license exceeding envelope
-	_, err = lm.ReserveLicense("lic2", 6.0)
-	if err == nil {
-		t.Errorf("expected error for exceeding envelope")
+	if license.Accepted {
+		t.Errorf("License should not be accepted initially")
 	}
 
-	// Reserve license with duplicate ID
-	_, err = lm.ReserveLicense("lic1", 1.0)
-	if err == nil {
-		t.Errorf("expected error for duplicate license ID")
+	// Accept the license
+	receipt, err := lm.Accept(license.IDBadge)
+	if err != nil {
+		t.Fatalf("Accept failed: %v", err)
+	}
+	if receipt == "" {
+		t.Errorf("Expected non-empty ship receipt")
 	}
 
-	// Reserve license with zero or negative amount
-	_, err = lm.ReserveLicense("lic3", 0)
+	// Accepting again should fail
+	_, err = lm.Accept(license.IDBadge)
 	if err == nil {
-		t.Errorf("expected error for zero amount")
+		t.Errorf("Expected error on double accept")
+	}
+
+	// Writeback should succeed
+	err = lm.Writeback(license.IDBadge)
+	if err != nil {
+		t.Errorf("Writeback failed: %v", err)
 	}
 }
 
-func TestLicenseManager_FanOutIssueAcceptWriteBack(t *testing.T) {
+func TestReserveExceedEnvelope(t *testing.T) {
 	lm := NewLicenseManager()
-	lic, err := lm.ReserveLicense("lic1", 2.0)
+
+	// Reserve $5
+	_, err := lm.Reserve(5)
 	if err != nil {
-		t.Fatalf("reserve error: %v", err)
+		t.Fatalf("Reserve failed: %v", err)
 	}
 
-	// Fan out license
-	err = lm.FanOutLicense(lic.ID)
-	if err != nil {
-		t.Errorf("fan out error: %v", err)
-	}
-	// Fan out again should error
-	err = lm.FanOutLicense(lic.ID)
+	// Reserve $4 should fail (5 + 4 > 8)
+	_, err = lm.Reserve(4)
 	if err == nil {
-		t.Errorf("expected error on second fan out")
+		t.Errorf("Expected error reserving beyond envelope")
 	}
 
-	// Issue ID badge
-	err = lm.IssueIDBadge(lic.ID, "badge123")
+	// Reserve $3 should succeed (5 + 3 = 8)
+	_, err = lm.Reserve(3)
 	if err != nil {
-		t.Errorf("issue badge error: %v", err)
-	}
-	// Issue badge again should error
-	err = lm.IssueIDBadge(lic.ID, "badge456")
-	if err == nil {
-		t.Errorf("expected error on second badge issue")
-	}
-
-	// Accept license
-	err = lm.AcceptLicense(lic.ID)
-	if err != nil {
-		t.Errorf("accept license error: %v", err)
-	}
-	// Accept again should error
-	err = lm.AcceptLicense(lic.ID)
-	if err == nil {
-		t.Errorf("expected error on second accept")
-	}
-
-	// Write back usage
-	err = lm.WriteBackUsage(lic.ID)
-	if err != nil {
-		t.Errorf("write back error: %v", err)
-	}
-	// Write back again should error
-	err = lm.WriteBackUsage(lic.ID)
-	if err == nil {
-		t.Errorf("expected error on second write back")
+		t.Errorf("Reserve failed unexpectedly: %v", err)
 	}
 }
 
-func TestLicenseManager_WriteBackWithoutShipReceipt(t *testing.T) {
+func TestGetLicense(t *testing.T) {
 	lm := NewLicenseManager()
-	lic, err := lm.ReserveLicense("lic2", 1.0)
+	license, err := lm.Reserve(2)
 	if err != nil {
-		t.Fatalf("reserve error: %v", err)
+		t.Fatalf("Reserve failed: %v", err)
 	}
 
-	// Try write back before accept (ship receipt)
-	err = lm.WriteBackUsage(lic.ID)
-	if err == nil {
-		t.Errorf("expected error writing back without ship receipt")
+	got, ok := lm.GetLicense(license.IDBadge)
+	if !ok {
+		t.Errorf("Expected license to be found")
+	}
+	if got.IDBadge != license.IDBadge {
+		t.Errorf("Mismatched IDBadge")
+	}
+
+	_, ok = lm.GetLicense("non-existent")
+	if ok {
+		t.Errorf("Expected license not found for invalid ID")
 	}
 }
