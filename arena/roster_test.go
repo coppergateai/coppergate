@@ -4,93 +4,87 @@ import (
 	"testing"
 )
 
-func TestLeanRosterModeActivation(t *testing.T) {
-	cfg := RosterConfig{
-		AvailableMicros: 1500, // under 2ms
-		MonthlyEnvelope: 800,  // $8 in cents
+func TestRosterAddRemove(t *testing.T) {
+	r := NewRoster()
+	u1 := User{ID: "u1", Role: RoleEngineer}
+	u2 := User{ID: "u2", Role: RoleReviewer}
+	r.AddUser(u1)
+	r.AddUser(u2)
+	if r.Count() != 2 {
+		t.Fatalf("expected 2 users, got %d", r.Count())
 	}
-	r := NewRoster(cfg)
-
-	if !r.leanRosterMode {
-		t.Fatal("expected leanRosterMode to be true under budget constraints")
+	if !r.HasEngineerAndReviewer() {
+		t.Fatal("expected roster to have engineer and reviewer")
 	}
-
-	// Engineer spawn allowed
-	if err := r.SpawnRole(RoleEngineer); err != nil {
-		t.Fatalf("expected Engineer spawn allowed, got error: %v", err)
+	r.RemoveUser("u1")
+	if r.Count() != 1 {
+		t.Fatalf("expected 1 user, got %d", r.Count())
 	}
-
-	// Reviewer spawn allowed
-	if err := r.SpawnRole(RoleReviewer); err != nil {
-		t.Fatalf("expected Reviewer spawn allowed, got error: %v", err)
-	}
-
-	// FullArena spawn disallowed
-	if err := r.SpawnRole(RoleFullArena); err != ErrSpawnNotAllowed {
-		t.Fatalf("expected FullArena spawn disallowed, got error: %v", err)
+	if r.HasEngineerAndReviewer() {
+		t.Fatal("expected roster to NOT have engineer and reviewer after removal")
 	}
 }
 
-func TestNormalRosterModeAllowsFullArena(t *testing.T) {
-	cfg := RosterConfig{
-		AvailableMicros: 5000, // over 2ms
-		MonthlyEnvelope: 1000, // $10 in cents
+func TestArenaSpawnFullArena(t *testing.T) {
+	a := NewArena(3000)
+	err := a.SpawnFullArena()
+	if err != nil {
+		t.Fatalf("expected full arena spawn success, got error: %v", err)
 	}
-	r := NewRoster(cfg)
-
-	if r.leanRosterMode {
-		t.Fatal("expected leanRosterMode to be false with relaxed budget")
-	}
-
-	// FullArena spawn allowed
-	if err := r.SpawnRole(RoleFullArena); err != nil {
-		t.Fatalf("expected FullArena spawn allowed, got error: %v", err)
-	}
-}
-
-func TestUpdateConfigChangesLeanRosterMode(t *testing.T) {
-	cfg := RosterConfig{
-		AvailableMicros: 5000,
-		MonthlyEnvelope: 1000,
-	}
-	r := NewRoster(cfg)
-	if r.leanRosterMode {
-		t.Fatal("expected leanRosterMode false initially")
+	err = a.SpawnFullArena()
+	if err != nil {
+		t.Fatalf("expected no error on repeated spawn, got: %v", err)
 	}
 
-	// Update to tight budget triggers lean roster
-	r.UpdateConfig(RosterConfig{
-		AvailableMicros: 1000,
-		MonthlyEnvelope: 800,
-	})
-	if !r.leanRosterMode {
-		t.Fatal("expected leanRosterMode true after update")
-	}
-
-	// FullArena spawn disallowed now
-	if err := r.SpawnRole(RoleFullArena); err != ErrSpawnNotAllowed {
-		t.Fatalf("expected FullArena spawn disallowed after update, got error: %v", err)
+	a.SetAvailableMicros(1000)
+	a2 := NewArena(1000)
+	err = a2.SpawnFullArena()
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded for low budget, got: %v", err)
 	}
 }
 
-func TestActiveRoles(t *testing.T) {
-	cfg := RosterConfig{
-		AvailableMicros: 1500,
-		MonthlyEnvelope: 800,
+func TestArenaSpawnLeanRoster(t *testing.T) {
+	a := NewArena(1500)
+	// No users yet
+	err := a.SpawnLeanRoster()
+	if err == nil {
+		t.Fatal("expected error for lean roster without engineer+reviewer")
 	}
-	r := NewRoster(cfg)
+	// Add only engineer
+	a.AddUserToRoster(User{ID: "eng1", Role: RoleEngineer})
+	err = a.SpawnLeanRoster()
+	if err == nil {
+		t.Fatal("expected error for lean roster without reviewer")
+	}
+	// Add reviewer
+	a.AddUserToRoster(User{ID: "rev1", Role: RoleReviewer})
+	err = a.SpawnLeanRoster()
+	if err != nil {
+		t.Fatalf("expected lean roster spawn success, got error: %v", err)
+	}
+}
 
-	r.SpawnRole(RoleEngineer)
-	r.SpawnRole(RoleReviewer)
-
-	roles := r.ActiveRoles()
-	if len(roles) != 2 {
-		t.Fatalf("expected 2 active roles, got %d", len(roles))
+func TestArenaSpawnArena(t *testing.T) {
+	a := NewArena(3000)
+	a.AddUserToRoster(User{ID: "eng1", Role: RoleEngineer})
+	a.AddUserToRoster(User{ID: "rev1", Role: RoleReviewer})
+	err := a.SpawnArena()
+	if err != nil {
+		t.Fatalf("expected full arena spawn success, got error: %v", err)
 	}
 
-	r.DespawnRole(RoleEngineer)
-	roles = r.ActiveRoles()
-	if len(roles) != 1 {
-		t.Fatalf("expected 1 active role after despawn, got %d", len(roles))
+	a2 := NewArena(1500)
+	a2.AddUserToRoster(User{ID: "eng1", Role: RoleEngineer})
+	a2.AddUserToRoster(User{ID: "rev1", Role: RoleReviewer})
+	err = a2.SpawnArena()
+	if err != nil {
+		t.Fatalf("expected lean roster spawn success, got error: %v", err)
+	}
+
+	a3 := NewArena(1500)
+	err = a3.SpawnArena()
+	if err == nil {
+		t.Fatal("expected error for lean roster spawn without engineer+reviewer")
 	}
 }

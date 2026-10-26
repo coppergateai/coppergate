@@ -2,10 +2,10 @@
 
 ## [Unreleased]
 
-### Added
+### Features
 
-- AG-012: Introduced lean roster allocation mode in arena package.
-  - When availableMicros budget is under $2 and user role is Engineer or Reviewer only,
-    the arena uses lean roster mode to reduce memory usage.
-  - FULL_ARENA spawn is avoided under tight budget ($8 monthly envelope).
-  - This improves memory efficiency and matches architecture acceptance criteria.
+- AG-012: Implement lean roster allocation under tight budget constraints.
+  - When availableMicros budget is under $2 (2000 microseconds), full arena spawn is disallowed.
+  - Lean roster spawn allowed only if roster contains at least one engineer and one reviewer.
+  - Added new Arena and Roster APIs to support budget-aware spawning.
+  - Includes tests covering lean roster and full arena spawn logic.
