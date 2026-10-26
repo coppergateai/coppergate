@@ -4,91 +4,95 @@ import (
 	"testing"
 )
 
-func TestLeanRosterAllocations(t *testing.T) {
-	tests := []struct {
-		name        string
-		mode        ArenaMode
-		budgetCents int
-		role        Role
-		size        int
-		wantErr     bool
-	}{
-		{
-			name:        "LeanRoster Engineer under budget",
-			mode:        LeanRosterMode,
-			budgetCents: 150,
-			role:        RoleEngineer,
-			size:        512 * 1024,
-			wantErr:     false,
-		},
-		{
-			name:        "LeanRoster Reviewer under budget",
-			mode:        LeanRosterMode,
-			budgetCents: 100,
-			role:        RoleReviewer,
-			size:        256 * 1024,
-			wantErr:     false,
-		},
-		{
-			name:        "LeanRoster FullArenaSpawn role disallowed",
-			mode:        LeanRosterMode,
-			budgetCents: 100,
-			role:        RoleFullArenaSpawn,
-			size:        128 * 1024,
-			wantErr:     true,
-		},
-		{
-			name:        "LeanRoster Engineer over budget disallowed",
-			mode:        LeanRosterMode,
-			budgetCents: 250,
-			role:        RoleEngineer,
-			size:        128 * 1024,
-			wantErr:     true,
-		},
-		{
-			name:        "LeanRoster allocation exceeding max size disallowed",
-			mode:        LeanRosterMode,
-			budgetCents: 100,
-			role:        RoleEngineer,
-			size:        2 * 1024 * 1024, // 2MB > maxSize 1MB
-			wantErr:     true,
-		},
-		{
-			name:        "FullArenaMode no restrictions",
-			mode:        FullArenaMode,
-			budgetCents: 500,
-			role:        RoleFullArenaSpawn,
-			size:        2 * 1024 * 1024,
-			wantErr:     false,
-		},
+func TestNewArena_LeanRosterEnabled(t *testing.T) {
+	cfg := Config{
+		AvailableMicros: 1_500_000, // under $2
+		Role:            RoleEngineer,
+		MonthlyEnvelope: 800, // $8
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a := NewArena(tt.mode, tt.budgetCents, tt.role)
-			buf, err := a.Alloc(tt.size)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("Alloc() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if err == nil && len(buf) != tt.size {
-				t.Errorf("Alloc() returned buffer size %d, want %d", len(buf), tt.size)
-			}
-		})
+	a, err := NewArena(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !a.IsLean() {
+		t.Errorf("expected lean mode enabled for engineer under budget")
 	}
 }
 
-func TestUsedTracking(t *testing.T) {
-	a := NewArena(LeanRosterMode, 100, RoleEngineer)
-	sizes := []int{100, 200, 300}
-	total := 0
-	for _, sz := range sizes {
-		_, err := a.Alloc(sz)
-		if err != nil {
-			t.Fatalf("Alloc() unexpected error: %v", err)
-		}
-		total += sz
+func TestNewArena_LeanRosterDisabledForRole(t *testing.T) {
+	cfg := Config{
+		AvailableMicros: 1_500_000,
+		Role:            RoleOther,
+		MonthlyEnvelope: 800,
 	}
-	if used := a.Used(); used != total {
-		t.Errorf("Used() = %d, want %d", used, total)
+	a, err := NewArena(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.IsLean() {
+		t.Errorf("expected lean mode disabled for non-engineer/reviewer role")
+	}
+}
+
+func TestNewArena_LeanRosterDisabledForBudget(t *testing.T) {
+	cfg := Config{
+		AvailableMicros: 3_000_000, // over $2
+		Role:            RoleEngineer,
+		MonthlyEnvelope: 800,
+	}
+	a, err := NewArena(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.IsLean() {
+		t.Errorf("expected lean mode disabled for budget over $2")
+	}
+}
+
+func TestAlloc_LeanModeAllocations(t *testing.T) {
+	cfg := Config{
+		AvailableMicros: 1_000_000,
+		Role:            RoleReviewer,
+		MonthlyEnvelope: 800,
+	}
+	a, err := NewArena(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !a.IsLean() {
+		t.Fatalf("expected lean mode enabled")
+	}
+
+	b1 := a.Alloc(100)
+	if len(b1) != 100 {
+		t.Errorf("expected allocation size 100, got %d", len(b1))
+	}
+	b2 := a.Alloc(200)
+	if len(b2) != 200 {
+		t.Errorf("expected allocation size 200, got %d", len(b2))
+	}
+}
+
+func TestAlloc_NormalModeAllocations(t *testing.T) {
+	cfg := Config{
+		AvailableMicros: 3_000_000,
+		Role:            RoleEngineer,
+		MonthlyEnvelope: 800,
+	}
+	a, err := NewArena(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.IsLean() {
+		t.Fatalf("expected lean mode disabled")
+	}
+
+	b1 := a.Alloc(100)
+	if len(b1) != 100 {
+		t.Errorf("expected allocation size 100, got %d", len(b1))
+	}
+	b2 := a.Alloc(200)
+	if len(b2) != 200 {
+		t.Errorf("expected allocation size 200, got %d", len(b2))
 	}
 }
