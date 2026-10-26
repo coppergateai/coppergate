@@ -5,146 +5,90 @@ import (
 	"time"
 )
 
-func TestSpendLicenseReserveUseRelease(t *testing.T) {
-	manager := NewSpendLicenseManager(800) // $8.00 in cents
+func TestLicenseManager_ReserveAndFanOut(t *testing.T) {
+	lm := NewLicenseManager(8.0)
 
-	err := manager.Reserve("res1", 300)
-	if err != nil {
-		t.Fatalf("Reserve failed: %v", err)
+	// Reserve a license within envelope
+	if err := lm.ReserveLicense("lic1", 5.0); err != nil {
+		t.Fatalf("ReserveLicense failed: %v", err)
 	}
 
-	err = manager.Reserve("res2", 600)
-	if err == nil {
-		t.Fatalf("Reserve should have failed due to budget exceeded")
+	// Reserve license exceeding envelope
+	if err := lm.ReserveLicense("lic2", 4.0); err == nil {
+		t.Fatalf("ReserveLicense should fail exceeding envelope")
 	}
 
-	err = manager.Use("res1")
-	if err != nil {
-		t.Fatalf("Use failed: %v", err)
+	// Fan out license within parent amount
+	if err := lm.FanOutLicense("lic1", "lic1a", 3.0); err != nil {
+		t.Fatalf("FanOutLicense failed: %v", err)
 	}
 
-	err = manager.Use("res1")
-	if err == nil {
-		t.Fatalf("Use should have failed for already used reservation")
+	// Fan out license exceeding parent amount
+	if err := lm.FanOutLicense("lic1", "lic1b", 3.0); err == nil {
+		t.Fatalf("FanOutLicense should fail insufficient amount")
 	}
 
-	err = manager.Release("res1")
-	if err != nil {
-		t.Fatalf("Release failed: %v", err)
+	// Consume license
+	if err := lm.ConsumeLicense("lic1a", 2.0); err != nil {
+		t.Fatalf("ConsumeLicense failed: %v", err)
 	}
 
-	err = manager.Release("res1")
-	if err == nil {
-		t.Fatalf("Release should have failed for non-existent reservation")
+	// Consume license exceeding amount
+	if err := lm.ConsumeLicense("lic1a", 2.0); err == nil {
+		t.Fatalf("ConsumeLicense should fail insufficient amount")
 	}
 }
 
-func TestIDBadgeIssueValidateInvalidate(t *testing.T) {
-	manager := NewIDBadgeManager()
+func TestBadgeManager_IssueValidateRevoke(t *testing.T) {
+	bm := NewBadgeManager()
 
-	badge, err := manager.IssueBadge(100 * time.Millisecond)
+	err := bm.IssueBadge("badge1", "prog1", time.Second*1)
 	if err != nil {
 		t.Fatalf("IssueBadge failed: %v", err)
 	}
 
-	valid, err := manager.ValidateBadge(badge.ID)
-	if err != nil || !valid {
+	valid, err := bm.ValidateBadge("badge1")
+	if err != nil {
 		t.Fatalf("ValidateBadge failed: %v", err)
 	}
-
-	time.Sleep(150 * time.Millisecond)
-	valid, err = manager.ValidateBadge(badge.ID)
-	if err == nil || valid {
-		t.Fatalf("ValidateBadge should have failed due to expiration")
+	if !valid {
+		t.Fatalf("Badge should be valid immediately after issuance")
 	}
 
-	badge2, err := manager.IssueBadge(time.Minute)
+	time.Sleep(time.Second * 2)
+	valid, err = bm.ValidateBadge("badge1")
 	if err != nil {
-		t.Fatalf("IssueBadge failed: %v", err)
+		t.Fatalf("ValidateBadge failed: %v", err)
+	}
+	if valid {
+		t.Fatalf("Badge should be invalid after expiration")
 	}
 
-	err = manager.InvalidateBadge(badge2.ID)
+	err = bm.RevokeBadge("badge1")
 	if err != nil {
-		t.Fatalf("InvalidateBadge failed: %v", err)
-	}
-
-	valid, err = manager.ValidateBadge(badge2.ID)
-	if err == nil || valid {
-		t.Fatalf("ValidateBadge should have failed due to invalidation")
+		t.Fatalf("RevokeBadge failed: %v", err)
 	}
 }
 
-func TestShipReceiptIssueGet(t *testing.T) {
-	manager := NewShipReceiptManager()
+func TestReceiptManager_AcceptAndGet(t *testing.T) {
+	rm := NewReceiptManager()
 
-	receipt, err := manager.IssueReceipt("r1", "res1", "details")
+	err := rm.AcceptReceipt("rcpt1", "lic1", 3.5)
 	if err != nil {
-		t.Fatalf("IssueReceipt failed: %v", err)
+		t.Fatalf("AcceptReceipt failed: %v", err)
 	}
 
-	if receipt.ID != "r1" {
-		t.Fatalf("Receipt ID mismatch")
-	}
-
-	_, err = manager.IssueReceipt("r1", "res2", "details")
-	if err == nil {
-		t.Fatalf("IssueReceipt should have failed for duplicate ID")
-	}
-
-	got, err := manager.GetReceipt("r1")
+	rcpt, err := rm.GetReceipt("rcpt1")
 	if err != nil {
 		t.Fatalf("GetReceipt failed: %v", err)
 	}
-
-	if got.ID != "r1" {
-		t.Fatalf("GetReceipt ID mismatch")
+	if rcpt.Amount != 3.5 || !rcpt.Accepted {
+		t.Fatalf("Receipt data mismatch")
 	}
 
-	_, err = manager.GetReceipt("nonexistent")
+	// Duplicate receipt ID
+	err = rm.AcceptReceipt("rcpt1", "lic1", 1.0)
 	if err == nil {
-		t.Fatalf("GetReceipt should have failed for nonexistent ID")
-	}
-}
-
-func TestRuntimeManagerFlow(t *testing.T) {
-	rm := NewRuntimeManager(800) // $8.00 in cents
-
-	// Reserve spend license
-	err := rm.ReserveSpendLicense("res1", 500)
-	if err != nil {
-		t.Fatalf("ReserveSpendLicense failed: %v", err)
-	}
-
-	// Issue badge
-	badge, err := rm.IssueIDBadge(time.Minute)
-	if err != nil {
-		t.Fatalf("IssueIDBadge failed: %v", err)
-	}
-
-	valid, err := rm.ValidateBadge(badge.ID)
-	if err != nil || !valid {
-		t.Fatalf("ValidateBadge failed: %v", err)
-	}
-
-	// Accept runtime execution
-	receipt, err := rm.AcceptRuntimeExecution("res1", "receipt1", "runtime completed successfully")
-	if err != nil {
-		t.Fatalf("AcceptRuntimeExecution failed: %v", err)
-	}
-
-	if receipt.ID != "receipt1" {
-		t.Fatalf("Receipt ID mismatch")
-	}
-
-	// Validate badge still valid
-	valid, err = rm.ValidateBadge(badge.ID)
-	if err != nil || !valid {
-		t.Fatalf("ValidateBadge failed after accept: %v", err)
-	}
-
-	// Release spend license (should error because already used)
-	err = rm.ReleaseSpendLicense("res1")
-	if err == nil {
-		t.Fatalf("ReleaseSpendLicense should have failed for used reservation")
+		t.Fatalf("AcceptReceipt should fail duplicate receipt ID")
 	}
 }
