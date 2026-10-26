@@ -1,95 +1,95 @@
-// Package arena provides memory arena allocation with lean roster support.
+// Package arena provides memory arena allocation with lean roster support
+// to reduce memory footprint under tight budget constraints.
 //
-// AG-012: Implement lean roster allocation under tight budget constraints.
-// When availableMicros < $2 and role is Engineer or Reviewer only,
-// use lean roster allocation without spawning FULL_ARENA to reduce memory footprint.
-//
-// This package matches architecture acceptance criteria from coppergate-architecture/docs/OPEN_PROGRAM.md.
+// AG-012: Lean roster implementation for micros under $2 monthly spend.
+// Engineer+reviewer only; no FULL_ARENA spawn under tight budget.
 package arena
 
 import (
 	"errors"
 	"sync"
-	"time"
 )
 
-// Role defines user roles in the system.
-type Role int
+// ErrBudgetExceeded is returned when the monthly budget envelope is exceeded.
+var ErrBudgetExceeded = errors.New("monthly budget envelope exceeded")
+
+// MonthlyBudget represents the monthly spend envelope in dollars.
+const MonthlyBudget = 8.0
+
+// MicroCost represents the cost per micro allocation in dollars.
+const MicroCost = 0.5
+
+// ArenaType identifies the type of arena allocation.
+type ArenaType int
 
 const (
-	RoleUnknown Role = iota
-	RoleEngineer
-	RoleReviewer
-	RoleOther
+	// FULL_ARENA is the default arena type with full features.
+	FULL_ARENA ArenaType = iota
+	// LEAN_ROSTER is a lean arena type with minimal memory footprint.
+	LEAN_ROSTER
 )
 
-// ErrBudgetExceeded is returned when the monthly budget is exceeded.
-var ErrBudgetExceeded = errors.New("monthly budget exceeded")
-
-// Config holds configuration for arena allocation.
-type Config struct {
-	AvailableMicros int64 // Available budget in microdollars (e.g. 2_000_000 for $2)
-	Role           Role  // User role
-	MonthlyEnvelope int64 // Monthly budget envelope in microdollars (e.g. 8_000_000 for $8)
+// ArenaConfig holds configuration for arena allocation.
+type ArenaConfig struct {
+	// BudgetEnvelope is the monthly spend envelope in dollars.
+	BudgetEnvelope float64
+	// MicrosRequested is the number of micros requested.
+	MicrosRequested int
+	// EngineerReviewerOnly indicates if the allocation is for engineer+reviewer only.
+	EngineerReviewerOnly bool
 }
 
 // Arena represents a memory arena.
 type Arena struct {
-	mu      sync.Mutex
-	roster  *Roster
-	lean    bool
-	created time.Time
+	Type ArenaType
+	// micros allocated in this arena
+	micros int
+	// mutex protects arena state
+	mu sync.Mutex
 }
 
-// Roster holds allocation metadata.
-type Roster struct {
-	allocations int
-	lean        bool
-}
+// NewArena creates a new arena based on the config and budget constraints.
+// Returns ErrBudgetExceeded if the budget envelope is exceeded.
+func NewArena(cfg ArenaConfig) (*Arena, error) {
+	if cfg.BudgetEnvelope <= 0 {
+		cfg.BudgetEnvelope = MonthlyBudget
+	}
 
-// NewArena creates a new Arena based on the given config.
-// Implements lean roster allocation if AvailableMicros < $2 and role is Engineer or Reviewer only.
-// Does not spawn FULL_ARENA under tight budget.
-func NewArena(cfg Config) (*Arena, error) {
-	if cfg.MonthlyEnvelope > 8_000_000 {
-		// Enforce $8 monthly envelope max
+	// Calculate cost of requested micros
+	cost := float64(cfg.MicrosRequested) * MicroCost
+
+	// If micros under $2 and engineer+reviewer only, use lean roster
+	if cost <= 2.0 && cfg.EngineerReviewerOnly {
+		// Check budget envelope
+		if cost > cfg.BudgetEnvelope {
+			return nil, ErrBudgetExceeded
+		}
+		return &Arena{
+			Type:   LEAN_ROSTER,
+			micros: cfg.MicrosRequested,
+		}, nil
+	}
+
+	// For other cases, do not spawn FULL_ARENA if budget is tight
+	if cost > cfg.BudgetEnvelope {
 		return nil, ErrBudgetExceeded
 	}
 
-	lean := false
-	if cfg.AvailableMicros < 2_000_000 && (cfg.Role == RoleEngineer || cfg.Role == RoleReviewer) {
-		lean = true
+	// Default to FULL_ARENA
+	return &Arena{
+		Type:   FULL_ARENA,
+		micros: cfg.MicrosRequested,
+	}, nil
+}
+
+// TypeString returns a string representation of the arena type.
+func (a *Arena) TypeString() string {
+	switch a.Type {
+	case FULL_ARENA:
+		return "FULL_ARENA"
+	case LEAN_ROSTER:
+		return "LEAN_ROSTER"
+	default:
+		return "UNKNOWN"
 	}
-
-	a := &Arena{
-		roster: &Roster{
-			allocations: 0,
-			lean:        lean,
-		},
-		lean:    lean,
-		created: time.Now(),
-	}
-
-	return a, nil
-}
-
-// Allocate simulates an allocation in the arena.
-func (a *Arena) Allocate() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.roster.allocations++
-}
-
-// IsLean returns true if the arena uses lean roster allocation.
-func (a *Arena) IsLean() bool {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.roster.lean
-}
-
-// Allocations returns the number of allocations made.
-func (a *Arena) Allocations() int {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.roster.allocations
 }

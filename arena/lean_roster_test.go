@@ -4,87 +4,62 @@ import (
 	"testing"
 )
 
-func TestNewArena_LeanRoster(t *testing.T) {
-	tests := []struct {
-		name           string
-		availableMicros int64
-		role           Role
-		wantLean       bool
-		wantErr        bool
-	}{
-		{
-			name:           "Lean roster for Engineer under $2",
-			availableMicros: 1_500_000,
-			role:           RoleEngineer,
-			wantLean:       true,
-		},
-		{
-			name:           "Lean roster for Reviewer under $2",
-			availableMicros: 1_999_999,
-			role:           RoleReviewer,
-			wantLean:       true,
-		},
-		{
-			name:           "No lean roster for Engineer at $2",
-			availableMicros: 2_000_000,
-			role:           RoleEngineer,
-			wantLean:       false,
-		},
-		{
-			name:           "No lean roster for Other role under $2",
-			availableMicros: 1_000_000,
-			role:           RoleOther,
-			wantLean:       false,
-		},
-		{
-			name:           "Error when monthly envelope exceeds $8",
-			availableMicros: 1_000_000,
-			role:           RoleEngineer,
-			wantErr:        true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := Config{
-				AvailableMicros: tt.availableMicros,
-				Role:           tt.role,
-				MonthlyEnvelope: 8_000_000,
-			}
-			if tt.wantErr {
-				cfg.MonthlyEnvelope = 9_000_000
-			}
-			a, err := NewArena(cfg)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("NewArena() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if err != nil {
-				return
-			}
-			if got := a.IsLean(); got != tt.wantLean {
-				t.Errorf("IsLean() = %v, want %v", got, tt.wantLean)
-			}
-		})
-	}
-}
-
-func TestArena_AllocateAndAllocations(t *testing.T) {
-	cfg := Config{
-		AvailableMicros: 1_000_000,
-		Role:           RoleEngineer,
-		MonthlyEnvelope: 8_000_000,
+func TestNewArena_LeanRosterUnderBudget(t *testing.T) {
+	cfg := ArenaConfig{
+		BudgetEnvelope:      8.0,
+		MicrosRequested:     3, // 3 * 0.5 = $1.5 < $2
+		EngineerReviewerOnly: true,
 	}
 	a, err := NewArena(cfg)
 	if err != nil {
-		t.Fatalf("NewArena() error = %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !a.IsLean() {
-		t.Errorf("Expected lean roster but got non-lean")
+	if a.Type != LEAN_ROSTER {
+		t.Errorf("expected LEAN_ROSTER, got %v", a.TypeString())
 	}
-	for i := 0; i < 5; i++ {
-		a.Allocate()
+	if a.micros != 3 {
+		t.Errorf("expected 3 micros, got %d", a.micros)
 	}
-	if got := a.Allocations(); got != 5 {
-		t.Errorf("Allocations() = %d, want 5", got)
+}
+
+func TestNewArena_LeanRosterOverBudget(t *testing.T) {
+	cfg := ArenaConfig{
+		BudgetEnvelope:      1.0,
+		MicrosRequested:     3, // cost $1.5 > budget $1.0
+		EngineerReviewerOnly: true,
+	}
+	_, err := NewArena(cfg)
+	if err != ErrBudgetExceeded {
+		t.Errorf("expected ErrBudgetExceeded, got %v", err)
+	}
+}
+
+func TestNewArena_FullArenaUnderBudget(t *testing.T) {
+	cfg := ArenaConfig{
+		BudgetEnvelope:      8.0,
+		MicrosRequested:     10, // cost $5.0 < $8.0
+		EngineerReviewerOnly: false,
+	}
+	a, err := NewArena(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.Type != FULL_ARENA {
+		t.Errorf("expected FULL_ARENA, got %v", a.TypeString())
+	}
+	if a.micros != 10 {
+		t.Errorf("expected 10 micros, got %d", a.micros)
+	}
+}
+
+func TestNewArena_FullArenaOverBudget(t *testing.T) {
+	cfg := ArenaConfig{
+		BudgetEnvelope:      4.0,
+		MicrosRequested:     10, // cost $5.0 > budget $4.0
+		EngineerReviewerOnly: false,
+	}
+	_, err := NewArena(cfg)
+	if err != ErrBudgetExceeded {
+		t.Errorf("expected ErrBudgetExceeded, got %v", err)
 	}
 }
