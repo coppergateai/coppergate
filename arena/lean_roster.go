@@ -1,13 +1,13 @@
 // Package arena provides memory arena allocation with lean roster support.
 //
-// AG-012: Introduce lean roster allocation mode to reduce memory usage under tight budget.
-// When availableMicros budget is under $2 and role is Engineer or Reviewer only,
-// the arena avoids spawning FULL_ARENA and uses a lean roster allocation.
+// AG-012: Introduce lean roster allocation mode for low-budget micros under $2 monthly.
+// This mode restricts allocation to Engineer+reviewer roles only and disables FULL_ARENA spawn
+// under tight budget constraints.
 //
-// This reduces memory footprint and matches architecture acceptance criteria.
+// This helps reduce memory footprint and cost while matching architecture acceptance criteria.
 //
 // Usage:
-//   arena := NewArena(config)
+//   arena := NewArena(LeanRosterMode, budgetCents)
 //   ptr := arena.Alloc(size)
 //   ...
 package arena
@@ -15,91 +15,85 @@ package arena
 import (
 	"errors"
 	"sync"
-	"time"
 )
 
-// Role represents user role for budget and allocation decisions.
+// Role represents user roles allowed to allocate in lean roster mode.
 type Role int
 
 const (
 	RoleUnknown Role = iota
 	RoleEngineer
 	RoleReviewer
-	RoleOther
+	RoleFullArenaSpawn // disallowed under lean roster mode
 )
 
-// Config holds arena configuration parameters.
-type Config struct {
-	AvailableMicros int64 // Available microseconds budget per month
-	Role           Role  // User role
-	MonthlyEnvelope int64 // Monthly budget envelope in dollars (cents)
-}
+// ArenaMode defines the allocation mode of the arena.
+type ArenaMode int
 
-// Arena represents a memory arena with lean roster capabilities.
+const (
+	FullArenaMode ArenaMode = iota
+	LeanRosterMode
+)
+
+// ErrBudgetExceeded is returned when allocation is disallowed due to budget constraints.
+var ErrBudgetExceeded = errors.New("allocation disallowed: budget exceeded or role restricted")
+
+// Arena represents a memory arena with lean roster support.
 type Arena struct {
-	mu       sync.Mutex
-	leanMode bool
-	allocs   [][]byte
+	mode       ArenaMode
+	budgetCents int
+	role       Role
+
+	mu      sync.Mutex
+	allocs  [][]byte
+	used    int
+	maxSize int
 }
 
-// NewArena creates a new Arena instance based on config and budget constraints.
-func NewArena(cfg Config) (*Arena, error) {
-	if cfg.AvailableMicros <= 0 {
-		return nil, errors.New("availableMicros must be positive")
-	}
-	if cfg.MonthlyEnvelope <= 0 {
-		return nil, errors.New("monthlyEnvelope must be positive")
-	}
-
-	leanMode := false
-	// AG-012: Enable lean roster if availableMicros under $2 and role is Engineer or Reviewer only
-	if cfg.AvailableMicros < 2_000_000 && // $2 in micros (assuming 1 micro = 1 cent for example)
-		(cfg.Role == RoleEngineer || cfg.Role == RoleReviewer) &&
-		cfg.MonthlyEnvelope <= 800 { // $8 monthly envelope in cents
-		leanMode = true
-	}
-
+// NewArena creates a new Arena with the given mode, budget (in cents), and user role.
+// LeanRosterMode restricts allocation to Engineer and Reviewer roles only and disables
+// FULL_ARENA spawn under tight budget (< $2).
+func NewArena(mode ArenaMode, budgetCents int, role Role) *Arena {
 	return &Arena{
-		leanMode: leanMode,
-		allocs:   make([][]byte, 0, 16),
-	}, nil
+		mode:       mode,
+		budgetCents: budgetCents,
+		role:       role,
+		maxSize:    1024 * 1024, // 1MB max for lean roster to keep memory tight
+	}
 }
 
 // Alloc allocates a byte slice of the given size from the arena.
-// In lean mode, allocations are smaller and no FULL_ARENA spawn occurs.
-func (a *Arena) Alloc(size int) []byte {
+// Returns ErrBudgetExceeded if allocation is disallowed under lean roster constraints.
+func (a *Arena) Alloc(size int) ([]byte, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if a.leanMode {
-		// Lean mode: allocate exact size slices, no pre-allocated big blocks
-		b := make([]byte, size)
-		a.allocs = append(a.allocs, b)
-		return b
+	if a.mode == LeanRosterMode {
+		// Enforce budget limit under $2 (200 cents)
+		if a.budgetCents > 200 {
+			// Budget too high for lean roster mode, disallow FULL_ARENA spawn
+			return nil, ErrBudgetExceeded
+		}
+		// Only Engineer and Reviewer roles allowed
+		if a.role != RoleEngineer && a.role != RoleReviewer {
+			return nil, ErrBudgetExceeded
+		}
+		// Enforce max size limit
+		if a.used+size > a.maxSize {
+			return nil, ErrBudgetExceeded
+		}
 	}
 
-	// Normal mode: allocate from a pre-allocated block (simulate FULL_ARENA)
-	if len(a.allocs) == 0 || len(a.allocs[len(a.allocs)-1]) < size {
-		// Allocate a new big block (simulate FULL_ARENA)
-		block := make([]byte, 1024*1024) // 1MB block
-		a.allocs = append(a.allocs, block)
-	}
-	// Return a slice from the last block (simplified)
-	block := a.allocs[len(a.allocs)-1]
-	if len(block) < size {
-		// Should not happen, but fallback
-		b := make([]byte, size)
-		a.allocs = append(a.allocs, b)
-		return b
-	}
-	b := block[:size]
-	a.allocs[len(a.allocs)-1] = block[size:]
-	return b
+	// Allocate memory slice
+	buf := make([]byte, size)
+	a.allocs = append(a.allocs, buf)
+	a.used += size
+	return buf, nil
 }
 
-// IsLean returns true if the arena is in lean roster mode.
-func (a *Arena) IsLean() bool {
+// Used returns the total bytes allocated so far.
+func (a *Arena) Used() int {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.leanMode
+	return a.used
 }
