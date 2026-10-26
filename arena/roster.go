@@ -5,112 +5,64 @@ import (
 	"sync"
 )
 
-// Roster manages a set of micros (lightweight workers) under a budget constraint.
-// It supports a lean mode that restricts micros to Engineer+Reviewer roles only,
-// disallowing FULL_ARENA spawn under tight budget conditions.
-type Roster struct {
-	mu          sync.Mutex
-	micros      map[string]*Micro
-	budgetCents int // monthly budget in cents
-	spentCents  int
-	leanMode    bool
-}
-
-// MicroRole defines the role of a micro.
-type MicroRole int
+// RosterType defines the type of roster to spawn.
+type RosterType int
 
 const (
-	RoleEngineer MicroRole = iota
-	RoleReviewer
-	RoleFullArena
+	// FullArena spawns the full arena roster.
+	FullArena RosterType = iota
+	// LeanRoster spawns a lean roster with only essential micros.
+	LeanRoster
 )
 
-func (r MicroRole) String() string {
-	switch r {
-	case RoleEngineer:
-		return "Engineer"
-	case RoleReviewer:
-		return "Reviewer"
-	case RoleFullArena:
-		return "FullArena"
-	default:
-		return "Unknown"
-	}
-}
-
-// Micro represents a lightweight worker with a role and cost.
+// Micro represents a microservice or micro unit in the arena.
 type Micro struct {
-	ID   string
-	Role MicroRole
-	Cost int // cost in cents per month
+	Name     string
+	Cost     float64
+	Role     string // e.g. "Engineer", "Reviewer", "Other"
+	FullSpawn bool  // true if this micro requires full arena spawn
 }
 
-// NewRoster creates a new Roster with a given monthly budget in cents.
-func NewRoster(budgetCents int) *Roster {
-	return &Roster{
-		micros:      make(map[string]*Micro),
-		budgetCents: budgetCents,
-		leanMode:    false,
-	}
+// Config holds configuration for roster spawning.
+type Config struct {
+	BudgetMonthly float64
+	AllowedRoles  map[string]bool
+	MaxMicroCost  float64
 }
 
-// EnableLeanMode enables lean mode if the budget is tight (<= $8).
-// Lean mode restricts micros to Engineer+Reviewer roles only and disallows FULL_ARENA spawn.
-func (r *Roster) EnableLeanMode() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.budgetCents <= 800 {
-		r.leanMode = true
-	}
+// Roster holds the spawned micros.
+type Roster struct {
+	Micros []Micro
+	mu     sync.Mutex
 }
 
-// AddMicro attempts to add a micro to the roster.
-// Returns error if adding the micro violates lean mode or budget constraints.
-func (r *Roster) AddMicro(m *Micro) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.leanMode && m.Role == RoleFullArena {
-		return errors.New("FULL_ARENA spawn disallowed under lean mode")
+// SpawnRoster spawns a roster based on the config and budget.
+// It returns a lean roster if budget is tight and micros are under cost threshold,
+// only including Engineer and Reviewer roles, and excludes full arena spawn micros.
+func SpawnRoster(availableMicros []Micro, cfg Config) (Roster, RosterType, error) {
+	if cfg.BudgetMonthly < 0 {
+		return Roster{}, FullArena, errors.New("invalid budget")
 	}
 
-	if m.Cost > 200 {
-		return errors.New("micro cost exceeds $2 limit")
+	// Determine if lean roster conditions are met:
+	// - Budget <= $8 monthly envelope (tight budget)
+	// - Micros cost under $2 each
+	// - Only Engineer and Reviewer roles allowed
+	// - No full arena spawn micros included
+	if cfg.BudgetMonthly <= 8 {
+		leanMicros := []Micro{}
+		for _, m := range availableMicros {
+			if m.Cost <= cfg.MaxMicroCost &&
+				cfg.AllowedRoles[m.Role] &&
+				!m.FullSpawn {
+				leanMicros = append(leanMicros, m)
+			}
+		}
+		if len(leanMicros) > 0 {
+			return Roster{Micros: leanMicros}, LeanRoster, nil
+		}
 	}
 
-	if r.spentCents+m.Cost > r.budgetCents {
-		return errors.New("budget exceeded")
-	}
-
-	r.micros[m.ID] = m
-	r.spentCents += m.Cost
-	return nil
-}
-
-// RemoveMicro removes a micro by ID from the roster.
-func (r *Roster) RemoveMicro(id string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if m, ok := r.micros[id]; ok {
-		r.spentCents -= m.Cost
-		delete(r.micros, id)
-	}
-}
-
-// Micros returns a copy of the current micros.
-func (r *Roster) Micros() []*Micro {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	result := make([]*Micro, 0, len(r.micros))
-	for _, m := range r.micros {
-		result = append(result, m)
-	}
-	return result
-}
-
-// IsLeanMode returns whether lean mode is enabled.
-func (r *Roster) IsLeanMode() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.leanMode
+	// Otherwise spawn full arena roster
+	return Roster{Micros: availableMicros}, FullArena, nil
 }
