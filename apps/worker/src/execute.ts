@@ -788,7 +788,10 @@ export async function executeClaimedRun(
     }
 
     await markRunValidating(db, { runId: run.id, workerId });
-    await renewRunLease(db, run.id, workerId, leaseMs);
+    // go test ./... on kprompt can exceed the default 30s lease; pin a long lease
+    // for the whole stack-validation window (heartbeat still renews below).
+    const validationLeaseMs = Math.max(leaseMs, 12 * 60_000);
+    await renewRunLease(db, run.id, workerId, validationLeaseMs);
 
     // Stack lint/test must run before sandbox destroy (git clone workdir).
     // PR review tasks do not produce code patches — use fake validation gate.
@@ -808,8 +811,12 @@ export async function executeClaimedRun(
       forceFake: forceFakeValidation,
       exec:
         sandbox && sandboxManager
-          ? (command, options) =>
-              sandboxManager.exec(sandbox!, command, options)
+          ? async (command, options) => {
+              await renewRunLease(db, run.id, workerId, validationLeaseMs).catch(
+                () => undefined,
+              );
+              return sandboxManager.exec(sandbox!, command, options);
+            }
           : undefined,
     });
   } finally {
@@ -1416,10 +1423,14 @@ export async function executeClaimedRun(
       payload: { message: `Delivery failed: ${message.slice(0, 400)}` },
     }).catch(() => undefined);
     try {
+      const closedPr =
+        /pull request is closed/i.test(message) ||
+        /pr is closed/i.test(message) ||
+        /\bpr closed\b/i.test(message);
       await markRunFailed(db, {
         runId: run.id,
         workerId,
-        errorCode: "delivery_error",
+        errorCode: closedPr ? "pr_closed" : "delivery_error",
         errorMessage: message.slice(0, 500),
       });
     } catch (markErr) {

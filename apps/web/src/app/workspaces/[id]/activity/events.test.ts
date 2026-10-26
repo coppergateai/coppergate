@@ -220,4 +220,48 @@ describe("activity events", () => {
     assert.match(control.summary ?? "", /pause/);
     assert.ok(groups.some((g) => g.action === "task.enqueue"));
   });
+
+  it("softens concurrency replan queue failures to waiting-on-capacity", () => {
+    const groups = groupActivityEvents([
+      evt({
+        id: "rq",
+        action: "maintainer.replan_queue_failed",
+        meta: {
+          error:
+            "community plan allows 1 concurrent run(s) per project; 1 in flight on this project — wait or pause Arena",
+        },
+      }),
+    ]);
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0]!.title, "Waiting on capacity");
+    assert.equal(groups[0]!.outcome, "review");
+    assert.match(groups[0]!.summary ?? "", /already in flight/i);
+  });
+
+  it("collapses replan queue failures per project", () => {
+    const projectId = "proj-kprompt";
+    const groups = groupActivityEvents([
+      evt({
+        id: "rq1",
+        action: "maintainer.replan_queue_failed",
+        createdAt: "2026-10-25T20:16:45.000Z",
+        meta: {
+          projectId,
+          error: "community plan allows 1 concurrent run(s) per project",
+        },
+      }),
+      evt({
+        id: "rq2",
+        action: "maintainer.replan_queue_failed",
+        createdAt: "2026-10-25T20:16:40.000Z",
+        meta: {
+          projectId,
+          error: "community plan allows 1 concurrent run(s) per project",
+        },
+      }),
+    ]);
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0]!.count, 2);
+    assert.equal(groups[0]!.title, "Waiting on capacity");
+  });
 });

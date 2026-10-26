@@ -210,11 +210,7 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     summary: (m) => {
       const err = str(m, "error");
       if (!err) return "Could not enqueue the next draft task";
-      if (
-        /concurrent run/i.test(err) ||
-        /in flight on this project/i.test(err) ||
-        /community plan allows/i.test(err)
-      ) {
+      if (isConcurrencyThrottleError(err)) {
         return "Another run is already in flight — wait or pause Arena, then retry";
       }
       return err.length > 140 ? `${err.slice(0, 137)}…` : err;
@@ -725,19 +721,44 @@ function mergeAttemptTitle(meta: Record<string, unknown> | null): string {
   return "Merge attempted";
 }
 
+function isConcurrencyThrottleError(err: string): boolean {
+  return (
+    /concurrent run/i.test(err) ||
+    /in flight on this project/i.test(err) ||
+    /plan allows/i.test(err)
+  );
+}
+
+function replanQueueTitle(meta: Record<string, unknown> | null): string {
+  const err = str(meta, "error");
+  if (err && isConcurrencyThrottleError(err)) return "Waiting on capacity";
+  return "Replan queue failed";
+}
+
+function replanQueueOutcome(meta: Record<string, unknown> | null): ActivityOutcome {
+  const err = str(meta, "error");
+  if (err && isConcurrencyThrottleError(err)) return "review";
+  return "failed";
+}
+
 function annotate(event: ActivityEvent, count = 1): ActivityChildEvent {
   const isMergeAttempt = event.action === "merge.attempt";
+  const isReplanQueue = event.action === "maintainer.replan_queue_failed";
   return {
     ...event,
     title: isMergeAttempt
       ? mergeAttemptTitle(event.meta)
-      : humanTitle(event.action),
+      : isReplanQueue
+        ? replanQueueTitle(event.meta)
+        : humanTitle(event.action),
     summary: summaryFor(event.action, event.meta, count),
     technicalLabel: technicalLabel(event.action),
     category: categoryFor(event.action),
     outcome: isMergeAttempt
       ? mergeAttemptOutcome(event.meta)
-      : outcomeFor(event.action),
+      : isReplanQueue
+        ? replanQueueOutcome(event.meta)
+        : outcomeFor(event.action),
   };
 }
 
@@ -789,6 +810,12 @@ function collapseKey(event: ActivityEvent): string {
     const projectId =
       typeof event.meta?.projectId === "string" ? event.meta.projectId : "";
     return `merge.attempt|${projectId || event.targetId || "workspace"}`;
+  }
+  // Capacity-wait / replan throttle storms: one row per project.
+  if (event.action === "maintainer.replan_queue_failed") {
+    const projectId =
+      typeof event.meta?.projectId === "string" ? event.meta.projectId : "";
+    return `replan_queue_failed|${projectId || event.targetId || "workspace"}`;
   }
   const projectId =
     typeof event.meta?.projectId === "string" ? event.meta.projectId : "";

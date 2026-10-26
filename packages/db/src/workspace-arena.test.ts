@@ -177,6 +177,14 @@ describe("classifyContenderRuntime", () => {
       "idle",
     );
     assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "FAILED", errorCode: "pr_closed" }),
+        1,
+        { arenaLive: true, nowMs: now },
+      ),
+      "idle",
+    );
+    assert.equal(
       classifyContenderRuntime(runStub({ status: "FAILED" }), 1, {
         arenaLive: true,
         contenderStatus: "ELIMINATED",
