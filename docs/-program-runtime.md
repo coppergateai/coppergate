@@ -1,43 +1,44 @@
 # Program Runtime (Contracted Autonomy) Spend License
 
+This document describes the new **Program Runtime Spend License** feature introduced in P-104.
+
 ## Overview
 
-This document describes the Program Runtime (Contracted Autonomy) Spend License feature (P-104), which enables reserving and fan-out of spend licenses within the program runtime. It also introduces ID badges for authorization and the acceptance flow culminating in a Ship Receipt.
+The Program Runtime Spend License enables contracted autonomy for programs running within the Coppergate platform. This feature introduces:
 
-This feature aligns with the architecture described in [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md) and supports a lean Arena model with an $8 monthly spend envelope.
+- **Spend License on Reserve/Fan-out:** Programs can reserve a spend license to manage their runtime spend within a monthly envelope.
+- **ID Badges:** Programs receive unique ID badges to identify and authorize spend licenses.
+- **Accept → Ship Receipt Flow:** Programs can accept spend licenses and receive ship receipts as proof of authorization.
+- **Landing + Writeback:** Spend license state is landed and written back to the system to ensure consistency and auditability.
 
-## Key Concepts
+## Architecture
 
-- **Spend License Reserve/Fan-out**: Allows reserving a portion of the monthly spend envelope for contracted autonomy programs, enabling controlled fan-out of spend licenses to sub-programs or components.
-- **ID Badges**: Unique identifiers issued to contracted autonomy programs to authenticate and authorize spend license usage.
-- **Accept → Ship Receipt Flow**: Programs accept the spend license reservation and receive a Ship Receipt as confirmation and proof of license usage.
+This feature aligns with the Open IDs architecture described in [coppergate-architecture/docs/OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md).
 
 ## Usage
 
-### Reserving Spend License
+1. **Reserve a Spend License:**
 
-Programs can reserve a portion of the $8 monthly envelope by requesting a spend license. The system ensures the reservation does not exceed the available envelope.
+   Programs request a spend license reservation to fan out spend capacity.
 
-### Fan-out
+2. **Receive ID Badge:**
 
-Reserved spend licenses can be fanned out to sub-programs or components, each receiving an ID badge to track and authorize spend usage.
+   Upon reservation, programs receive an ID badge that uniquely identifies their spend license.
 
-### Acceptance and Ship Receipt
+3. **Accept Spend License:**
 
-Once a program accepts the reserved spend license, it receives a Ship Receipt. This receipt serves as a record of the transaction and can be used for auditing and verification.
+   Programs accept the spend license to activate it.
 
-## API
+4. **Ship Receipt:**
 
-### ReserveSpendLicense(amount int) (LicenseID, error)
+   After acceptance, a ship receipt is generated and returned to the program as proof.
 
-Reserves a spend license for the specified amount if available.
+5. **Landing and Writeback:**
 
-### FanOutLicense(parentLicenseID LicenseID, amount int) (ChildLicenseID, error)
+   The spend license state is landed in the system and written back to ensure the spend is accounted for.
 
-Fans out a portion of a parent license to a child license.
+## Monthly Envelope
 
-### AcceptLicense(licenseID LicenseID) (ShipReceipt, error)
-
-Accepts the license and returns a Ship Receipt.
+The spend license operates within an $8 monthly envelope, ensuring spend limits are respected.
 
 ## Example
