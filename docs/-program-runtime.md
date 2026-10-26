@@ -1,56 +1,42 @@
-# Program Runtime (Contracted Autonomy)
+# Program Runtime (Contracted Autonomy) Spend License
 
-This document describes the Program Runtime capability introduced in P-104, which enables managing spend licenses on reserve/fan-out, handling ID badges, and accepting program runtime receipts.
+This document describes the new P-104 capability for managing Program Runtime spend licenses within the Coppergate platform.
 
 ## Overview
 
-The Program Runtime feature allows contracted autonomy for programs by managing spend licenses within a monthly envelope of $8. It supports:
+P-104 introduces the ability to reserve and fan-out spend licenses for contracted autonomy programs. This includes:
 
-- Reserving and fan-out of spend licenses to control program runtime costs.
-- Issuance and management of ID badges for program identity and access.
-- Accepting runtime receipts to confirm spend and program execution.
-- Integration with the primary coppergate repo runtime environment.
+- Reserving spend licenses on program runtime.
+- Fan-out of spend licenses to sub-programs or components.
+- Issuance and management of ID badges for authorized program entities.
+- Acceptance of spend licenses leading to issuance of Ship Receipts.
+- Landing and writeback of spend license state under `/docs/-program-runtime`.
+
+This capability aligns with the architecture defined in [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md).
 
 ## Key Concepts
 
-- **Spend License**: A license representing a monetary spend allocation reserved for program runtime.
-- **Reserve/Fan-out**: Mechanism to allocate spend licenses to subprograms or runtime instances.
-- **ID Badges**: Digital badges issued to programs for identity and authorization.
-- **Accept → Ship Receipt**: Process of accepting runtime spend and shipping a receipt for audit and tracking.
+- **Spend License Reserve/Fan-out**: Programs can reserve a portion of their monthly spend envelope (default $8) and fan it out to sub-programs or components.
+- **ID Badges**: Unique identifiers issued to program entities authorized to spend licenses.
+- **Accept → Ship Receipt**: Upon acceptance of a spend license, a Ship Receipt is generated to confirm the transaction.
+- **Landing + Writeback**: Spend license state is landed under `/docs/-program-runtime` and updated accordingly.
 
 ## Usage
 
 ### Reserving Spend License
 
-Programs can reserve spend licenses up to the monthly envelope limit ($8). This reservation ensures that runtime costs are controlled and accounted.
+Programs can reserve spend licenses via the runtime API or CLI. The reserved amount is deducted from the monthly envelope.
 
-### ID Badges
+### Fan-out
 
-ID badges are issued to programs to verify identity and enable authorized runtime operations.
+Reserved licenses can be fanned out to sub-programs or components, each receiving an ID badge.
 
-### Accepting Receipts
+### Accepting Spend License
 
-Programs accept runtime receipts to confirm spend and execution. Receipts are logged and can be audited.
+Authorized entities accept spend licenses using their ID badges, triggering the issuance of a Ship Receipt.
 
-## Implementation Details
+### Viewing Spend License State
 
-- The feature is implemented in the primary coppergate repository.
-- It follows the architecture Open IDs as specified in `coppergate-architecture/docs/OPEN_PROGRAM.md`.
-- The runtime environment uses a lean Arena for memory and resource management.
-- The monthly envelope is capped at $8 to control spend.
+The current state of spend licenses can be viewed under `/docs/-program-runtime`.
 
-## Testing
-
-Automated tests cover:
-
-- Spend license reservation and fan-out logic.
-- ID badge issuance and validation.
-- Receipt acceptance and logging.
-
-## Changelog
-
-- Added P-104 Program Runtime capability with spend license management, ID badges, and receipt acceptance.
-
----
-
-For detailed API and usage examples, refer to the code documentation and tests in the primary coppergate repo.
+## Example
