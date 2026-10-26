@@ -3,11 +3,7 @@
 ## [Unreleased]
 
 ### Added
-
-- AG-012: Implemented Lean Roster capability in arena package.
-  - Supports micros with roles Engineer and Reviewer only.
-  - Enforces per-micro cost limit of $2.
-  - Enforces monthly budget envelope of $8.
-  - Prevents spawning FULL_ARENA micros under tight budget.
-  - Includes thread-safe management and validation.
-  - Covered by unit tests.
+- AG-012: Implement lean roster spawning capability with micros under $2 for Engineer and Reviewer roles only.
+- Enforced no full arena spawn under tight budget (< $8 monthly).
+- Added `arena.SpawnRoster` function with budget and role constraints.
+- Added tests covering role authorization, budget constraints, and roster type selection.

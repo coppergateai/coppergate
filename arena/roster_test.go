@@ -4,87 +4,94 @@ import (
 	"testing"
 )
 
-func TestSpawnRoster_FullArenaAllowed(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetCents: 800, // $8
-		AvailableMicros:    10,
-		EngineerCount:      2,
-		ReviewerCount:      2,
+func TestSpawnRoster_EngineerLeanRosterUnderBudget(t *testing.T) {
+	cfg := RosterConfig{
+		BudgetDollars: 5.00,
+		Role:          "Engineer",
+		AllowFullArena: false,
 	}
-	r, err := SpawnRoster(cfg)
+	roster, err := SpawnRoster(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if r.Type != FullArena {
-		t.Errorf("expected FullArena roster, got %v", r.Type)
+	if roster.Type != LeanRoster {
+		t.Errorf("expected lean roster, got %v", roster.Type)
 	}
-	if r.Engineers != 2 || r.Reviewers != 2 {
-		t.Errorf("unexpected engineer/reviewer count: %d/%d", r.Engineers, r.Reviewers)
+	if roster.TotalCost > cfg.BudgetDollars {
+		t.Errorf("roster cost %v exceeds budget %v", roster.TotalCost, cfg.BudgetDollars)
+	}
+	for _, m := range roster.Micros {
+		if m.Cost >= 2.00 {
+			t.Errorf("micro %s cost %v exceeds $2 limit for lean roster", m.Name, m.Cost)
+		}
 	}
 }
 
-func TestSpawnRoster_LeanRosterUnderBudget(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetCents: 400, // $4, less than full arena $8
-		AvailableMicros:    1,   // 1 micro under $2
-		EngineerCount:      1,
-		ReviewerCount:      1,
+func TestSpawnRoster_ReviewerLeanRosterUnderBudget(t *testing.T) {
+	cfg := RosterConfig{
+		BudgetDollars: 7.00,
+		Role:          "Reviewer",
+		AllowFullArena: false,
 	}
-	r, err := SpawnRoster(cfg)
+	roster, err := SpawnRoster(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if r.Type != LeanRoster {
-		t.Errorf("expected LeanRoster, got %v", r.Type)
-	}
-	if r.SpawnedMicros != 1 {
-		t.Errorf("expected 1 micro spawned, got %d", r.SpawnedMicros)
+	if roster.Type != LeanRoster {
+		t.Errorf("expected lean roster, got %v", roster.Type)
 	}
 }
 
-func TestSpawnRoster_LeanRosterBudgetTooLow(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetCents: 100, // $1, less than $2 per micro
-		AvailableMicros:    1,
-		EngineerCount:      1,
-		ReviewerCount:      1,
+func TestSpawnRoster_UnauthorizedRole(t *testing.T) {
+	cfg := RosterConfig{
+		BudgetDollars: 10.00,
+		Role:          "Intern",
+		AllowFullArena: true,
 	}
 	_, err := SpawnRoster(cfg)
 	if err == nil {
-		t.Fatal("expected error due to budget too low, got nil")
+		t.Fatal("expected error for unauthorized role")
 	}
 }
 
-func TestSpawnRoster_LeanRosterInsufficientStaff(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetCents: 400,
-		AvailableMicros:    1,
-		EngineerCount:      0,
-		ReviewerCount:      1,
+func TestSpawnRoster_FullArenaAllowedAndBudgetSufficient(t *testing.T) {
+	cfg := RosterConfig{
+		BudgetDollars: 10.00,
+		Role:          "Engineer",
+		AllowFullArena: true,
 	}
-	_, err := SpawnRoster(cfg)
-	if err == nil {
-		t.Fatal("expected error due to insufficient engineer count, got nil")
-	}
-}
-
-func TestRosterManager_UpdateAndGet(t *testing.T) {
-	rm := NewRosterManager()
-	cfg := Config{
-		MonthlyBudgetCents: 400,
-		AvailableMicros:    2,
-		EngineerCount:      1,
-		ReviewerCount:      1,
-	}
-	err := rm.UpdateRoster(cfg)
+	roster, err := SpawnRoster(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	r := rm.GetRoster()
-	if r == nil {
-		t.Fatal("expected roster, got nil")
+	if roster.Type != FullArena {
+		t.Errorf("expected full arena roster, got %v", roster.Type)
 	}
-	if r.Type != LeanRoster {
-		t.Errorf("expected LeanRoster, got %v", r.Type)
+}
+
+func TestSpawnRoster_FullArenaNotAllowedUnderTightBudget(t *testing.T) {
+	cfg := RosterConfig{
+		BudgetDollars: 7.00,
+		Role:          "Engineer",
+		AllowFullArena: true,
+	}
+	roster, err := SpawnRoster(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if roster.Type != LeanRoster {
+		t.Errorf("expected lean roster under tight budget, got %v", roster.Type)
+	}
+}
+
+func TestSpawnRoster_BudgetTooLow(t *testing.T) {
+	cfg := RosterConfig{
+		BudgetDollars: 1.00,
+		Role:          "Engineer",
+		AllowFullArena: false,
+	}
+	_, err := SpawnRoster(cfg)
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
 	}
 }
