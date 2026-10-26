@@ -4,149 +4,107 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 )
 
-// SpendLicense represents a contracted autonomy spend license with a monthly envelope.
+// SpendLicense represents a reserved spend license within a program runtime.
 type SpendLicense struct {
-	MonthlyEnvelopeCents int64 // e.g. 800 cents = $8
-	mu                   sync.Mutex
-	ReservedCents        int64
-	ConsumedCents        int64
-	IDBadges             map[string]*IDBadge
+	ID          string  // unique license ID
+	ProgramID   string  // associated program runtime ID
+	Amount      float64 // amount reserved
+	Consumed   float64 // amount consumed/fanned out
+	BadgeID     string  // linked ID badge
+	Accepted   bool    // whether license has been accepted
+	ShipReceipt string  // receipt ID after acceptance
 }
 
-// IDBadge represents an authorization badge for spend license consumption.
-type IDBadge struct {
-	ID        string
-	IssuedAt  time.Time
-	Consumed  int64 // cents consumed under this badge
-	Revoked   bool
-	RevokedAt time.Time
+// LicenseManager manages spend licenses within the runtime.
+type LicenseManager struct {
+	mu        sync.Mutex
+	licenses  map[string]*SpendLicense
+	badgeSeq  int
+	receiptSeq int
 }
 
-// ShipReceipt confirms accepted spend license usage.
-type ShipReceipt struct {
-	BadgeID    string
-	AmountCents int64
-	Timestamp  time.Time
-}
-
-// NewSpendLicense creates a new spend license with the given monthly envelope.
-func NewSpendLicense(monthlyEnvelopeCents int64) *SpendLicense {
-	return &SpendLicense{
-		MonthlyEnvelopeCents: monthlyEnvelopeCents,
-		IDBadges:             make(map[string]*IDBadge),
+// NewLicenseManager creates a new LicenseManager.
+func NewLicenseManager() *LicenseManager {
+	return &LicenseManager{
+		licenses: make(map[string]*SpendLicense),
 	}
 }
 
-// Reserve attempts to reserve a specified amount of cents from the monthly envelope.
-// Returns an error if insufficient funds are available.
-func (sl *SpendLicense) Reserve(amountCents int64) error {
-	sl.mu.Lock()
-	defer sl.mu.Unlock()
+// ReserveLicense reserves a spend license for a program runtime.
+func (lm *LicenseManager) ReserveLicense(programID string, amount float64) (*SpendLicense, error) {
+	if amount <= 0 {
+		return nil, errors.New("amount must be positive")
+	}
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
 
-	available := sl.MonthlyEnvelopeCents - sl.ReservedCents - sl.ConsumedCents
-	if amountCents <= 0 {
-		return errors.New("reserve amount must be positive")
+	licenseID := fmt.Sprintf("lic-%s-%d", programID, len(lm.licenses)+1)
+	badgeID := fmt.Sprintf("badge-%d", lm.badgeSeq+1)
+	lm.badgeSeq++
+
+	license := &SpendLicense{
+		ID:        licenseID,
+		ProgramID: programID,
+		Amount:    amount,
+		Consumed:  0,
+		BadgeID:   badgeID,
+		Accepted:  false,
 	}
-	if amountCents > available {
-		return fmt.Errorf("insufficient funds: requested %d cents, available %d cents", amountCents, available)
+	lm.licenses[licenseID] = license
+	return license, nil
+}
+
+// FanOutLicense consumes part of the reserved license amount.
+func (lm *LicenseManager) FanOutLicense(licenseID string, amount float64) error {
+	if amount <= 0 {
+		return errors.New("fan-out amount must be positive")
 	}
-	sl.ReservedCents += amountCents
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	license, ok := lm.licenses[licenseID]
+	if !ok {
+		return errors.New("license not found")
+	}
+	if license.Accepted {
+		return errors.New("cannot fan-out accepted license")
+	}
+	if license.Consumed+amount > license.Amount {
+		return errors.New("fan-out exceeds reserved amount")
+	}
+	license.Consumed += amount
 	return nil
 }
 
-// IssueIDBadge issues a new ID badge for spend license consumption.
-func (sl *SpendLicense) IssueIDBadge(id string) (*IDBadge, error) {
-	sl.mu.Lock()
-	defer sl.mu.Unlock()
+// AcceptLicense marks the license as accepted and issues a Ship Receipt.
+func (lm *LicenseManager) AcceptLicense(licenseID string) (string, error) {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
 
-	if _, exists := sl.IDBadges[id]; exists {
-		return nil, fmt.Errorf("badge ID %s already exists", id)
+	license, ok := lm.licenses[licenseID]
+	if !ok {
+		return "", errors.New("license not found")
 	}
-	badge := &IDBadge{
-		ID:       id,
-		IssuedAt: time.Now(),
+	if license.Accepted {
+		return "", errors.New("license already accepted")
 	}
-	sl.IDBadges[id] = badge
-	return badge, nil
+	license.Accepted = true
+	lm.receiptSeq++
+	receiptID := fmt.Sprintf("receipt-%d", lm.receiptSeq)
+	license.ShipReceipt = receiptID
+	return receiptID, nil
 }
 
-// AcceptUsage accepts spend license usage for a given badge and amount.
-// Returns a ShipReceipt confirming the usage.
-func (sl *SpendLicense) AcceptUsage(badgeID string, amountCents int64) (*ShipReceipt, error) {
-	sl.mu.Lock()
-	defer sl.mu.Unlock()
+// GetLicense returns the license by ID.
+func (lm *LicenseManager) GetLicense(licenseID string) (*SpendLicense, error) {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
 
-	badge, exists := sl.IDBadges[badgeID]
-	if !exists {
-		return nil, fmt.Errorf("badge ID %s not found", badgeID)
+	license, ok := lm.licenses[licenseID]
+	if !ok {
+		return nil, errors.New("license not found")
 	}
-	if badge.Revoked {
-		return nil, fmt.Errorf("badge ID %s is revoked", badgeID)
-	}
-	if amountCents <= 0 {
-		return nil, errors.New("usage amount must be positive")
-	}
-	if amountCents > sl.ReservedCents {
-		return nil, fmt.Errorf("usage amount %d exceeds reserved %d", amountCents, sl.ReservedCents)
-	}
-
-	// Consume reserved amount
-	sl.ReservedCents -= amountCents
-	sl.ConsumedCents += amountCents
-	badge.Consumed += amountCents
-
-	receipt := &ShipReceipt{
-		BadgeID:    badgeID,
-		AmountCents: amountCents,
-		Timestamp:  time.Now(),
-	}
-	return receipt, nil
-}
-
-// RevokeBadge revokes an ID badge, preventing further usage acceptance.
-func (sl *SpendLicense) RevokeBadge(badgeID string) error {
-	sl.mu.Lock()
-	defer sl.mu.Unlock()
-
-	badge, exists := sl.IDBadges[badgeID]
-	if !exists {
-		return fmt.Errorf("badge ID %s not found", badgeID)
-	}
-	if badge.Revoked {
-		return fmt.Errorf("badge ID %s already revoked", badgeID)
-	}
-	badge.Revoked = true
-	badge.RevokedAt = time.Now()
-	return nil
-}
-
-// LandingData represents landed usage data for writeback.
-type LandingData struct {
-	BadgeID     string
-	AmountCents int64
-	Timestamp   time.Time
-}
-
-// LandUsage lands usage data and writes back to update spend license state.
-func (sl *SpendLicense) LandUsage(data LandingData) error {
-	sl.mu.Lock()
-	defer sl.mu.Unlock()
-
-	badge, exists := sl.IDBadges[data.BadgeID]
-	if !exists {
-		return fmt.Errorf("badge ID %s not found", data.BadgeID)
-	}
-	if data.AmountCents <= 0 {
-		return errors.New("landed amount must be positive")
-	}
-
-	// For simplicity, landing usage adds to consumed if not already accounted.
-	// In a real system, deduplication and idempotency would be needed.
-	badge.Consumed += data.AmountCents
-	sl.ConsumedCents += data.AmountCents
-
-	return nil
+	return license, nil
 }
