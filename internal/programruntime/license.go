@@ -2,150 +2,148 @@ package programruntime
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
 
 // Constants for spend limits
 const (
-	MonthlySpendEnvelopeCents = 800 // $8.00 in cents
+	MonthlySpendEnvelope = 8.0 // $8 monthly envelope
 )
 
-// LicenseManager manages spend licenses for program runtime.
+// LicenseManager manages spend licenses for programs.
 type LicenseManager struct {
-	mu               sync.Mutex
-	monthlySpendUsed  int // in cents
-	currentMonth     time.Month
-	currentYear      int
-	idBadgeCounter   int
-	activeLicenses   map[string]*SpendLicense
-	shipReceipts     map[string]*ShipReceipt
+	mu            sync.Mutex
+	balances      map[string]float64 // programID -> remaining license balance for current month
+	badgeRegistry map[string]*IDBadge
+	receipts      []*ShipReceipt
 }
 
-// SpendLicense represents a reserved spend license.
-type SpendLicense struct {
+// IDBadge represents an ID badge issued to a program or agent.
+type IDBadge struct {
 	ID        string
-	AmountCents int
+	ProgramID string
 	IssuedAt  time.Time
-	IDBadge   string
-	FannedOut bool
+	Valid     bool
 }
 
-// ShipReceipt represents the acceptance and confirmation of a spend license.
+// ShipReceipt represents a receipt generated upon acceptance.
 type ShipReceipt struct {
-	LicenseID string
-	AcceptedAt time.Time
+	ReceiptID string
 	BadgeID   string
+	ProgramID string
+	Amount    float64
+	Timestamp time.Time
 }
 
 // NewLicenseManager creates a new LicenseManager instance.
 func NewLicenseManager() *LicenseManager {
-	now := time.Now()
 	return &LicenseManager{
-		monthlySpendUsed: 0,
-		currentMonth:     now.Month(),
-		currentYear:      now.Year(),
-		idBadgeCounter:   0,
-		activeLicenses:   make(map[string]*SpendLicense),
-		shipReceipts:     make(map[string]*ShipReceipt),
+		balances:      make(map[string]float64),
+		badgeRegistry: make(map[string]*IDBadge),
+		receipts:      []*ShipReceipt{},
 	}
 }
 
-// ReserveSpendLicense attempts to reserve a spend license for the given amount in cents.
-// Returns the reserved license or an error if the monthly envelope is exceeded.
-func (lm *LicenseManager) ReserveSpendLicense(amountCents int) (*SpendLicense, error) {
+// ReserveLicense attempts to reserve a spend license amount for a program.
+// Returns an ID badge if successful.
+func (lm *LicenseManager) ReserveLicense(programID string, amount float64) (*IDBadge, error) {
+	if amount <= 0 {
+		return nil, errors.New("amount must be positive")
+	}
+	if amount > MonthlySpendEnvelope {
+		return nil, fmt.Errorf("amount exceeds monthly spend envelope of $%.2f", MonthlySpendEnvelope)
+	}
+
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	now := time.Now()
-	// Reset monthly spend if month changed
-	if now.Month() != lm.currentMonth || now.Year() != lm.currentYear {
-		lm.monthlySpendUsed = 0
-		lm.currentMonth = now.Month()
-		lm.currentYear = now.Year()
+	currentBalance, ok := lm.balances[programID]
+	if !ok {
+		currentBalance = MonthlySpendEnvelope
+	}
+	if amount > currentBalance {
+		return nil, fmt.Errorf("insufficient license balance: requested %.2f, available %.2f", amount, currentBalance)
 	}
 
-	if amountCents <= 0 {
+	// Deduct amount
+	lm.balances[programID] = currentBalance - amount
+
+	// Issue ID badge
+	badgeID := fmt.Sprintf("badge-%s-%d", programID, time.Now().UnixNano())
+	badge := &IDBadge{
+		ID:        badgeID,
+		ProgramID: programID,
+		IssuedAt:  time.Now(),
+		Valid:     true,
+	}
+	lm.badgeRegistry[badgeID] = badge
+
+	return badge, nil
+}
+
+// ValidateBadge checks if a badge is valid and belongs to the given program.
+func (lm *LicenseManager) ValidateBadge(badgeID, programID string) bool {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	badge, ok := lm.badgeRegistry[badgeID]
+	if !ok || !badge.Valid {
+		return false
+	}
+	return badge.ProgramID == programID
+}
+
+// AcceptLicense accepts a license usage by badge ID and generates a ship receipt.
+func (lm *LicenseManager) AcceptLicense(badgeID string, amount float64) (*ShipReceipt, error) {
+	if amount <= 0 {
 		return nil, errors.New("amount must be positive")
 	}
 
-	if lm.monthlySpendUsed+amountCents > MonthlySpendEnvelopeCents {
-		return nil, errors.New("monthly spend envelope exceeded")
-	}
-
-	lm.monthlySpendUsed += amountCents
-	lm.idBadgeCounter++
-	licenseID := generateLicenseID(lm.idBadgeCounter)
-	idBadge := generateIDBadge(lm.idBadgeCounter)
-
-	license := &SpendLicense{
-		ID:         licenseID,
-		AmountCents: amountCents,
-		IssuedAt:   now,
-		IDBadge:    idBadge,
-		FannedOut:  false,
-	}
-	lm.activeLicenses[licenseID] = license
-	return license, nil
-}
-
-// FanOutLicense marks the license as fanned out (distributed).
-func (lm *LicenseManager) FanOutLicense(licenseID string) error {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	license, ok := lm.activeLicenses[licenseID]
-	if !ok {
-		return errors.New("license not found")
-	}
-	if license.FannedOut {
-		return errors.New("license already fanned out")
-	}
-	license.FannedOut = true
-	return nil
-}
-
-// AcceptLicense accepts a license and generates a ShipReceipt.
-func (lm *LicenseManager) AcceptLicense(licenseID string, badgeID string) (*ShipReceipt, error) {
-	lm.mu.Lock()
-	defer lm.mu.Unlock()
-
-	license, ok := lm.activeLicenses[licenseID]
-	if !ok {
-		return nil, errors.New("license not found")
-	}
-	if license.IDBadge != badgeID {
-		return nil, errors.New("invalid badge ID for license")
+	badge, ok := lm.badgeRegistry[badgeID]
+	if !ok || !badge.Valid {
+		return nil, errors.New("invalid or expired badge")
 	}
 
+	// Generate ship receipt
+	receiptID := fmt.Sprintf("receipt-%s-%d", badgeID, time.Now().UnixNano())
 	receipt := &ShipReceipt{
-		LicenseID: licenseID,
-		AcceptedAt: time.Now(),
+		ReceiptID: receiptID,
 		BadgeID:   badgeID,
+		ProgramID: badge.ProgramID,
+		Amount:    amount,
+		Timestamp: time.Now(),
 	}
-	lm.shipReceipts[licenseID] = receipt
+	lm.receipts = append(lm.receipts, receipt)
+
+	// Invalidate badge after acceptance
+	badge.Valid = false
+
 	return receipt, nil
 }
 
-// generateLicenseID generates a unique license ID based on a counter.
-func generateLicenseID(counter int) string {
-	return "LIC-" + itoa(counter)
+// GetBalance returns the remaining license balance for a program.
+func (lm *LicenseManager) GetBalance(programID string) float64 {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	balance, ok := lm.balances[programID]
+	if !ok {
+		return MonthlySpendEnvelope
+	}
+	return balance
 }
 
-// generateIDBadge generates a unique ID badge string based on a counter.
-func generateIDBadge(counter int) string {
-	return "BADGE-" + itoa(counter)
-}
+// GetReceipts returns all ship receipts.
+func (lm *LicenseManager) GetReceipts() []*ShipReceipt {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
 
-// itoa converts int to string without importing strconv for simplicity.
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	var s []byte
-	for i > 0 {
-		s = append([]byte{byte('0' + i%10)}, s...)
-		i /= 10
-	}
-	return string(s)
+	copies := make([]*ShipReceipt, len(lm.receipts))
+	copy(copies, lm.receipts)
+	return copies
 }
