@@ -2,8 +2,8 @@
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  max-width: 78rem;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: 1.35rem 1.35rem 3rem;
   overflow-x: clip;
   container-type: inline-size;
@@ -726,7 +726,7 @@ a.timelineBody:hover {
   padding: 0.75rem 0.8rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--ink-soft);
+  background: var(--surface);
   text-decoration: none;
   color: inherit;
   transition: border-color 150ms ease, background 150ms ease;

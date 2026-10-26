@@ -388,6 +388,7 @@
 
 .sectionLede {
   margin: 0 0 1rem;
+  max-width: 42rem;
   color: var(--mute);
   font-size: 0.9rem;
   line-height: 1.5;
@@ -1178,17 +1179,31 @@ html[data-theme="light"] .legendFree {
 .evidenceSummary {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 1.15rem;
-  margin: 0.15rem 0 0.35rem;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0.55rem;
   color: var(--mute);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+}
+
+.evidenceSummary > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--mute-strong, var(--mute));
 }
 
 .evidenceSummary strong {
   color: var(--paper);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
 }
 
 .evidenceList {

@@ -243,6 +243,8 @@
 }
 
 .lanes {
+  width: 100%;
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;

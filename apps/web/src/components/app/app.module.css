@@ -251,7 +251,7 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.34rem 0.5rem 0.34rem 0.55rem;
+  padding: 0.34rem 0.5rem 0.34rem 0.85rem;
   border-radius: 6px;
   color: var(--mute);
   font-size: 0.82rem;
@@ -270,7 +270,6 @@
 .navItemActive {
   background: var(--overlay-strong);
   color: var(--paper);
-  padding-left: 0.85rem;
 }
 
 .navItemActive::before {
