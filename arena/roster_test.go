@@ -4,93 +4,100 @@ import (
 	"testing"
 )
 
-func TestLeanRosterModeActivation(t *testing.T) {
+func TestSpawnRoster_FullArenaAllowed(t *testing.T) {
+	micros := []Micro{
+		{Name: "micro1", Cost: 3.0, Role: "Engineer"},
+		{Name: "micro2", Cost: 1.5, Role: "Reviewer"},
+		{Name: "micro3", Cost: 2.5, Role: "Other"},
+	}
 	cfg := RosterConfig{
-		AvailableMicros: 1500, // under 2ms
-		MonthlyEnvelope: 800,  // $8 in cents
+		Budget:         10,
+		AvailableMicros: micros,
+		AllowFullArena: true,
 	}
-	r := NewRoster(cfg)
-
-	if !r.leanRosterMode {
-		t.Fatal("expected leanRosterMode to be true under budget constraints")
+	roster, err := SpawnRoster(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// Engineer spawn allowed
-	if err := r.SpawnRole(RoleEngineer); err != nil {
-		t.Fatalf("expected Engineer spawn allowed, got error: %v", err)
+	if roster.Type != FullArena {
+		t.Errorf("expected FullArena roster, got %v", roster.Type)
 	}
-
-	// Reviewer spawn allowed
-	if err := r.SpawnRole(RoleReviewer); err != nil {
-		t.Fatalf("expected Reviewer spawn allowed, got error: %v", err)
-	}
-
-	// FullArena spawn disallowed
-	if err := r.SpawnRole(RoleFullArena); err != ErrSpawnNotAllowed {
-		t.Fatalf("expected FullArena spawn disallowed, got error: %v", err)
+	if len(roster.Micros) != len(micros) {
+		t.Errorf("expected %d micros, got %d", len(micros), len(roster.Micros))
 	}
 }
 
-func TestNormalRosterModeAllowsFullArena(t *testing.T) {
+func TestSpawnRoster_LeanRosterUnderBudget(t *testing.T) {
+	micros := []Micro{
+		{Name: "micro1", Cost: 1.9, Role: "Engineer"},
+		{Name: "micro2", Cost: 1.5, Role: "Reviewer"},
+		{Name: "micro3", Cost: 2.5, Role: "Engineer"},
+		{Name: "micro4", Cost: 1.0, Role: "Other"},
+	}
 	cfg := RosterConfig{
-		AvailableMicros: 5000, // over 2ms
-		MonthlyEnvelope: 1000, // $10 in cents
+		Budget:         5,
+		AvailableMicros: micros,
+		AllowFullArena: false,
 	}
-	r := NewRoster(cfg)
-
-	if r.leanRosterMode {
-		t.Fatal("expected leanRosterMode to be false with relaxed budget")
+	roster, err := SpawnRoster(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// FullArena spawn allowed
-	if err := r.SpawnRole(RoleFullArena); err != nil {
-		t.Fatalf("expected FullArena spawn allowed, got error: %v", err)
+	if roster.Type != LeanRoster {
+		t.Errorf("expected LeanRoster, got %v", roster.Type)
+	}
+	// Expect only micro1 and micro2 included (under $2 and role Engineer or Reviewer)
+	expectedNames := map[string]bool{"micro1": true, "micro2": true}
+	if len(roster.Micros) != 2 {
+		t.Errorf("expected 2 micros, got %d", len(roster.Micros))
+	}
+	for _, m := range roster.Micros {
+		if !expectedNames[m.Name] {
+			t.Errorf("unexpected micro %s in lean roster", m.Name)
+		}
 	}
 }
 
-func TestUpdateConfigChangesLeanRosterMode(t *testing.T) {
+func TestSpawnRoster_NoSuitableLeanMicros(t *testing.T) {
+	micros := []Micro{
+		{Name: "micro1", Cost: 2.5, Role: "Engineer"},
+		{Name: "micro2", Cost: 3.0, Role: "Reviewer"},
+		{Name: "micro3", Cost: 1.0, Role: "Other"},
+	}
 	cfg := RosterConfig{
-		AvailableMicros: 5000,
-		MonthlyEnvelope: 1000,
+		Budget:         5,
+		AvailableMicros: micros,
+		AllowFullArena: false,
 	}
-	r := NewRoster(cfg)
-	if r.leanRosterMode {
-		t.Fatal("expected leanRosterMode false initially")
-	}
-
-	// Update to tight budget triggers lean roster
-	r.UpdateConfig(RosterConfig{
-		AvailableMicros: 1000,
-		MonthlyEnvelope: 800,
-	})
-	if !r.leanRosterMode {
-		t.Fatal("expected leanRosterMode true after update")
-	}
-
-	// FullArena spawn disallowed now
-	if err := r.SpawnRole(RoleFullArena); err != ErrSpawnNotAllowed {
-		t.Fatalf("expected FullArena spawn disallowed after update, got error: %v", err)
+	_, err := SpawnRoster(cfg)
+	if err == nil {
+		t.Fatalf("expected error due to no suitable lean micros")
 	}
 }
 
-func TestActiveRoles(t *testing.T) {
+func TestSpawnRoster_InvalidBudget(t *testing.T) {
+	micros := []Micro{
+		{Name: "micro1", Cost: 1.0, Role: "Engineer"},
+	}
 	cfg := RosterConfig{
-		AvailableMicros: 1500,
-		MonthlyEnvelope: 800,
+		Budget:         0,
+		AvailableMicros: micros,
+		AllowFullArena: false,
 	}
-	r := NewRoster(cfg)
-
-	r.SpawnRole(RoleEngineer)
-	r.SpawnRole(RoleReviewer)
-
-	roles := r.ActiveRoles()
-	if len(roles) != 2 {
-		t.Fatalf("expected 2 active roles, got %d", len(roles))
+	_, err := SpawnRoster(cfg)
+	if err == nil {
+		t.Fatalf("expected error due to zero budget")
 	}
+}
 
-	r.DespawnRole(RoleEngineer)
-	roles = r.ActiveRoles()
-	if len(roles) != 1 {
-		t.Fatalf("expected 1 active role after despawn, got %d", len(roles))
+func TestSpawnRoster_NoAvailableMicros(t *testing.T) {
+	cfg := RosterConfig{
+		Budget:         10,
+		AvailableMicros: []Micro{},
+		AllowFullArena: true,
+	}
+	_, err := SpawnRoster(cfg)
+	if err == nil {
+		t.Fatalf("expected error due to no available micros")
 	}
 }
