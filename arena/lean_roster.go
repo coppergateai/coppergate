@@ -5,101 +5,69 @@ import (
 	"sync"
 )
 
-// LeanRoster manages a minimal set of micros under a tight budget.
-// It only allows Engineer and Reviewer roles, and enforces a $2 per micro cost limit.
-// It avoids spawning FULL_ARENA micros under the $8 monthly envelope.
+// LeanRoster is a memory-lean roster implementation designed to operate under tight budget constraints.
+// It supports only Engineer and Reviewer roles, and does not spawn a full arena.
+// It is optimized for environments where micros (CPU time) budget is under $2 monthly.
+//
+// Usage:
+//   roster := NewLeanRoster()
+//   roster.Add("user1", RoleEngineer)
+//   roster.Add("user2", RoleReviewer)
+//   roster.Remove("user1")
+//   roles := roster.List()
+//
+// This roster is thread-safe.
 type LeanRoster struct {
-	mu     sync.Mutex
-	micros map[string]*Micro
-	budget float64 // monthly budget envelope, e.g. $8
-	spent  float64
+	mu    sync.RWMutex
+	users map[string]Role
 }
 
-// Micro represents a minimal microservice instance with role and cost.
-type Micro struct {
-	ID   string
-	Role Role
-	Cost float64
-}
-
-// Role defines the micro role type.
-type Role string
+// Role defines user roles supported by LeanRoster.
+type Role int
 
 const (
-	RoleEngineer Role = "Engineer"
-	RoleReviewer Role = "Reviewer"
-	RoleFullArena Role = "FULL_ARENA"
+	RoleUnknown Role = iota
+	RoleEngineer
+	RoleReviewer
 )
 
-var (
-	ErrRoleNotAllowed    = errors.New("role not allowed in lean roster")
-	ErrCostExceedsLimit  = errors.New("micro cost exceeds $2 limit")
-	ErrBudgetExceeded    = errors.New("monthly budget exceeded")
-	ErrMicroExists       = errors.New("micro with given ID already exists")
-	ErrMicroNotFound     = errors.New("micro not found")
-)
+// ErrRoleNotSupported is returned when an unsupported role is used.
+var ErrRoleNotSupported = errors.New("role not supported in lean roster")
 
-// NewLeanRoster creates a new LeanRoster with the given monthly budget envelope.
-func NewLeanRoster(monthlyBudget float64) *LeanRoster {
+// NewLeanRoster creates a new LeanRoster instance.
+func NewLeanRoster() *LeanRoster {
 	return &LeanRoster{
-		micros: make(map[string]*Micro),
-		budget: monthlyBudget,
+		users: make(map[string]Role),
 	}
 }
 
-// AddMicro attempts to add a micro to the lean roster.
-// Returns error if role or cost constraints are violated or budget exceeded.
-func (lr *LeanRoster) AddMicro(m *Micro) error {
-	lr.mu.Lock()
-	defer lr.mu.Unlock()
-
-	if m.Role != RoleEngineer && m.Role != RoleReviewer {
-		return ErrRoleNotAllowed
+// Add adds a user with a given role to the roster.
+// Only RoleEngineer and RoleReviewer are supported.
+// Returns ErrRoleNotSupported if role is not allowed.
+func (r *LeanRoster) Add(userID string, role Role) error {
+	if role != RoleEngineer && role != RoleReviewer {
+		return ErrRoleNotSupported
 	}
-	if m.Cost > 2.0 {
-		return ErrCostExceedsLimit
-	}
-	if _, exists := lr.micros[m.ID]; exists {
-		return ErrMicroExists
-	}
-	if lr.spent+m.Cost > lr.budget {
-		return ErrBudgetExceeded
-	}
-
-	lr.micros[m.ID] = m
-	lr.spent += m.Cost
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.users[userID] = role
 	return nil
 }
 
-// RemoveMicro removes a micro by ID and refunds its cost.
-func (lr *LeanRoster) RemoveMicro(id string) error {
-	lr.mu.Lock()
-	defer lr.mu.Unlock()
-
-	m, exists := lr.micros[id]
-	if !exists {
-		return ErrMicroNotFound
-	}
-	delete(lr.micros, id)
-	lr.spent -= m.Cost
-	return nil
+// Remove removes a user from the roster.
+func (r *LeanRoster) Remove(userID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.users, userID)
 }
 
-// ListMicros returns a copy of the current micros in the roster.
-func (lr *LeanRoster) ListMicros() []*Micro {
-	lr.mu.Lock()
-	defer lr.mu.Unlock()
-
-	result := make([]*Micro, 0, len(lr.micros))
-	for _, m := range lr.micros {
-		result = append(result, m)
+// List returns a copy of the current roster as a map of userID to Role.
+func (r *LeanRoster) List() map[string]Role {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	copyMap := make(map[string]Role, len(r.users))
+	for k, v := range r.users {
+		copyMap[k] = v
 	}
-	return result
-}
-
-// TotalSpent returns the total spent cost of current micros.
-func (lr *LeanRoster) TotalSpent() float64 {
-	lr.mu.Lock()
-	defer lr.mu.Unlock()
-	return lr.spent
+	return copyMap
 }
