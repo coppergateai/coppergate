@@ -4,66 +4,92 @@ import (
 	"testing"
 )
 
-func TestNewArena_FullArenaBudgetExceeded(t *testing.T) {
+func TestLeanRosterActivation(t *testing.T) {
 	cfg := RosterConfig{
-		Budget: Budget{Monthly: 1.99},
-		Mode:   FullArena,
+		AvailableMicros: 1_500, // under 2ms
+		MonthlyBudget:   8,
 	}
-	_, err := NewArena(cfg)
-	if err != ErrBudgetExceeded {
-		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
+	r := NewRoster(cfg)
+
+	if !r.IsLeanRosterActive() {
+		t.Errorf("expected lean roster mode active, got inactive")
+	}
+
+	// Spawn Engineer allowed
+	if err := r.SpawnArena("spawn1", RoleEngineer); err != nil {
+		t.Errorf("unexpected error spawning engineer: %v", err)
+	}
+
+	// Spawn Reviewer allowed
+	if err := r.SpawnArena("spawn2", RoleReviewer); err != nil {
+		t.Errorf("unexpected error spawning reviewer: %v", err)
+	}
+
+	// Spawn FULL_ARENA disallowed
+	err := r.SpawnArena("spawn3", RoleFullArenaSpawn)
+	if err != ErrFullArenaSpawnNotAllowed {
+		t.Errorf("expected ErrFullArenaSpawnNotAllowed, got %v", err)
 	}
 }
 
-func TestNewArena_LeanRosterAllowed(t *testing.T) {
+func TestLeanRosterDeactivation(t *testing.T) {
 	cfg := RosterConfig{
-		Budget:         Budget{Monthly: 2.0},
-		Mode:           LeanRoster,
-		AvailableMicros: 1.5,
+		AvailableMicros: 3_000, // over 2ms
+		MonthlyBudget:   8,
 	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	r := NewRoster(cfg)
+
+	if r.IsLeanRosterActive() {
+		t.Errorf("expected lean roster mode inactive, got active")
 	}
-	if a.Mode() != LeanRoster {
-		t.Fatalf("expected LeanRoster mode, got %v", a.Mode())
+
+	// Spawn FULL_ARENA allowed
+	if err := r.SpawnArena("spawn1", RoleFullArenaSpawn); err != nil {
+		t.Errorf("unexpected error spawning full arena: %v", err)
 	}
 }
 
-func TestNewArena_FullArenaAllowed(t *testing.T) {
+func TestUpdateConfigChangesMode(t *testing.T) {
 	cfg := RosterConfig{
-		Budget: Budget{Monthly: 8.0},
-		Mode:   FullArena,
+		AvailableMicros: 3_000,
+		MonthlyBudget:   8,
 	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	r := NewRoster(cfg)
+	if r.IsLeanRosterActive() {
+		t.Errorf("expected lean roster inactive initially")
 	}
-	if a.Mode() != FullArena {
-		t.Fatalf("expected FullArena mode, got %v", a.Mode())
+
+	// Update to lean roster conditions
+	r.UpdateConfig(RosterConfig{
+		AvailableMicros: 1_000,
+		MonthlyBudget:   8,
+	})
+	if !r.IsLeanRosterActive() {
+		t.Errorf("expected lean roster active after update")
 	}
 }
 
-func TestAllocate_LeanRosterLimit(t *testing.T) {
+func TestRemoveSpawn(t *testing.T) {
 	cfg := RosterConfig{
-		Budget:         Budget{Monthly: 2.0},
-		Mode:           LeanRoster,
-		AvailableMicros: 1.0,
+		AvailableMicros: 1_000,
+		MonthlyBudget:   8,
 	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	r := NewRoster(cfg)
+
+	r.SpawnArena("spawn1", RoleEngineer)
+	r.SpawnArena("spawn2", RoleReviewer)
+
+	spawns := r.GetSpawns()
+	if len(spawns) != 2 {
+		t.Errorf("expected 2 spawns, got %d", len(spawns))
 	}
-	_, err = a.Allocate(2048)
-	if err == nil {
-		t.Fatalf("expected allocation error for large size in lean roster")
+
+	r.RemoveSpawn("spawn1")
+	spawns = r.GetSpawns()
+	if len(spawns) != 1 {
+		t.Errorf("expected 1 spawn after removal, got %d", len(spawns))
 	}
-	// Small allocation should succeed
-	buf, err := a.Allocate(512)
-	if err != nil {
-		t.Fatalf("unexpected allocation error: %v", err)
-	}
-	if len(buf) != 512 {
-		t.Fatalf("expected buffer size 512, got %d", len(buf))
+	if _, ok := spawns["spawn1"]; ok {
+		t.Errorf("spawn1 should have been removed")
 	}
 }
