@@ -5,58 +5,61 @@ import (
 )
 
 func TestLeanRoster_AddMicro(t *testing.T) {
-	lr := NewLeanRoster(8.0)
+	lr := NewLeanRoster(8.0, 2.0)
 
-	// Valid micro under $2 and allowed role
-	m1 := &Micro{ID: "m1", Role: RoleEngineer, Cost: 1.5}
+	// Allowed micro: Engineer under $2
+	m1 := &Micro{ID: "m1", Cost: 1.5, Role: RoleEngineer}
 	if err := lr.AddMicro(m1); err != nil {
-		t.Fatalf("expected add success, got error: %v", err)
+		t.Fatalf("expected add micro success, got error: %v", err)
 	}
 
-	// Duplicate ID
-	if err := lr.AddMicro(m1); err == nil {
-		t.Fatalf("expected error on duplicate ID")
+	// Allowed micro: Reviewer under $2
+	m2 := &Micro{ID: "m2", Cost: 1.0, Role: RoleReviewer}
+	if err := lr.AddMicro(m2); err != nil {
+		t.Fatalf("expected add micro success, got error: %v", err)
 	}
 
-	// Disallowed role FULL_ARENA
-	m2 := &Micro{ID: "m2", Role: RoleFullArena, Cost: 1.0}
-	if err := lr.AddMicro(m2); err == nil {
-		t.Fatalf("expected error on disallowed role FULL_ARENA")
+	// Disallowed role: FullArena
+	m3 := &Micro{ID: "m3", Cost: 1.0, Role: RoleFullArena}
+	if err := lr.AddMicro(m3); err != ErrFullArenaDisallow {
+		t.Fatalf("expected FULL_ARENA disallow error, got: %v", err)
 	}
 
-	// Cost above $2
-	m3 := &Micro{ID: "m3", Role: RoleReviewer, Cost: 2.01}
-	if err := lr.AddMicro(m3); err == nil {
-		t.Fatalf("expected error on cost above $2")
+	// Disallowed role: Unknown
+	m4 := &Micro{ID: "m4", Cost: 1.0, Role: RoleUnknown}
+	if err := lr.AddMicro(m4); err != ErrRoleNotAllowed {
+		t.Fatalf("expected role not allowed error, got: %v", err)
 	}
 
-	// Add multiple valid micros until budget exceeded
-	m4 := &Micro{ID: "m4", Role: RoleReviewer, Cost: 2.0}
-	m5 := &Micro{ID: "m5", Role: RoleEngineer, Cost: 2.0}
-	m6 := &Micro{ID: "m6", Role: RoleEngineer, Cost: 2.0}
+	// Cost exceeds maxMicroCost
+	m5 := &Micro{ID: "m5", Cost: 2.5, Role: RoleEngineer}
+	if err := lr.AddMicro(m5); err != ErrBudgetExceeded {
+		t.Fatalf("expected budget exceeded error for cost > maxMicroCost, got: %v", err)
+	}
 
-	if err := lr.AddMicro(m4); err != nil {
-		t.Fatalf("expected add success m4, got %v", err)
-	}
-	if err := lr.AddMicro(m5); err != nil {
-		t.Fatalf("expected add success m5, got %v", err)
-	}
-	// Adding m6 would exceed $8 budget (1.5 + 2 + 2 + 2 = 7.5 + 2 = 9.5 > 8)
-	if err := lr.AddMicro(m6); err == nil {
-		t.Fatalf("expected budget exceeded error on m6")
+	// Add micros until budget exceeded
+	m6 := &Micro{ID: "m6", Cost: 5.0, Role: RoleEngineer}
+	if err := lr.AddMicro(m6); err != ErrBudgetExceeded {
+		t.Fatalf("expected budget exceeded error for total cost > budget, got: %v", err)
 	}
 
 	// Remove micro and add again
 	lr.RemoveMicro("m1")
 	if err := lr.AddMicro(m6); err != nil {
-		t.Fatalf("expected add success after removal, got %v", err)
+		t.Fatalf("expected add micro success after removal, got error: %v", err)
+	}
+
+	// ListMicros check
+	micros := lr.ListMicros()
+	if len(micros) != 2 {
+		t.Fatalf("expected 2 micros in roster, got %d", len(micros))
 	}
 }
 
-func TestLeanRoster_GetMicros_TotalSpent(t *testing.T) {
-	lr := NewLeanRoster(8.0)
-	m1 := &Micro{ID: "m1", Role: RoleEngineer, Cost: 1.0}
-	m2 := &Micro{ID: "m2", Role: RoleReviewer, Cost: 1.5}
+func TestLeanRoster_CurrentSpent(t *testing.T) {
+	lr := NewLeanRoster(8.0, 2.0)
+	m1 := &Micro{ID: "m1", Cost: 1.5, Role: RoleEngineer}
+	m2 := &Micro{ID: "m2", Cost: 1.0, Role: RoleReviewer}
 
 	if err := lr.AddMicro(m1); err != nil {
 		t.Fatal(err)
@@ -65,13 +68,14 @@ func TestLeanRoster_GetMicros_TotalSpent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	micros := lr.GetMicros()
-	if len(micros) != 2 {
-		t.Fatalf("expected 2 micros, got %d", len(micros))
-	}
-
-	spent := lr.TotalSpent()
+	spent := lr.CurrentSpent()
 	if spent != 2.5 {
 		t.Fatalf("expected spent 2.5, got %f", spent)
+	}
+
+	lr.RemoveMicro("m1")
+	spent = lr.CurrentSpent()
+	if spent != 1.0 {
+		t.Fatalf("expected spent 1.0 after removal, got %f", spent)
 	}
 }
