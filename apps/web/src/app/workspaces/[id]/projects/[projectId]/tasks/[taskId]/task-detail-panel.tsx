@@ -764,7 +764,12 @@ export function TaskDetailPanel({
         </section>
       ) : null}
 
-      <RecoveryCopy taskStatus={task.status} run={selected} />
+      {/* Skip duplicate “Run failed” when failureHint already covers it. */}
+      <RecoveryCopy
+        taskStatus={task.status}
+        run={selected}
+        suppressFailed={Boolean(failureHint)}
+      />
 
       {diffSummary || deliveryReport || ciFitness.checks.length > 0 || ciFitness.awaitingLive ? (
         <section id="verification" className={styles.section}>
@@ -989,15 +994,19 @@ export function TaskDetailPanel({
 function RecoveryCopy({
   taskStatus,
   run,
+  suppressFailed = false,
 }: {
   taskStatus: string;
   run: Run | null;
+  suppressFailed?: boolean;
 }) {
   const stale =
     run?.status === "RUNNING" &&
     !!run.leaseUntil &&
     Date.parse(run.leaseUntil) < Date.now();
-  const showFailed = taskStatus === "FAILED" || run?.errorCode === "ci_failed";
+  const showFailed =
+    !suppressFailed &&
+    (taskStatus === "FAILED" || run?.errorCode === "ci_failed");
   const showCancelled =
     taskStatus === "CANCELLED" || run?.status === "CANCELLED";
   const showQueued =

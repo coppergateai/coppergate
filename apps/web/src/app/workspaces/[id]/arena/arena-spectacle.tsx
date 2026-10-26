@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SkeletonStack } from "@/components/app/ui";
+import { displayTaskTitle } from "@/lib/display-title";
 import { AgentInspector } from "./agent-inspector";
 import styles from "./arena-mission.module.css";
 
@@ -174,10 +175,11 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
     if (c.budgetMicrosRemaining <= 0) return "Eliminated — budget spent";
     return state === "idle" ? "Standing by" : "No active run";
   }
+  const title = displayTaskTitle(run.taskTitle, 72);
   if (state === "idle") {
     // Quiet historical terminals — do not surface old error codes as live status.
     if (c.budgetMicrosRemaining <= 0) return "Standing by · budget spent";
-    if (run.taskTitle) return `Last · ${run.taskTitle}`;
+    if (title) return `Last · ${title}`;
     return "Standing by";
   }
   if (state === "needsAttention" && c.budgetMicrosRemaining <= 0) {
@@ -185,10 +187,10 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
   }
   if (run.errorCode === "pr_closed") return "PR closed — terminal";
   if (run.errorCode) return run.errorCode.replace(/_/g, " ");
-  if (run.taskTitle) {
-    if (state === "running") return run.taskTitle;
-    if (state === "awaitingCi") return `Awaiting validation · ${run.taskTitle}`;
-    return run.taskTitle;
+  if (title) {
+    if (state === "running") return title;
+    if (state === "awaitingCi") return `Awaiting validation · ${title}`;
+    return title;
   }
   return run.status.replace(/_/g, " ");
 }
