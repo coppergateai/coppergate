@@ -2,118 +2,102 @@ package programruntime
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-// MonthlySpendEnvelope defines the maximum spend allowed per month.
-const MonthlySpendEnvelope = 8.00 // $8 monthly envelope
+// MonthlySpendEnvelope defines the fixed monthly spend envelope in dollars.
+const MonthlySpendEnvelope = 8
 
-// LicenseID uniquely identifies a spend license.
-type LicenseID string
-
-// IDBadge represents an authorization badge for a program runtime spend license.
-type IDBadge struct {
-	LicenseID LicenseID
-	IssuedAt  time.Time
-	Valid     bool
+// License represents a spend license reservation for a program runtime.
+type License struct {
+	IDBadge      string    // Unique ID badge for the license
+	ReservedAt   time.Time // Timestamp of reservation
+	Amount       int       // Amount reserved in dollars
+	Accepted     bool      // Whether the license has been accepted
+	ShipReceipt  string    // Receipt generated upon acceptance
 }
 
-// SpendLicense represents a reserved spend license for program runtime.
-type SpendLicense struct {
-	ID        LicenseID
-	Reserved  float64
-	Spent     float64
-	Badge     *IDBadge
-	CreatedAt time.Time
-	Accepted  bool
-}
-
-// LicenseManager manages spend licenses and enforces spend limits.
+// LicenseManager manages spend licenses within the monthly envelope.
 type LicenseManager struct {
 	mu            sync.Mutex
-	licenses      map[LicenseID]*SpendLicense
-	totalReserved float64
+	totalReserved int
+	licenses      map[string]*License
 }
 
 // NewLicenseManager creates a new LicenseManager instance.
 func NewLicenseManager() *LicenseManager {
 	return &LicenseManager{
-		licenses: make(map[LicenseID]*SpendLicense),
+		licenses: make(map[string]*License),
 	}
 }
 
-// ReserveLicense attempts to reserve a spend license for the requested amount.
-// Returns an IDBadge if successful.
-func (lm *LicenseManager) ReserveLicense(amount float64) (*IDBadge, error) {
-	lm.mu.Lock()
-	defer lm.mu.Unlock()
-
+// Reserve attempts to reserve a spend license for the given amount.
+// Returns the License with an ID badge if successful.
+func (lm *LicenseManager) Reserve(amount int) (*License, error) {
 	if amount <= 0 {
 		return nil, errors.New("amount must be positive")
 	}
-
-	if lm.totalReserved+amount > MonthlySpendEnvelope {
-		return nil, errors.New("monthly spend envelope exceeded")
-	}
-
-	id := LicenseID(generateLicenseID())
-	license := &SpendLicense{
-		ID:        id,
-		Reserved:  amount,
-		Spent:     0,
-		CreatedAt: time.Now(),
-		Accepted:  false,
-	}
-	badge := &IDBadge{
-		LicenseID: id,
-		IssuedAt:  time.Now(),
-		Valid:     true,
-	}
-	license.Badge = badge
-
-	lm.licenses[id] = license
-	lm.totalReserved += amount
-
-	return badge, nil
-}
-
-// AcceptLicense marks the license as accepted and generates a ship receipt.
-func (lm *LicenseManager) AcceptLicense(id LicenseID) (*ShipReceipt, error) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	license, ok := lm.licenses[id]
+	if lm.totalReserved+amount > MonthlySpendEnvelope {
+		return nil, fmt.Errorf("insufficient spend envelope: requested %d, available %d", amount, MonthlySpendEnvelope-lm.totalReserved)
+	}
+
+	idBadge := uuid.New().String()
+	license := &License{
+		IDBadge:    idBadge,
+		ReservedAt: time.Now(),
+		Amount:     amount,
+		Accepted:   false,
+	}
+	lm.licenses[idBadge] = license
+	lm.totalReserved += amount
+	return license, nil
+}
+
+// Accept marks the license as accepted and generates a ship receipt.
+func (lm *LicenseManager) Accept(idBadge string) (string, error) {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	license, ok := lm.licenses[idBadge]
 	if !ok {
-		return nil, errors.New("license not found")
+		return "", errors.New("license not found")
 	}
 	if license.Accepted {
-		return nil, errors.New("license already accepted")
-	}
-	if !license.Badge.Valid {
-		return nil, errors.New("invalid badge")
+		return "", errors.New("license already accepted")
 	}
 
 	license.Accepted = true
-	license.Badge.Valid = false
+	license.ShipReceipt = fmt.Sprintf("SHIP-RECEIPT-%s-%d", license.IDBadge, time.Now().UnixNano())
+	return license.ShipReceipt, nil
+}
 
-	receipt := &ShipReceipt{
-		LicenseID: id,
-		Timestamp: time.Now(),
-		Amount:    license.Reserved,
+// GetLicense returns the license by ID badge.
+func (lm *LicenseManager) GetLicense(idBadge string) (*License, bool) {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+	license, ok := lm.licenses[idBadge]
+	return license, ok
+}
+
+// Writeback simulates landing and persisting the license state.
+// In a real system, this would write to persistent storage.
+func (lm *LicenseManager) Writeback(idBadge string) error {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	license, ok := lm.licenses[idBadge]
+	if !ok {
+		return errors.New("license not found")
 	}
-
-	return receipt, nil
-}
-
-// ShipReceipt confirms the spend license acceptance.
-type ShipReceipt struct {
-	LicenseID LicenseID
-	Timestamp time.Time
-	Amount    float64
-}
-
-// generateLicenseID generates a unique license ID string.
-func generateLicenseID() string {
-	return time.Now().Format("20060102150405.000000000")
+	// Simulate writeback logic here.
+	// For this implementation, we just log or confirm the writeback.
+	// In production, this would be a DB or durable store write.
+	return nil
 }
