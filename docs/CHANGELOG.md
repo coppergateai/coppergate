@@ -1,12 +1,8 @@
-# Changelog
-
 ## [Unreleased]
 
 ### Added
-
-- AG-012: Introduced lean roster allocation mode in arena package.
-  - Restricts allocation to Engineer and Reviewer roles only under $2 monthly budget.
-  - Disables FULL_ARENA spawn under tight budget constraints.
-  - Enforces max 1MB allocation size to keep memory footprint lean.
-  - Provides `Arena` struct with `LeanRosterMode` and role-based allocation control.
-  - Includes tests validating budget and role restrictions.
+- AG-012: Implemented lean roster allocation under $2 micros cost per engineer+reviewer pair.
+  - Lean roster enabled when cost is under $2 micros and monthly budget is $8.
+  - Full arena spawn prevented under tight budget; fallback to lean roster or error if budget exceeded.
+  - New `arena.Roster` type with `LeanRoster` and `FullArenaRoster` options.
+  - Tests cover budget constraints and roster type selection.
