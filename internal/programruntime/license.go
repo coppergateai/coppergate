@@ -6,114 +6,162 @@ import (
 	"time"
 )
 
-// MonthlySpendEnvelope defines the maximum spend allowed per month.
-const MonthlySpendEnvelope = 8.00 // $8 monthly envelope
+// Constants for spend envelope
+const (
+	MonthlySpendEnvelope = 8.00 // $8 monthly envelope
+)
 
-// LicenseID uniquely identifies a spend license.
+// LicenseID uniquely identifies a spend license
 type LicenseID string
 
-// IDBadge represents an authorization badge for a program runtime spend license.
-type IDBadge struct {
-	LicenseID LicenseID
+// BadgeID uniquely identifies an ID badge
+type BadgeID string
+
+// ShipReceiptID uniquely identifies a ship receipt
+type ShipReceiptID string
+
+// License represents a spend license reserved for a program or sub-program
+type License struct {
+	ID           LicenseID
+	ProgramID    string
+	Amount       float64
+	ReservedAt   time.Time
+	Allocated    bool
+	AllocatedTo  string // sub-program or agent ID
+}
+
+// Badge represents an ID badge issued to an autonomous agent
+type Badge struct {
+	ID        BadgeID
+	AgentID   string
 	IssuedAt  time.Time
 	Valid     bool
+	LicenseID LicenseID
 }
 
-// SpendLicense represents a reserved spend license for program runtime.
-type SpendLicense struct {
-	ID        LicenseID
-	Reserved  float64
-	Spent     float64
-	Badge     *IDBadge
-	CreatedAt time.Time
-	Accepted  bool
+// ShipReceipt confirms acceptance of a spend license
+type ShipReceipt struct {
+	ID         ShipReceiptID
+	LicenseID  LicenseID
+	AcceptedAt time.Time
+	AgentID    string
 }
 
-// LicenseManager manages spend licenses and enforces spend limits.
+// LicenseManager manages licenses, badges, and ship receipts
 type LicenseManager struct {
-	mu            sync.Mutex
-	licenses      map[LicenseID]*SpendLicense
-	totalReserved float64
+	mu           sync.Mutex
+	licenses     map[LicenseID]*License
+	badges       map[BadgeID]*Badge
+	shipReceipts map[ShipReceiptID]*ShipReceipt
+	monthlySpend float64
 }
 
-// NewLicenseManager creates a new LicenseManager instance.
+// NewLicenseManager creates a new LicenseManager
 func NewLicenseManager() *LicenseManager {
 	return &LicenseManager{
-		licenses: make(map[LicenseID]*SpendLicense),
+		licenses:     make(map[LicenseID]*License),
+		badges:       make(map[BadgeID]*Badge),
+		shipReceipts: make(map[ShipReceiptID]*ShipReceipt),
+		monthlySpend: 0,
 	}
 }
 
-// ReserveLicense attempts to reserve a spend license for the requested amount.
-// Returns an IDBadge if successful.
-func (lm *LicenseManager) ReserveLicense(amount float64) (*IDBadge, error) {
+// ReserveLicense reserves a spend license for a program or sub-program
+func (lm *LicenseManager) ReserveLicense(programID string, amount float64) (LicenseID, error) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
 	if amount <= 0 {
-		return nil, errors.New("amount must be positive")
+		return "", errors.New("amount must be positive")
+	}
+	if lm.monthlySpend+amount > MonthlySpendEnvelope {
+		return "", errors.New("exceeds monthly spend envelope")
 	}
 
-	if lm.totalReserved+amount > MonthlySpendEnvelope {
-		return nil, errors.New("monthly spend envelope exceeded")
+	id := LicenseID(generateID("lic"))
+	license := &License{
+		ID:         id,
+		ProgramID:  programID,
+		Amount:     amount,
+		ReservedAt: time.Now(),
+		Allocated:  false,
 	}
-
-	id := LicenseID(generateLicenseID())
-	license := &SpendLicense{
-		ID:        id,
-		Reserved:  amount,
-		Spent:     0,
-		CreatedAt: time.Now(),
-		Accepted:  false,
-	}
-	badge := &IDBadge{
-		LicenseID: id,
-		IssuedAt:  time.Now(),
-		Valid:     true,
-	}
-	license.Badge = badge
-
 	lm.licenses[id] = license
-	lm.totalReserved += amount
-
-	return badge, nil
+	lm.monthlySpend += amount
+	return id, nil
 }
 
-// AcceptLicense marks the license as accepted and generates a ship receipt.
-func (lm *LicenseManager) AcceptLicense(id LicenseID) (*ShipReceipt, error) {
+// FanOutLicense allocates a reserved license to a sub-program or agent
+func (lm *LicenseManager) FanOutLicense(licenseID LicenseID, allocatedTo string) error {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	license, ok := lm.licenses[id]
+	license, ok := lm.licenses[licenseID]
 	if !ok {
-		return nil, errors.New("license not found")
+		return errors.New("license not found")
 	}
-	if license.Accepted {
-		return nil, errors.New("license already accepted")
+	if license.Allocated {
+		return errors.New("license already allocated")
 	}
-	if !license.Badge.Valid {
-		return nil, errors.New("invalid badge")
+	license.Allocated = true
+	license.AllocatedTo = allocatedTo
+	return nil
+}
+
+// IssueBadge issues an ID badge to an agent for a given license
+func (lm *LicenseManager) IssueBadge(agentID string, licenseID LicenseID) (BadgeID, error) {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	license, ok := lm.licenses[licenseID]
+	if !ok {
+		return "", errors.New("license not found")
+	}
+	if !license.Allocated {
+		return "", errors.New("license not allocated")
 	}
 
-	license.Accepted = true
-	license.Badge.Valid = false
+	badgeID := BadgeID(generateID("badge"))
+	badge := &Badge{
+		ID:        badgeID,
+		AgentID:   agentID,
+		IssuedAt:  time.Now(),
+		Valid:     true,
+		LicenseID: licenseID,
+	}
+	lm.badges[badgeID] = badge
+	return badgeID, nil
+}
 
+// AcceptLicense accepts a license spend and generates a ship receipt
+func (lm *LicenseManager) AcceptLicense(badgeID BadgeID) (ShipReceiptID, error) {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	badge, ok := lm.badges[badgeID]
+	if !ok {
+		return "", errors.New("badge not found")
+	}
+	if !badge.Valid {
+		return "", errors.New("badge invalid")
+	}
+
+	receiptID := ShipReceiptID(generateID("ship"))
 	receipt := &ShipReceipt{
-		LicenseID: id,
-		Timestamp: time.Now(),
-		Amount:    license.Reserved,
+		ID:         receiptID,
+		LicenseID:  badge.LicenseID,
+		AcceptedAt: time.Now(),
+		AgentID:    badge.AgentID,
 	}
+	lm.shipReceipts[receiptID] = receipt
 
-	return receipt, nil
+	// Invalidate badge after acceptance
+	badge.Valid = false
+
+	return receiptID, nil
 }
 
-// ShipReceipt confirms the spend license acceptance.
-type ShipReceipt struct {
-	LicenseID LicenseID
-	Timestamp time.Time
-	Amount    float64
-}
-
-// generateLicenseID generates a unique license ID string.
-func generateLicenseID() string {
-	return time.Now().Format("20060102150405.000000000")
+// Helper function to generate IDs (stubbed for example)
+func generateID(prefix string) string {
+	return prefix + "-" + time.Now().Format("20060102150405.000000000")
 }
