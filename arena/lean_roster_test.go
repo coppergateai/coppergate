@@ -4,95 +4,49 @@ import (
 	"testing"
 )
 
-func TestNewArena_LeanRosterEnabled(t *testing.T) {
-	cfg := Config{
-		AvailableMicros: 1_500_000, // under $2
-		Role:            RoleEngineer,
-		MonthlyEnvelope: 800, // $8
-	}
-	a, err := NewArena(cfg)
+func TestLeanRoster_AddEntry(t *testing.T) {
+	cfg := Config{MonthlyBudgetCents: 800} // $8.00 budget
+	lr := NewLeanRoster(cfg)
+
+	// Add Engineer under $2 cost - should succeed
+	err := lr.AddEntry("user1", RoleEngineer, 150)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error adding Engineer: %v", err)
 	}
-	if !a.IsLean() {
-		t.Errorf("expected lean mode enabled for engineer under budget")
-	}
-}
 
-func TestNewArena_LeanRosterDisabledForRole(t *testing.T) {
-	cfg := Config{
-		AvailableMicros: 1_500_000,
-		Role:            RoleOther,
-		MonthlyEnvelope: 800,
-	}
-	a, err := NewArena(cfg)
+	// Add Reviewer under $2 cost - should succeed
+	err = lr.AddEntry("user2", RoleReviewer, 199)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if a.IsLean() {
-		t.Errorf("expected lean mode disabled for non-engineer/reviewer role")
-	}
-}
-
-func TestNewArena_LeanRosterDisabledForBudget(t *testing.T) {
-	cfg := Config{
-		AvailableMicros: 3_000_000, // over $2
-		Role:            RoleEngineer,
-		MonthlyEnvelope: 800,
-	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if a.IsLean() {
-		t.Errorf("expected lean mode disabled for budget over $2")
-	}
-}
-
-func TestAlloc_LeanModeAllocations(t *testing.T) {
-	cfg := Config{
-		AvailableMicros: 1_000_000,
-		Role:            RoleReviewer,
-		MonthlyEnvelope: 800,
-	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !a.IsLean() {
-		t.Fatalf("expected lean mode enabled")
+		t.Fatalf("unexpected error adding Reviewer: %v", err)
 	}
 
-	b1 := a.Alloc(100)
-	if len(b1) != 100 {
-		t.Errorf("expected allocation size 100, got %d", len(b1))
-	}
-	b2 := a.Alloc(200)
-	if len(b2) != 200 {
-		t.Errorf("expected allocation size 200, got %d", len(b2))
-	}
-}
-
-func TestAlloc_NormalModeAllocations(t *testing.T) {
-	cfg := Config{
-		AvailableMicros: 3_000_000,
-		Role:            RoleEngineer,
-		MonthlyEnvelope: 800,
-	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if a.IsLean() {
-		t.Fatalf("expected lean mode disabled")
+	// Add FULL_ARENA role - should fail
+	err = lr.AddEntry("user3", RoleFullArena, 100)
+	if err == nil {
+		t.Fatal("expected error adding FULL_ARENA role, got none")
 	}
 
-	b1 := a.Alloc(100)
-	if len(b1) != 100 {
-		t.Errorf("expected allocation size 100, got %d", len(b1))
+	// Add unknown role - should fail
+	err = lr.AddEntry("user4", RoleUnknown, 100)
+	if err == nil {
+		t.Fatal("expected error adding unknown role, got none")
 	}
-	b2 := a.Alloc(200)
-	if len(b2) != 200 {
-		t.Errorf("expected allocation size 200, got %d", len(b2))
+
+	// Add Engineer exceeding budget - should fail
+	err = lr.AddEntry("user5", RoleEngineer, 600)
+	if err == nil {
+		t.Fatal("expected budget exceeded error, got none")
+	}
+
+	// Check entries count
+	entries := lr.Entries()
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+
+	// Check spent cents
+	spent := lr.Spent()
+	if spent != 349 {
+		t.Fatalf("expected spent 349 cents, got %d", spent)
 	}
 }
