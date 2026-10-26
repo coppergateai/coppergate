@@ -3,8 +3,4 @@
 ## [Unreleased]
 
 ### Added
-- Implemented Program Runtime (P-104) capability:
-  - Spend license reservation and fan-out with $8 monthly envelope.
-  - ID badge issuance and validation.
-  - Accept to ship receipt workflow.
-  - Landing and writeback support under `/docs/-program-runtime`.
+- Program Runtime capability (P-104): spend license reservation on reserve/fan-out, ID badges issuance, accept-to-ship receipt workflow.
