@@ -17,9 +17,7 @@
     "prepare": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@coppergate/sandbox": "workspace:*"
-  },
-  "optionalDependencies": {
+    "@coppergate/sandbox": "workspace:*",
     "@cursor/sdk": "^1.0.40"
   },
   "devDependencies": {
