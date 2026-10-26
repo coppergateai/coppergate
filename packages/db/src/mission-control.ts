@@ -452,7 +452,11 @@ export async function getWorkspaceMissionControl(
   attention.sort((a, b) => {
     // Concurrency / provider quota crisis leads — stop burn before triage.
     const rank = (k: MissionControlAttentionKind) =>
-      k === "concurrency" || k === "provider_quota" ? 0 : 1;
+      k === "concurrency" ||
+      k === "provider_quota" ||
+      k === "merge_blocked"
+        ? 0
+        : 1;
     const ra = rank(a.kind);
     const rb = rank(b.kind);
     if (ra !== rb) return ra - rb;

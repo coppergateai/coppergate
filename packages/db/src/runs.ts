@@ -7,6 +7,7 @@ import {
   reserveEstimateForTask,
 } from "./budgets.js";
 import { agentRuns, tasks, type AgentRun } from "./schema.js";
+import { assertSpendLicenseForTask, SpendLicenseError } from "./spend-license.js";
 
 export class RunError extends Error {
   readonly code: "not_found" | "conflict" | "not_owner" | "policy" | "cancelled";
@@ -266,6 +267,18 @@ export async function createTaskRun(
     task.projectId,
     estimateMicros,
   );
+  try {
+    await assertSpendLicenseForTask(db, {
+      workspaceId: input.workspaceId,
+      projectId: task.projectId,
+      taskTitle: task.title,
+    });
+  } catch (err) {
+    if (err instanceof SpendLicenseError) {
+      throw new RunError("policy", err.message);
+    }
+    throw err;
+  }
 
   const result = await enqueueAgentRun(db, {
     workspaceId: input.workspaceId,

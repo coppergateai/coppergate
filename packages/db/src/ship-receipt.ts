@@ -92,13 +92,40 @@ export function buildShipReceipt(input: {
   };
 }
 
+/** True when the Accept actor is the maintainer / system auto path. */
+export function isAutonomousAcceptActor(actor: string): boolean {
+  const a = actor.trim().toLowerCase();
+  return (
+    a.startsWith("system:") ||
+    a === "maintainer" ||
+    a.includes("auto-accept") ||
+    a.includes("auto_accept")
+  );
+}
+
+/**
+ * Count human review/approve touches. Autonomous Accept must report 0 when
+ * no prior human action exists (do not inflate with Math.max(1,…)).
+ */
+export function resolveHumanTouchCount(input: {
+  priorHumanActions: number;
+  acceptedBy: string;
+}): number {
+  if (isAutonomousAcceptActor(input.acceptedBy)) {
+    return Math.max(0, input.priorHumanActions);
+  }
+  // Human Accept itself counts as the closing touch when none recorded yet.
+  return Math.max(1, input.priorHumanActions);
+}
+
 async function countHumanTouches(
   db: Database,
   workspaceId: string,
   taskId: string,
+  acceptedBy: string,
 ): Promise<number> {
   const rows = await db
-    .select({ action: auditEvents.action })
+    .select({ action: auditEvents.action, actor: auditEvents.actor })
     .from(auditEvents)
     .where(
       and(
@@ -116,10 +143,15 @@ async function countHumanTouches(
   ]);
   let n = 0;
   for (const r of rows) {
-    if (humanActions.has(r.action)) n += 1;
+    if (!humanActions.has(r.action)) continue;
+    // Skip system auto-accept audits — they are not human touches.
+    if (isAutonomousAcceptActor(r.actor)) continue;
+    n += 1;
   }
-  // Accept itself counts as the closing human touch when none recorded yet.
-  return Math.max(1, n);
+  return resolveHumanTouchCount({
+    priorHumanActions: n,
+    acceptedBy,
+  });
 }
 
 /**
@@ -208,6 +240,7 @@ export async function persistShipReceipt(
     db,
     input.workspaceId,
     input.task.id,
+    input.actor,
   );
 
   const receipt = buildShipReceipt({

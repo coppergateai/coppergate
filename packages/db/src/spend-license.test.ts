@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { openIdFromTaskTitle, SpendLicenseError } from "./spend-license.js";
+import {
+  licenseTitleForProgram,
+  openIdFromTaskTitle,
+  SpendLicenseError,
+} from "./spend-license.js";
 
 describe("spend-license", () => {
   it("openIdFromTaskTitle extracts program IDs", () => {
@@ -16,5 +20,38 @@ describe("spend-license", () => {
     );
     assert.equal(err.code, "missing_open_id");
     assert.match(err.message, /No Open ID/);
+  });
+
+  it("licenseTitleForProgram prefixes next Open ID when program-bound", () => {
+    const md = `
+| ID | Title | Status |
+| P-007 | Good first issue | Open |
+| AG-012 | Lean roster | Open |
+`;
+    const out = licenseTitleForProgram({
+      title: "Sentry: TypeError in page",
+      programBound: true,
+      roadmapMarkdown: md,
+    });
+    assert.equal(out.licensed, true);
+    assert.ok(out.openId);
+    assert.match(out.title, new RegExp(`^${out.openId}:`));
+  });
+
+  it("licenseTitleForProgram is a no-op when already licensed or unbound", () => {
+    assert.equal(
+      licenseTitleForProgram({
+        title: "AG-011: already tagged",
+        programBound: true,
+      }).licensed,
+      false,
+    );
+    assert.equal(
+      licenseTitleForProgram({
+        title: "freestyle",
+        programBound: false,
+      }).openId,
+      null,
+    );
   });
 });

@@ -164,7 +164,8 @@ function resolveWorkerAgent(
       );
     }
 
-    // Prefer BYOK / env OpenAI or Cursor — required for live http product work.
+    // Prefer Cursor-class coding (cursor_local / SDK) when available; OpenAI is
+    // chat→file-write and stays secondary unless CONTENDER_HARNESS=native_openai.
     if (!forceFakePath || explicit === "native_openai") {
       try {
         const resolved = await resolveByokForProfile(
@@ -180,14 +181,56 @@ function resolveWorkerAgent(
             parseEncryptionKey(keyHex),
           );
           await touchLlmByokUsed(db, workspaceId, byok.id);
-          const kind = vendorToAgentKind(byok.vendor);
+          let kind = vendorToAgentKind(byok.vendor);
+          let primaryKey = apiKey;
+          let primaryModel = model;
+          let primaryBase = byok.baseUrl ?? undefined;
+          let primaryCredentialId = byok.id;
+          let primaryLabel = byok.label;
+          let primaryVendor = byok.vendor;
+          let openaiFailover:
+            | { apiKey: string; baseUrl?: string; model?: string }
+            | undefined;
+
+          // Prefer workspace Cursor BYOK as primary for live product coding.
+          if (kind === "openai" && explicit !== "native_openai") {
+            const cursorPrimary = await resolveCursorFallbackCredential(
+              db,
+              workspaceId,
+              byok.id,
+            );
+            if (cursorPrimary?.byok.encryptedPayload) {
+              openaiFailover = {
+                apiKey,
+                baseUrl: byok.baseUrl ?? undefined,
+                model,
+              };
+              primaryKey = openSecret(
+                cursorPrimary.byok.encryptedPayload,
+                parseEncryptionKey(keyHex),
+              );
+              await touchLlmByokUsed(db, workspaceId, cursorPrimary.byok.id);
+              kind = "cursor";
+              primaryModel = cursorPrimary.model ?? model;
+              primaryBase = undefined;
+              primaryCredentialId = cursorPrimary.byok.id;
+              primaryLabel = cursorPrimary.byok.label;
+              primaryVendor = cursorPrimary.byok.vendor;
+              log.info("preferring Cursor BYOK as primary coding agent", {
+                workspaceId,
+                cursorCredentialId: cursorPrimary.byok.id,
+                openaiFailoverId: byok.id,
+              });
+            }
+          }
+
           log.info("using workspace BYOK for coding agent", {
             workspaceId,
-            credentialId: byok.id,
-            label: byok.label,
-            vendor: byok.vendor,
+            credentialId: primaryCredentialId,
+            label: primaryLabel,
+            vendor: primaryVendor,
             kind,
-            model,
+            model: primaryModel,
             profileKey,
           });
           if (explicit === "native_openai") {
@@ -203,6 +246,40 @@ function resolveWorkerAgent(
             );
           }
 
+          if (kind === "cursor") {
+            // cursor_local primary; keep OpenAI as FailoverCodingAgent when demoted.
+            if (openaiFailover) {
+              log.info("using ContenderHarness with OpenAI failover", {
+                harnessKind: "cursor_local",
+                workspaceId,
+              });
+              return createCodingAgent({
+                kind: "cursor",
+                apiKey: primaryKey,
+                model: primaryModel,
+                fallback: {
+                  kind: "openai",
+                  apiKey: openaiFailover.apiKey,
+                  baseUrl: openaiFailover.baseUrl,
+                  model: openaiFailover.model,
+                },
+              });
+            }
+            log.info("using ContenderHarness", {
+              harnessKind: "cursor_local",
+              workspaceId,
+            });
+            return harnessAsCodingAgent(
+              createContenderHarness({
+                kind: "cursor_local",
+                cursor: {
+                  apiKey: primaryKey,
+                  model: primaryModel,
+                },
+              }),
+            );
+          }
+
           let fallback:
             | {
                 kind: CodingAgentKind;
@@ -210,38 +287,34 @@ function resolveWorkerAgent(
                 model?: string;
               }
             | undefined;
-          if (kind === "openai") {
-            const cursorFb = await resolveCursorFallbackCredential(
-              db,
-              workspaceId,
-              byok.id,
+          const cursorFb = await resolveCursorFallbackCredential(
+            db,
+            workspaceId,
+            primaryCredentialId,
+          );
+          if (cursorFb?.byok.encryptedPayload) {
+            const cursorKey = openSecret(
+              cursorFb.byok.encryptedPayload,
+              parseEncryptionKey(keyHex),
             );
-            if (cursorFb?.byok.encryptedPayload) {
-              const cursorKey = openSecret(
-                cursorFb.byok.encryptedPayload,
-                parseEncryptionKey(keyHex),
-              );
-              await touchLlmByokUsed(db, workspaceId, cursorFb.byok.id);
-              fallback = {
-                kind: "cursor",
-                apiKey: cursorKey,
-                model: cursorFb.model,
-              };
-              log.info("wiring Cursor BYOK as OpenAI quota failover", {
-                workspaceId,
-                cursorCredentialId: cursorFb.byok.id,
-                model: cursorFb.model,
-              });
-            }
-            // Hosted production: Cursor failover only via workspace BYOK.
-            // Env CURSOR_API_KEY is ignored unless ALLOW_ENV_LLM_KEYS=1.
+            await touchLlmByokUsed(db, workspaceId, cursorFb.byok.id);
+            fallback = {
+              kind: "cursor",
+              apiKey: cursorKey,
+              model: cursorFb.model,
+            };
+            log.info("wiring Cursor BYOK as OpenAI quota failover", {
+              workspaceId,
+              cursorCredentialId: cursorFb.byok.id,
+              model: cursorFb.model,
+            });
           }
 
           return createCodingAgent({
             kind,
-            apiKey,
-            baseUrl: byok.baseUrl ?? undefined,
-            model,
+            apiKey: primaryKey,
+            baseUrl: primaryBase,
+            model: primaryModel,
             fallback,
           });
         }
@@ -249,6 +322,29 @@ function resolveWorkerAgent(
         log.warn("BYOK resolve failed; falling back", {
           error: err instanceof Error ? err.message : String(err),
         });
+      }
+
+      // Env: prefer Cursor SDK when CURSOR_API_KEY is allowed (self-host).
+      const allowEnv =
+        process.env.ALLOW_ENV_LLM_KEYS === "1" ||
+        process.env.NODE_ENV !== "production";
+      const envCursorKey = allowEnv
+        ? process.env.CURSOR_API_KEY?.trim() || ""
+        : "";
+      if (envCursorKey && explicit !== "native_openai") {
+        log.info("using ContenderHarness from env CURSOR_API_KEY", {
+          harnessKind: "cursor_local",
+          workspaceId,
+        });
+        return harnessAsCodingAgent(
+          createContenderHarness({
+            kind: "cursor_local",
+            cursor: {
+              apiKey: envCursorKey,
+              model: process.env.CURSOR_MODEL?.trim() || undefined,
+            },
+          }),
+        );
       }
 
       // Env LLM/CURSOR keys: local/self-host only (gated inside createCodingAgent).

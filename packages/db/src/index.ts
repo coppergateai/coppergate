@@ -357,6 +357,7 @@ export {
 } from "./architecture-backlog.js";
 export {
   assertSpendLicenseForTask,
+  licenseTitleForProgram,
   openIdFromTaskTitle,
   SpendLicenseError,
   type SpendLicense,
@@ -365,7 +366,9 @@ export {
   SHIP_RECEIPT_KIND,
   buildShipReceipt,
   getShipReceiptForTask,
+  isAutonomousAcceptActor,
   persistShipReceipt,
+  resolveHumanTouchCount,
   type ShipReceiptBody,
 } from "./ship-receipt.js";
 export {

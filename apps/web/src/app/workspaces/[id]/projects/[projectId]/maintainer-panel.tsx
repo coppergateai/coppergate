@@ -31,6 +31,7 @@ type Policy = {
   communityScoutMaxPerRun?: number;
   autoQueueReplanTasks?: boolean;
   releaseTagStyle?: string;
+  maxTournamentN?: number;
 };
 
 type Props = {
@@ -237,6 +238,10 @@ export function MaintainerPanel({
               <dd>{yn(policy.selfImprove)}</dd>
             </div>
             <div>
+              <dt>Tournament N</dt>
+              <dd>{policy.maxTournamentN ?? 2}</dd>
+            </div>
+            <div>
               <dt>Community replies</dt>
               <dd>{yn(policy.communityReplies)}</dd>
             </div>
@@ -282,6 +287,12 @@ export function MaintainerPanel({
             <div>
               <dt>Self-improves</dt>
               <dd>{metrics.selfImproves}</dd>
+            </div>
+            <div>
+              <dt>Meta duels</dt>
+              <dd title="Champion vs challenger strategy applied to arena">
+                {metrics.metaTournaments ?? 0}
+              </dd>
             </div>
             <div>
               <dt>Replans</dt>

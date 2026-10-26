@@ -19,6 +19,10 @@ import {
   applySpawnProfilesToArena,
   resolveSpawnProfileKeys,
 } from "./profiles.js";
+import {
+  assertSpendLicenseForTask,
+  licenseTitleForProgram,
+} from "./spend-license.js";
 import { submitTaskForApproval } from "./task-transitions.js";
 
 export class SignalError extends Error {
@@ -506,6 +510,37 @@ async function createTaskFromSignal(
       }
     }
   }
+  let programBound = false;
+  try {
+    const v = JSON.parse(project.maintainerPolicyJson ?? "{}") as {
+      architectureRepo?: unknown;
+    };
+    programBound =
+      typeof v.architectureRepo === "string" &&
+      /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(v.architectureRepo.trim());
+  } catch {
+    programBound = false;
+  }
+  // Program-bound: attach next Open ID so arm → spend license can pass.
+  const licensed = licenseTitleForProgram({
+    title: input.event.title.slice(0, 200),
+    programBound,
+  });
+  try {
+    await assertSpendLicenseForTask(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      taskTitle: licensed.title,
+    });
+  } catch (err) {
+    throw new SignalError(
+      "invalid",
+      err instanceof Error
+        ? err.message
+        : "No Open ID — cannot arm signal under program-bound spend",
+    );
+  }
+
   const now = new Date();
   const [task] = await db
     .insert(tasks)
@@ -515,7 +550,7 @@ async function createTaskFromSignal(
       projectId: input.projectId,
       milestoneId: milestone.id,
       briefId,
-      title: input.event.title.slice(0, 200),
+      title: licensed.title,
       goal: input.event.body || input.event.title,
       scope: `Signal ${input.event.provider}:${input.event.externalId}`,
       allowedPaths: JSON.stringify(["**/*"]),

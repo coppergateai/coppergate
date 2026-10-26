@@ -6,6 +6,7 @@ import {
   ensureArenaForProject,
   isContenderStrategy,
   MAX_TOURNAMENT_FANOUT,
+  type ContenderStrategy,
 } from "./arena.js";
 import { getLlmByokById } from "./credentials.js";
 import {
@@ -488,6 +489,8 @@ export async function applySpawnProfilesToArena(
     projectId: string;
     actor: string;
     profileKeys: string[];
+    /** Optional per-profile strategy overrides (meta-tournament challenger flip). */
+    strategyByKey?: Record<string, ContenderStrategy>;
   },
 ): Promise<void> {
   const seen = new Set<string>();
@@ -539,7 +542,9 @@ export async function applySpawnProfilesToArena(
 
   for (const key of keys) {
     const profile = byKey.get(key);
-    const rawStrategy = profile?.strategyDefault ?? "balanced";
+    const override = input.strategyByKey?.[key];
+    const rawStrategy =
+      override ?? profile?.strategyDefault ?? "balanced";
     const strategy = isContenderStrategy(rawStrategy) ? rawStrategy : "balanced";
     const existing = byProfile.get(key);
     if (existing) {

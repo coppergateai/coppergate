@@ -5,7 +5,11 @@
  */
 
 import { and, eq } from "drizzle-orm";
-import { extractArchitectureIdFromTitle } from "./architecture-backlog.js";
+import {
+  extractArchitectureIdFromTitle,
+  parseArchitectureOpenTasks,
+  pickNextArchitectureTask,
+} from "./architecture-backlog.js";
 import type { Database } from "./client.js";
 import { projects } from "./schema.js";
 
@@ -31,6 +35,37 @@ export function openIdFromTaskTitle(
   title: string | null | undefined,
 ): string | null {
   return extractArchitectureIdFromTitle(title);
+}
+
+/**
+ * When program-bound and the title lacks an Open ID, prefix the next Open line
+ * from ARCHITECTURE_BACKLOG_MD (or provided markdown). Pure aside from env read.
+ */
+export function licenseTitleForProgram(input: {
+  title: string;
+  programBound: boolean;
+  roadmapMarkdown?: string | null;
+  excludeIds?: string[];
+}): { title: string; openId: string | null; licensed: boolean } {
+  const existing = openIdFromTaskTitle(input.title);
+  if (existing) {
+    return { title: input.title, openId: existing, licensed: false };
+  }
+  if (!input.programBound) {
+    return { title: input.title, openId: null, licensed: false };
+  }
+  const md =
+    input.roadmapMarkdown?.trim() ||
+    process.env.ARCHITECTURE_BACKLOG_MD?.trim() ||
+    "";
+  const next = pickNextArchitectureTask(parseArchitectureOpenTasks(md), {
+    excludeIds: input.excludeIds ?? [],
+  });
+  if (!next) {
+    return { title: input.title, openId: null, licensed: false };
+  }
+  const titled = `${next.id}: ${input.title}`.slice(0, 200);
+  return { title: titled, openId: next.id, licensed: true };
 }
 
 /** Lightweight parse — avoid importing maintainer.ts (circular with arena). */

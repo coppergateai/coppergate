@@ -114,7 +114,9 @@ export function MissionControl({ data, recentEvents }: Props) {
 
   const concurrencyItem = attention.find((a) => a.kind === "concurrency");
   const providerQuotaItem = attention.find((a) => a.kind === "provider_quota");
-  const crisisItem = concurrencyItem || providerQuotaItem;
+  const mergeBlockedItem = attention.find((a) => a.kind === "merge_blocked");
+  const crisisItem =
+    concurrencyItem || providerQuotaItem || mergeBlockedItem;
   // Capacity-wait / normal rows are advisory — don't paint the ops chip red.
   const hasHighAttention = attention.some((a) => a.priority === "high");
   const opsWarn =
@@ -139,6 +141,9 @@ export function MissionControl({ data, recentEvents }: Props) {
     }
     if (providerQuotaItem) {
       return providerQuotaItem.detail;
+    }
+    if (mergeBlockedItem) {
+      return mergeBlockedItem.detail;
     }
     if (concurrencyItem) {
       return concurrencyItem.detail;
@@ -571,7 +576,11 @@ export function MissionControl({ data, recentEvents }: Props) {
                     ■
                   </span>
                   <span className={styles.actionLabel}>
-                    {providerQuotaItem ? "Open Arena" : "Pause Arena"}
+                    {mergeBlockedItem
+                      ? (mergeBlockedItem.ctaLabel ?? "Fix merge rights")
+                      : providerQuotaItem
+                        ? "Open Arena"
+                        : "Pause Arena"}
                   </span>
                 </Link>
               ) : (

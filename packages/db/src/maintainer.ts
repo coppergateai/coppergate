@@ -195,7 +195,8 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   coordinatedMultiRepo: false,
   allowedSignalProviders: ["*", "ci_failure", "sentry", "dependabot", "codeql"],
   pathAllowlist: [],
-  maxTournamentN: 1,
+  /** Community duel width — keep aligned with plan maxTournamentFanout (2). */
+  maxTournamentN: 2,
   visionBriefId: null,
   replanIntervalDays: 7,
   autoQueueReplanTasks: true,
@@ -510,13 +511,22 @@ export async function enableMaintainerMode(
     actor: input.actor,
   });
 
+  const duelN = Math.max(1, Math.min(3, policy.maxTournamentN));
   const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
-    defaultContenderN: Math.min(1, policy.maxTournamentN),
+    defaultContenderN: duelN,
+    contenderCount: duelN,
     minHuman: true,
   });
+  // Pin arena width to policy even when the arena already existed.
+  if (arena.defaultContenderN !== duelN) {
+    await db
+      .update(arenas)
+      .set({ defaultContenderN: duelN, updatedAt: new Date() })
+      .where(eq(arenas.id, arena.id));
+  }
   if (!arena.minHuman) {
     await setArenaMinHuman(db, {
       workspaceId: input.workspaceId,
@@ -808,13 +818,15 @@ export async function startProjectArena(
   } catch {
     /* keep full roster if spend lookup fails */
   }
-  const rosterN = Math.max(1, rosterKeys.length);
+  const startPolicy = parseMaintainerPolicy(project.maintainerPolicyJson);
+  const duelN = Math.max(1, Math.min(3, startPolicy.maxTournamentN));
+  const rosterN = Math.max(duelN, rosterKeys.length);
   let { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
     minHuman: true,
-    defaultContenderN: Math.min(rosterN, 1),
+    defaultContenderN: duelN,
     contenderCount: rosterN,
   });
   try {
@@ -826,6 +838,14 @@ export async function startProjectArena(
     });
   } catch {
     // spawn best-effort — tick continues
+  }
+  if (arena.defaultContenderN !== duelN) {
+    const [pinned] = await db
+      .update(arenas)
+      .set({ defaultContenderN: duelN, updatedAt: new Date() })
+      .where(eq(arenas.id, arena.id))
+      .returning();
+    if (pinned) arena = pinned;
   }
 
   if (!arena.minHuman) {
@@ -1902,7 +1922,27 @@ export async function maybeSelfImproveProfile(
         projectId: input.projectId,
         actor: input.actor,
         profileKeys: [base.key, challengerKey],
+        strategyByKey: {
+          [base.key]:
+            base.strategyDefault === "balanced" ||
+            base.strategyDefault === "blitz" ||
+            base.strategyDefault === "fortress"
+              ? base.strategyDefault
+              : "balanced",
+          [challengerKey]: flip,
+        },
       });
+      // Meta duel = champion vs challenger (N=2), not a solo pin.
+      const arenaRow = await getArenaForProject(db, {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+      });
+      if (arenaRow && arenaRow.defaultContenderN < 2) {
+        await db
+          .update(arenas)
+          .set({ defaultContenderN: 2, updatedAt: new Date() })
+          .where(eq(arenas.id, arenaRow.id));
+      }
       changed = true;
       await recordMaintainerEvent(db, {
         workspaceId: input.workspaceId,
@@ -1912,6 +1952,7 @@ export async function maybeSelfImproveProfile(
           championKey: base.key,
           challengerKey,
           challengerStrategy: flip,
+          applied: true,
           avgEfficiency,
         },
       });
@@ -1925,6 +1966,7 @@ export async function maybeSelfImproveProfile(
           championKey: base.key,
           challengerKey,
           challengerStrategy: flip,
+          applied: true,
         },
       });
       }

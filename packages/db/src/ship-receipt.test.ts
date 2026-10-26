@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildShipReceipt } from "./ship-receipt.js";
+import {
+  buildShipReceipt,
+  isAutonomousAcceptActor,
+  resolveHumanTouchCount,
+} from "./ship-receipt.js";
 
 describe("ship-receipt", () => {
   it("buildShipReceipt captures Open ID and spend", () => {
@@ -54,5 +58,24 @@ describe("ship-receipt", () => {
     });
     assert.equal(receipt.openId, null);
     assert.match(receipt.writeback.note, /writeback skipped/);
+  });
+
+  it("autonomous Accept reports 0 human touches when none prior", () => {
+    assert.equal(isAutonomousAcceptActor("system:maintainer"), true);
+    assert.equal(isAutonomousAcceptActor("user-42"), false);
+    assert.equal(
+      resolveHumanTouchCount({
+        priorHumanActions: 0,
+        acceptedBy: "system:maintainer",
+      }),
+      0,
+    );
+    assert.equal(
+      resolveHumanTouchCount({
+        priorHumanActions: 0,
+        acceptedBy: "user-42",
+      }),
+      1,
+    );
   });
 });
