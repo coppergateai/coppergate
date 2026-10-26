@@ -4,81 +4,97 @@ import (
 	"testing"
 )
 
-func TestRosterAddUser(t *testing.T) {
-	roster := NewRoster(8) // $8 monthly envelope = 8 micros
-
-	// Add engineer user
-	err := roster.AddUser("user1", RoleEngineer)
-	if err != nil {
-		t.Fatalf("unexpected error adding engineer: %v", err)
+func TestSpawnRoster(t *testing.T) {
+	tests := []struct {
+		name       string
+		cfg        RosterConfig
+		wantType   RosterType
+		wantErr    bool
+	}{
+		{
+			name: "Full arena allowed with sufficient budget",
+			cfg: RosterConfig{
+				BudgetCents: 800,
+				MicroCost:   3.0,
+				EngineerOnly: false,
+			},
+			wantType: FullArena,
+			wantErr:  false,
+		},
+		{
+			name: "Lean roster under $2 micro cost and engineer only with tight budget",
+			cfg: RosterConfig{
+				BudgetCents: 700,
+				MicroCost:   1.99,
+				EngineerOnly: true,
+			},
+			wantType: LeanRoster,
+			wantErr:  false,
+		},
+		{
+			name: "Error on tight budget but micro cost too high",
+			cfg: RosterConfig{
+				BudgetCents: 700,
+				MicroCost:   2.01,
+				EngineerOnly: true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Error on tight budget but engineer only false",
+			cfg: RosterConfig{
+				BudgetCents: 700,
+				MicroCost:   1.50,
+				EngineerOnly: false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Full arena allowed with exactly $8 budget",
+			cfg: RosterConfig{
+				BudgetCents: 800,
+				MicroCost:   1.50,
+				EngineerOnly: true,
+			},
+			wantType: FullArena,
+			wantErr:  false,
+		},
 	}
 
-	// Add reviewer user
-	err = roster.AddUser("user2", RoleReviewer)
-	if err != nil {
-		t.Fatalf("unexpected error adding reviewer: %v", err)
-	}
-
-	// Add other role user - should be ignored silently (no error, no add)
-	err = roster.AddUser("user3", RoleOther)
-	if err != nil {
-		t.Fatalf("unexpected error adding other role: %v", err)
-	}
-	users := roster.Users()
-	if _, ok := users["user3"]; ok {
-		t.Errorf("user with other role should not be added")
-	}
-
-	// Add duplicate user - no additional cost
-	err = roster.AddUser("user1", RoleEngineer)
-	if err != nil {
-		t.Fatalf("unexpected error adding duplicate user: %v", err)
-	}
-
-	// Add users until budget exceeded
-	err = roster.AddUser("user4", RoleEngineer)
-	if err != nil {
-		t.Fatalf("unexpected error adding user4: %v", err)
-	}
-	// Micros used now: 2+2+2 = 6
-
-	err = roster.AddUser("user5", RoleReviewer)
-	if err != ErrBudgetExceeded {
-		t.Errorf("expected ErrBudgetExceeded adding user5, got %v", err)
-	}
-
-	// Remove a user and add another
-	roster.RemoveUser("user2") // frees 2 micros, used now 4
-	err = roster.AddUser("user5", RoleReviewer)
-	if err != nil {
-		t.Fatalf("unexpected error adding user5 after removal: %v", err)
-	}
-
-	// Check micros used is 6 again
-	if got := roster.MicrosUsed(); got != 6 {
-		t.Errorf("expected micros used 6, got %d", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := SpawnRoster(tt.cfg)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("SpawnRoster() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil && r.Type != tt.wantType {
+				t.Errorf("SpawnRoster() got type = %v, want %v", r.Type, tt.wantType)
+			}
+		})
 	}
 }
 
-func TestRosterRemoveUser(t *testing.T) {
-	roster := NewRoster(8)
-	roster.AddUser("user1", RoleEngineer)
-	roster.AddUser("user2", RoleReviewer)
+func TestRosterManager_GetOrSpawnRoster(t *testing.T) {
+	cfg := RosterConfig{
+		BudgetCents: 700,
+		MicroCost:   1.5,
+		EngineerOnly: true,
+	}
+	rm := NewRosterManager(cfg)
 
-	roster.RemoveUser("user1")
-	users := roster.Users()
-	if _, ok := users["user1"]; ok {
-		t.Errorf("user1 should have been removed")
+	r1, err := rm.GetOrSpawnRoster()
+	if err != nil {
+		t.Fatalf("GetOrSpawnRoster() error = %v", err)
+	}
+	if r1.Type != LeanRoster {
+		t.Errorf("Expected LeanRoster, got %v", r1.Type)
 	}
 
-	// Removing non-existent user should not panic
-	roster.RemoveUser("nonexistent")
-}
-
-func TestRosterMicrosLimit(t *testing.T) {
-	const limit = 8
-	roster := NewRoster(limit)
-	if roster.MicrosLimit() != limit {
-		t.Errorf("expected micros limit %d, got %d", limit, roster.MicrosLimit())
+	r2, err := rm.GetOrSpawnRoster()
+	if err != nil {
+		t.Fatalf("GetOrSpawnRoster() second call error = %v", err)
+	}
+	if r2 != r1 {
+		t.Errorf("Expected same roster instance on second call")
 	}
 }
