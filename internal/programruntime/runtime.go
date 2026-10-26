@@ -3,107 +3,116 @@ package programruntime
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
-// RuntimeState represents the state of a program runtime operation.
-type RuntimeState string
-
+// Constants for spend envelope
 const (
-	StatePending   RuntimeState = "Pending"
-	StateAccepted  RuntimeState = "Accept"
-	StateShipReceipt RuntimeState = "ShipReceipt"
+	MonthlySpendEnvelopeCents = 800 // $8.00 in cents
 )
 
-// RuntimeOperation represents a program runtime operation.
-type RuntimeOperation struct {
+// IDBadge represents an identity badge for a program participant.
+type IDBadge struct {
 	ID        string
-	BadgeID   string
-	Spend     int64 // spend amount in cents
-	State     RuntimeState
-	processed bool
+	IssuedAt  time.Time
+	ExpiresAt time.Time
+	Valid     bool
 }
 
-// RuntimeManager manages program runtime operations.
-type RuntimeManager struct {
-	mu          sync.Mutex
-	licenseMgr  *LicenseManager
-	badgeMgr    *BadgeManager
-	operations  map[string]*RuntimeOperation
+// SpendLicense manages the spend license state.
+type SpendLicense struct {
+	mu            sync.Mutex
+	ReservedCents int
+	SpentCents    int
 }
 
-// NewRuntimeManager creates a new RuntimeManager.
-func NewRuntimeManager(licenseMgr *LicenseManager, badgeMgr *BadgeManager) *RuntimeManager {
-	return &RuntimeManager{
-		licenseMgr: licenseMgr,
-		badgeMgr:   badgeMgr,
-		operations: make(map[string]*RuntimeOperation),
+// ProgramRuntime manages the contracted autonomy runtime state.
+type ProgramRuntime struct {
+	license      *SpendLicense
+	idBadges     map[string]*IDBadge
+	accepted     map[string]bool
+	shipReceipts map[string]bool
+}
+
+// NewProgramRuntime creates a new ProgramRuntime instance.
+func NewProgramRuntime() *ProgramRuntime {
+	return &ProgramRuntime{
+		license: &SpendLicense{},
+		idBadges: make(map[string]*IDBadge),
+		accepted: make(map[string]bool),
+		shipReceipts: make(map[string]bool),
 	}
 }
 
-// CreateOperation creates a new runtime operation in Pending state.
-func (rm *RuntimeManager) CreateOperation(id, badgeID string, spend int64) (*RuntimeOperation, error) {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-	if id == "" || badgeID == "" {
-		return nil, errors.New("operation id and badge id required")
-	}
-	if spend <= 0 {
-		return nil, errors.New("spend must be positive")
-	}
-	if !rm.badgeMgr.ValidateBadge(badgeID) {
-		return nil, errors.New("invalid or inactive badge")
-	}
-	if _, exists := rm.operations[id]; exists {
-		return nil, errors.New("operation id already exists")
-	}
-	op := &RuntimeOperation{
-		ID:      id,
-		BadgeID: badgeID,
-		Spend:   spend,
-		State:   StatePending,
-	}
-	rm.operations[id] = op
-	return op, nil
-}
+// ReserveSpend attempts to reserve spend cents on the license.
+// Returns error if reservation exceeds monthly envelope.
+func (pr *ProgramRuntime) ReserveSpend(cents int) error {
+	pr.license.mu.Lock()
+	defer pr.license.mu.Unlock()
 
-// AcceptOperation transitions operation from Pending to Accept and reserves spend license.
-func (rm *RuntimeManager) AcceptOperation(id string) error {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-	op, exists := rm.operations[id]
-	if !exists {
-		return errors.New("operation not found")
+	if pr.license.ReservedCents+cents > MonthlySpendEnvelopeCents {
+		return errors.New("spend reservation exceeds monthly envelope")
 	}
-	if op.State != StatePending {
-		return errors.New("operation not in pending state")
-	}
-	if err := rm.licenseMgr.ReserveSpend(op.Spend); err != nil {
-		return err
-	}
-	op.State = StateAccepted
+	pr.license.ReservedCents += cents
 	return nil
 }
 
-// ShipReceiptOperation transitions operation from Accept to ShipReceipt, finalizing spend.
-func (rm *RuntimeManager) ShipReceiptOperation(id string) error {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-	op, exists := rm.operations[id]
-	if !exists {
-		return errors.New("operation not found")
+// FanOutSpend releases reserved spend and marks it as spent.
+func (pr *ProgramRuntime) FanOutSpend(cents int) error {
+	pr.license.mu.Lock()
+	defer pr.license.mu.Unlock()
+
+	if cents > pr.license.ReservedCents {
+		return errors.New("cannot fan-out more than reserved")
 	}
-	if op.State != StateAccepted {
-		return errors.New("operation not in accept state")
-	}
-	op.State = StateShipReceipt
-	op.processed = true
+	pr.license.ReservedCents -= cents
+	pr.license.SpentCents += cents
 	return nil
 }
 
-// GetOperation returns the operation by id.
-func (rm *RuntimeManager) GetOperation(id string) (*RuntimeOperation, bool) {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-	op, exists := rm.operations[id]
-	return op, exists
+// IssueIDBadge issues a new ID badge for a participant.
+func (pr *ProgramRuntime) IssueIDBadge(id string, validDuration time.Duration) *IDBadge {
+	badge := &IDBadge{
+		ID:        id,
+		IssuedAt:  time.Now(),
+		ExpiresAt: time.Now().Add(validDuration),
+		Valid:     true,
+	}
+	pr.idBadges[id] = badge
+	return badge
+}
+
+// ValidateIDBadge checks if the badge is valid and not expired.
+func (pr *ProgramRuntime) ValidateIDBadge(id string) bool {
+	badge, ok := pr.idBadges[id]
+	if !ok {
+		return false
+	}
+	if !badge.Valid {
+		return false
+	}
+	if time.Now().After(badge.ExpiresAt) {
+		badge.Valid = false
+		return false
+	}
+	return true
+}
+
+// Accept marks an item as accepted.
+func (pr *ProgramRuntime) Accept(itemID string) {
+	pr.accepted[itemID] = true
+}
+
+// ShipReceipt transitions an accepted item to shipped receipt.
+func (pr *ProgramRuntime) ShipReceipt(itemID string) error {
+	if !pr.accepted[itemID] {
+		return errors.New("item not accepted")
+	}
+	pr.shipReceipts[itemID] = true
+	return nil
+}
+
+// IsShipped checks if an item has been shipped.
+func (pr *ProgramRuntime) IsShipped(itemID string) bool {
+	return pr.shipReceipts[itemID]
 }

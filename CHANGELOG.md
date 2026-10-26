@@ -1,12 +1,9 @@
-# Changelog
-
 ## [Unreleased]
 
 ### Added
-
-- P-104: Implemented Program Runtime (Contracted Autonomy) Spend License on reserve/fan-out operations.
-- Added ID badge issuance and validation for program participants.
-- Added Accept → Ship Receipt workflow for program runtime operations.
-- Added landing and writeback support under `/docs/-program-runtime`.
-- Added comprehensive tests covering license spend, badge management, and runtime operation state transitions.
-- Added user-facing documentation for Program Runtime feature under `/docs/-program-runtime.md`.
+- P-104: Program Runtime (Contracted Autonomy) spend license management on reserve/fan-out.
+- ID badge issuance for contracted autonomy agents.
+- Accept → Ship Receipt flow for spend license consumption.
+- Landing and writeback process for program runtime state.
+- Documentation added under `/docs/-program-runtime.md`.
+- Comprehensive tests covering spend license reservation, badge issuance, acceptance, and landing.

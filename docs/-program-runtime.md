@@ -2,50 +2,37 @@
 
 ## Overview
 
-This document describes the Program Runtime feature (P-104) which enables contracted autonomy spend licenses on reserve/fan-out operations, ID badges issuance, and the accept-to-ship receipt workflow.
+This document describes the Program Runtime capability introduced in P-104, which enables contracted autonomy spend licenses on reserve/fan-out operations. It also covers ID badge issuance, the acceptance flow leading to ship receipts, and the landing and writeback process.
 
-The feature supports:
+## Key Features
 
-- Licensing spend on reserve and fan-out operations within program runtime.
-- Issuance and management of ID badges for program participants.
-- Transition from Accept state to Ship Receipt state with proper license accounting.
-- Landing and writeback of program runtime data under `/docs/-program-runtime`.
+- **Spend License on Reserve/Fan-out**: Programs can now reserve spend licenses for contracted autonomy operations, ensuring controlled and budgeted execution within the $8 monthly envelope.
+- **ID Badges**: Unique ID badges are issued to contracted autonomy agents to authenticate and authorize spend operations.
+- **Accept → Ship Receipt Flow**: After a contracted autonomy operation is accepted, a ship receipt is generated to confirm the transaction.
+- **Landing + Writeback**: Program runtime state changes are landed and written back to the system, ensuring consistency and traceability.
 
-## Architecture
+## Architecture Alignment
 
-This feature aligns with the Open IDs and architecture described in [coppergate-architecture/docs/OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md).
+This capability aligns with the Open IDs architecture described in `coppergate-architecture/docs/OPEN_PROGRAM.md`, ensuring secure and auditable program runtime spend management.
 
 ## Usage
 
-### Reserve/Fan-out Spend License
+1. **Reserve Spend License**: Programs request a spend license for contracted autonomy operations.
+2. **Issue ID Badge**: Upon approval, an ID badge is issued to the agent.
+3. **Accept Operation**: The agent accepts the operation, triggering the spend license consumption.
+4. **Ship Receipt**: A receipt is generated and logged.
+5. **Landing and Writeback**: The operation's results are landed and written back to the program runtime state.
 
-When a program runtime operation reserves or fans out resources, the spend license is deducted from the contracted autonomy license pool. This ensures that the program does not exceed its $8 monthly envelope.
+## Testing and Validation
 
-### ID Badges
+This feature is covered by automated tests in the primary coppergate repository, ensuring correctness and adherence to the architecture.
 
-ID badges are issued to program participants to authenticate and authorize their actions within the runtime. Badges are required for spend license operations.
+## Change Log
 
-### Accept → Ship Receipt Workflow
-
-Upon acceptance of a program runtime operation, the system transitions the state to Ship Receipt, confirming the spend license has been accounted for and the operation is finalized.
-
-## Landing and Writeback
-
-Program runtime data is landed under `/docs/-program-runtime` and includes writeback capabilities to update runtime state and license usage.
-
-## Testing
-
-The feature is covered by unit and integration tests validating:
-
-- Correct spend license deduction on reserve/fan-out.
-- Proper issuance and validation of ID badges.
-- State transitions from Accept to Ship Receipt.
-- Data landing and writeback correctness.
-
-## Change History
-
-- v1.0 (P-104): Initial implementation of Program Runtime Spend License, ID badges, and Accept → Ship Receipt workflow.
+- Added Program Runtime contracted autonomy spend license management.
+- Implemented ID badge issuance and acceptance flow.
+- Integrated ship receipt generation and landing/writeback process.
 
 ---
 
-For detailed API and usage examples, see the code documentation and tests.
+For detailed API and usage examples, refer to the primary repository source code and tests.

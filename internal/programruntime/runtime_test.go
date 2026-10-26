@@ -2,122 +2,75 @@ package programruntime
 
 import (
 	"testing"
+	"time"
 )
 
-func TestLicenseManager(t *testing.T) {
-	lm := NewLicenseManager(800) // $8.00 in cents
-	if lm.Remaining() != 800 {
-		t.Errorf("expected remaining 800, got %d", lm.Remaining())
-	}
-	err := lm.ReserveSpend(500)
+func TestSpendLicenseReserveAndFanOut(t *testing.T) {
+	pr := NewProgramRuntime()
+
+	// Reserve $5.00 (500 cents)
+	err := pr.ReserveSpend(500)
 	if err != nil {
 		t.Fatalf("unexpected error reserving spend: %v", err)
 	}
-	if lm.Used() != 500 {
-		t.Errorf("expected used 500, got %d", lm.Used())
-	}
-	if lm.Remaining() != 300 {
-		t.Errorf("expected remaining 300, got %d", lm.Remaining())
-	}
-	err = lm.ReserveSpend(400)
+
+	// Reserve $4.00 (400 cents) should fail (total 900 > 800)
+	err = pr.ReserveSpend(400)
 	if err == nil {
-		t.Errorf("expected error reserving spend exceeding limit")
+		t.Fatalf("expected error reserving spend exceeding envelope, got none")
 	}
-	lm.ReleaseSpend(200)
-	if lm.Used() != 300 {
-		t.Errorf("expected used 300 after release, got %d", lm.Used())
-	}
-}
 
-func TestBadgeManager(t *testing.T) {
-	bm := NewBadgeManager()
-	badge, err := bm.IssueBadge("badge1", "user1")
+	// Fan out $3.00 (300 cents)
+	err = pr.FanOutSpend(300)
 	if err != nil {
-		t.Fatalf("unexpected error issuing badge: %v", err)
-	}
-	if !bm.ValidateBadge(badge.ID) {
-		t.Errorf("badge should be valid")
-	}
-	err = bm.RevokeBadge(badge.ID)
-	if err != nil {
-		t.Fatalf("unexpected error revoking badge: %v", err)
-	}
-	if bm.ValidateBadge(badge.ID) {
-		t.Errorf("badge should be invalid after revoke")
-	}
-}
-
-func TestRuntimeManagerWorkflow(t *testing.T) {
-	lm := NewLicenseManager(800)
-	bm := NewBadgeManager()
-	rm := NewRuntimeManager(lm, bm)
-
-	_, err := bm.IssueBadge("badge1", "user1")
-	if err != nil {
-		t.Fatalf("issue badge error: %v", err)
+		t.Fatalf("unexpected error fanning out spend: %v", err)
 	}
 
-	op, err := rm.CreateOperation("op1", "badge1", 500)
-	if err != nil {
-		t.Fatalf("create operation error: %v", err)
-	}
-	if op.State != StatePending {
-		t.Errorf("expected state Pending, got %s", op.State)
-	}
-
-	err = rm.AcceptOperation("op1")
-	if err != nil {
-		t.Fatalf("accept operation error: %v", err)
-	}
-	op, _ = rm.GetOperation("op1")
-	if op.State != StateAccepted {
-		t.Errorf("expected state Accept, got %s", op.State)
-	}
-	if lm.Used() != 500 {
-		t.Errorf("expected license used 500, got %d", lm.Used())
-	}
-
-	err = rm.ShipReceiptOperation("op1")
-	if err != nil {
-		t.Fatalf("ship receipt operation error: %v", err)
-	}
-	op, _ = rm.GetOperation("op1")
-	if op.State != StateShipReceipt {
-		t.Errorf("expected state ShipReceipt, got %s", op.State)
-	}
-	if !op.processed {
-		t.Errorf("expected operation processed true")
-	}
-}
-
-func TestInvalidBadgeOperation(t *testing.T) {
-	lm := NewLicenseManager(800)
-	bm := NewBadgeManager()
-	rm := NewRuntimeManager(lm, bm)
-
-	_, err := rm.CreateOperation("op1", "invalid-badge", 100)
+	// Fan out $300 again should fail (only 200 reserved left)
+	err = pr.FanOutSpend(300)
 	if err == nil {
-		t.Errorf("expected error for invalid badge")
+		t.Fatalf("expected error fanning out more than reserved, got none")
 	}
 }
 
-func TestSpendLimitExceeded(t *testing.T) {
-	lm := NewLicenseManager(800)
-	bm := NewBadgeManager()
-	rm := NewRuntimeManager(lm, bm)
+func TestIDBadgeIssueAndValidate(t *testing.T) {
+	pr := NewProgramRuntime()
 
-	_, err := bm.IssueBadge("badge1", "user1")
-	if err != nil {
-		t.Fatalf("issue badge error: %v", err)
+	badge := pr.IssueIDBadge("user123", time.Second*1)
+	if badge == nil {
+		t.Fatalf("expected badge, got nil")
 	}
 
-	op, err := rm.CreateOperation("op1", "badge1", 900)
-	if err != nil {
-		t.Fatalf("create operation error: %v", err)
+	if !pr.ValidateIDBadge("user123") {
+		t.Fatalf("expected badge to be valid immediately after issue")
 	}
 
-	err = rm.AcceptOperation("op1")
+	time.Sleep(time.Second * 2)
+
+	if pr.ValidateIDBadge("user123") {
+		t.Fatalf("expected badge to be invalid after expiration")
+	}
+}
+
+func TestAcceptAndShipReceipt(t *testing.T) {
+	pr := NewProgramRuntime()
+
+	itemID := "item42"
+
+	// ShipReceipt without accept should fail
+	err := pr.ShipReceipt(itemID)
 	if err == nil {
-		t.Errorf("expected error accepting operation exceeding spend limit")
+		t.Fatalf("expected error shipping unaccepted item, got none")
+	}
+
+	pr.Accept(itemID)
+
+	err = pr.ShipReceipt(itemID)
+	if err != nil {
+		t.Fatalf("unexpected error shipping accepted item: %v", err)
+	}
+
+	if !pr.IsShipped(itemID) {
+		t.Fatalf("expected item to be marked as shipped")
 	}
 }
