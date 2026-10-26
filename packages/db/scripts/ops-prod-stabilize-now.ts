@@ -3,7 +3,7 @@
  * - kprompt: Pause all arenas, maintainer off, cancel hot runs, fail stale VALIDATING
  * - coppergate: keep N=1, resume primary arena if paused (self-pilot active)
  */
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   closeDb,
   createDb,

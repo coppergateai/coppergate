@@ -229,3 +229,84 @@ export async function fetchCommitCheckEvidence(input: {
 
   return out;
 }
+
+const GH_API_HEADERS = (token: string) => ({
+  Accept: "application/vnd.github+json",
+  Authorization: `Bearer ${token}`,
+  "User-Agent": "coppergate-worker",
+  "X-GitHub-Api-Version": "2022-11-28",
+});
+
+/** True when any completed check suite on the SHA failed or timed out. */
+export async function commitCheckSuitesFailed(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  sha: string;
+  fetchImpl?: typeof fetch;
+}): Promise<boolean> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/commits/${encodeURIComponent(input.sha)}/check-suites`,
+    { headers: GH_API_HEADERS(input.token) },
+  );
+  if (!res.ok) return false;
+  const body = (await res.json()) as {
+    check_suites?: Array<{ conclusion?: string | null; status?: string }>;
+  };
+  const suites = body.check_suites ?? [];
+  if (suites.length === 0) return false;
+  return suites.some(
+    (s) =>
+      s.status === "completed" &&
+      (s.conclusion === "failure" || s.conclusion === "timed_out"),
+  );
+}
+
+/** Default branch tip SHA for a repo (null when the API call fails). */
+export async function getRepoDefaultBranchHead(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ defaultBranch: string; sha: string } | null> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const headers = GH_API_HEADERS(input.token);
+  const repoRes = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}`,
+    { headers },
+  );
+  if (!repoRes.ok) return null;
+  const repoBody = (await repoRes.json()) as { default_branch?: string };
+  const defaultBranch = repoBody.default_branch;
+  if (!defaultBranch) return null;
+  const refRes = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/git/ref/heads/${encodeURIComponent(defaultBranch)}`,
+    { headers },
+  );
+  if (!refRes.ok) return null;
+  const refBody = (await refRes.json()) as { object?: { sha?: string } };
+  const sha = refBody.object?.sha;
+  if (!sha) return null;
+  return { defaultBranch, sha };
+}
+
+/** Open Coppergate ship-rollback PRs (title: Revert: … (CI red on main)). */
+export async function countOpenShipRollbackPrs(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  fetchImpl?: typeof fetch;
+}): Promise<number> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const q = encodeURIComponent(
+    `repo:${input.owner}/${input.repo} is:pr is:open "CI red on main" in:title`,
+  );
+  const res = await fetchImpl(
+    `https://api.github.com/search/issues?q=${q}&per_page=1`,
+    { headers: GH_API_HEADERS(input.token) },
+  );
+  if (!res.ok) return 0;
+  const body = (await res.json()) as { total_count?: number };
+  return typeof body.total_count === "number" ? body.total_count : 0;
+}

@@ -307,10 +307,13 @@ export function scoreCiChecks(
   let passed: boolean;
   if (!requiredConfigured) {
     passed =
-      checks.some((c) => c.passed && !c.blocksAccept) || checks.length === 0;
+      checks.some((c) => c.passed && !c.blocksAccept) ||
+      // Vacuous only when not explicitly waiting on live CI.
+      (checks.length === 0 && !options.statusAwaitingCi);
   } else if (requiredReported.length === 0) {
-    // Required configured but none reported: empty = vacuous; helpers alone ≠ pass.
-    passed = checks.length === 0;
+    // Required configured but none reported: helpers alone ≠ pass.
+    // Empty is vacuous only when the run is not WAITING_CI (fail closed while awaiting).
+    passed = checks.length === 0 && !options.statusAwaitingCi;
   } else {
     passed = requiredReported.some((c) => c.passed) && !blocking;
   }

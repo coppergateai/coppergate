@@ -38,7 +38,7 @@ describe("FakeCodingAgent", () => {
     const completion = events.find((e) => e.kind === "completion");
     assert.ok(completion);
     assert.ok(isFakeCompletionPayload(completion!.payload));
-    assert.match(completion!.payload!.branchName, /^coppergate\/task-/);
+    assert.match(completion!.payload!.branchName, /^chore\/cg-task-/);
     assert.match(completion!.message ?? "", /not DONE/i);
   });
 

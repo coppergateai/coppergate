@@ -9,7 +9,23 @@ ALTER TABLE "agent_profiles"
 
 DROP INDEX IF EXISTS "integration_credentials_ws_provider_label_uidx";
 
--- Restore single-credential uniqueness (keep only one active row per workspace if needed)
+-- Collapse multi-BYOK rows so (workspace_id, provider) can be unique again.
+-- Keep the default active row when present, else the oldest row.
+DELETE FROM "integration_credentials" AS ic
+WHERE ic."id" IN (
+  SELECT d."id"
+  FROM "integration_credentials" AS d
+  WHERE d."id" NOT IN (
+    SELECT DISTINCT ON ("workspace_id", "provider") "id"
+    FROM "integration_credentials"
+    ORDER BY
+      "workspace_id",
+      "provider",
+      ("is_default" AND "status" = 'active') DESC,
+      "created_at" ASC
+  )
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS "integration_credentials_ws_provider_uidx"
   ON "integration_credentials" ("workspace_id", "provider");
 

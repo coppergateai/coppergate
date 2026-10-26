@@ -53,7 +53,9 @@ describe("seo helpers", () => {
       path.join(process.cwd(), "src/components/docs/docs-nav.tsx"),
       "utf8",
     );
-    const hrefs = [...navSrc.matchAll(/href:\s*"(\/[^"]+)"/g)].map((m) => m[1]);
+    const hrefs = [...navSrc.matchAll(/href:\s*"(\/[^"]+)"/g)]
+      .map((m) => m[1])
+      .filter((h): h is string => typeof h === "string");
     assert.ok(hrefs.includes("/docs/open-program-runtime"));
     const paths = new Set(PUBLIC_STATIC_ROUTES.map((r) => r.url));
     for (const href of hrefs) {

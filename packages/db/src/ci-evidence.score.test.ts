@@ -58,6 +58,13 @@ describe("scoreCiChecks", () => {
     assert.equal(empty.passed, true);
     assert.equal(empty.acceptReady, true);
 
+    const waitingEmpty = scoreCiChecks([], {
+      requiredNames: ["test"],
+      statusAwaitingCi: true,
+    });
+    assert.equal(waitingEmpty.ciSatisfied, false);
+    assert.equal(waitingEmpty.acceptReady, false);
+
     const waiting = scoreCiChecks(
       [{ name: "test", passed: true, blocksAccept: false }],
       { requiredNames: ["test"], statusAwaitingCi: true },
