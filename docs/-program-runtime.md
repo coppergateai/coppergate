@@ -2,42 +2,54 @@
 
 ## Overview
 
-This document describes the Program Runtime (Contracted Autonomy) Spend License feature (P-104), which enables reserving and fan-out of spend licenses within the program runtime. It also introduces ID badges for authorization and the acceptance flow culminating in a Ship Receipt.
+This feature introduces the Program Runtime Spend License capability, enabling contracted autonomy for program execution with controlled spend limits. It includes:
 
-This feature aligns with the architecture described in [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md) and supports a lean Arena model with an $8 monthly spend envelope.
+- License reservation and fan-out spend control.
+- ID badge issuance for program runtime authorization.
+- Acceptance flow from license spend to ship receipt confirmation.
+- Integration with the `/docs/-program-runtime` documentation landing page.
 
 ## Key Concepts
 
-- **Spend License Reserve/Fan-out**: Allows reserving a portion of the monthly spend envelope for contracted autonomy programs, enabling controlled fan-out of spend licenses to sub-programs or components.
-- **ID Badges**: Unique identifiers issued to contracted autonomy programs to authenticate and authorize spend license usage.
-- **Accept → Ship Receipt Flow**: Programs accept the spend license reservation and receive a Ship Receipt as confirmation and proof of license usage.
+### Spend License on Reserve/Fan-out
+
+The system reserves a spend license for program runtime operations, ensuring that the spend does not exceed the contracted $8 monthly envelope. Fan-out operations are controlled to prevent overspending.
+
+### ID Badges
+
+Each program runtime instance receives an ID badge that authorizes its spend license usage. These badges are cryptographically verifiable and track spend attribution.
+
+### Accept → Ship Receipt Flow
+
+Once a spend license is accepted for a program runtime, a ship receipt is generated to confirm the transaction and update the spend ledger.
 
 ## Usage
 
-### Reserving Spend License
+1. **Reserve Spend License**  
+   Programs request a spend license reservation before runtime execution.
 
-Programs can reserve a portion of the $8 monthly envelope by requesting a spend license. The system ensures the reservation does not exceed the available envelope.
+2. **Receive ID Badge**  
+   Upon reservation, the program receives an ID badge authorizing spend.
 
-### Fan-out
+3. **Accept License and Ship Receipt**  
+   The program accepts the license spend, triggering a ship receipt that finalizes the spend and updates the system state.
 
-Reserved spend licenses can be fanned out to sub-programs or components, each receiving an ID badge to track and authorize spend usage.
+## Architecture
 
-### Acceptance and Ship Receipt
+This feature aligns with the Open IDs architecture described in `coppergate-architecture/docs/OPEN_PROGRAM.md`. It leverages lean Arena design principles to maintain efficiency and scalability.
 
-Once a program accepts the reserved spend license, it receives a Ship Receipt. This receipt serves as a record of the transaction and can be used for auditing and verification.
+## Testing
 
-## API
+The feature is covered by unit and integration tests validating:
 
-### ReserveSpendLicense(amount int) (LicenseID, error)
+- License reservation and spend limits.
+- ID badge issuance and verification.
+- Accept and ship receipt flows.
 
-Reserves a spend license for the specified amount if available.
+## Change History
 
-### FanOutLicense(parentLicenseID LicenseID, amount int) (ChildLicenseID, error)
+- **P-104**: Initial implementation of Program Runtime Spend License with contracted autonomy.
 
-Fans out a portion of a parent license to a child license.
+---
 
-### AcceptLicense(licenseID LicenseID) (ShipReceipt, error)
-
-Accepts the license and returns a Ship Receipt.
-
-## Example
+For detailed API usage and examples, see the code documentation and tests in the primary coppergate repository.
