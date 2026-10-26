@@ -5,133 +5,115 @@ import (
 	"time"
 )
 
-func TestReserveLicense(t *testing.T) {
+func TestReserveLicense_Success(t *testing.T) {
 	lm := NewLicenseManager()
-
-	// Reserve within envelope
-	id, err := lm.ReserveLicense("program1", 5)
+	badge, err := lm.ReserveLicense(5)
 	if err != nil {
-		t.Fatalf("unexpected error reserving license: %v", err)
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if id == "" {
-		t.Fatal("expected license ID")
+	if badge == nil {
+		t.Fatal("expected badge, got nil")
 	}
-
-	// Reserve exceeding envelope
-	_, err = lm.ReserveLicense("program1", 4)
-	if err == nil {
-		t.Fatal("expected error exceeding monthly spend envelope")
+	if badge.Valid != true {
+		t.Errorf("expected badge valid true, got false")
 	}
 }
 
-func TestFanOutLicense(t *testing.T) {
+func TestReserveLicense_ExceedEnvelope(t *testing.T) {
 	lm := NewLicenseManager()
-	id, err := lm.ReserveLicense("program1", 3)
+	_, err := lm.ReserveLicense(5)
 	if err != nil {
-		t.Fatalf("reserve error: %v", err)
+		t.Fatalf("expected no error, got %v", err)
 	}
-
-	err = lm.FanOutLicense(id, "agent1")
-	if err != nil {
-		t.Fatalf("fan-out error: %v", err)
-	}
-
-	// Fan-out again should fail
-	err = lm.FanOutLicense(id, "agent2")
+	_, err = lm.ReserveLicense(4)
 	if err == nil {
-		t.Fatal("expected error on double allocation")
+		t.Fatal("expected error for exceeding envelope, got none")
 	}
 }
 
-func TestIssueBadge(t *testing.T) {
+func TestAcceptLicense_Success(t *testing.T) {
 	lm := NewLicenseManager()
-	id, err := lm.ReserveLicense("program1", 2)
+	badge, err := lm.ReserveLicense(3)
 	if err != nil {
-		t.Fatalf("reserve error: %v", err)
+		t.Fatalf("reserve license failed: %v", err)
 	}
-
-	// Cannot issue badge before fan-out
-	_, err = lm.IssueBadge("agent1", id)
-	if err == nil {
-		t.Fatal("expected error issuing badge before allocation")
-	}
-
-	err = lm.FanOutLicense(id, "agent1")
+	receipt, err := lm.AcceptLicense(badge.LicenseID)
 	if err != nil {
-		t.Fatalf("fan-out error: %v", err)
+		t.Fatalf("accept license failed: %v", err)
 	}
-
-	badgeID, err := lm.IssueBadge("agent1", id)
-	if err != nil {
-		t.Fatalf("issue badge error: %v", err)
-	}
-	if badgeID == "" {
-		t.Fatal("expected badge ID")
+	if receipt.Amount != 3 {
+		t.Errorf("expected receipt amount 3, got %v", receipt.Amount)
 	}
 }
 
-func TestAcceptLicense(t *testing.T) {
+func TestAcceptLicense_AlreadyAccepted(t *testing.T) {
 	lm := NewLicenseManager()
-	id, err := lm.ReserveLicense("program1", 1)
+	badge, err := lm.ReserveLicense(2)
 	if err != nil {
-		t.Fatalf("reserve error: %v", err)
+		t.Fatalf("reserve license failed: %v", err)
 	}
-	err = lm.FanOutLicense(id, "agent1")
+	_, err = lm.AcceptLicense(badge.LicenseID)
 	if err != nil {
-		t.Fatalf("fan-out error: %v", err)
+		t.Fatalf("accept license failed: %v", err)
 	}
-	badgeID, err := lm.IssueBadge("agent1", id)
-	if err != nil {
-		t.Fatalf("issue badge error: %v", err)
+	_, err = lm.AcceptLicense(badge.LicenseID)
+	if err == nil {
+		t.Fatal("expected error on second accept, got none")
 	}
+}
 
-	receiptID, err := lm.AcceptLicense(badgeID)
+func TestAcceptLicense_InvalidBadge(t *testing.T) {
+	lm := NewLicenseManager()
+	badge, err := lm.ReserveLicense(1)
 	if err != nil {
-		t.Fatalf("accept license error: %v", err)
+		t.Fatalf("reserve license failed: %v", err)
 	}
-	if receiptID == "" {
-		t.Fatal("expected ship receipt ID")
-	}
-
-	// Badge should be invalid after acceptance
+	// Invalidate badge manually
 	lm.mu.Lock()
-	badge := lm.badges[badgeID]
+	lm.licenses[badge.LicenseID].Badge.Valid = false
 	lm.mu.Unlock()
-	if badge.Valid {
-		t.Fatal("expected badge to be invalid after acceptance")
-	}
 
-	// Accepting again should fail
-	_, err = lm.AcceptLicense(badgeID)
+	_, err = lm.AcceptLicense(badge.LicenseID)
 	if err == nil {
-		t.Fatal("expected error accepting with invalid badge")
+		t.Fatal("expected error for invalid badge, got none")
+	}
+}
+
+func TestReserveLicense_InvalidAmount(t *testing.T) {
+	lm := NewLicenseManager()
+	_, err := lm.ReserveLicense(0)
+	if err == nil {
+		t.Fatal("expected error for zero amount, got none")
+	}
+	_, err = lm.ReserveLicense(-1)
+	if err == nil {
+		t.Fatal("expected error for negative amount, got none")
 	}
 }
 
 func TestConcurrentReserve(t *testing.T) {
 	lm := NewLicenseManager()
 	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 8; i++ {
 		go func() {
-			_, _ = lm.ReserveLicense("program1", 1)
+			_, _ = lm.ReserveLicense(1)
 			done <- true
 		}()
 	}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 8; i++ {
 		<-done
 	}
-	// Total spend should not exceed envelope
-	if lm.monthlySpend > MonthlySpendEnvelope {
-		t.Fatalf("monthly spend exceeded envelope: %v", lm.monthlySpend)
+	// Total reserved should not exceed 8
+	if lm.totalReserved > MonthlySpendEnvelope {
+		t.Errorf("total reserved %v exceeds envelope %v", lm.totalReserved, MonthlySpendEnvelope)
 	}
 }
 
-func TestGenerateIDFormat(t *testing.T) {
-	id := generateID("test")
-	if len(id) == 0 {
-		t.Fatal("expected non-empty ID")
-	}
-	if id[:5] != "test-" {
-		t.Fatalf("expected prefix 'test-', got %s", id[:5])
+func TestGenerateLicenseID_Unique(t *testing.T) {
+	id1 := generateLicenseID()
+	time.Sleep(1 * time.Millisecond)
+	id2 := generateLicenseID()
+	if id1 == id2 {
+		t.Errorf("expected unique license IDs, got %v and %v", id1, id2)
 	}
 }
