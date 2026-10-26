@@ -2,77 +2,102 @@ package programruntime
 
 import (
 	"testing"
-	"time"
 )
 
-func TestReserveSpendLicense(t *testing.T) {
-	pr := New()
+func TestSpendLicenseReserveRelease(t *testing.T) {
+	sl := NewSpendLicense(800) // $8.00 in cents
 
-	// Reserve $5.00 (500 cents) - should succeed
-	if err := pr.ReserveSpendLicense(500); err != nil {
-		t.Fatalf("unexpected error reserving spend: %v", err)
-	}
-
-	// Reserve $4.00 (400 cents) - should fail (total 900 > 800)
-	if err := pr.ReserveSpendLicense(400); err != ErrSpendLimitExceeded {
-		t.Fatalf("expected ErrSpendLimitExceeded, got %v", err)
-	}
-
-	// Reserve $3.00 (300 cents) - should succeed (total 800)
-	if err := pr.ReserveSpendLicense(300); err != nil {
-		t.Fatalf("unexpected error reserving spend: %v", err)
-	}
-}
-
-func TestResetIfNeeded(t *testing.T) {
-	pr := New()
-	pr.spendReserved = 800
-	pr.lastReset = time.Now().Add(-31 * 24 * time.Hour) // force reset
-
-	pr.resetIfNeeded()
-
-	if pr.spendReserved != 0 {
-		t.Fatalf("expected spendReserved reset to 0, got %d", pr.spendReserved)
-	}
-}
-
-func TestIssueAndGetIDBadge(t *testing.T) {
-	pr := New()
-	badgeID := "badge123"
-
-	badge := pr.IssueIDBadge(badgeID)
-	if badge.ID != badgeID {
-		t.Fatalf("expected badge ID %s, got %s", badgeID, badge.ID)
-	}
-
-	gotBadge, err := pr.GetIDBadge(badgeID)
+	badge, err := sl.Reserve(500)
 	if err != nil {
-		t.Fatalf("unexpected error getting badge: %v", err)
+		t.Fatalf("unexpected error reserving license: %v", err)
 	}
-	if gotBadge.ID != badgeID {
-		t.Fatalf("expected badge ID %s, got %s", badgeID, gotBadge.ID)
+	if badge.ID == "" {
+		t.Fatal("expected non-empty badge ID")
 	}
 
-	// Test non-existent badge
-	_, err = pr.GetIDBadge("nonexistent")
-	if err != ErrBadgeNotFound {
-		t.Fatalf("expected ErrBadgeNotFound, got %v", err)
+	if sl.Used() != 500 {
+		t.Fatalf("expected used to be 500, got %d", sl.Used())
+	}
+
+	// Reserve more than available
+	_, err = sl.Reserve(400)
+	if err == nil {
+		t.Fatal("expected error reserving more than available")
+	}
+
+	sl.Release(200)
+	if sl.Used() != 300 {
+		t.Fatalf("expected used to be 300 after release, got %d", sl.Used())
+	}
+
+	// Release negative amount should not panic or change used
+	sl.Release(-100)
+	if sl.Used() != 300 {
+		t.Fatalf("expected used to remain 300 after negative release, got %d", sl.Used())
 	}
 }
 
-func TestAcceptAndShip(t *testing.T) {
-	pr := New()
-	programID := "prog1"
-	details := "Accepted program state"
+func TestIDBadgeValidation(t *testing.T) {
+	badge := NewIDBadge()
+	if err := badge.Validate(); err != nil {
+		t.Fatalf("expected valid badge, got error: %v", err)
+	}
 
-	receipt := pr.AcceptAndShip(programID, details)
-	if receipt.ProgramID != programID {
-		t.Fatalf("expected ProgramID %s, got %s", programID, receipt.ProgramID)
+	invalidBadge := IDBadge{ID: "short"}
+	if err := invalidBadge.Validate(); err == nil {
+		t.Fatal("expected error for invalid badge length")
 	}
-	if receipt.Details != details {
-		t.Fatalf("expected Details %s, got %s", details, receipt.Details)
+}
+
+func TestAcceptManager(t *testing.T) {
+	am := NewAcceptManager()
+	sl := NewSpendLicense(800)
+
+	badge, err := sl.Reserve(300)
+	if err != nil {
+		t.Fatalf("reserve failed: %v", err)
 	}
-	if time.Since(receipt.Timestamp) > time.Minute {
-		t.Fatalf("receipt timestamp too old")
+
+	receipt, err := am.Accept(badge, 300)
+	if err != nil {
+		t.Fatalf("accept failed: %v", err)
+	}
+	if receipt.Amount != 300 {
+		t.Fatalf("expected receipt amount 300, got %d", receipt.Amount)
+	}
+
+	// Accepting again should fail
+	_, err = am.Accept(badge, 300)
+	if err == nil {
+		t.Fatal("expected error on duplicate accept")
+	}
+
+	// GetReceipt returns the receipt
+	got, ok := am.GetReceipt(badge)
+	if !ok {
+		t.Fatal("expected receipt to exist")
+	}
+	if got.Amount != 300 {
+		t.Fatalf("expected receipt amount 300, got %d", got.Amount)
+	}
+}
+
+func TestLandingManager(t *testing.T) {
+	lm := NewLandingManager()
+	badge := NewIDBadge()
+
+	err := lm.Land(badge)
+	if err != nil {
+		t.Fatalf("land failed: %v", err)
+	}
+
+	if !lm.IsLanded(badge) {
+		t.Fatal("expected badge to be landed")
+	}
+
+	// Landing again should fail
+	err = lm.Land(badge)
+	if err == nil {
+		t.Fatal("expected error on duplicate land")
 	}
 }
