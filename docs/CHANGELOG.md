@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- AG-012: Implemented lean roster with $2 max cost per micro and $8 total budget.
-  - Only Engineer and Reviewer roles allowed.
-  - FULL_ARENA spawn disallowed under tight budget.
-  - Added tests covering budget and role constraints.
+- AG-012: Implement lean roster allocation in arena package.
+  - When availableMicros < $2 and role is Engineer or Reviewer only, arena uses lean roster allocation.
+  - FULL_ARENA spawn is avoided under tight $8 monthly budget.
+  - Added tests covering lean roster behavior and budget enforcement.
