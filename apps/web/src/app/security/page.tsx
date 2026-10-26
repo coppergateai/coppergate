@@ -25,21 +25,20 @@ export default function SecurityPage() {
         <p className={styles.pageEyebrow}>Trust</p>
         <h1 className={styles.pageTitle}>Security</h1>
         <p className={styles.pageLede}>
-          How autonomy, access, and kill-switches work in the open-source
-          Survivor arena — self-hosted or on the hosted instance.
+          How Open Program spend licenses, fitness gates, and kill-switches
+          keep Contracted Autonomy accountable — self-hosted or hosted.
         </p>
 
         <div className={styles.prose}>
           <section>
             <h2>Fitness is the gate</h2>
             <p>
-              Coppergate&apos;s north star is an autonomous Survivor arena:
-              contenders compete and promote through critic scores, tests, and
-              CI. You are not meant to approve every micro-step. You set policy
-              and spend caps, and you hold a kill-switch. The practical wedge is{" "}
-              <strong>issue → verified PR</strong> with budgets; production and
-              default-branch writes stay policy-gated (off until you enable
-              them).
+              Coppergate&apos;s north star is Open Program Runtime: contenders
+              compete under a spend license tied to Open IDs, promote through
+              fitness and CI, and you Accept once. You set policy and hold a
+              kill-switch. Success is Done writeback plus a{" "}
+              <strong>Ship Receipt</strong>; production and default-branch
+              writes stay policy-gated (off until you enable them).
             </p>
           </section>
 
@@ -94,14 +93,17 @@ export default function SecurityPage() {
         <div className={styles.docsCtaRow}>
           <a
             className={styles.btnHeroPrimary}
-            href="https://github.com/coppergateai/coppergate"
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
             target="_blank"
             rel="noreferrer"
           >
-            View on GitHub
+            Self-host guide
           </a>
-          <Link className={styles.btnSecondary} href="/docs">
-            Read the docs
+          <Link
+            className={styles.btnSecondary}
+            href="/docs/open-program-runtime"
+          >
+            Open Program Runtime
           </Link>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted

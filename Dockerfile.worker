@@ -30,5 +30,10 @@ RUN apt-get update \
   && corepack prepare pnpm@9.15.9 --activate \
   && go version
 COPY --from=build /app /app
+# Non-root runtime — sandbox workdirs use /tmp (world-writable).
+RUN groupadd --system --gid 1001 coppergate \
+  && useradd --system --uid 1001 --gid coppergate --home-dir /app --shell /usr/sbin/nologin coppergate \
+  && chown -R coppergate:coppergate /app
+USER coppergate
 WORKDIR /app/apps/worker
 CMD ["pnpm", "start"]

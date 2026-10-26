@@ -88,8 +88,11 @@ export default function SupportedStackPage() {
           >
             Self-host guide
           </a>
-          <Link className={styles.btnSecondary} href="/login">
-            Try hosted
+          <Link
+            className={styles.btnSecondary}
+            href="/docs/open-program-runtime"
+          >
+            Open Program Runtime
           </Link>
           <Link className={styles.btnSecondary} href="/docs/limitations">
             Limitations

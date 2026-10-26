@@ -32,6 +32,12 @@ Date: 2026-10-24
 - Native OpenAI harness uses `createCodingAgent` so BYOK path inherits env fallback
 - No failover on policy yields (`no_file_blocks`, path gates, spend_cap, cancel/abort) — correctness preserved
 
+## Cycle 14
+- **Cursor local SDK adapter**: `CursorSdkCodingAgent` (`@cursor/sdk`, `local.cwd` = sandbox workdir); BYOK vendor `cursor` + per-profile routing
+- **Quota failover**: `FailoverCodingAgent` also switches on primary `provider_quota` error events (not only throws); OpenAI primary + Cursor BYOK/`CURSOR_API_KEY` secondary
+- Arena `pauseArenaForProviderQuota` only when the run ends without completion (both providers failed); successful Cursor fallback keeps the arena running
+- Capability matrix: `cursor_local` live; `cursor_cloud` remains wait-state
+
 ## Cycle 6
 - **Restored poison reclaim** (was missing on disk): RUNNING → `QUEUED` with `reclaim:N`; after max 3 or 45m wall-clock → `FAILED` (`lease_expired_poison`)
 - **WAITING_CI stall timeout**: `finished_at` older than 6h (env `WAITING_CI_TIMEOUT_MS`) → `FAILED` (`waiting_ci_timeout`); frees concurrency slots
@@ -89,11 +95,19 @@ Date: 2026-10-24
 - **Evidence attention**: title includes project so duplicate P-00N rows are distinguishable
 - **Issues API**: GitHub 403/404 no longer 500 the project Overview issues panel
 
+## Cycle 15
+- **Soft-cancel reaper**: lease-expired / stuck `RUNNING|VALIDATING` with `cancel_requested_at` → hard `CANCELLED` + estimate release (no requeue / recover / immortal inflight)
+- **Lease renew refuse**: `renewRunLease` fails with `cancelled` when soft-cancel is set so ownership dies at the lease boundary
+- **Pre-delivery cancel**: worker honors cancel after agent work and immediately before PR deliver / review POST (no ship-after-cancel)
+- **CI required fail-closed**: when `CI_REQUIRED_CHECK_NAMES` is set, helper greens alone do not satisfy / auto-accept while the required context is still missing (`scoreCiChecks`)
+
 ## Tests
 - `@coppergate/agents` — path/tool gates, abort, failover, prompt-guard, buildPrompt, duplicate FILE, JSON retry
 - `delivery.test.ts` — fake idempotency, list fail-closed, 422 recovery, CAS conflict
 - `delivery-artifacts.test.ts` — checkpoint build/parse + legacy fail-closed
 - `runs.reaper-policy.test.ts` — reclaim parse + WAITING_CI timeout env
+- `runs.claim.test.ts` — soft-cancel reaper → CANCELLED (needs `DATABASE_URL`)
+- `ci-evidence.score.test.ts` — required-missing helpers ≠ accept-ready
 - `ci-evidence.test.ts` — WAITING_CI status alone not accept-ready (needs `DATABASE_URL`)
 - `budgets.test.ts` — llm_tokens once-per-runId (needs `DATABASE_URL`)
 - DB claim/execute suites need `DATABASE_URL`
@@ -104,3 +118,5 @@ Date: 2026-10-24
 - Failover doubles spend only on thrown provider failures; operators should size fallback model cost intentionally
 - Prompt isolation is defense-in-depth, not a guarantee against model compliance failures
 - llm_tokens dedupe is application-level (race of two concurrent inserts for same runId still possible without a unique index)
+- Delivery still uses a single capped lease renew (multi-file slow GitHub can race reaper before checkpoint)
+- PR-review path has no durable checkpoint — crash after GitHub POST can FAIL a landed review

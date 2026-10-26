@@ -125,11 +125,11 @@ export default function OpenProgramRuntimePage() {
           >
             Self-host guide
           </a>
+          <Link className={styles.btnSecondary} href="/docs/pricing">
+            Pricing ($0)
+          </Link>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted
-          </Link>
-          <Link className={styles.btnSecondary} href="/docs/pricing">
-            Pricing
           </Link>
         </div>
       </div>

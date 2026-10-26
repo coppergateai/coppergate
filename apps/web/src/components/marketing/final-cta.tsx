@@ -64,6 +64,8 @@ export function FinalCta() {
           {" · "}
           <Link href="/docs/limitations">Limitations</Link>
           {" · "}
+          <a href="#projects">Coppergate is built by Coppergate</a>
+          {" · "}
           hello@coppergate.ai
         </p>
       </div>

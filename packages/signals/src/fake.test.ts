@@ -43,6 +43,16 @@ describe("FakeSignalAdapter", () => {
     });
     assert.equal(good.ok, true);
   });
+
+  it("rejects when secret is not configured (fail closed)", () => {
+    const adapter = new FakeSignalAdapter();
+    const result = adapter.verify({
+      rawBody: "{}",
+      headers: { "x-coppergate-signal-secret": "anything" },
+      secret: null,
+    });
+    assert.equal(result.ok, false);
+  });
 });
 
 describe("severityAtLeast", () => {

@@ -94,17 +94,20 @@ export default function LimitationsPage() {
         <div className={styles.docsCtaRow}>
           <a
             className={styles.btnHeroPrimary}
-            href="https://github.com/coppergateai/coppergate"
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
             target="_blank"
             rel="noreferrer"
           >
-            View on GitHub
+            Self-host guide
           </a>
+          <Link
+            className={styles.btnSecondary}
+            href="/docs/open-program-runtime"
+          >
+            Open Program Runtime
+          </Link>
           <Link className={styles.btnSecondary} href="/docs/pricing">
             Pricing ($0)
-          </Link>
-          <Link className={styles.btnSecondary} href="/docs/supported-stack">
-            Supported stack
           </Link>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted

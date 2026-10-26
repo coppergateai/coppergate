@@ -44,17 +44,17 @@ type Category = {
 const workflows = [
   {
     source: "Sentry",
-    path: "Error detected → Arena → Verified fix PR",
+    path: "Error detected → Open ID → Arena → reviewable PR",
     note: "Inbound webhook arms a bounded fixer tournament when configured.",
   },
   {
     source: "Jira",
-    path: "Engineering issue → Arena → Candidate implementation",
+    path: "Engineering issue → Open ID → Arena → reviewable PR",
     note: "Issue webhooks map to tasks; delivery is still PR/MR review.",
   },
   {
     source: "GitHub CI",
-    path: "Failed workflow → Arena → Proposed repair",
+    path: "Failed workflow → Open ID → Arena → proposed repair",
     note: "CI failure adapters can arm repair contests against the failing SHA.",
   },
 ] as const;
@@ -150,12 +150,12 @@ export function SignalAdaptersSection() {
       <div className={styles.sectionInner}>
         <p className={styles.sectionEyebrow}>Integrations</p>
         <h2 id="signals-title" className={styles.sectionTitle}>
-          From signal to verified PR.
+          From signal to program-bound Arena.
         </h2>
         <p className={styles.sectionLede}>
-          Webhooks from tools you already run can arm a bounded Arena. Live PR/MR
-          delivery is GitHub and GitLab today — always reviewable, never an
-          unattended merge.
+          Webhooks from tools you already run can arm a bounded Arena against an
+          Open ID. Live PR/MR delivery is GitHub and GitLab today — always
+          reviewable, never an unattended merge.
         </p>
 
         <ul className={styles.workflowOutcomes}>
@@ -172,9 +172,12 @@ export function SignalAdaptersSection() {
           <Link className={styles.btnSecondary} href="/docs/supported-stack">
             Supported stack
           </Link>
-          <Link className={styles.btnSecondary} href="/login">
-            Try hosted
+          <Link className={styles.btnSecondary} href="/docs/open-program-runtime">
+            Open Program Runtime
           </Link>
+          <a className={styles.inlineDocLink} href="#get-started">
+            Get started →
+          </a>
         </div>
       </div>
 

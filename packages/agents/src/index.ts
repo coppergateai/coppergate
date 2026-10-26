@@ -30,9 +30,25 @@ export {
 } from "./openai-compatible.js";
 export {
   createCodingAgent,
+  type CodingAgentKind,
+  type CreateCodingAgentFallback,
   type CreateCodingAgentOptions,
 } from "./create-agent.js";
 export { FailoverCodingAgent } from "./failover.js";
+export {
+  CursorSdkCodingAgent,
+  type CursorSdkAgentHandle,
+  type CursorSdkBridge,
+  type CursorSdkCodingAgentConfig,
+  type CursorSdkCreateOptions,
+  type CursorSdkRunHandle,
+} from "./cursor-sdk.js";
+export {
+  diffWorkdirSnapshots,
+  snapshotWorkdir,
+  type ChangedWorkdirFile,
+  type WorkdirFileSnapshot,
+} from "./workdir-diff.js";
 export {
   flagsPromptInjectionPhrases,
   guardPromptFields,
@@ -51,6 +67,7 @@ export {
 } from "./strategy.js";
 export {
   CursorCloudHarnessStub,
+  CursorLocalHarness,
   NativeFakeHarness,
   NativeOpenAiHarness,
   OpenHandsHarnessStub,

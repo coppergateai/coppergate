@@ -246,11 +246,12 @@ export async function executeClaimedRun(
     let completion: FakeCompletionPayload | null = null;
     let lastAgentErrorCode: string | null = null;
     let lastAgentErrorMessage: string | null = null;
+    /** True when FailoverCodingAgent switched providers mid-run (quota / throw). */
+    let sawProviderFailover = false;
   let validationReport: Awaited<
     ReturnType<typeof runStackValidation>
   > | null = null;
   let actualCost = 0;
-  let sawCancel = false;
 
   let strategy = "balanced";
   let strategyContext: string | undefined;
@@ -413,15 +414,53 @@ export async function executeClaimedRun(
   // Heartbeat keeps ownership during long LLM / validation work (default lease 30s).
   const abortController = new AbortController();
   let lostOwnership = false;
+  let sawCancel = false;
   const heartbeatMs = Math.max(1_000, Math.floor(leaseMs / 3));
   const heartbeat = setInterval(() => {
     void renewRunLease(db, run.id, workerId, leaseMs).catch((err) => {
-      if (err instanceof RunError && err.code === "not_owner") {
+      if (err instanceof RunError && err.code === "cancelled") {
+        sawCancel = true;
+        abortController.abort();
+      } else if (err instanceof RunError && err.code === "not_owner") {
         lostOwnership = true;
         abortController.abort();
       }
     });
   }, heartbeatMs);
+
+  const finishCancelled = async (
+    reason: string,
+  ): Promise<"cancelled"> => {
+    clearInterval(heartbeat);
+    try {
+      await markRunCancelled(db, {
+        runId: run.id,
+        workerId,
+        errorMessage: reason,
+      });
+    } catch (err) {
+      // Reaper may already have hard-cancelled after lease expiry.
+      if (!(err instanceof RunError && err.code === "not_owner")) {
+        log.warn("markRunCancelled after soft-cancel skipped", {
+          runId: run.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    await safeTaskTransition(db, task, "CANCELLED", workerId, log);
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
+    return "cancelled";
+  };
+
+  const honorCancelIfRequested = async (
+    reason: string,
+  ): Promise<"cancelled" | null> => {
+    if (sawCancel || (await isRunCancelRequested(db, run.id))) {
+      sawCancel = true;
+      return finishCancelled(reason);
+    }
+    return null;
+  };
 
   try {
     try {
@@ -554,6 +593,11 @@ export async function executeClaimedRun(
         try {
           await renewRunLease(db, run.id, workerId, leaseMs);
         } catch (err) {
+          if (err instanceof RunError && err.code === "cancelled") {
+            sawCancel = true;
+            abortController.abort();
+            break;
+          }
           if (err instanceof RunError && err.code === "not_owner") {
             lostOwnership = true;
             abortController.abort();
@@ -587,6 +631,24 @@ export async function executeClaimedRun(
           }
         }
 
+        if (
+          event.kind === "progress" &&
+          event.payload?.code === "provider_failover"
+        ) {
+          sawProviderFailover = true;
+          log.info("provider failover engaged", {
+            runId: run.id,
+            reason:
+              typeof event.payload.reason === "string"
+                ? event.payload.reason.slice(0, 200)
+                : null,
+            trigger:
+              typeof event.payload.trigger === "string"
+                ? event.payload.trigger
+                : null,
+          });
+        }
+
         if (event.kind === "error") {
           const code =
             typeof event.payload?.code === "string" ? event.payload.code : null;
@@ -606,10 +668,23 @@ export async function executeClaimedRun(
         ) {
           completion = event.payload;
           actualCost = event.payload.actualCostMicros || actualCost;
+          // Successful secondary run after quota — do not treat primary quota as terminal.
+          if (sawProviderFailover && lastAgentErrorCode === "provider_quota") {
+            lastAgentErrorCode = null;
+            lastAgentErrorMessage = null;
+          }
         }
       }
 
+      if (sawCancel) {
+        return finishCancelled("Run cancelled during agent work");
+      }
+
       if (lostOwnership) {
+        const cancelled = await honorCancelIfRequested(
+          "Run cancelled after lease loss",
+        );
+        if (cancelled) return cancelled;
         log.warn("lost run lease ownership; aborting without delivery", {
           runId: run.id,
         });
@@ -831,10 +906,21 @@ export async function executeClaimedRun(
   }
 
   if (lostOwnership) {
+    const cancelled = await honorCancelIfRequested(
+      "Run cancelled after lease loss during validation",
+    );
+    if (cancelled) return cancelled;
     log.warn("lost run lease ownership after agent work; skipping delivery", {
       runId: run.id,
     });
     return "failed";
+  }
+
+  {
+    const cancelled = await honorCancelIfRequested(
+      "Run cancelled before delivery",
+    );
+    if (cancelled) return cancelled;
   }
 
   // Stop heartbeat before delivery — hung GitHub calls must not renew forever
@@ -844,6 +930,9 @@ export async function executeClaimedRun(
   try {
     await renewRunLease(db, run.id, workerId, deliveryLeaseMs);
   } catch (err) {
+    if (err instanceof RunError && err.code === "cancelled") {
+      return finishCancelled("Run cancelled before delivery lease renew");
+    }
     if (err instanceof RunError && err.code === "not_owner") {
       log.warn("lost ownership before delivery; skipping", { runId: run.id });
       return "failed";
@@ -983,6 +1072,13 @@ export async function executeClaimedRun(
         completion.reviewBody.trim()) ||
       `## Coppergate review\n\nAutomated review for task \`${task.id}\` / run \`${run.id}\`.\n`;
 
+    {
+      const cancelled = await honorCancelIfRequested(
+        "Run cancelled before PR review post",
+      );
+      if (cancelled) return cancelled;
+    }
+
     if (deliveryMode === "http" && authToken) {
       await submitPullRequestReview({
         token: authToken,
@@ -1117,6 +1213,12 @@ export async function executeClaimedRun(
     run.workspaceId,
     run.id,
   );
+  if (!existingCheckpoint) {
+    const cancelled = await honorCancelIfRequested(
+      "Run cancelled before pull request delivery",
+    );
+    if (cancelled) return cancelled;
+  }
   const delivery = existingCheckpoint
     ? {
         prUrl: existingCheckpoint.prUrl,

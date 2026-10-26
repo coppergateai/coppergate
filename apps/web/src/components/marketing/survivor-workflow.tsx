@@ -63,13 +63,19 @@ export function SurvivorWorkflow() {
         </ol>
 
         <div className={styles.sectionCtas}>
+          <Link
+            className={styles.btnSecondary}
+            href="/docs/open-program-runtime"
+          >
+            Open Program Runtime
+          </Link>
           <a
             className={styles.btnSecondary}
-            href="https://github.com/coppergateai/coppergate"
+            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
             target="_blank"
             rel="noreferrer"
           >
-            Start on GitHub
+            Self-host guide
           </a>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted

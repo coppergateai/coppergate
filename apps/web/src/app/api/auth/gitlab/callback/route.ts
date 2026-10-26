@@ -130,6 +130,15 @@ export async function GET(request: Request) {
       throw new ApiError("forbidden", "Invalid OAuth state");
     }
 
+    const loginConsumed = await tryConsumeSignedState(db, {
+      jti: `oauth_login:gitlab:${state}`,
+      kind: "oauth_login",
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    });
+    if (!loginConsumed) {
+      throw new ApiError("forbidden", "OAuth state already used");
+    }
+
     const user = await upsertScmUser(db, {
       authProvider: "gitlab",
       externalUserId: String(profile.id),

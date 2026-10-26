@@ -14,6 +14,15 @@ export const metadata: Metadata = publicPageMetadata({
 
 const entries = [
   {
+    date: "2026-10-26",
+    title: "Marketing Open Program consistency",
+    items: [
+      "Hero link + FAQ/how/arena/signals/fitness CTAs → Open Program Runtime",
+      "Pricing + security + pilots copy: Ship Receipt / Contracted Autonomy",
+      "Final CTA dogfood link to #projects; less GitHub CTA repetition mid-page",
+    ],
+  },
+  {
     date: "2026-10-25",
     title: "Open Program Runtime",
     items: [
@@ -141,8 +150,8 @@ export default function ChangelogPage() {
         <p className={styles.pageEyebrow}>Product</p>
         <h1 className={styles.pageTitle}>Changelog</h1>
         <p className={styles.pageLede}>
-          What shipped in the open — arena, signals, delivery, and the public
-          site.
+          What shipped in the open — Open Program Runtime, arena, signals, and
+          the public site.
         </p>
 
         <div className={styles.changelogList}>
@@ -165,20 +174,18 @@ export default function ChangelogPage() {
         <div className={styles.docsCtaRow}>
           <a
             className={styles.btnHeroPrimary}
-            href="https://github.com/coppergateai/coppergate"
-            target="_blank"
-            rel="noreferrer"
-          >
-            View on GitHub
-          </a>
-          <a
-            className={styles.btnSecondary}
             href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
             target="_blank"
             rel="noreferrer"
           >
             Self-host guide
           </a>
+          <Link
+            className={styles.btnSecondary}
+            href="/docs/open-program-runtime"
+          >
+            Open Program Runtime
+          </Link>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted
           </Link>
@@ -187,6 +194,8 @@ export default function ChangelogPage() {
           <a href="mailto:hello@coppergate.ai">hello@coppergate.ai</a>
           {" · "}
           <Link href="/docs">Docs</Link>
+          {" · "}
+          <Link href="/docs/pricing">Pricing</Link>
         </p>
       </article>
     </SiteChrome>

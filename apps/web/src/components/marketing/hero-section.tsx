@@ -38,6 +38,12 @@ export function HeroSection() {
             <HostedCtaLink className={styles.btnSecondary} />
           </div>
 
+          <p className={styles.heroDocLink}>
+            <a href="/docs/open-program-runtime">
+              What is Open Program Runtime? →
+            </a>
+          </p>
+
           <ul className={styles.trustList}>
             <li>MIT · Community $0</li>
             <li>Program-bound spend</li>

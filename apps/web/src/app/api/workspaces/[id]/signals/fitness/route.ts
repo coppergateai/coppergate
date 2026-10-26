@@ -18,13 +18,25 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+/** Test/manual fitness ingest — off in production unless explicitly enabled. */
+function fitnessTestIngestAllowed(): boolean {
+  if (process.env.ALLOW_FITNESS_TEST_INGEST === "1") return true;
+  return process.env.NODE_ENV !== "production";
+}
+
 /**
  * Owner/test fitness ingest (Codecov / e2e / perf / preview / sonar).
- * Production providers POST here or via provider webhooks later.
+ * Production providers should use signed webhooks; this route is for local/CI.
  */
 export async function POST(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
+    if (!fitnessTestIngestAllowed()) {
+      throw new ApiError(
+        "forbidden",
+        "Fitness test ingest disabled in production (set ALLOW_FITNESS_TEST_INGEST=1)",
+      );
+    }
     requireCsrf(request);
     const user = await requireUser(request);
     const { id: workspaceId } = await context.params;

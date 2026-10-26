@@ -92,7 +92,7 @@ export async function POST(request: Request, context: RouteContext) {
               title: "Demo smoke task",
               goal: "Exercise the delivery board with one tiny task",
               scope: "Touch one file or add a one-line comment",
-              allowedPaths: ["*"],
+              allowedPaths: ["docs/**", "README.md"],
               acceptanceCriteria: ["Task visible on delivery board"],
               estimateMicros: 50_000,
               estimateComplexity: "S",

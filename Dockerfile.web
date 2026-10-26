@@ -27,5 +27,9 @@ COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
 # File-based blog markdown (sitemap + /blog index read at runtime)
 COPY --from=build /app/apps/web/content ./apps/web/content
+RUN groupadd --system --gid 1001 coppergate \
+  && useradd --system --uid 1001 --gid coppergate --home-dir /app --shell /usr/sbin/nologin coppergate \
+  && chown -R coppergate:coppergate /app
+USER coppergate
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]

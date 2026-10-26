@@ -62,6 +62,12 @@ const envSchema = z.object({
   LLM_BASE_URL: z.string().url().optional(),
   LLM_MODEL: z.string().min(1).optional(),
   /**
+   * Optional Cursor local SDK key. When set with OpenAI primary, worker wraps
+   * FailoverCodingAgent (quota / thrown provider failures → Cursor).
+   */
+  CURSOR_API_KEY: z.string().min(1).optional(),
+  CURSOR_MODEL: z.string().min(1).optional(),
+  /**
    * Worker PR delivery: `fake` (default) or `http` (real GitHub App installation).
    * Staging / TASK033 sets `http` with App credentials.
    */

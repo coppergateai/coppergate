@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { EmptyState } from "@/components/app/ui";
+import { displayTaskTitle } from "@/lib/display-title";
 import styles from "./project-detail.module.css";
 
 export type BoardTask = {
@@ -115,7 +116,9 @@ function BoardCard({
   return (
     <li className={styles.boardCard}>
       <Link href={href}>
-        <div className={styles.boardCardTitle}>{t.title}</div>
+        <div className={styles.boardCardTitle}>
+          {displayTaskTitle(t.title) || t.title}
+        </div>
         <div className={styles.boardCardMeta} title={t.status}>
           {t.milestoneTitle} · {statusLabel(t.status)}
           {t.estimateMicros != null

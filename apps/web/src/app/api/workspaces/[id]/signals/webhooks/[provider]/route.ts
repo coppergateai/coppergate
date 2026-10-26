@@ -56,6 +56,13 @@ export async function POST(request: Request, context: RouteContext) {
       rootSecret,
       providerSecret,
     });
+    // Fail closed — adapters must never accept webhooks without a configured secret.
+    if (!secret) {
+      throw new ApiError(
+        "not_ready",
+        "Signal webhooks require SIGNAL_WEBHOOK_SECRET (or SIGNAL_<PROVIDER>_SECRET)",
+      );
+    }
 
     const rawBody = await request.text();
     const verified = adapter.verify({

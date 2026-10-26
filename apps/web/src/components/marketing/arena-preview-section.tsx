@@ -194,19 +194,14 @@ export function ArenaPreviewSection() {
         </div>
 
         <div className={styles.sectionCtas}>
-          <a
-            className={styles.btnSecondary}
-            href="https://github.com/coppergateai/coppergate"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Run it from GitHub
+          <a className={styles.btnSecondary} href="#how-it-works">
+            See how it works
           </a>
-          <Link className={styles.btnSecondary} href="/login">
-            Try hosted
+          <Link className={styles.btnSecondary} href="/docs/open-program-runtime">
+            Open Program Runtime
           </Link>
-          <a className={styles.inlineDocLink} href="#how-it-works">
-            See how it works →
+          <a className={styles.inlineDocLink} href="#get-started">
+            Get started →
           </a>
         </div>
       </div>

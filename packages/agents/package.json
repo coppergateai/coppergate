@@ -19,6 +19,9 @@
   "dependencies": {
     "@coppergate/sandbox": "workspace:*"
   },
+  "optionalDependencies": {
+    "@cursor/sdk": "^1.0.40"
+  },
   "devDependencies": {
     "@coppergate/eslint-config": "workspace:*",
     "@coppergate/typescript-config": "workspace:*",

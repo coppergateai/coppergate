@@ -34,8 +34,9 @@ export default async function LoginPage() {
           <h1 className={styles.authTitle}>Try the hosted arena</h1>
           <p className={styles.authLede}>
             Free to explore — no paid plan required. Sign in with GitHub or
-            GitLab to open workspaces. We only request identity scopes —
-            repository access comes later under your control.
+            GitLab to open workspaces, bind Open Programs, and review Ship
+            Receipts. Identity scopes only — repository access comes later
+            under your control.
           </p>
           {githubReady ? (
             <a className={styles.authCta} href="/api/auth/github">
@@ -66,9 +67,11 @@ export default async function LoginPage() {
             Prefer self-host? Read the guide →
           </a>
           <p className={styles.authNote}>
-            MIT · Community $0 to self-host · Kill-switch + spend caps
+            MIT · Community $0 · Open Program spend licenses · Kill-switch
           </p>
           <p className={styles.authNote}>
+            <Link href="/docs/open-program-runtime">Open Program Runtime</Link>
+            {" · "}
             <Link href="/docs/pricing">Pricing</Link>
             {" · "}
             <Link href="/docs/limitations">Limitations</Link>

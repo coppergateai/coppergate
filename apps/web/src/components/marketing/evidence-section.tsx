@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   ILLUSTRATIVE_ARENA,
   ILLUSTRATIVE_CONTENDERS,
@@ -76,13 +77,14 @@ export function EvidenceSection() {
             <a className={styles.btnSecondary} href="#arena">
               Open Arena demo
             </a>
-            <a
-              className={styles.inlineDocLink}
-              href="https://github.com/coppergateai/coppergate"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              className={styles.btnSecondary}
+              href="/docs/open-program-runtime"
             >
-              View on GitHub →
+              Open Program Runtime
+            </Link>
+            <a className={styles.inlineDocLink} href="#get-started">
+              Get started →
             </a>
           </div>
         </article>

@@ -2,6 +2,7 @@
 
 export type LlmVendorId =
   | "openai"
+  | "cursor"
   | "groq"
   | "openrouter"
   | "ollama"
@@ -47,6 +48,24 @@ export const LLM_PROVIDERS: readonly LlmProviderPreset[] = [
     ],
     supportsDiscover: false,
     hint: "Paste your OpenAI API key and pick a model.",
+  },
+  {
+    id: "cursor",
+    name: "Cursor (local agent)",
+    baseUrl: null,
+    requiresKey: true,
+    keyPlaceholder: "cursor_…",
+    hideBaseUrl: true,
+    curatedModels: [
+      "composer-2.5",
+      "auto",
+      "claude-opus-4-5",
+      "claude-sonnet-4-5",
+      "gpt-5.2",
+    ],
+    supportsDiscover: false,
+    hint:
+      "Dashboard → Integrations API key. Worker runs @cursor/sdk locally against the sandbox. When OpenAI hits quota, a Cursor connection is used as automatic failover.",
   },
   {
     id: "groq",
@@ -169,6 +188,8 @@ export function normalizeLlmBaseUrl(
   baseUrl: string | null | undefined,
 ): string | null {
   const preset = getLlmProvider(vendorId);
+  // Cursor is not OpenAI-compatible — never store a fake chat base URL.
+  if (vendorId === "cursor") return null;
   if (preset?.hideBaseUrl && preset.baseUrl) return preset.baseUrl;
   const trimmed = typeof baseUrl === "string" ? baseUrl.trim() : "";
   if (trimmed) return trimmed.replace(/\/+$/, "");

@@ -21,7 +21,7 @@ export const PILOT_PROJECTS: readonly PilotProject[] = [
     href: "https://www.coppergate.ai",
     github: "https://github.com/coppergateai/coppergate",
     blurb:
-      "Coppergate is built by Coppergate — the Survivor arena ships verified PRs into its own MIT repos under a spend cap.",
+      "Coppergate is built by Coppergate — Open Program lines, spend licenses, and Ship Receipts on our own MIT repos.",
     logoSrc: "/logo-black.svg",
     logoSrcDark: "/logo-white.svg",
     logoAlt: "Coppergate",

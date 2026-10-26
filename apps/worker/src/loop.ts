@@ -5,6 +5,7 @@ import {
   harnessAsCodingAgent,
   type ContenderHarnessKind,
   type CodingAgent,
+  type CodingAgentKind,
 } from "@coppergate/agents";
 import {
   applyTaskTransition,
@@ -13,6 +14,7 @@ import {
   getDefaultLlmByok,
   getEffectiveAgentProfile,
   getLlmByokById,
+  listLlmByok,
   purgeExpiredSoftDeletedWorkspaces,
   reapStaleRuns,
   touchLlmByokUsed,
@@ -41,12 +43,37 @@ function parseHarnessEnv(): ContenderHarnessKind | null {
     "native_openai",
     "openhands",
     "aider",
+    "cursor_local",
     "cursor_cloud",
     "codex",
   ];
   return raw && (allowed as string[]).includes(raw)
     ? (raw as ContenderHarnessKind)
     : null;
+}
+
+function vendorToAgentKind(vendor: string | null | undefined): CodingAgentKind {
+  return vendor?.trim().toLowerCase() === "cursor" ? "cursor" : "openai";
+}
+
+async function resolveCursorFallbackCredential(
+  db: Database,
+  workspaceId: string,
+  primaryCredentialId: string | null,
+): Promise<{ byok: IntegrationCredential; model: string | undefined } | null> {
+  const listed = await listLlmByok(db, workspaceId);
+  const cursorMeta = listed.find(
+    (c) =>
+      c.vendor.trim().toLowerCase() === "cursor" &&
+      c.id !== primaryCredentialId,
+  );
+  if (!cursorMeta) return null;
+  const byok = await getLlmByokById(db, workspaceId, cursorMeta.id);
+  if (!byok?.encryptedPayload) return null;
+  return {
+    byok,
+    model: byok.model?.trim() || undefined,
+  };
 }
 
 /**
@@ -127,7 +154,17 @@ function resolveWorkerAgent(
       );
     }
 
-    // Prefer BYOK / env OpenAI — required for live http product work.
+    if (explicit === "cursor_local") {
+      log.info("using ContenderHarness", {
+        harnessKind: explicit,
+        workspaceId,
+      });
+      return harnessAsCodingAgent(
+        createContenderHarness({ kind: "cursor_local" }),
+      );
+    }
+
+    // Prefer BYOK / env OpenAI or Cursor — required for live http product work.
     if (!forceFakePath || explicit === "native_openai") {
       try {
         const resolved = await resolveByokForProfile(
@@ -143,11 +180,13 @@ function resolveWorkerAgent(
             parseEncryptionKey(keyHex),
           );
           await touchLlmByokUsed(db, workspaceId, byok.id);
+          const kind = vendorToAgentKind(byok.vendor);
           log.info("using workspace BYOK for coding agent", {
             workspaceId,
             credentialId: byok.id,
             label: byok.label,
             vendor: byok.vendor,
+            kind,
             model,
             profileKey,
           });
@@ -163,10 +202,50 @@ function resolveWorkerAgent(
               }),
             );
           }
+
+          let fallback:
+            | {
+                kind: CodingAgentKind;
+                apiKey?: string;
+                model?: string;
+              }
+            | undefined;
+          if (kind === "openai") {
+            const cursorFb = await resolveCursorFallbackCredential(
+              db,
+              workspaceId,
+              byok.id,
+            );
+            if (cursorFb?.byok.encryptedPayload) {
+              const cursorKey = openSecret(
+                cursorFb.byok.encryptedPayload,
+                parseEncryptionKey(keyHex),
+              );
+              await touchLlmByokUsed(db, workspaceId, cursorFb.byok.id);
+              fallback = {
+                kind: "cursor",
+                apiKey: cursorKey,
+                model: cursorFb.model,
+              };
+              log.info("wiring Cursor BYOK as OpenAI quota failover", {
+                workspaceId,
+                cursorCredentialId: cursorFb.byok.id,
+                model: cursorFb.model,
+              });
+            } else if (process.env.CURSOR_API_KEY?.trim()) {
+              fallback = { kind: "cursor" };
+              log.info("wiring CURSOR_API_KEY as OpenAI quota failover", {
+                workspaceId,
+              });
+            }
+          }
+
           return createCodingAgent({
+            kind,
             apiKey,
             baseUrl: byok.baseUrl ?? undefined,
             model,
+            fallback,
           });
         }
       } catch (err) {
@@ -178,7 +257,9 @@ function resolveWorkerAgent(
       const envAgent = createCodingAgent();
       // createCodingAgent returns Fake when no key — only keep it if real provider.
       if (!(envAgent instanceof FakeCodingAgent)) {
-        log.info("using OpenAI-compatible agent from env", { workspaceId });
+        log.info("using coding agent from env (OpenAI and/or Cursor)", {
+          workspaceId,
+        });
         return envAgent;
       }
     }
@@ -260,6 +341,7 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           reaped.failedValidating > 0 ||
           reaped.failedPoison > 0 ||
           reaped.failedWaitingCi > 0 ||
+          reaped.cancelledSoft > 0 ||
           reaped.recoveredDelivered > 0
         ) {
           log.info("reaped stale runs", {
@@ -267,8 +349,27 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
             failedValidating: reaped.failedValidating,
             failedPoison: reaped.failedPoison,
             failedWaitingCi: reaped.failedWaitingCi,
+            cancelledSoft: reaped.cancelledSoft,
             recoveredDelivered: reaped.recoveredDelivered,
           });
+        }
+        for (const cancelled of reaped.cancelledRuns) {
+          try {
+            await applyTaskTransition(db, {
+              workspaceId: cancelled.workspaceId,
+              taskId: cancelled.taskId,
+              toStatus: "CANCELLED",
+              actor: `worker:${workerId}`,
+              reason: cancelled.errorCode,
+            });
+          } catch (err) {
+            log.warn("task CANCELLED after soft-cancel reaper skipped", {
+              taskId: cancelled.taskId,
+              runId: cancelled.id,
+              errorCode: cancelled.errorCode,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
         }
         for (const recovered of reaped.recoveredDeliveredRuns) {
           const toStatus =

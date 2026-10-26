@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { assertSafeServerFetchUrl } from "@coppergate/sandbox/policy";
 import {
   AgentPolicyError,
   buildFakeCompletion,
@@ -317,6 +318,9 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       const signal = mergeAbortSignals(externalSignal, timeout.signal);
 
       try {
+        // Defense in depth — write path uses DNS-resolved checks; block obvious
+        // metadata/private literal hosts before any outbound call.
+        assertSafeServerFetchUrl(this.baseUrl, { allowLoopback: true });
         const res = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
           method: "POST",
           headers: {

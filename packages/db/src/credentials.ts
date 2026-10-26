@@ -1,4 +1,8 @@
 import { and, asc, desc, eq } from "drizzle-orm";
+import {
+  SandboxPolicyError,
+  assertSafeServerFetchUrlResolved,
+} from "@coppergate/sandbox/policy";
 import type { Database } from "./client.js";
 import { recordAuditEvent } from "./briefs.js";
 import {
@@ -12,6 +16,27 @@ export class CredentialError extends Error {
     super(message);
     this.name = "CredentialError";
     this.code = code;
+  }
+}
+
+/** Block metadata/private SSRF targets; loopback allowed for local Ollama/LM Studio. */
+async function assertSafeLlmBaseUrl(
+  baseUrl: string | null | undefined,
+): Promise<string | null | undefined> {
+  if (baseUrl === undefined) return undefined;
+  if (baseUrl === null) return null;
+  const trimmed = baseUrl.trim();
+  if (!trimmed) return null;
+  try {
+    const url = await assertSafeServerFetchUrlResolved(trimmed, {
+      allowLoopback: true,
+    });
+    return url.href.replace(/\/$/, "");
+  } catch (err) {
+    if (err instanceof SandboxPolicyError) {
+      throw new CredentialError("invalid", err.message);
+    }
+    throw new CredentialError("invalid", "Invalid baseUrl");
   }
 }
 
@@ -228,6 +253,8 @@ export async function createLlmByok(
     throw new CredentialError("invalid", "encrypted payload required");
   }
 
+  const safeBaseUrl = await assertSafeLlmBaseUrl(input.baseUrl);
+
   const baseLabel = slugifyLabel(
     input.label?.trim() ||
       suggestLlmConnectionLabel(vendor, input.model ?? null),
@@ -272,7 +299,7 @@ export async function createLlmByok(
       label,
       vendor,
       encryptedPayload,
-      baseUrl: input.baseUrl ?? null,
+      baseUrl: safeBaseUrl ?? null,
       model: input.model ?? null,
       isDefault: makeDefault,
       status: "active",
@@ -344,6 +371,8 @@ export async function updateLlmByok(
     await clearDefaults(db, input.workspaceId, existing.id);
   }
 
+  const safeBaseUrl = await assertSafeLlmBaseUrl(input.baseUrl);
+
   const [updated] = await db
     .update(integrationCredentials)
     .set({
@@ -354,7 +383,8 @@ export async function updateLlmByok(
         input.vendor !== undefined
           ? input.vendor.trim().toLowerCase() || existing.vendor
           : existing.vendor,
-      baseUrl: input.baseUrl === undefined ? existing.baseUrl : input.baseUrl,
+      baseUrl:
+        safeBaseUrl === undefined ? existing.baseUrl : safeBaseUrl,
       model: input.model === undefined ? existing.model : input.model,
       isDefault:
         input.setDefault === true ? true : existing.isDefault,
