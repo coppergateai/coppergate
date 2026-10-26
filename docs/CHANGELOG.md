@@ -3,8 +3,6 @@
 ## [Unreleased]
 
 ### Added
-- AG-012: Implemented lean Arena allocator with tight budget enforcement.
-  - Allocations fail with ErrFullArena when capacity exceeded.
-  - Designed for micros under $2 engineer+reviewer cost, no full arena spawn beyond budget.
-  - Includes Reset method for reuse.
-  - Covered by unit tests.
+- AG-012: Implement lean roster allocation under tight budget.
+  - When availableMicros budget is under $2, only Engineer and Reviewer roles are allowed.
+  - FULL_ARENA spawn is disallowed under this budget to keep memory usage lean.
