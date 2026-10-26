@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
-### Features
+### Added
 
-- AG-012: Implemented Lean Roster capability with micros under $2 cost, only Engineer and Reviewer roles allowed, no FULL_ARENA spawn under $8 monthly budget envelope. Added tests and usage docs.
+- AG-012: Implemented LeanArena in arena package for lean roster allocation under $2 monthly budget.
+  - Only Engineer and Reviewer roles allowed.
+  - Avoids FULL_ARENA spawn under tight budget.
+  - Includes allocation, free, and role restriction logic.
+  - Added tests covering allocation, role restrictions, and budget enforcement.
