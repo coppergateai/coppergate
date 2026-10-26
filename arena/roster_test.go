@@ -4,92 +4,91 @@ import (
 	"testing"
 )
 
-func TestLeanRosterActivation(t *testing.T) {
+func TestNewRoster_LeanRosterAllowed(t *testing.T) {
 	cfg := RosterConfig{
-		AvailableMicros: 1_500, // under 2ms
-		MonthlyBudget:   8,
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    1_500_000, // under $2
 	}
-	r := NewRoster(cfg)
-
-	if !r.IsLeanRosterActive() {
-		t.Errorf("expected lean roster mode active, got inactive")
+	r, err := NewRoster(cfg)
+	if err != nil {
+		t.Fatalf("expected lean roster, got error: %v", err)
 	}
-
-	// Spawn Engineer allowed
-	if err := r.SpawnArena("spawn1", RoleEngineer); err != nil {
-		t.Errorf("unexpected error spawning engineer: %v", err)
-	}
-
-	// Spawn Reviewer allowed
-	if err := r.SpawnArena("spawn2", RoleReviewer); err != nil {
-		t.Errorf("unexpected error spawning reviewer: %v", err)
-	}
-
-	// Spawn FULL_ARENA disallowed
-	err := r.SpawnArena("spawn3", RoleFullArenaSpawn)
-	if err != ErrFullArenaSpawnNotAllowed {
-		t.Errorf("expected ErrFullArenaSpawnNotAllowed, got %v", err)
+	if r == nil {
+		t.Fatal("expected roster instance, got nil")
 	}
 }
 
-func TestLeanRosterDeactivation(t *testing.T) {
+func TestNewRoster_FullArenaRefused(t *testing.T) {
 	cfg := RosterConfig{
-		AvailableMicros: 3_000, // over 2ms
-		MonthlyBudget:   8,
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    3_000_000, // over $2
 	}
-	r := NewRoster(cfg)
-
-	if r.IsLeanRosterActive() {
-		t.Errorf("expected lean roster mode inactive, got active")
+	r, err := NewRoster(cfg)
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
 	}
-
-	// Spawn FULL_ARENA allowed
-	if err := r.SpawnArena("spawn1", RoleFullArenaSpawn); err != nil {
-		t.Errorf("unexpected error spawning full arena: %v", err)
+	if r != nil {
+		t.Fatal("expected nil roster on budget exceed")
 	}
 }
 
-func TestUpdateConfigChangesMode(t *testing.T) {
+func TestNewRoster_BudgetTooLow(t *testing.T) {
 	cfg := RosterConfig{
-		AvailableMicros: 3_000,
-		MonthlyBudget:   8,
+		MonthlyBudgetCents: 700,       // under $8
+		AvailableMicros:    1_000_000, // under $2
 	}
-	r := NewRoster(cfg)
-	if r.IsLeanRosterActive() {
-		t.Errorf("expected lean roster inactive initially")
+	r, err := NewRoster(cfg)
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
 	}
-
-	// Update to lean roster conditions
-	r.UpdateConfig(RosterConfig{
-		AvailableMicros: 1_000,
-		MonthlyBudget:   8,
-	})
-	if !r.IsLeanRosterActive() {
-		t.Errorf("expected lean roster active after update")
+	if r != nil {
+		t.Fatal("expected nil roster on low budget")
 	}
 }
 
-func TestRemoveSpawn(t *testing.T) {
+func TestRoster_AddEntryAndCapacity(t *testing.T) {
 	cfg := RosterConfig{
-		AvailableMicros: 1_000,
-		MonthlyBudget:   8,
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    1_000_000,
 	}
-	r := NewRoster(cfg)
-
-	r.SpawnArena("spawn1", RoleEngineer)
-	r.SpawnArena("spawn2", RoleReviewer)
-
-	spawns := r.GetSpawns()
-	if len(spawns) != 2 {
-		t.Errorf("expected 2 spawns, got %d", len(spawns))
+	r, err := NewRoster(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	r.RemoveSpawn("spawn1")
-	spawns = r.GetSpawns()
-	if len(spawns) != 1 {
-		t.Errorf("expected 1 spawn after removal, got %d", len(spawns))
+	for i := 0; i < r.capacity; i++ {
+		err := r.AddEntry(
+			"id"+string(i),
+			"engineer"+string(i),
+			"reviewer"+string(i),
+		)
+		if err != nil {
+			t.Fatalf("unexpected error adding entry %d: %v", i, err)
+		}
 	}
-	if _, ok := spawns["spawn1"]; ok {
-		t.Errorf("spawn1 should have been removed")
+	err = r.AddEntry("overflow", "eng", "rev")
+	if err == nil {
+		t.Fatal("expected error on capacity overflow, got none")
+	}
+}
+
+func TestRoster_EntriesCopy(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    1_000_000,
+	}
+	r, err := NewRoster(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r.AddEntry("id1", "eng1", "rev1")
+	entries := r.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	entries[0].Engineer = "changed"
+	// Ensure original is not changed
+	orig := r.Entries()
+	if orig[0].Engineer == "changed" {
+		t.Fatal("entries copy is not deep")
 	}
 }
