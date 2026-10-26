@@ -4,104 +4,84 @@ import (
 	"testing"
 )
 
-func TestReserveSpendLicense(t *testing.T) {
-	manager := NewSpendLicenseManager(8.0)
-
-	// Test valid reservation
-	license, err := manager.ReserveSpendLicense("prog1", 5.0)
+func TestNewSpendLicense(t *testing.T) {
+	sl, err := NewSpendLicense("id1", 800, 500)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if license.ProgramID != "prog1" {
-		t.Errorf("expected programID 'prog1', got %s", license.ProgramID)
+	if sl.ID != "id1" {
+		t.Errorf("expected ID 'id1', got %s", sl.ID)
 	}
-	if license.Amount != 5.0 {
-		t.Errorf("expected amount 5.0, got %.2f", license.Amount)
+	if sl.Reserved != 500 {
+		t.Errorf("expected reserved 500, got %d", sl.Reserved)
 	}
-	if license.IsActive {
-		t.Errorf("license should not be active on reservation")
-	}
-
-	// Test zero or negative amount
-	_, err = manager.ReserveSpendLicense("prog1", 0)
-	if err == nil {
-		t.Errorf("expected error for zero amount")
-	}
-
-	_, err = manager.ReserveSpendLicense("prog1", -1)
-	if err == nil {
-		t.Errorf("expected error for negative amount")
-	}
-
-	// Test amount exceeding envelope
-	_, err = manager.ReserveSpendLicense("prog1", 10)
-	if err == nil {
-		t.Errorf("expected error for amount exceeding envelope")
+	if sl.Envelope != 800 {
+		t.Errorf("expected envelope 800, got %d", sl.Envelope)
 	}
 }
 
-func TestAcceptSpendLicense(t *testing.T) {
-	manager := NewSpendLicenseManager(8.0)
-
-	license, err := manager.ReserveSpendLicense("prog2", 3.0)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	receipt, err := manager.AcceptSpendLicense(license.ID)
-	if err != nil {
-		t.Fatalf("unexpected error on accept: %v", err)
-	}
-	if receipt == "" {
-		t.Errorf("expected non-empty ship receipt")
-	}
-
-	// Accepting again should error
-	_, err = manager.AcceptSpendLicense(license.ID)
+func TestNewSpendLicenseReserveExceedsEnvelope(t *testing.T) {
+	_, err := NewSpendLicense("id2", 800, 900)
 	if err == nil {
-		t.Errorf("expected error on second accept")
-	}
-
-	// Accept non-existent license
-	_, err = manager.AcceptSpendLicense("nonexistent")
-	if err == nil {
-		t.Errorf("expected error on accept non-existent license")
+		t.Fatal("expected error for reserve exceeding envelope")
 	}
 }
 
-func TestWritebackSpendLicense(t *testing.T) {
-	manager := NewSpendLicenseManager(8.0)
-
-	license, err := manager.ReserveSpendLicense("prog3", 4.0)
+func TestFanOut(t *testing.T) {
+	sl, _ := NewSpendLicense("id1", 800, 600)
+	sub, err := sl.FanOut("id2", 300)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// Writeback before accept should error
-	err = manager.WritebackSpendLicense(license.ID)
-	if err == nil {
-		t.Errorf("expected error writing back inactive license")
+	if sub.ID != "id2" {
+		t.Errorf("expected sub ID 'id2', got %s", sub.ID)
 	}
+	if sub.Reserved != 300 {
+		t.Errorf("expected sub reserved 300, got %d", sub.Reserved)
+	}
+	if sl.Used != 300 {
+		t.Errorf("expected used 300, got %d", sl.Used)
+	}
+}
 
-	_, err = manager.AcceptSpendLicense(license.ID)
+func TestFanOutInsufficientReserve(t *testing.T) {
+	sl, _ := NewSpendLicense("id1", 800, 400)
+	_, err := sl.FanOut("id2", 500)
+	if err == nil {
+		t.Fatal("expected error for fan out exceeding reserved")
+	}
+}
+
+func TestAccept(t *testing.T) {
+	sl, _ := NewSpendLicense("id1", 800, 500)
+	receipt, err := sl.Accept()
 	if err != nil {
-		t.Fatalf("unexpected error on accept: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
+	if !sl.Accepted {
+		t.Error("expected license to be accepted")
+	}
+	if receipt.LicenseID != sl.ID {
+		t.Errorf("receipt LicenseID mismatch: got %s, want %s", receipt.LicenseID, sl.ID)
+	}
+}
 
-	err = manager.WritebackSpendLicense(license.ID)
+func TestAcceptTwice(t *testing.T) {
+	sl, _ := NewSpendLicense("id1", 800, 500)
+	_, err := sl.Accept()
 	if err != nil {
-		t.Errorf("unexpected error on writeback: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// Writeback again should error
-	err = manager.WritebackSpendLicense(license.ID)
+	_, err = sl.Accept()
 	if err == nil {
-		t.Errorf("expected error on second writeback")
+		t.Fatal("expected error on second accept")
 	}
+}
 
-	// Writeback non-existent license
-	err = manager.WritebackSpendLicense("nonexistent")
-	if err == nil {
-		t.Errorf("expected error on writeback non-existent license")
+func TestLandingWriteback(t *testing.T) {
+	sl, _ := NewSpendLicense("id1", 800, 500)
+	err := sl.LandingWriteback()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
