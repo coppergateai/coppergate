@@ -1,5 +1,3 @@
-// Package arena provides memory arenas for efficient allocation.
-// AG-012: Implement lean roster allocation under tight budget constraints.
 package arena
 
 import (
@@ -7,69 +5,67 @@ import (
 	"sync"
 )
 
-// RosterConfig holds configuration for roster allocation.
+// RosterType defines the type of roster allocation.
+type RosterType int
+
+const (
+	// FullArena spawns a full arena roster.
+	FullArena RosterType = iota
+	// LeanRoster spawns a lean roster with micros under $2.
+	LeanRoster
+)
+
+// ErrBudgetExceeded is returned when the budget is too tight for FullArena.
+var ErrBudgetExceeded = errors.New("budget too tight for FullArena roster")
+
+// Micro represents a microservice or micro unit with cost.
+type Micro struct {
+	Name  string
+	Cost  float64 // Cost in dollars
+	Role  string  // e.g. "Engineer", "Reviewer"
+}
+
+// RosterConfig holds configuration for roster creation.
 type RosterConfig struct {
-	MonthlyBudgetCents int64 // Monthly budget in cents, e.g. 800 for $8
-	AvailableMicros    int64 // Available micros for allocation
+	BudgetMonthly float64
+	AllowFullArena bool
 }
 
-// Roster represents a lean roster allocator.
+// Roster holds the allocated micros.
 type Roster struct {
-	mu       sync.Mutex
-	entries  []Entry
-	capacity int
+	Micros []Micro
+	mu     sync.Mutex
 }
 
-// Entry represents a roster entry.
-type Entry struct {
-	ID       string
-	Engineer string
-	Reviewer string
-}
+// NewRoster creates a roster based on the config and available micros.
+// It returns ErrBudgetExceeded if FullArena is requested but budget is too tight.
+func NewRoster(config RosterConfig, availableMicros []Micro, rosterType RosterType) (*Roster, error) {
+	r := &Roster{}
 
-// ErrBudgetExceeded is returned when budget constraints prevent full arena spawn.
-var ErrBudgetExceeded = errors.New("budget exceeded: cannot spawn full arena")
-
-// NewRoster creates a new lean roster if budget and micros allow.
-// It enforces the $2 micros limit and engineer+reviewer only entries.
-// If budget is tight, it refuses full arena spawn.
-func NewRoster(cfg RosterConfig) (*Roster, error) {
-	if cfg.AvailableMicros > 2_000_000 {
-		// Micros over $2, allow full arena spawn (not lean)
-		return nil, ErrBudgetExceeded
+	switch rosterType {
+	case FullArena:
+		if !config.AllowFullArena {
+			return nil, ErrBudgetExceeded
+		}
+		// FullArena spawns all available micros regardless of cost.
+		r.Micros = append(r.Micros, availableMicros...)
+	case LeanRoster:
+		// LeanRoster includes only micros under $2 and role Engineer or Reviewer.
+		for _, m := range availableMicros {
+			if m.Cost < 2.0 && (m.Role == "Engineer" || m.Role == "Reviewer") {
+				r.Micros = append(r.Micros, m)
+			}
+		}
+	default:
+		return nil, errors.New("unknown roster type")
 	}
-	if cfg.MonthlyBudgetCents < 800 {
-		// Budget under $8, refuse full arena spawn
-		return nil, ErrBudgetExceeded
-	}
-	// Lean roster: engineer+reviewer only, no full arena spawn
-	return &Roster{
-		entries:  make([]Entry, 0, 10), // lean capacity
-		capacity: 10,
-	}, nil
+
+	return r, nil
 }
 
-// AddEntry adds an engineer+reviewer entry to the roster.
-// Returns error if capacity exceeded.
-func (r *Roster) AddEntry(id, engineer, reviewer string) error {
+// Count returns the number of micros in the roster.
+func (r *Roster) Count() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if len(r.entries) >= r.capacity {
-		return errors.New("roster capacity exceeded")
-	}
-	r.entries = append(r.entries, Entry{
-		ID:       id,
-		Engineer: engineer,
-		Reviewer: reviewer,
-	})
-	return nil
-}
-
-// Entries returns a copy of current roster entries.
-func (r *Roster) Entries() []Entry {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	cpy := make([]Entry, len(r.entries))
-	copy(cpy, r.entries)
-	return cpy
+	return len(r.Micros)
 }

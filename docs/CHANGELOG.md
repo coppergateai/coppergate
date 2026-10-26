@@ -3,7 +3,6 @@
 ## [Unreleased]
 
 ### Added
-- AG-012: Implement lean roster allocation under $2 micros and $8 monthly budget.
-  - Enforces engineer+reviewer only entries.
-  - Prevents full arena spawn under tight budget.
-  - Includes tests for budget enforcement and roster capacity.
+- AG-012: Implemented lean roster allocation selecting micros under $2 with roles Engineer or Reviewer only.
+- Prevent spawning FullArena roster when monthly budget is tight (under $8) unless explicitly allowed.
+- Added tests covering lean roster filtering and budget enforcement for FullArena.
