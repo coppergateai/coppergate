@@ -1,54 +1,34 @@
 package program
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 )
 
-// Constants for spend envelope and badge validity
+// Constants for monthly envelope and default values.
 const (
-	MonthlySpendEnvelopeCents = 800 // $8.00 in cents
-	BadgeValidityDuration     = 24 * time.Hour
+	MonthlyEnvelope = 8.0 // $8 monthly envelope
 )
 
-// ErrInsufficientSpend indicates not enough spend available for reservation or fan-out.
-var ErrInsufficientSpend = errors.New("insufficient spend available")
-
-// SpendLicense represents a reserved spend license.
+// SpendLicense represents a spend license reservation or fan-out.
 type SpendLicense struct {
-	ProgramID   string
-	ReservedCents int
-	FannedOutCents int
-	Badges      map[string]*IDBadge
-	Accepted    bool
-	ShipReceipt *ShipReceipt
-	mu          sync.Mutex
+	ID           string    `json:"id"`
+	Amount       float64   `json:"amount"`
+	ReservedAt   time.Time `json:"reserved_at"`
+	FannedOutTo  string    `json:"fanned_out_to,omitempty"`
+	BadgeID      string    `json:"badge_id,omitempty"`
+	Accepted     bool      `json:"accepted"`
+	ShipReceipt  string    `json:"ship_receipt,omitempty"`
 }
 
-// IDBadge represents an ID badge issued to a program instance.
-type IDBadge struct {
-	BadgeID    string
-	IssuedAt   time.Time
-	ExpiresAt  time.Time
-	Signature  string // simplified signature
-}
-
-// ShipReceipt represents a receipt generated upon acceptance.
-type ShipReceipt struct {
-	ProgramID string
-	Timestamp time.Time
-	ReceiptID string
-}
-
-// RuntimeSpendManager manages spend licenses for programs.
+// RuntimeSpendManager manages spend licenses for program runtime.
 type RuntimeSpendManager struct {
-	licenses map[string]*SpendLicense
-	mu       sync.Mutex
+	mu            sync.Mutex
+	totalReserved float64
+	licenses      map[string]*SpendLicense
 }
 
 // NewRuntimeSpendManager creates a new RuntimeSpendManager.
@@ -58,150 +38,89 @@ func NewRuntimeSpendManager() *RuntimeSpendManager {
 	}
 }
 
-// ReserveSpend reserves spend for a program up to the monthly envelope.
-func (m *RuntimeSpendManager) ReserveSpend(programID string, amountCents int) error {
-	if amountCents <= 0 {
-		return fmt.Errorf("amount must be positive")
-	}
-	if amountCents > MonthlySpendEnvelopeCents {
-		return fmt.Errorf("amount exceeds monthly spend envelope")
-	}
+// ReserveSpend reserves an amount from the monthly envelope.
+func (r *RuntimeSpendManager) ReserveSpend(id string, amount float64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	license, exists := m.licenses[programID]
-	if !exists {
-		license = &SpendLicense{
-			ProgramID: programID,
-			Badges:    make(map[string]*IDBadge),
-		}
-		m.licenses[programID] = license
+	if amount <= 0 {
+		return errors.New("amount must be positive")
+	}
+	if r.totalReserved+amount > MonthlyEnvelope {
+		return fmt.Errorf("reserve amount %.2f exceeds monthly envelope %.2f", r.totalReserved+amount, MonthlyEnvelope)
+	}
+	if _, exists := r.licenses[id]; exists {
+		return fmt.Errorf("license with ID %s already exists", id)
 	}
 
-	license.mu.Lock()
-	defer license.mu.Unlock()
-
-	if license.ReservedCents+amountCents > MonthlySpendEnvelopeCents {
-		return ErrInsufficientSpend
+	license := &SpendLicense{
+		ID:         id,
+		Amount:     amount,
+		ReservedAt: time.Now(),
 	}
-
-	license.ReservedCents += amountCents
+	r.licenses[id] = license
+	r.totalReserved += amount
 	return nil
 }
 
-// FanOutSpend fans out reserved spend to a child program.
-func (m *RuntimeSpendManager) FanOutSpend(parentID, childID string, amountCents int) error {
-	if amountCents <= 0 {
-		return fmt.Errorf("amount must be positive")
+// FanOutSpend fans out a reserved spend license to a sub-program/component.
+func (r *RuntimeSpendManager) FanOutSpend(parentID, fanOutID, to string, amount float64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	parent, ok := r.licenses[parentID]
+	if !ok {
+		return fmt.Errorf("parent license %s not found", parentID)
+	}
+	if parent.Accepted {
+		return errors.New("cannot fan-out from accepted license")
+	}
+	if amount <= 0 || amount > parent.Amount {
+		return errors.New("invalid fan-out amount")
+	}
+	if _, exists := r.licenses[fanOutID]; exists {
+		return fmt.Errorf("license with ID %s already exists", fanOutID)
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// Reduce parent amount
+	parent.Amount -= amount
 
-	parentLicense, exists := m.licenses[parentID]
-	if !exists {
-		return fmt.Errorf("parent program license not found")
+	// Create fan-out license with badge ID
+	badgeID := fmt.Sprintf("badge-%s", fanOutID)
+	fanOutLicense := &SpendLicense{
+		ID:          fanOutID,
+		Amount:      amount,
+		ReservedAt:  time.Now(),
+		FannedOutTo: to,
+		BadgeID:     badgeID,
 	}
-
-	parentLicense.mu.Lock()
-	defer parentLicense.mu.Unlock()
-
-	available := parentLicense.ReservedCents - parentLicense.FannedOutCents
-	if amountCents > available {
-		return ErrInsufficientSpend
-	}
-
-	childLicense, exists := m.licenses[childID]
-	if !exists {
-		childLicense = &SpendLicense{
-			ProgramID: childID,
-			Badges:    make(map[string]*IDBadge),
-		}
-		m.licenses[childID] = childLicense
-	}
-
-	childLicense.mu.Lock()
-	defer childLicense.mu.Unlock()
-
-	parentLicense.FannedOutCents += amountCents
-	childLicense.ReservedCents += amountCents
+	r.licenses[fanOutID] = fanOutLicense
 	return nil
 }
 
-// IssueBadge issues an ID badge for a program.
-func (m *RuntimeSpendManager) IssueBadge(programID string) (*IDBadge, error) {
-	m.mu.Lock()
-	license, exists := m.licenses[programID]
-	m.mu.Unlock()
-	if !exists {
-		return nil, fmt.Errorf("program license not found")
-	}
+// AcceptSpend accepts a spend license by badge ID and issues a Ship Receipt.
+func (r *RuntimeSpendManager) AcceptSpend(badgeID string) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	license.mu.Lock()
-	defer license.mu.Unlock()
-
-	badgeID, err := generateRandomID()
-	if err != nil {
-		return nil, err
+	for _, license := range r.licenses {
+		if license.BadgeID == badgeID {
+			if license.Accepted {
+				return "", errors.New("license already accepted")
+			}
+			license.Accepted = true
+			receipt := fmt.Sprintf("ship-receipt-%s-%d", license.ID, time.Now().Unix())
+			license.ShipReceipt = receipt
+			return receipt, nil
+		}
 	}
-	now := time.Now()
-	badge := &IDBadge{
-		BadgeID:   badgeID,
-		IssuedAt:  now,
-		ExpiresAt: now.Add(BadgeValidityDuration),
-	}
-	badge.Signature = badge.sign()
-
-	license.Badges[badgeID] = badge
-	return badge, nil
+	return "", errors.New("badge ID not found")
 }
 
-// AcceptLicense marks the spend license as accepted and generates a ship receipt.
-func (m *RuntimeSpendManager) AcceptLicense(programID string) (*ShipReceipt, error) {
-	m.mu.Lock()
-	license, exists := m.licenses[programID]
-	m.mu.Unlock()
-	if !exists {
-		return nil, fmt.Errorf("program license not found")
-	}
+// GetSpendLicenseState returns the JSON representation of all spend licenses.
+func (r *RuntimeSpendManager) GetSpendLicenseState() ([]byte, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	license.mu.Lock()
-	defer license.mu.Unlock()
-
-	if license.Accepted {
-		return nil, fmt.Errorf("license already accepted")
-	}
-
-	license.Accepted = true
-	receiptID, err := generateRandomID()
-	if err != nil {
-		return nil, err
-	}
-	receipt := &ShipReceipt{
-		ProgramID: programID,
-		Timestamp: time.Now(),
-		ReceiptID: receiptID,
-	}
-	license.ShipReceipt = receipt
-	return receipt, nil
-}
-
-// generateRandomID creates a random hex string ID.
-func generateRandomID() (string, error) {
-	b := make([]byte, 16)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
-
-// sign creates a simplified signature for the badge.
-func (b *IDBadge) sign() string {
-	h := sha256.New()
-	h.Write([]byte(b.BadgeID))
-	h.Write([]byte(b.IssuedAt.String()))
-	h.Write([]byte(b.ExpiresAt.String()))
-	return hex.EncodeToString(h.Sum(nil))
+	return json.MarshalIndent(r.licenses, "", "  ")
 }
