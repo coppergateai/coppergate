@@ -1,31 +1,65 @@
 package programruntime
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
+	"sync"
 )
 
-// IDBadge uniquely identifies a program runtime operation.
+// IDBadge represents an issued badge for a program participant.
 type IDBadge struct {
-	ID string
+	ID     string
+	Owner  string
+	Active bool
 }
 
-// NewIDBadge generates a new unique ID badge.
-func NewIDBadge() IDBadge {
-	b := make([]byte, 16)
-	_, err := rand.Read(b)
-	if err != nil {
-		// fallback to a fixed ID on error (should be rare)
-		return IDBadge{ID: "00000000000000000000000000000000"}
-	}
-	return IDBadge{ID: hex.EncodeToString(b)}
+// BadgeManager manages ID badges.
+type BadgeManager struct {
+	mu     sync.Mutex
+	badges map[string]*IDBadge
 }
 
-// Validate checks if the IDBadge is valid.
-func (b IDBadge) Validate() error {
-	if len(b.ID) != 32 {
-		return errors.New("invalid badge ID length")
+// NewBadgeManager creates a new BadgeManager.
+func NewBadgeManager() *BadgeManager {
+	return &BadgeManager{
+		badges: make(map[string]*IDBadge),
 	}
+}
+
+// IssueBadge issues a new badge for the given owner.
+func (bm *BadgeManager) IssueBadge(id, owner string) (*IDBadge, error) {
+	bm.mu.Lock()
+	defer bm.mu.Unlock()
+	if id == "" || owner == "" {
+		return nil, errors.New("badge id and owner required")
+	}
+	if _, exists := bm.badges[id]; exists {
+		return nil, errors.New("badge id already exists")
+	}
+	badge := &IDBadge{
+		ID:     id,
+		Owner:  owner,
+		Active: true,
+	}
+	bm.badges[id] = badge
+	return badge, nil
+}
+
+// RevokeBadge deactivates a badge.
+func (bm *BadgeManager) RevokeBadge(id string) error {
+	bm.mu.Lock()
+	defer bm.mu.Unlock()
+	badge, exists := bm.badges[id]
+	if !exists {
+		return errors.New("badge not found")
+	}
+	badge.Active = false
 	return nil
+}
+
+// ValidateBadge checks if a badge is active and exists.
+func (bm *BadgeManager) ValidateBadge(id string) bool {
+	bm.mu.Lock()
+	defer bm.mu.Unlock()
+	badge, exists := bm.badges[id]
+	return exists && badge.Active
 }
