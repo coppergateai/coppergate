@@ -4,87 +4,74 @@ import (
 	"testing"
 )
 
-func TestNewArena_LeanRoster(t *testing.T) {
-	tests := []struct {
-		name           string
-		availableMicros int64
-		role           Role
-		wantLean       bool
-		wantErr        bool
-	}{
-		{
-			name:           "Lean roster for Engineer under $2",
-			availableMicros: 1_500_000,
-			role:           RoleEngineer,
-			wantLean:       true,
-		},
-		{
-			name:           "Lean roster for Reviewer under $2",
-			availableMicros: 1_999_999,
-			role:           RoleReviewer,
-			wantLean:       true,
-		},
-		{
-			name:           "No lean roster for Engineer at $2",
-			availableMicros: 2_000_000,
-			role:           RoleEngineer,
-			wantLean:       false,
-		},
-		{
-			name:           "No lean roster for Other role under $2",
-			availableMicros: 1_000_000,
-			role:           RoleOther,
-			wantLean:       false,
-		},
-		{
-			name:           "Error when monthly envelope exceeds $8",
-			availableMicros: 1_000_000,
-			role:           RoleEngineer,
-			wantErr:        true,
-		},
+func TestLeanRoster_AddMicro(t *testing.T) {
+	lr := NewLeanRoster(8.0)
+
+	// Valid micro under $2 and allowed role
+	m1 := &Micro{ID: "m1", Role: RoleEngineer, Cost: 1.5}
+	if err := lr.AddMicro(m1); err != nil {
+		t.Fatalf("expected add success, got error: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := Config{
-				AvailableMicros: tt.availableMicros,
-				Role:           tt.role,
-				MonthlyEnvelope: 8_000_000,
-			}
-			if tt.wantErr {
-				cfg.MonthlyEnvelope = 9_000_000
-			}
-			a, err := NewArena(cfg)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("NewArena() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if err != nil {
-				return
-			}
-			if got := a.IsLean(); got != tt.wantLean {
-				t.Errorf("IsLean() = %v, want %v", got, tt.wantLean)
-			}
-		})
+	// Duplicate ID
+	if err := lr.AddMicro(m1); err == nil {
+		t.Fatalf("expected error on duplicate ID")
+	}
+
+	// Disallowed role FULL_ARENA
+	m2 := &Micro{ID: "m2", Role: RoleFullArena, Cost: 1.0}
+	if err := lr.AddMicro(m2); err == nil {
+		t.Fatalf("expected error on disallowed role FULL_ARENA")
+	}
+
+	// Cost above $2
+	m3 := &Micro{ID: "m3", Role: RoleReviewer, Cost: 2.01}
+	if err := lr.AddMicro(m3); err == nil {
+		t.Fatalf("expected error on cost above $2")
+	}
+
+	// Add multiple valid micros until budget exceeded
+	m4 := &Micro{ID: "m4", Role: RoleReviewer, Cost: 2.0}
+	m5 := &Micro{ID: "m5", Role: RoleEngineer, Cost: 2.0}
+	m6 := &Micro{ID: "m6", Role: RoleEngineer, Cost: 2.0}
+
+	if err := lr.AddMicro(m4); err != nil {
+		t.Fatalf("expected add success m4, got %v", err)
+	}
+	if err := lr.AddMicro(m5); err != nil {
+		t.Fatalf("expected add success m5, got %v", err)
+	}
+	// Adding m6 would exceed $8 budget (1.5 + 2 + 2 + 2 = 7.5 + 2 = 9.5 > 8)
+	if err := lr.AddMicro(m6); err == nil {
+		t.Fatalf("expected budget exceeded error on m6")
+	}
+
+	// Remove micro and add again
+	lr.RemoveMicro("m1")
+	if err := lr.AddMicro(m6); err != nil {
+		t.Fatalf("expected add success after removal, got %v", err)
 	}
 }
 
-func TestArena_AllocateAndAllocations(t *testing.T) {
-	cfg := Config{
-		AvailableMicros: 1_000_000,
-		Role:           RoleEngineer,
-		MonthlyEnvelope: 8_000_000,
+func TestLeanRoster_GetMicros_TotalSpent(t *testing.T) {
+	lr := NewLeanRoster(8.0)
+	m1 := &Micro{ID: "m1", Role: RoleEngineer, Cost: 1.0}
+	m2 := &Micro{ID: "m2", Role: RoleReviewer, Cost: 1.5}
+
+	if err := lr.AddMicro(m1); err != nil {
+		t.Fatal(err)
 	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("NewArena() error = %v", err)
+	if err := lr.AddMicro(m2); err != nil {
+		t.Fatal(err)
 	}
-	if !a.IsLean() {
-		t.Errorf("Expected lean roster but got non-lean")
+
+	micros := lr.GetMicros()
+	if len(micros) != 2 {
+		t.Fatalf("expected 2 micros, got %d", len(micros))
 	}
-	for i := 0; i < 5; i++ {
-		a.Allocate()
-	}
-	if got := a.Allocations(); got != 5 {
-		t.Errorf("Allocations() = %d, want 5", got)
+
+	spent := lr.TotalSpent()
+	if spent != 2.5 {
+		t.Fatalf("expected spent 2.5, got %f", spent)
 	}
 }
