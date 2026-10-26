@@ -3,4 +3,10 @@
 ## [Unreleased]
 
 ### Added
-- Program Runtime capability (P-104): spend license reservation on reserve/fan-out, ID badges issuance, accept-to-ship receipt workflow.
+
+- P-104: Program Runtime (Contracted Autonomy) capability.
+  - Spend license reserve and fan-out within $8 monthly envelope.
+  - ID badge issuance for runtime authorization.
+  - Accept output and generate ship receipts.
+  - Runtime data landing under `/docs/-program-runtime`.
+  - Full tests covering spend, badges, and acceptance workflows.
