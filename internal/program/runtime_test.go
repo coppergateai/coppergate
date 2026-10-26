@@ -2,115 +2,122 @@ package program
 
 import (
 	"testing"
+	"time"
 )
 
 func TestReserveSpend(t *testing.T) {
-	rt := NewRuntime()
+	rt := NewRuntime("prog1")
 
+	// Reserve within envelope
 	if err := rt.ReserveSpend(5); err != nil {
 		t.Fatalf("unexpected error reserving spend: %v", err)
 	}
 
-	if reserved := rt.GetReserved(); reserved != 5 {
-		t.Fatalf("expected reserved 5, got %d", reserved)
-	}
-
 	// Reserve exceeding envelope
 	if err := rt.ReserveSpend(4); err == nil {
-		t.Fatalf("expected error reserving beyond envelope")
+		t.Fatalf("expected error when exceeding spend envelope")
 	}
 
-	// Reserve zero or negative
+	// Reserve zero or negative amount
 	if err := rt.ReserveSpend(0); err == nil {
-		t.Fatalf("expected error reserving zero amount")
+		t.Fatalf("expected error for zero amount")
 	}
 	if err := rt.ReserveSpend(-1); err == nil {
-		t.Fatalf("expected error reserving negative amount")
+		t.Fatalf("expected error for negative amount")
 	}
 }
 
-func TestFanOutSpend(t *testing.T) {
-	rt := NewRuntime()
-	if err := rt.ReserveSpend(6); err != nil {
-		t.Fatalf("reserve failed: %v", err)
+func TestSpendResetAfterMonth(t *testing.T) {
+	rt := NewRuntime("prog2")
+
+	if err := rt.ReserveSpend(8); err != nil {
+		t.Fatalf("unexpected error reserving spend: %v", err)
 	}
 
-	badge, err := rt.FanOutSpend("agent1", 3)
-	if err != nil {
-		t.Fatalf("fan-out failed: %v", err)
-	}
-	if badge.AgentID != "agent1" || badge.Amount != 3 {
-		t.Fatalf("unexpected badge data: %+v", badge)
-	}
+	// Simulate time passing > 30 days
+	rt.mu.Lock()
+	rt.lastReset = rt.lastReset.Add(-31 * 24 * time.Hour)
+	rt.mu.Unlock()
 
-	// Fan-out exceeding reserved
-	if _, err := rt.FanOutSpend("agent2", 4); err == nil {
-		t.Fatalf("expected error fan-out exceeding reserved")
-	}
-
-	// Fan-out zero or negative
-	if _, err := rt.FanOutSpend("agent3", 0); err == nil {
-		t.Fatalf("expected error fan-out zero amount")
-	}
-	if _, err := rt.FanOutSpend("agent3", -1); err == nil {
-		t.Fatalf("expected error fan-out negative amount")
+	// Should reset spend and allow new reservation
+	if err := rt.ReserveSpend(8); err != nil {
+		t.Fatalf("expected spend reset, got error: %v", err)
 	}
 }
 
-func TestAcceptSpend(t *testing.T) {
-	rt := NewRuntime()
-	if err := rt.ReserveSpend(5); err != nil {
-		t.Fatalf("reserve failed: %v", err)
-	}
+func TestBadgeLifecycle(t *testing.T) {
+	rt := NewRuntime("prog3")
 
-	_, err := rt.FanOutSpend("agent1", 5)
+	badge, err := rt.IssueBadge("badge1", time.Minute)
 	if err != nil {
-		t.Fatalf("fan-out failed: %v", err)
+		t.Fatalf("failed to issue badge: %v", err)
 	}
 
-	receipt, err := rt.AcceptSpend("agent1")
-	if err != nil {
-		t.Fatalf("accept spend failed: %v", err)
-	}
-	if receipt.AgentID != "agent1" || receipt.Amount != 5 {
-		t.Fatalf("unexpected receipt data: %+v", receipt)
+	if !rt.ValidateBadge("badge1") {
+		t.Fatalf("badge should be valid immediately after issuance")
 	}
 
-	// Accept again should fail
-	if _, err := rt.AcceptSpend("agent1"); err == nil {
-		t.Fatalf("expected error on double accept")
+	// Duplicate badge ID
+	if _, err := rt.IssueBadge("badge1", time.Minute); err == nil {
+		t.Fatalf("expected error issuing duplicate badge ID")
 	}
 
-	// Accept without badge
-	if _, err := rt.AcceptSpend("agent2"); err == nil {
-		t.Fatalf("expected error accepting without badge")
+	// Empty badge ID
+	if _, err := rt.IssueBadge("", time.Minute); err == nil {
+		t.Fatalf("expected error issuing empty badge ID")
+	}
+
+	// Revoke badge
+	if err := rt.RevokeBadge("badge1"); err != nil {
+		t.Fatalf("failed to revoke badge: %v", err)
+	}
+
+	if rt.ValidateBadge("badge1") {
+		t.Fatalf("revoked badge should not be valid")
+	}
+
+	// Revoke non-existent badge
+	if err := rt.RevokeBadge("nonexistent"); err == nil {
+		t.Fatalf("expected error revoking non-existent badge")
+	}
+
+	// Revoke already revoked badge
+	if err := rt.RevokeBadge("badge1"); err == nil {
+		t.Fatalf("expected error revoking already revoked badge")
 	}
 }
 
-func TestGetShipReceipt(t *testing.T) {
-	rt := NewRuntime()
-	if err := rt.ReserveSpend(3); err != nil {
-		t.Fatalf("reserve failed: %v", err)
-	}
-	_, err := rt.FanOutSpend("agent1", 3)
+func TestBadgeExpiration(t *testing.T) {
+	rt := NewRuntime("prog4")
+
+	badge, err := rt.IssueBadge("badge2", time.Millisecond*10)
 	if err != nil {
-		t.Fatalf("fan-out failed: %v", err)
-	}
-	_, err = rt.AcceptSpend("agent1")
-	if err != nil {
-		t.Fatalf("accept failed: %v", err)
+		t.Fatalf("failed to issue badge: %v", err)
 	}
 
-	receipt, ok := rt.GetShipReceipt("agent1")
-	if !ok {
-		t.Fatalf("expected receipt for agent1")
+	time.Sleep(20 * time.Millisecond)
+
+	if rt.ValidateBadge(badge.ID) {
+		t.Fatalf("badge should be expired")
 	}
-	if receipt.AgentID != "agent1" || receipt.Amount != 3 {
-		t.Fatalf("unexpected receipt data: %+v", receipt)
+}
+
+func TestAcceptActionAndReceipts(t *testing.T) {
+	rt := NewRuntime("prog5")
+
+	receipt := rt.AcceptAction("Accepted contract #123")
+	if receipt.ProgramID != "prog5" {
+		t.Fatalf("receipt ProgramID mismatch")
+	}
+	if receipt.Details != "Accepted contract #123" {
+		t.Fatalf("receipt Details mismatch")
 	}
 
-	_, ok = rt.GetShipReceipt("agent2")
-	if ok {
-		t.Fatalf("did not expect receipt for agent2")
+	receipts := rt.GetReceipts()
+	if len(receipts) != 1 {
+		t.Fatalf("expected 1 receipt, got %d", len(receipts))
+	}
+	if receipts[0].Details != "Accepted contract #123" {
+		t.Fatalf("receipt Details mismatch in GetReceipts")
 	}
 }
