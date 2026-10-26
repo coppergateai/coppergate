@@ -4,75 +4,81 @@ import (
 	"testing"
 )
 
-func TestNewRoster_LeanRoster(t *testing.T) {
-	available := []Micro{
-		{"micro1", 1.5, "Engineer"},
-		{"micro2", 2.5, "Engineer"},
-		{"micro3", 1.0, "Reviewer"},
-		{"micro4", 3.0, "Reviewer"},
-		{"micro5", 1.9, "Other"},
-		{"micro6", 1.8, "Engineer"},
-	}
+func TestRosterAddUser(t *testing.T) {
+	roster := NewRoster(8) // $8 monthly envelope = 8 micros
 
-	config := RosterConfig{
-		BudgetMonthly: 8.0,
-		AllowFullArena: false,
-	}
-
-	r, err := NewRoster(config, available, LeanRoster)
+	// Add engineer user
+	err := roster.AddUser("user1", RoleEngineer)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error adding engineer: %v", err)
 	}
 
-	expectedNames := map[string]bool{"micro1": true, "micro3": true, "micro6": true}
-	if r.Count() != len(expectedNames) {
-		t.Errorf("expected %d micros, got %d", len(expectedNames), r.Count())
-	}
-
-	for _, m := range r.Micros {
-		if !expectedNames[m.Name] {
-			t.Errorf("unexpected micro included: %v", m.Name)
-		}
-	}
-}
-
-func TestNewRoster_FullArenaAllowed(t *testing.T) {
-	available := []Micro{
-		{"micro1", 3.0, "Engineer"},
-		{"micro2", 4.0, "Reviewer"},
-	}
-
-	config := RosterConfig{
-		BudgetMonthly: 8.0,
-		AllowFullArena: true,
-	}
-
-	r, err := NewRoster(config, available, FullArena)
+	// Add reviewer user
+	err = roster.AddUser("user2", RoleReviewer)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error adding reviewer: %v", err)
 	}
 
-	if r.Count() != len(available) {
-		t.Errorf("expected %d micros, got %d", len(available), r.Count())
+	// Add other role user - should be ignored silently (no error, no add)
+	err = roster.AddUser("user3", RoleOther)
+	if err != nil {
+		t.Fatalf("unexpected error adding other role: %v", err)
 	}
-}
-
-func TestNewRoster_FullArenaNotAllowed(t *testing.T) {
-	available := []Micro{
-		{"micro1", 3.0, "Engineer"},
-		{"micro2", 4.0, "Reviewer"},
-	}
-
-	config := RosterConfig{
-		BudgetMonthly: 8.0,
-		AllowFullArena: false,
+	users := roster.Users()
+	if _, ok := users["user3"]; ok {
+		t.Errorf("user with other role should not be added")
 	}
 
-	_, err := NewRoster(config, available, FullArena)
-	if err == nil {
-		t.Fatal("expected error due to budget, got nil")
+	// Add duplicate user - no additional cost
+	err = roster.AddUser("user1", RoleEngineer)
+	if err != nil {
+		t.Fatalf("unexpected error adding duplicate user: %v", err)
 	}
+
+	// Add users until budget exceeded
+	err = roster.AddUser("user4", RoleEngineer)
+	if err != nil {
+		t.Fatalf("unexpected error adding user4: %v", err)
+	}
+	// Micros used now: 2+2+2 = 6
+
+	err = roster.AddUser("user5", RoleReviewer)
 	if err != ErrBudgetExceeded {
-		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
+		t.Errorf("expected ErrBudgetExceeded adding user5, got %v", err)
+	}
+
+	// Remove a user and add another
+	roster.RemoveUser("user2") // frees 2 micros, used now 4
+	err = roster.AddUser("user5", RoleReviewer)
+	if err != nil {
+		t.Fatalf("unexpected error adding user5 after removal: %v", err)
+	}
+
+	// Check micros used is 6 again
+	if got := roster.MicrosUsed(); got != 6 {
+		t.Errorf("expected micros used 6, got %d", got)
+	}
+}
+
+func TestRosterRemoveUser(t *testing.T) {
+	roster := NewRoster(8)
+	roster.AddUser("user1", RoleEngineer)
+	roster.AddUser("user2", RoleReviewer)
+
+	roster.RemoveUser("user1")
+	users := roster.Users()
+	if _, ok := users["user1"]; ok {
+		t.Errorf("user1 should have been removed")
+	}
+
+	// Removing non-existent user should not panic
+	roster.RemoveUser("nonexistent")
+}
+
+func TestRosterMicrosLimit(t *testing.T) {
+	const limit = 8
+	roster := NewRoster(limit)
+	if roster.MicrosLimit() != limit {
+		t.Errorf("expected micros limit %d, got %d", limit, roster.MicrosLimit())
 	}
 }

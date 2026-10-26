@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
-- AG-012: Implemented lean roster allocation selecting micros under $2 with roles Engineer or Reviewer only.
-- Prevent spawning FullArena roster when monthly budget is tight (under $8) unless explicitly allowed.
-- Added tests covering lean roster filtering and budget enforcement for FullArena.
+- AG-012: Implement lean roster management supporting only Engineer and Reviewer roles.
+  - Enforces $8 monthly micros envelope.
+  - Each user costs 2 micros.
+  - Prevents FULL_ARENA spawn under tight budget.
+  - Provides thread-safe AddUser, RemoveUser, and Users listing.
+  - Includes tests covering budget enforcement and role filtering.
