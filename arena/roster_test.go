@@ -4,63 +4,59 @@ import (
 	"testing"
 )
 
-func TestLeanRoster_AddUser_UnderBudget(t *testing.T) {
+func TestRoster_AddEntry_UnderBudget(t *testing.T) {
 	r := NewRoster(1_500_000) // $1.5 budget under $2
 
 	// Engineer allowed
-	if err := r.AddUser(User{ID: "u1", Role: RoleEngineer}); err != nil {
+	if err := r.AddEntry("user1", RoleEngineer); err != nil {
 		t.Fatalf("expected engineer allowed, got error: %v", err)
 	}
 
 	// Reviewer allowed
-	if err := r.AddUser(User{ID: "u2", Role: RoleReviewer}); err != nil {
+	if err := r.AddEntry("user2", RoleReviewer); err != nil {
 		t.Fatalf("expected reviewer allowed, got error: %v", err)
 	}
 
 	// FullArena disallowed
-	err := r.AddUser(User{ID: "u3", Role: RoleFullArena})
-	if err == nil {
-		t.Fatal("expected error adding FullArena under budget < $2, got none")
+	if err := r.AddEntry("user3", RoleFullArena); err != ErrFullArenaNotAllowed {
+		t.Fatalf("expected FULL_ARENA disallowed, got: %v", err)
 	}
 
-	// Other roles disallowed (simulate by casting invalid role)
-	err = r.AddUser(User{ID: "u4", Role: Role(99)})
-	if err == nil {
-		t.Fatal("expected error adding unknown role under budget < $2, got none")
+	// Unknown role disallowed
+	if err := r.AddEntry("user4", Role(99)); err == nil {
+		t.Fatalf("expected unknown role disallowed, got nil error")
 	}
 }
 
-func TestLeanRoster_AddUser_AboveBudget(t *testing.T) {
+func TestRoster_AddEntry_AboveBudget(t *testing.T) {
 	r := NewRoster(3_000_000) // $3 budget above $2
 
 	// Engineer allowed
-	if err := r.AddUser(User{ID: "u1", Role: RoleEngineer}); err != nil {
+	if err := r.AddEntry("user1", RoleEngineer); err != nil {
 		t.Fatalf("expected engineer allowed, got error: %v", err)
 	}
 
 	// Reviewer allowed
-	if err := r.AddUser(User{ID: "u2", Role: RoleReviewer}); err != nil {
+	if err := r.AddEntry("user2", RoleReviewer); err != nil {
 		t.Fatalf("expected reviewer allowed, got error: %v", err)
 	}
 
-	// FullArena allowed
-	if err := r.AddUser(User{ID: "u3", Role: RoleFullArena}); err != nil {
-		t.Fatalf("expected FullArena allowed above $2, got error: %v", err)
+	// FullArena allowed above budget
+	if err := r.AddEntry("user3", RoleFullArena); err != nil {
+		t.Fatalf("expected FULL_ARENA allowed, got error: %v", err)
 	}
 }
 
-func TestLeanRoster_SpawnArena(t *testing.T) {
-	r := NewRoster(1_000_000) // $1 budget under $2
-
-	err := r.SpawnArena()
-	if err == nil {
-		t.Fatal("expected error spawning FULL_ARENA under budget < $2, got none")
+func TestRoster_SetAvailableMicros(t *testing.T) {
+	r := NewRoster(3_000_000)
+	if err := r.AddEntry("user1", RoleFullArena); err != nil {
+		t.Fatalf("expected FULL_ARENA allowed initially, got error: %v", err)
 	}
 
-	r.SetAvailableMicros(3_000_000) // $3 budget above $2
+	r.SetAvailableMicros(1_000_000) // reduce budget below $2
 
-	err = r.SpawnArena()
-	if err != nil {
-		t.Fatalf("expected spawn success above $2, got error: %v", err)
+	// Now FULL_ARENA disallowed
+	if err := r.AddEntry("user2", RoleFullArena); err != ErrFullArenaNotAllowed {
+		t.Fatalf("expected FULL_ARENA disallowed after budget drop, got: %v", err)
 	}
 }
