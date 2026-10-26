@@ -6,90 +6,101 @@ import (
 )
 
 // Roster manages a lean set of micros under a tight budget.
-// It only allows Engineer+reviewer roles and avoids spawning FULL_ARENA micros when budget is tight.
+// It only allows Engineer+reviewer roles and enforces a $2 per micro monthly cost limit.
+// FULL_ARENA spawn is disabled under this tight budget mode.
 type Roster struct {
-	mu       sync.Mutex
-	micros   map[string]*Micro
-	budget   float64 // monthly budget envelope in dollars
-	spent    float64
-	maxBudget float64
+	mu      sync.Mutex
+	micros  map[string]*Micro
+	budget  float64
+	spent   float64
+	lean    bool
+	maxCost float64
 }
 
-// Micro represents a microservice or micro instance in the roster.
+// Micro represents a microservice or micro unit in the roster.
 type Micro struct {
-	ID       string
-	Role     Role
-	Cost     float64
-	FullArena bool
+	ID    string
+	Role  Role
+	Cost  float64
+	Alive bool
 }
 
 // Role defines the role of a micro.
-type Role string
+type Role int
 
 const (
-	RoleEngineer Role = "Engineer"
-	RoleReviewer Role = "Reviewer"
-	RoleOther    Role = "Other"
+	RoleUnknown Role = iota
+	RoleEngineer
+	RoleReviewer
+	RoleFullArenaSpawn
 )
 
-// NewRoster creates a new Roster with a given monthly budget envelope.
-func NewRoster(maxBudget float64) *Roster {
+// ErrBudgetExceeded is returned when adding a micro exceeds the budget.
+var ErrBudgetExceeded = errors.New("budget exceeded")
+
+// ErrInvalidRole is returned when a micro role is not allowed in lean roster.
+var ErrInvalidRole = errors.New("invalid role for lean roster")
+
+// ErrFullArenaSpawnNotAllowed is returned when FULL_ARENA spawn is attempted under tight budget.
+var ErrFullArenaSpawnNotAllowed = errors.New("FULL_ARENA spawn not allowed under tight budget")
+
+// NewLeanRoster creates a new lean roster with $2 max cost per micro and $8 total budget.
+func NewLeanRoster() *Roster {
 	return &Roster{
-		micros:    make(map[string]*Micro),
-		maxBudget: maxBudget,
+		micros:  make(map[string]*Micro),
+		budget:  8.0,
+		lean:    true,
+		maxCost: 2.0,
 	}
 }
 
-// AddMicro attempts to add a micro to the roster.
-// It enforces the lean roster policy:
-// - Only Engineer or Reviewer roles allowed.
-// - No FULL_ARENA spawn if budget is tight (spent + cost > maxBudget).
-// - Micros under $2 cost only.
+// AddMicro adds a micro to the roster if it meets lean constraints.
 func (r *Roster) AddMicro(m *Micro) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if m.Cost > 2.0 {
-		return errors.New("micro cost exceeds $2 limit")
-	}
-
-	if m.Role != RoleEngineer && m.Role != RoleReviewer {
-		return errors.New("micro role not allowed in lean roster")
-	}
-
-	if m.FullArena {
-		return errors.New("FULL_ARENA spawn not allowed under tight budget")
-	}
-
-	if r.spent+m.Cost > r.maxBudget {
-		return errors.New("budget exceeded, cannot add micro")
+	if r.lean {
+		// Only Engineer or Reviewer roles allowed.
+		if m.Role != RoleEngineer && m.Role != RoleReviewer {
+			if m.Role == RoleFullArenaSpawn {
+				return ErrFullArenaSpawnNotAllowed
+			}
+			return ErrInvalidRole
+		}
+		// Cost per micro must be <= 2
+		if m.Cost > r.maxCost {
+			return ErrBudgetExceeded
+		}
+		// Check total budget
+		if r.spent+m.Cost > r.budget {
+			return ErrBudgetExceeded
+		}
 	}
 
 	if _, exists := r.micros[m.ID]; exists {
-		return errors.New("micro already exists")
+		// Already present, ignore add
+		return nil
 	}
 
 	r.micros[m.ID] = m
 	r.spent += m.Cost
+	m.Alive = true
 	return nil
 }
 
-// RemoveMicro removes a micro from the roster by ID.
-func (r *Roster) RemoveMicro(id string) error {
+// RemoveMicro removes a micro from the roster.
+func (r *Roster) RemoveMicro(id string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	m, exists := r.micros[id]
-	if !exists {
-		return errors.New("micro not found")
+	if m, exists := r.micros[id]; exists {
+		r.spent -= m.Cost
+		delete(r.micros, id)
+		m.Alive = false
 	}
-
-	delete(r.micros, id)
-	r.spent -= m.Cost
-	return nil
 }
 
-// ListMicros returns a copy of all micros in the roster.
+// ListMicros returns a copy of the current micros.
 func (r *Roster) ListMicros() []*Micro {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -99,11 +110,4 @@ func (r *Roster) ListMicros() []*Micro {
 		mics = append(mics, m)
 	}
 	return mics
-}
-
-// CurrentSpent returns the current spent budget.
-func (r *Roster) CurrentSpent() float64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.spent
 }
