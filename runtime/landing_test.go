@@ -1,30 +1,36 @@
 package runtime
 
-import (
-	"testing"
-)
+import "testing"
 
-func TestLandingStateWritebackReceipt(t *testing.T) {
-	ls := NewLandingState(8.0)
-	err := ls.SpendLicense.Reserve(3.0)
+func TestLandingAndWriteback(t *testing.T) {
+	rl := NewRuntimeLanding()
+
+	sl := NewSpendLicense(800)
+	badge, err := NewIDBadge()
 	if err != nil {
-		t.Fatalf("Reserve failed: %v", err)
+		t.Fatalf("failed to create badge: %v", err)
 	}
 
-	receipt, err := AcceptSpendLicense("prog-1", ls.SpendLicense, 3.0)
-	if err != nil {
-		t.Fatalf("AcceptSpendLicense failed: %v", err)
+	rc := &RuntimeContract{
+		ID:           "contract1",
+		SpendLicense: sl,
+		Badge:        badge,
+		State:        StatePending,
 	}
 
-	err = ls.WritebackReceipt(receipt)
-	if err != nil {
-		t.Fatalf("WritebackReceipt failed: %v", err)
+	if err := rl.Land(rc); err != nil {
+		t.Fatalf("land failed: %v", err)
 	}
 
-	if len(ls.Receipts) != 1 {
-		t.Fatalf("Receipts length incorrect, got %d want 1", len(ls.Receipts))
+	if len(rl.contracts) != 1 {
+		t.Errorf("expected 1 contract landed, got %d", len(rl.contracts))
 	}
-	if ls.Receipts[0] != receipt {
-		t.Fatal("Receipt in landing state does not match expected")
+
+	if err := rl.Writeback(); err != nil {
+		t.Fatalf("writeback failed: %v", err)
+	}
+
+	if len(rl.contracts) != 0 {
+		t.Errorf("expected 0 contracts after writeback, got %d", len(rl.contracts))
 	}
 }

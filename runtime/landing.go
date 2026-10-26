@@ -2,27 +2,45 @@ package runtime
 
 import (
 	"errors"
+	"sync"
 )
 
-// LandingState holds the runtime state including spend license and receipts.
-type LandingState struct {
-	SpendLicense *SpendLicense
-	Receipts     []*ShipReceipt
+// RuntimeLanding manages landing and writeback of runtime state changes.
+type RuntimeLanding struct {
+	mu       sync.Mutex
+	contracts map[string]*RuntimeContract
 }
 
-// NewLandingState creates a new landing state with a spend license envelope.
-func NewLandingState(monthlyEnvelope float64) *LandingState {
-	return &LandingState{
-		SpendLicense: NewSpendLicense(monthlyEnvelope),
-		Receipts:     []*ShipReceipt{},
+// NewRuntimeLanding creates a new RuntimeLanding manager.
+func NewRuntimeLanding() *RuntimeLanding {
+	return &RuntimeLanding{
+		contracts: make(map[string]*RuntimeContract),
 	}
 }
 
-// WritebackReceipt adds a ship receipt to the landing state.
-func (ls *LandingState) WritebackReceipt(receipt *ShipReceipt) error {
-	if receipt == nil {
-		return errors.New("receipt is nil")
+// Land adds or updates a runtime contract in the landing area.
+func (rl *RuntimeLanding) Land(contract *RuntimeContract) error {
+	if contract == nil {
+		return errors.New("contract is nil")
 	}
-	ls.Receipts = append(ls.Receipts, receipt)
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	rl.contracts[contract.ID] = contract
+	return nil
+}
+
+// Writeback persists the landed contracts to storage.
+// For this example, we simulate writeback by clearing the landing area.
+func (rl *RuntimeLanding) Writeback() error {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	// Simulate persistence logic here.
+	// In a real system, this would write to a database or durable storage.
+
+	// Clear landing after writeback
+	rl.contracts = make(map[string]*RuntimeContract)
 	return nil
 }
