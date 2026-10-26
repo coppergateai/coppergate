@@ -1,109 +1,75 @@
-// Package arena provides memory arena management with lean roster support.
-//
-// AG-012: Implements a lean roster mode that activates when availableMicros budget is under $2.
-// This mode restricts arena spawns to Engineer+reviewer only, disallowing FULL_ARENA spawns
-// under tight budget constraints.
-//
-// This feature helps keep memory usage lean and within an $8 monthly envelope budget.
-//
-// See architecture Open IDs in coppergate-architecture/docs/OPEN_PROGRAM.md for design details.
+// Package arena provides memory arenas for efficient allocation.
+// AG-012: Implement lean roster allocation under tight budget constraints.
 package arena
 
 import (
 	"errors"
 	"sync"
-	"time"
 )
 
-// Role represents user roles in the system.
-type Role int
-
-const (
-	RoleEngineer Role = iota
-	RoleReviewer
-	RoleFullArenaSpawn
-)
-
-// ErrFullArenaSpawnNotAllowed is returned when FULL_ARENA spawn is disallowed under lean roster.
-var ErrFullArenaSpawnNotAllowed = errors.New("FULL_ARENA spawn disallowed under lean roster mode")
-
-// RosterConfig holds configuration for roster behavior.
+// RosterConfig holds configuration for roster allocation.
 type RosterConfig struct {
-	AvailableMicros int64 // microseconds budget available for arena usage
-	MonthlyBudget   int64 // monthly budget in dollars (cents internally)
+	MonthlyBudgetCents int64 // Monthly budget in cents, e.g. 800 for $8
+	AvailableMicros    int64 // Available micros for allocation
 }
 
-// Roster manages arena spawns with lean roster enforcement.
+// Roster represents a lean roster allocator.
 type Roster struct {
-	mu             sync.Mutex
-	config         RosterConfig
-	leanRosterMode bool
-	spawns         map[string]Role // map of spawn IDs to roles
+	mu       sync.Mutex
+	entries  []Entry
+	capacity int
 }
 
-// NewRoster creates a new Roster with given config.
-func NewRoster(cfg RosterConfig) *Roster {
-	r := &Roster{
-		config: cfg,
-		spawns: make(map[string]Role),
+// Entry represents a roster entry.
+type Entry struct {
+	ID       string
+	Engineer string
+	Reviewer string
+}
+
+// ErrBudgetExceeded is returned when budget constraints prevent full arena spawn.
+var ErrBudgetExceeded = errors.New("budget exceeded: cannot spawn full arena")
+
+// NewRoster creates a new lean roster if budget and micros allow.
+// It enforces the $2 micros limit and engineer+reviewer only entries.
+// If budget is tight, it refuses full arena spawn.
+func NewRoster(cfg RosterConfig) (*Roster, error) {
+	if cfg.AvailableMicros > 2_000_000 {
+		// Micros over $2, allow full arena spawn (not lean)
+		return nil, ErrBudgetExceeded
 	}
-	r.updateLeanRosterMode()
-	return r
-}
-
-// updateLeanRosterMode updates leanRosterMode flag based on availableMicros and budget.
-func (r *Roster) updateLeanRosterMode() {
-	// Activate lean roster mode if availableMicros under 2_000 (2ms) and monthly budget <= $8
-	if r.config.AvailableMicros < 2_000 && r.config.MonthlyBudget <= 8 {
-		r.leanRosterMode = true
-	} else {
-		r.leanRosterMode = false
+	if cfg.MonthlyBudgetCents < 800 {
+		// Budget under $8, refuse full arena spawn
+		return nil, ErrBudgetExceeded
 	}
+	// Lean roster: engineer+reviewer only, no full arena spawn
+	return &Roster{
+		entries:  make([]Entry, 0, 10), // lean capacity
+		capacity: 10,
+	}, nil
 }
 
-// UpdateConfig updates the roster config and recalculates lean roster mode.
-func (r *Roster) UpdateConfig(cfg RosterConfig) {
+// AddEntry adds an engineer+reviewer entry to the roster.
+// Returns error if capacity exceeded.
+func (r *Roster) AddEntry(id, engineer, reviewer string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.config = cfg
-	r.updateLeanRosterMode()
-}
-
-// SpawnArena attempts to spawn an arena for a given spawnID and role.
-// Returns error if FULL_ARENA spawn is disallowed under lean roster mode.
-func (r *Roster) SpawnArena(spawnID string, role Role) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.leanRosterMode && role == RoleFullArenaSpawn {
-		return ErrFullArenaSpawnNotAllowed
+	if len(r.entries) >= r.capacity {
+		return errors.New("roster capacity exceeded")
 	}
-
-	r.spawns[spawnID] = role
+	r.entries = append(r.entries, Entry{
+		ID:       id,
+		Engineer: engineer,
+		Reviewer: reviewer,
+	})
 	return nil
 }
 
-// RemoveSpawn removes a spawn from the roster.
-func (r *Roster) RemoveSpawn(spawnID string) {
+// Entries returns a copy of current roster entries.
+func (r *Roster) Entries() []Entry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.spawns, spawnID)
-}
-
-// IsLeanRosterActive returns true if lean roster mode is active.
-func (r *Roster) IsLeanRosterActive() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.leanRosterMode
-}
-
-// GetSpawns returns a copy of current spawns map.
-func (r *Roster) GetSpawns() map[string]Role {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	cpy := make(map[string]Role, len(r.spawns))
-	for k, v := range r.spawns {
-		cpy[k] = v
-	}
+	cpy := make([]Entry, len(r.entries))
+	copy(cpy, r.entries)
 	return cpy
 }
