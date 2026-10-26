@@ -5,100 +5,102 @@ import (
 	"sync"
 )
 
-// RosterType defines the type of roster allocation.
+// RosterType defines the type of roster to spawn.
 type RosterType int
 
 const (
-	// FullArenaRoster is the default roster type with full arena allocation.
-	FullArenaRoster RosterType = iota
-	// LeanRoster is a lean roster allocation under tight budget constraints.
+	// FullArena spawns a full arena roster.
+	FullArena RosterType = iota
+	// LeanRoster spawns a lean roster with minimal micros.
 	LeanRoster
 )
 
-// ErrBudgetExceeded is returned when the budget does not allow full arena spawn.
+// Config holds configuration for roster spawning.
+type Config struct {
+	MonthlyBudgetCents int64 // Monthly budget in cents
+	AvailableMicros    int64 // Micros available for this roster spawn
+	Role               string
+}
+
+// ErrBudgetExceeded is returned when budget is too tight for full arena.
 var ErrBudgetExceeded = errors.New("budget too tight for full arena spawn")
 
-// RosterConfig holds configuration for roster allocation.
-type RosterConfig struct {
-	MonthlyBudgetUSD float64
-	// MicrosCostPerEngineer is the cost in micros per engineer+reviewer.
-	MicrosCostPerEngineer int64
-	// RequestedRosterType is the desired roster type.
-	RequestedRosterType RosterType
-}
-
-// Roster represents a roster allocation.
+// Roster represents a spawned roster.
 type Roster struct {
-	Type       RosterType
-	Engineers  int
-	Reviewers  int
-	TotalCost  int64 // in micros
-	underBudget bool
-	mu         sync.Mutex
+	Type      RosterType
+	Micros    int64
+	Role      string
+	SpawnedAt int64 // Unix timestamp for spawn time (optional)
 }
 
-// NewRoster creates a new roster allocation based on config and budget constraints.
-// It returns ErrBudgetExceeded if full arena spawn is requested but budget is too tight.
-func NewRoster(cfg RosterConfig, engineers, reviewers int) (*Roster, error) {
-	r := &Roster{
-		Engineers: engineers,
-		Reviewers: reviewers,
+// SpawnRoster decides which roster to spawn based on config and budget.
+func SpawnRoster(cfg Config) (*Roster, error) {
+	// Enforce $8 monthly budget envelope (800 cents)
+	if cfg.MonthlyBudgetCents > 800 {
+		// Over budget, fallback to lean roster
+		return spawnLeanRoster(cfg)
 	}
 
-	// Calculate total micros cost for engineer+reviewer pairs.
-	totalPairs := engineers + reviewers
-	totalCost := int64(totalPairs) * cfg.MicrosCostPerEngineer
+	// If available micros under $2 (200 cents) and role is engineer or reviewer only,
+	// spawn lean roster.
+	if cfg.AvailableMicros < 200 && (cfg.Role == "engineer" || cfg.Role == "reviewer") {
+		return spawnLeanRoster(cfg)
+	}
 
-	// Convert monthly budget to micros.
-	monthlyBudgetMicros := int64(cfg.MonthlyBudgetUSD * 1_000_000)
+	// Otherwise, spawn full arena roster.
+	return spawnFullArena(cfg)
+}
 
-	switch cfg.RequestedRosterType {
-	case LeanRoster:
-		// Lean roster only allowed if cost under $2 (2,000,000 micros).
-		if totalCost > 2_000_000 {
-			// If requested lean but cost exceeds $2 micros, fallback to full arena if budget allows.
-			if totalCost <= monthlyBudgetMicros {
-				r.Type = FullArenaRoster
-				r.TotalCost = totalCost
-				r.underBudget = true
-				return r, nil
-			}
-			return nil, ErrBudgetExceeded
-		}
-		// Lean roster allowed under $2 micros cost.
-		r.Type = LeanRoster
-		r.TotalCost = totalCost
-		r.underBudget = true
-		return r, nil
+func spawnLeanRoster(cfg Config) (*Roster, error) {
+	return &Roster{
+		Type:   LeanRoster,
+		Micros: cfg.AvailableMicros,
+		Role:   cfg.Role,
+	}, nil
+}
 
-	case FullArenaRoster:
-		// Full arena spawn only if budget allows.
-		if totalCost > monthlyBudgetMicros {
-			return nil, ErrBudgetExceeded
-		}
-		r.Type = FullArenaRoster
-		r.TotalCost = totalCost
-		r.underBudget = true
-		return r, nil
+func spawnFullArena(cfg Config) (*Roster, error) {
+	// If budget is tight, disallow full arena spawn.
+	if cfg.MonthlyBudgetCents < 800 {
+		return nil, ErrBudgetExceeded
+	}
+	return &Roster{
+		Type:   FullArena,
+		Micros: cfg.AvailableMicros,
+		Role:   cfg.Role,
+	}, nil
+}
 
-	default:
-		// Default to full arena if unknown roster type.
-		if totalCost > monthlyBudgetMicros {
-			return nil, ErrBudgetExceeded
-		}
-		r.Type = FullArenaRoster
-		r.TotalCost = totalCost
-		r.underBudget = true
-		return r, nil
+// RosterManager manages roster spawning with concurrency safety.
+type RosterManager struct {
+	mu     sync.Mutex
+	config Config
+	roster *Roster
+}
+
+// NewRosterManager creates a new roster manager with config.
+func NewRosterManager(cfg Config) *RosterManager {
+	return &RosterManager{
+		config: cfg,
 	}
 }
 
-// IsLean returns true if the roster is lean.
-func (r *Roster) IsLean() bool {
-	return r.Type == LeanRoster
+// Spawn spawns a roster according to the config and updates the manager state.
+func (rm *RosterManager) Spawn() (*Roster, error) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	r, err := SpawnRoster(rm.config)
+	if err != nil {
+		return nil, err
+	}
+	rm.roster = r
+	return r, nil
 }
 
-// IsFullArena returns true if the roster is full arena.
-func (r *Roster) IsFullArena() bool {
-	return r.Type == FullArenaRoster
+// Current returns the current roster.
+func (rm *RosterManager) Current() *Roster {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	return rm.roster
 }

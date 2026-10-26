@@ -4,72 +4,81 @@ import (
 	"testing"
 )
 
-func TestNewRoster_LeanUnderBudget(t *testing.T) {
-	cfg := RosterConfig{
-		MonthlyBudgetUSD:      8,
-		MicrosCostPerEngineer: 1_000_000, // $1 per engineer+reviewer pair
-		RequestedRosterType:   LeanRoster,
+func TestSpawnRoster_LeanRosterUnderBudget(t *testing.T) {
+	cfg := Config{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    150,
+		Role:               "engineer",
 	}
-	// 1 engineer + 1 reviewer = 2 pairs * $1 = $2 micros cost
-	r, err := NewRoster(cfg, 1, 1)
+	r, err := SpawnRoster(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !r.IsLean() {
+	if r.Type != LeanRoster {
 		t.Errorf("expected lean roster, got %v", r.Type)
 	}
-	if r.TotalCost != 2_000_000 {
-		t.Errorf("expected total cost 2,000,000 micros, got %d", r.TotalCost)
+	if r.Micros != 150 {
+		t.Errorf("expected micros 150, got %d", r.Micros)
 	}
 }
 
-func TestNewRoster_LeanOverBudgetFallbackFull(t *testing.T) {
-	cfg := RosterConfig{
-		MonthlyBudgetUSD:      8,
-		MicrosCostPerEngineer: 1_500_000, // $1.5 per engineer+reviewer pair
-		RequestedRosterType:   LeanRoster,
+func TestSpawnRoster_FullArenaAllowed(t *testing.T) {
+	cfg := Config{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    500,
+		Role:               "engineer",
 	}
-	// 1 engineer + 1 reviewer = 2 pairs * $1.5 = $3 micros cost > $2 lean limit
-	// But total cost $3 < $8 budget, so fallback to full arena
-	r, err := NewRoster(cfg, 1, 1)
+	r, err := SpawnRoster(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !r.IsFullArena() {
-		t.Errorf("expected full arena roster fallback, got %v", r.Type)
-	}
-	if r.TotalCost != 3_000_000 {
-		t.Errorf("expected total cost 3,000,000 micros, got %d", r.TotalCost)
+	if r.Type != FullArena {
+		t.Errorf("expected full arena, got %v", r.Type)
 	}
 }
 
-func TestNewRoster_FullArenaOverBudget(t *testing.T) {
-	cfg := RosterConfig{
-		MonthlyBudgetUSD:      2,
-		MicrosCostPerEngineer: 2_000_000, // $2 per engineer+reviewer pair
-		RequestedRosterType:   FullArenaRoster,
+func TestSpawnRoster_FullArenaDisallowedUnderBudget(t *testing.T) {
+	cfg := Config{
+		MonthlyBudgetCents: 700,
+		AvailableMicros:    500,
+		Role:               "engineer",
 	}
-	// 2 engineers + 2 reviewers = 4 pairs * $2 = $8 micros cost > $2 budget
-	_, err := NewRoster(cfg, 2, 2)
+	_, err := SpawnRoster(cfg)
+	if err == nil {
+		t.Fatal("expected error for budget exceeded, got nil")
+	}
 	if err != ErrBudgetExceeded {
 		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
 	}
 }
 
-func TestNewRoster_DefaultFullArenaWithinBudget(t *testing.T) {
-	cfg := RosterConfig{
-		MonthlyBudgetUSD:      8,
-		MicrosCostPerEngineer: 1_000_000,
-		RequestedRosterType:   99, // unknown, defaults to full arena
+func TestSpawnRoster_LeanRosterReviewerUnderBudget(t *testing.T) {
+	cfg := Config{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    100,
+		Role:               "reviewer",
 	}
-	r, err := NewRoster(cfg, 2, 2)
+	r, err := SpawnRoster(cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !r.IsFullArena() {
-		t.Errorf("expected full arena roster, got %v", r.Type)
+	if r.Type != LeanRoster {
+		t.Errorf("expected lean roster, got %v", r.Type)
 	}
-	if r.TotalCost != 4_000_000 {
-		t.Errorf("expected total cost 4,000,000 micros, got %d", r.TotalCost)
+}
+
+func TestSpawnRoster_LeanRosterNonEngineerReviewer(t *testing.T) {
+	cfg := Config{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    100,
+		Role:               "admin",
+	}
+	r, err := SpawnRoster(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should spawn full arena because role is not engineer/reviewer
+	if r.Type != FullArena {
+		t.Errorf("expected full arena, got %v", r.Type)
 	}
 }
