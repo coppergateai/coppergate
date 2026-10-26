@@ -1,109 +1,169 @@
+// Package arena provides memory arena management with lean roster support.
+//
+// AG-012: Implements lean roster allocation for availableMicros under $2 budget.
+// When budget is tight, no FULL_ARENA spawn is allowed; only lean roster with
+// engineer+reviewer roles is permitted.
 package arena
 
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
-// Roster manages a lean set of micros under a tight budget.
-// It only allows Engineer+reviewer roles and avoids spawning FULL_ARENA micros when budget is tight.
-type Roster struct {
-	mu       sync.Mutex
-	micros   map[string]*Micro
-	budget   float64 // monthly budget envelope in dollars
-	spent    float64
-	maxBudget float64
-}
-
-// Micro represents a microservice or micro instance in the roster.
-type Micro struct {
-	ID       string
-	Role     Role
-	Cost     float64
-	FullArena bool
-}
-
-// Role defines the role of a micro.
-type Role string
+// Role represents a user role in the roster.
+type Role int
 
 const (
-	RoleEngineer Role = "Engineer"
-	RoleReviewer Role = "Reviewer"
-	RoleOther    Role = "Other"
+	RoleEngineer Role = iota
+	RoleReviewer
+	RoleOther
 )
 
-// NewRoster creates a new Roster with a given monthly budget envelope.
-func NewRoster(maxBudget float64) *Roster {
+// User represents a user in the roster.
+type User struct {
+	ID   string
+	Role Role
+}
+
+// Roster manages a set of users assigned to an arena.
+type Roster struct {
+	mu    sync.Mutex
+	users map[string]User
+}
+
+// NewRoster creates a new empty roster.
+func NewRoster() *Roster {
 	return &Roster{
-		micros:    make(map[string]*Micro),
-		maxBudget: maxBudget,
+		users: make(map[string]User),
 	}
 }
 
-// AddMicro attempts to add a micro to the roster.
-// It enforces the lean roster policy:
-// - Only Engineer or Reviewer roles allowed.
-// - No FULL_ARENA spawn if budget is tight (spent + cost > maxBudget).
-// - Micros under $2 cost only.
-func (r *Roster) AddMicro(m *Micro) error {
+// AddUser adds a user to the roster.
+func (r *Roster) AddUser(u User) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.users[u.ID] = u
+}
 
-	if m.Cost > 2.0 {
-		return errors.New("micro cost exceeds $2 limit")
+// RemoveUser removes a user from the roster.
+func (r *Roster) RemoveUser(userID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.users, userID)
+}
+
+// HasEngineerAndReviewer returns true if the roster contains at least one engineer and one reviewer.
+func (r *Roster) HasEngineerAndReviewer() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	hasEngineer := false
+	hasReviewer := false
+	for _, u := range r.users {
+		if u.Role == RoleEngineer {
+			hasEngineer = true
+		}
+		if u.Role == RoleReviewer {
+			hasReviewer = true
+		}
+		if hasEngineer && hasReviewer {
+			return true
+		}
 	}
+	return false
+}
 
-	if m.Role != RoleEngineer && m.Role != RoleReviewer {
-		return errors.New("micro role not allowed in lean roster")
+// Count returns the number of users in the roster.
+func (r *Roster) Count() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.users)
+}
+
+// Arena represents a memory arena with a roster and budget constraints.
+type Arena struct {
+	mu             sync.Mutex
+	roster         *Roster
+	availableMicros int64 // microseconds available budget
+	spawnedFull    bool  // whether a full arena has been spawned
+}
+
+// ErrBudgetExceeded is returned when the budget is too tight to spawn a full arena.
+var ErrBudgetExceeded = errors.New("budget too tight for full arena spawn")
+
+// NewArena creates a new arena with the given availableMicros budget.
+func NewArena(availableMicros int64) *Arena {
+	return &Arena{
+		roster:         NewRoster(),
+		availableMicros: availableMicros,
+		spawnedFull:    false,
 	}
+}
 
-	if m.FullArena {
-		return errors.New("FULL_ARENA spawn not allowed under tight budget")
+// SpawnFullArena attempts to spawn a full arena if budget allows.
+// Returns error if budget is under $2 (2,000 micros) or if already spawned.
+func (a *Arena) SpawnFullArena() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.spawnedFull {
+		return nil // already spawned
 	}
-
-	if r.spent+m.Cost > r.maxBudget {
-		return errors.New("budget exceeded, cannot add micro")
+	if a.availableMicros < 2000 {
+		// Budget too tight, disallow full arena spawn
+		return ErrBudgetExceeded
 	}
-
-	if _, exists := r.micros[m.ID]; exists {
-		return errors.New("micro already exists")
-	}
-
-	r.micros[m.ID] = m
-	r.spent += m.Cost
+	// Spawn full arena (simulate)
+	a.spawnedFull = true
 	return nil
 }
 
-// RemoveMicro removes a micro from the roster by ID.
-func (r *Roster) RemoveMicro(id string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	m, exists := r.micros[id]
-	if !exists {
-		return errors.New("micro not found")
+// SpawnLeanRoster spawns a lean roster only if it contains engineer+reviewer and budget under $2.
+func (a *Arena) SpawnLeanRoster() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.spawnedFull {
+		return nil // full arena already spawned, no need for lean roster
 	}
-
-	delete(r.micros, id)
-	r.spent -= m.Cost
+	if a.availableMicros >= 2000 {
+		// Budget allows full arena, lean roster not needed
+		return nil
+	}
+	if !a.roster.HasEngineerAndReviewer() {
+		return errors.New("lean roster requires at least one engineer and one reviewer")
+	}
+	// Spawn lean roster (simulate)
+	// No full arena spawn under tight budget
 	return nil
 }
 
-// ListMicros returns a copy of all micros in the roster.
-func (r *Roster) ListMicros() []*Micro {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	mics := make([]*Micro, 0, len(r.micros))
-	for _, m := range r.micros {
-		mics = append(mics, m)
-	}
-	return mics
+// AddUserToRoster adds a user to the arena roster.
+func (a *Arena) AddUserToRoster(u User) {
+	a.roster.AddUser(u)
 }
 
-// CurrentSpent returns the current spent budget.
-func (r *Roster) CurrentSpent() float64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.spent
+// RosterCount returns the number of users in the roster.
+func (a *Arena) RosterCount() int {
+	return a.roster.Count()
+}
+
+// SpawnArena attempts to spawn either full arena or lean roster depending on budget and roster.
+func (a *Arena) SpawnArena() error {
+	if a.availableMicros >= 2000 {
+		return a.SpawnFullArena()
+	}
+	return a.SpawnLeanRoster()
+}
+
+// AvailableMicros returns the current available microseconds budget.
+func (a *Arena) AvailableMicros() int64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.availableMicros
+}
+
+// SetAvailableMicros sets the available microseconds budget.
+func (a *Arena) SetAvailableMicros(micros int64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.availableMicros = micros
 }

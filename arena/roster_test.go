@@ -4,87 +4,87 @@ import (
 	"testing"
 )
 
-func TestRoster_AddMicro(t *testing.T) {
-	r := NewRoster(8.0)
-
-	// Valid micro under $2, Engineer role, no FULL_ARENA
-	m1 := &Micro{ID: "m1", Role: RoleEngineer, Cost: 1.5, FullArena: false}
-	if err := r.AddMicro(m1); err != nil {
-		t.Fatalf("expected add micro success, got error: %v", err)
+func TestRosterAddRemove(t *testing.T) {
+	r := NewRoster()
+	u1 := User{ID: "u1", Role: RoleEngineer}
+	u2 := User{ID: "u2", Role: RoleReviewer}
+	r.AddUser(u1)
+	r.AddUser(u2)
+	if r.Count() != 2 {
+		t.Fatalf("expected 2 users, got %d", r.Count())
 	}
-
-	// Duplicate micro ID
-	if err := r.AddMicro(m1); err == nil {
-		t.Fatal("expected error on duplicate micro ID")
+	if !r.HasEngineerAndReviewer() {
+		t.Fatal("expected roster to have engineer and reviewer")
 	}
-
-	// Micro cost over $2
-	m2 := &Micro{ID: "m2", Role: RoleEngineer, Cost: 2.5, FullArena: false}
-	if err := r.AddMicro(m2); err == nil {
-		t.Fatal("expected error on micro cost > $2")
+	r.RemoveUser("u1")
+	if r.Count() != 1 {
+		t.Fatalf("expected 1 user, got %d", r.Count())
 	}
-
-	// Micro role not allowed
-	m3 := &Micro{ID: "m3", Role: RoleOther, Cost: 1.0, FullArena: false}
-	if err := r.AddMicro(m3); err == nil {
-		t.Fatal("expected error on disallowed role")
-	}
-
-	// FULL_ARENA spawn not allowed
-	m4 := &Micro{ID: "m4", Role: RoleEngineer, Cost: 1.0, FullArena: true}
-	if err := r.AddMicro(m4); err == nil {
-		t.Fatal("expected error on FULL_ARENA spawn")
-	}
-
-	// Add micros until budget exceeded
-	m5 := &Micro{ID: "m5", Role: RoleReviewer, Cost: 2.0, FullArena: false}
-	if err := r.AddMicro(m5); err != nil {
-		t.Fatalf("expected add micro success, got error: %v", err)
-	}
-	m6 := &Micro{ID: "m6", Role: RoleEngineer, Cost: 2.0, FullArena: false}
-	if err := r.AddMicro(m6); err != nil {
-		t.Fatalf("expected add micro success, got error: %v", err)
-	}
-	// This next micro would exceed $8 budget (1.5 + 2 + 2 + 2 = 7.5, adding 1.0 would be 8.5)
-	m7 := &Micro{ID: "m7", Role: RoleEngineer, Cost: 1.0, FullArena: false}
-	if err := r.AddMicro(m7); err == nil {
-		t.Fatal("expected error on budget exceeded")
+	if r.HasEngineerAndReviewer() {
+		t.Fatal("expected roster to NOT have engineer and reviewer after removal")
 	}
 }
 
-func TestRoster_RemoveMicro(t *testing.T) {
-	r := NewRoster(8.0)
-	m := &Micro{ID: "m1", Role: RoleEngineer, Cost: 1.5, FullArena: false}
-	if err := r.AddMicro(m); err != nil {
-		t.Fatalf("add micro failed: %v", err)
+func TestArenaSpawnFullArena(t *testing.T) {
+	a := NewArena(3000)
+	err := a.SpawnFullArena()
+	if err != nil {
+		t.Fatalf("expected full arena spawn success, got error: %v", err)
 	}
-	if err := r.RemoveMicro("m1"); err != nil {
-		t.Fatalf("remove micro failed: %v", err)
+	err = a.SpawnFullArena()
+	if err != nil {
+		t.Fatalf("expected no error on repeated spawn, got: %v", err)
 	}
-	if r.CurrentSpent() != 0 {
-		t.Fatalf("expected spent 0 after removal, got %f", r.CurrentSpent())
-	}
-	if err := r.RemoveMicro("m1"); err == nil {
-		t.Fatal("expected error removing non-existent micro")
+
+	a.SetAvailableMicros(1000)
+	a2 := NewArena(1000)
+	err = a2.SpawnFullArena()
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded for low budget, got: %v", err)
 	}
 }
 
-func TestRoster_ListMicros(t *testing.T) {
-	r := NewRoster(8.0)
-	m1 := &Micro{ID: "m1", Role: RoleEngineer, Cost: 1.5, FullArena: false}
-	m2 := &Micro{ID: "m2", Role: RoleReviewer, Cost: 1.0, FullArena: false}
-	r.AddMicro(m1)
-	r.AddMicro(m2)
+func TestArenaSpawnLeanRoster(t *testing.T) {
+	a := NewArena(1500)
+	// No users yet
+	err := a.SpawnLeanRoster()
+	if err == nil {
+		t.Fatal("expected error for lean roster without engineer+reviewer")
+	}
+	// Add only engineer
+	a.AddUserToRoster(User{ID: "eng1", Role: RoleEngineer})
+	err = a.SpawnLeanRoster()
+	if err == nil {
+		t.Fatal("expected error for lean roster without reviewer")
+	}
+	// Add reviewer
+	a.AddUserToRoster(User{ID: "rev1", Role: RoleReviewer})
+	err = a.SpawnLeanRoster()
+	if err != nil {
+		t.Fatalf("expected lean roster spawn success, got error: %v", err)
+	}
+}
 
-	mics := r.ListMicros()
-	if len(mics) != 2 {
-		t.Fatalf("expected 2 micros, got %d", len(mics))
+func TestArenaSpawnArena(t *testing.T) {
+	a := NewArena(3000)
+	a.AddUserToRoster(User{ID: "eng1", Role: RoleEngineer})
+	a.AddUserToRoster(User{ID: "rev1", Role: RoleReviewer})
+	err := a.SpawnArena()
+	if err != nil {
+		t.Fatalf("expected full arena spawn success, got error: %v", err)
 	}
-	found := map[string]bool{}
-	for _, m := range mics {
-		found[m.ID] = true
+
+	a2 := NewArena(1500)
+	a2.AddUserToRoster(User{ID: "eng1", Role: RoleEngineer})
+	a2.AddUserToRoster(User{ID: "rev1", Role: RoleReviewer})
+	err = a2.SpawnArena()
+	if err != nil {
+		t.Fatalf("expected lean roster spawn success, got error: %v", err)
 	}
-	if !found["m1"] || !found["m2"] {
-		t.Fatal("expected micros m1 and m2 in list")
+
+	a3 := NewArena(1500)
+	err = a3.SpawnArena()
+	if err == nil {
+		t.Fatal("expected error for lean roster spawn without engineer+reviewer")
 	}
 }
