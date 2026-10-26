@@ -1,145 +1,125 @@
 package program
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 )
 
-// Constants for spend envelope and badge expiration.
+// Constants for spend envelope
 const (
-	MonthlySpendEnvelopeCents = 800 // $8.00 in cents
-	IDBadgeValidityDuration   = 24 * time.Hour
+	MonthlySpendEnvelope = 8.00
 )
 
-// ErrSpendLimitExceeded is returned when reservation exceeds monthly envelope.
-var ErrSpendLimitExceeded = errors.New("spend license reservation exceeds monthly envelope")
-
-// ErrInvalidBadge is returned when an ID badge is invalid or expired.
-var ErrInvalidBadge = errors.New("invalid or expired ID badge")
-
-// ProgramRuntime manages contracted autonomy spend license and ID badges.
-type ProgramRuntime struct {
-	mu sync.Mutex
-
-	// programID uniquely identifies the program.
-	programID string
-
-	// spendReservedCents tracks the reserved spend for the current month.
-	spendReservedCents int
-
-	// badge issued for this runtime instance.
-	badge *IDBadge
-
-	// accepted indicates if the contract was accepted.
-	accepted bool
-
-	// shipReceipt generated after acceptance.
-	shipReceipt *ShipReceipt
-
-	// monthStart tracks the start of the current spend month.
-	monthStart time.Time
-}
-
-// IDBadge represents a program runtime identity badge.
-type IDBadge struct {
-	Token     string
+// Badge represents an ID badge issued to an entity.
+type Badge struct {
+	Entity    string
+	IssuedAt  time.Time
 	ExpiresAt time.Time
+	Signature string // Simplified signature placeholder
 }
 
-// ShipReceipt represents a receipt generated after contract acceptance.
+// SpendLicense tracks reserved and spent amounts.
+type SpendLicense struct {
+	Reserved float64
+	Spent    float64
+	mu       sync.Mutex
+}
+
+// Runtime manages program runtime state.
+type Runtime struct {
+	Spend    SpendLicense
+	Badges   map[string]Badge
+	Receipts []ShipReceipt
+	mu       sync.Mutex
+}
+
+// ShipReceipt represents a receipt generated on acceptance.
 type ShipReceipt struct {
-	ProgramID string
 	Timestamp time.Time
+	ProgramID string
+	Amount    float64
 	Details   string
 }
 
-// NewProgramRuntime creates a new ProgramRuntime instance.
-func NewProgramRuntime(programID string) *ProgramRuntime {
-	return &ProgramRuntime{
-		programID: programID,
-		monthStart: time.Now().Truncate(30 * 24 * time.Hour), // approximate month start
+// NewRuntime creates a new Runtime instance.
+func NewRuntime() *Runtime {
+	return &Runtime{
+		Spend:  SpendLicense{},
+		Badges: make(map[string]Badge),
 	}
 }
 
-// ReserveSpendLicense attempts to reserve spend license cents for the runtime.
-// Returns error if reservation exceeds monthly envelope.
-func (pr *ProgramRuntime) ReserveSpendLicense(ctx context.Context, cents int) error {
-	pr.mu.Lock()
-	defer pr.mu.Unlock()
+// ReserveSpend reserves an amount from the monthly envelope.
+func (r *Runtime) ReserveSpend(amount float64) error {
+	r.Spend.mu.Lock()
+	defer r.Spend.mu.Unlock()
+
+	if amount <= 0 {
+		return errors.New("reserve amount must be positive")
+	}
+	if r.Spend.Reserved+amount > MonthlySpendEnvelope {
+		return fmt.Errorf("reserve exceeds monthly envelope: %.2f + %.2f > %.2f",
+			r.Spend.Reserved, amount, MonthlySpendEnvelope)
+	}
+	r.Spend.Reserved += amount
+	return nil
+}
+
+// FanOutSpend allocates reserved spend to a subcomponent.
+func (r *Runtime) FanOutSpend(amount float64) error {
+	r.Spend.mu.Lock()
+	defer r.Spend.mu.Unlock()
+
+	if amount <= 0 {
+		return errors.New("fan-out amount must be positive")
+	}
+	if r.Spend.Spent+amount > r.Spend.Reserved {
+		return fmt.Errorf("fan-out exceeds reserved spend: %.2f + %.2f > %.2f",
+			r.Spend.Spent, amount, r.Spend.Reserved)
+	}
+	r.Spend.Spent += amount
+	return nil
+}
+
+// IssueBadge issues an ID badge to an entity.
+func (r *Runtime) IssueBadge(entity string) (Badge, error) {
+	if entity == "" {
+		return Badge{}, errors.New("entity cannot be empty")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	now := time.Now()
-	if now.Sub(pr.monthStart) >= 30*24*time.Hour {
-		// Reset monthly spend reservation for new month.
-		pr.monthStart = now.Truncate(30 * 24 * time.Hour)
-		pr.spendReservedCents = 0
+	badge := Badge{
+		Entity:    entity,
+		IssuedAt:  now,
+		ExpiresAt: now.Add(24 * time.Hour),
+		Signature: fmt.Sprintf("signed-%s-%d", entity, now.Unix()), // simplified
 	}
-
-	if pr.spendReservedCents+cents > MonthlySpendEnvelopeCents {
-		return ErrSpendLimitExceeded
-	}
-
-	pr.spendReservedCents += cents
-	return nil
+	r.Badges[entity] = badge
+	return badge, nil
 }
 
-// IssueIDBadge issues a new ID badge valid for 24 hours.
-func (pr *ProgramRuntime) IssueIDBadge(ctx context.Context) *IDBadge {
-	pr.mu.Lock()
-	defer pr.mu.Unlock()
-
-	token := fmt.Sprintf("%s-%d", pr.programID, time.Now().UnixNano())
-	badge := &IDBadge{
-		Token:     token,
-		ExpiresAt: time.Now().Add(IDBadgeValidityDuration),
+// AcceptOutput accepts an output and generates a ship receipt.
+func (r *Runtime) AcceptOutput(programID string, amount float64, details string) (ShipReceipt, error) {
+	if programID == "" {
+		return ShipReceipt{}, errors.New("programID cannot be empty")
 	}
-	pr.badge = badge
-	return badge
-}
-
-// ValidateIDBadge checks if the provided badge token is valid and not expired.
-func (pr *ProgramRuntime) ValidateIDBadge(token string) error {
-	pr.mu.Lock()
-	defer pr.mu.Unlock()
-
-	if pr.badge == nil || pr.badge.Token != token || time.Now().After(pr.badge.ExpiresAt) {
-		return ErrInvalidBadge
-	}
-	return nil
-}
-
-// AcceptContract accepts the contract if the badge is valid and not already accepted.
-// Generates a ship receipt.
-func (pr *ProgramRuntime) AcceptContract(ctx context.Context, badgeToken string) (*ShipReceipt, error) {
-	pr.mu.Lock()
-	defer pr.mu.Unlock()
-
-	if pr.accepted {
-		return nil, errors.New("contract already accepted")
+	if amount <= 0 {
+		return ShipReceipt{}, errors.New("amount must be positive")
 	}
 
-	if pr.badge == nil || pr.badge.Token != badgeToken || time.Now().After(pr.badge.ExpiresAt) {
-		return nil, ErrInvalidBadge
-	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	pr.accepted = true
-	pr.shipReceipt = &ShipReceipt{
-		ProgramID: pr.programID,
+	receipt := ShipReceipt{
 		Timestamp: time.Now(),
-		Details:   "Contract accepted and shipped",
+		ProgramID: programID,
+		Amount:    amount,
+		Details:   details,
 	}
-	return pr.shipReceipt, nil
-}
-
-// GetShipReceipt returns the ship receipt if contract was accepted.
-func (pr *ProgramRuntime) GetShipReceipt() (*ShipReceipt, error) {
-	pr.mu.Lock()
-	defer pr.mu.Unlock()
-
-	if !pr.accepted || pr.shipReceipt == nil {
-		return nil, errors.New("no ship receipt available")
-	}
-	return pr.shipReceipt, nil
+	r.Receipts = append(r.Receipts, receipt)
+	return receipt, nil
 }
