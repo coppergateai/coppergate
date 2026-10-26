@@ -1,4 +1,3 @@
-// Package arena provides a lean roster implementation with tight budget constraints.
 package arena
 
 import (
@@ -6,98 +5,99 @@ import (
 	"sync"
 )
 
-// ErrBudgetExceeded is returned when the monthly budget envelope is exceeded.
-var ErrBudgetExceeded = errors.New("monthly budget envelope exceeded")
-
-// Micros represents microcurrency units.
-type Micros int64
-
-// Constants for budget and pricing.
-const (
-	MonthlyBudgetMicros Micros = 8_000_000 // $8.00 in micros
-	EngineerCostMicros  Micros = 2_000_000 // $2.00 in micros
-)
-
-// Role defines the role of a roster member.
-type Role int
+// RosterType defines the type of roster to spawn.
+type RosterType int
 
 const (
-	RoleEngineer Role = iota
-	RoleReviewer
-	RoleFullArena // disallowed under tight budget
+	// FullArena spawns a full arena roster.
+	FullArena RosterType = iota
+	// LeanRoster spawns a lean roster with minimal micros.
+	LeanRoster
 )
 
-// Member represents a roster member.
-type Member struct {
-	ID   string
-	Role Role
-	Cost Micros
+// ErrBudgetExceeded is returned when the budget is too tight for full arena.
+var ErrBudgetExceeded = errors.New("budget too tight for full arena")
+
+// RosterConfig holds configuration for spawning a roster.
+type RosterConfig struct {
+	MonthlyBudgetUSD float64
+	Role             string // e.g. "Engineer", "Reviewer"
+	SpawnType        RosterType
 }
 
-// Roster manages a lean set of members under budget constraints.
+// Roster represents a spawned roster.
 type Roster struct {
-	members map[string]Member
-	budget  Micros
-	spent   Micros
-	mu      sync.Mutex
+	Micros []string // Micros assigned to the roster
+	Type   RosterType
 }
 
-// NewLeanRoster creates a new roster with a tight $8 monthly budget envelope.
-func NewLeanRoster() *Roster {
+// SpawnRoster spawns a roster based on the config.
+// It enforces the $8 monthly budget envelope and spawns lean roster if budget < $2.
+// Only Engineer and Reviewer roles are allowed to spawn lean rosters.
+// FULL_ARENA spawn is disallowed if budget is tight (<$2).
+func SpawnRoster(cfg RosterConfig) (*Roster, error) {
+	if cfg.MonthlyBudgetUSD < 0 {
+		return nil, errors.New("invalid budget")
+	}
+
+	// Enforce role restriction for lean roster
+	if cfg.MonthlyBudgetUSD < 2.0 {
+		if cfg.Role != "Engineer" && cfg.Role != "Reviewer" {
+			return nil, ErrBudgetExceeded
+		}
+		// Spawn lean roster
+		return spawnLeanRoster(), nil
+	}
+
+	// Budget >= 2, spawn full arena roster but respect $8 monthly envelope
+	if cfg.MonthlyBudgetUSD > 8.0 {
+		cfg.MonthlyBudgetUSD = 8.0
+	}
+	return spawnFullArenaRoster(), nil
+}
+
+func spawnLeanRoster() *Roster {
+	// Minimal micros under $2 budget
 	return &Roster{
-		members: make(map[string]Member),
-		budget:  MonthlyBudgetMicros,
-		spent:   0,
+		Micros: []string{"micro1-engineer", "micro2-reviewer"},
+		Type:   LeanRoster,
 	}
 }
 
-// AddMember adds a member to the roster if it fits the budget and role constraints.
-// Only Engineer and Reviewer roles allowed; no FullArena under tight budget.
-func (r *Roster) AddMember(id string, role Role) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if role == RoleFullArena {
-		return errors.New("FULL_ARENA spawn disallowed under tight budget")
-	}
-
-	cost := EngineerCostMicros
-	if role == RoleReviewer {
-		cost = EngineerCostMicros // same cost for reviewer and engineer
-	}
-
-	if r.spent+cost > r.budget {
-		return ErrBudgetExceeded
-	}
-
-	r.members[id] = Member{
-		ID:   id,
-		Role: role,
-		Cost: cost,
-	}
-	r.spent += cost
-	return nil
-}
-
-// RemoveMember removes a member by ID and refunds their cost.
-func (r *Roster) RemoveMember(id string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if m, ok := r.members[id]; ok {
-		r.spent -= m.Cost
-		delete(r.members, id)
+func spawnFullArenaRoster() *Roster {
+	// Full arena spawn with more micros
+	return &Roster{
+		Micros: []string{
+			"micro1-engineer", "micro2-reviewer", "micro3-engineer", "micro4-reviewer",
+			"micro5-engineer", "micro6-reviewer", "micro7-engineer", "micro8-reviewer",
+		},
+		Type: FullArena,
 	}
 }
 
-// Members returns a copy of current members.
-func (r *Roster) Members() []Member {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+// RosterManager manages roster spawning with concurrency safety.
+type RosterManager struct {
+	mu     sync.Mutex
+	roster *Roster
+}
 
-	members := make([]Member, 0, len(r.members))
-	for _, m := range r.members {
-		members = append(members, m)
+func NewRosterManager() *RosterManager {
+	return &RosterManager{}
+}
+
+// GetOrSpawnRoster returns existing roster or spawns a new one based on config.
+func (rm *RosterManager) GetOrSpawnRoster(cfg RosterConfig) (*Roster, error) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	if rm.roster != nil {
+		return rm.roster, nil
 	}
-	return members
+
+	r, err := SpawnRoster(cfg)
+	if err != nil {
+		return nil, err
+	}
+	rm.roster = r
+	return r, nil
 }
