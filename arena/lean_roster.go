@@ -6,82 +6,63 @@ import (
 )
 
 // LeanRoster manages a minimal set of micros under a tight budget.
-// It only allows Engineer+reviewer roles and prevents FULL_ARENA spawn.
-// Designed for monthly budget envelope of $8 and micros under $2 each.
+// It only allows Engineer and Reviewer roles, and disallows FULL_ARENA spawns.
 type LeanRoster struct {
-	mu      sync.Mutex
-	micros  map[string]*Micro
-	budget  float64
-	spent   float64
-	maxCost float64
+	mu     sync.Mutex
+	micros map[string]*Micro
+	budget float64 // monthly budget envelope in dollars
+	spent  float64
 }
 
-// Micro represents a microservice or micro unit with cost and role.
+// Micro represents a minimal unit with role and cost.
 type Micro struct {
-	ID    string
-	Cost  float64
-	Role  Role
-	Alive bool
+	ID   string
+	Role Role
+	Cost float64
 }
 
-// Role defines the role of a micro.
-type Role int
+// Role defines allowed roles for micros.
+type Role string
 
 const (
-	RoleUnknown Role = iota
-	RoleEngineer
-	RoleReviewer
-	RoleFullArena // disallowed in lean roster
+	RoleEngineer Role = "Engineer"
+	RoleReviewer Role = "Reviewer"
+	RoleFullArena Role = "FULL_ARENA"
 )
 
-var (
-	ErrBudgetExceeded   = errors.New("budget exceeded")
-	ErrRoleNotAllowed   = errors.New("role not allowed in lean roster")
-	ErrFullArenaDisallow = errors.New("FULL_ARENA spawn disallowed under tight budget")
-)
-
-// NewLeanRoster creates a new lean roster with given monthly budget envelope and max micro cost.
-func NewLeanRoster(monthlyBudget float64, maxMicroCost float64) *LeanRoster {
+// NewLeanRoster creates a new LeanRoster with given budget envelope.
+func NewLeanRoster(budget float64) *LeanRoster {
 	return &LeanRoster{
-		micros:  make(map[string]*Micro),
-		budget:  monthlyBudget,
-		maxCost: maxMicroCost,
+		micros: make(map[string]*Micro),
+		budget: budget,
 	}
 }
 
-// AddMicro attempts to add a micro to the lean roster.
-// Only Engineer and Reviewer roles allowed.
-// Reject FULL_ARENA role.
-// Reject if cost exceeds maxMicroCost or budget exceeded.
+// AddMicro attempts to add a micro to the roster.
+// Returns error if role is disallowed, cost exceeds budget, or ID duplicate.
 func (lr *LeanRoster) AddMicro(m *Micro) error {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
 
-	if m.Role == RoleFullArena {
-		return ErrFullArenaDisallow
-	}
 	if m.Role != RoleEngineer && m.Role != RoleReviewer {
-		return ErrRoleNotAllowed
+		return errors.New("disallowed role: only Engineer and Reviewer allowed in lean roster")
 	}
-	if m.Cost > lr.maxCost {
-		return ErrBudgetExceeded
+	if m.Cost > 2.0 {
+		return errors.New("micro cost exceeds $2 limit")
 	}
 	if lr.spent+m.Cost > lr.budget {
-		return ErrBudgetExceeded
+		return errors.New("budget exceeded")
 	}
-
 	if _, exists := lr.micros[m.ID]; exists {
-		// Already present, no cost increment
-		return nil
+		return errors.New("micro ID already exists")
 	}
 
 	lr.micros[m.ID] = m
 	lr.spent += m.Cost
-	m.Alive = true
 	return nil
 }
 
-// RemoveMicro removes a micro from the roster and frees budget.
+// RemoveMicro removes a micro by ID, freeing budget.
 func (lr *LeanRoster) RemoveMicro(id string) {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
@@ -89,24 +70,23 @@ func (lr *LeanRoster) RemoveMicro(id string) {
 	if m, exists := lr.micros[id]; exists {
 		delete(lr.micros, id)
 		lr.spent -= m.Cost
-		m.Alive = false
 	}
 }
 
-// ListMicros returns a snapshot list of current micros.
-func (lr *LeanRoster) ListMicros() []*Micro {
+// GetMicros returns a snapshot list of current micros.
+func (lr *LeanRoster) GetMicros() []*Micro {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
 
-	list := make([]*Micro, 0, len(lr.micros))
+	result := make([]*Micro, 0, len(lr.micros))
 	for _, m := range lr.micros {
-		list = append(list, m)
+		result = append(result, m)
 	}
-	return list
+	return result
 }
 
-// CurrentSpent returns the current spent budget.
-func (lr *LeanRoster) CurrentSpent() float64 {
+// TotalSpent returns the current spent budget.
+func (lr *LeanRoster) TotalSpent() float64 {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
 	return lr.spent
