@@ -48,7 +48,7 @@ packages/
 
 Primary loop: GitHub **issue → verified PR** (CI + cost + Accept). See [`docs/WEDGE.md`](./docs/WEDGE.md).
 
-Optional later (not required for OSS use): hosted billing / GTM notes live under [`docs/GTM.md`](./docs/GTM.md) and [`docs/LAUNCH_KIT.md`](./docs/LAUNCH_KIT.md).
+Hosted GTM / pilot / staging ops notes live in the private [`coppergate-architecture`](https://github.com/coppergateai/coppergate-architecture) repo (`docs/GTM.md`, `docs/STAGING.md`, …) — not required for OSS / self-host use.
 
 ## Prerequisites
 
@@ -120,7 +120,7 @@ License: **MIT**. Optional hosted SKUs are not required to run Coppergate.
 4. Migrate prod DB: `DATABASE_URL=… pnpm db:migrate`.
 5. Attach `coppergate.ai` (Vercel DNS + ImprovMX — see architecture `EMAIL.md`).
 
-**Staging (TASK033):** see [`docs/STAGING.md`](./docs/STAGING.md) — web + worker + `GITHUB_DELIVERY_MODE=http` + `scripts/staging-smoke.mjs`.
+**Staging (operators):** private architecture repo → `docs/STAGING.md` — web + worker + `GITHUB_DELIVERY_MODE=http` + `scripts/staging-smoke.mjs`.
 
 ## Status
 

@@ -38,4 +38,4 @@ GitHub PR + CI remains the fitness surface. Quality/runtime signals (Sentry, Son
 
 Operator proof script: [`apps/worker/scripts/prove-issue-wedge.mjs`](../apps/worker/scripts/prove-issue-wedge.mjs) · notes: [`scripts/manual-issue-wedge.md`](../scripts/manual-issue-wedge.md).
 
-Sonar / CI-fail seed scripts remain for the **secondary** signal vertical — see [SIGNALS.md](./SIGNALS.md) and [STAGING.md](./STAGING.md).
+Sonar / CI-fail seed scripts remain for the **secondary** signal vertical — see [SIGNALS.md](./SIGNALS.md). Staging operator notes: private architecture `docs/STAGING.md`.

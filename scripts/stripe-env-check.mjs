@@ -77,7 +77,7 @@ console.log(
       issues,
       warnings,
       guidance: ok
-        ? "Stripe env shape OK — run Checkout smoke (docs/STRIPE_PRODUCTION.md)."
+        ? "Stripe env shape OK — run Checkout smoke (architecture docs/STRIPE_PRODUCTION.md)."
         : "Fix issues, then redeploy web with matching Dashboard webhook secret.",
     },
     null,

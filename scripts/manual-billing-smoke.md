@@ -1,6 +1,6 @@
 # Phase 0 — Stripe billing + paid invite smoke
 
-Production checklist: [`docs/STRIPE_PRODUCTION.md`](../docs/STRIPE_PRODUCTION.md).  
+Production checklist: architecture [`docs/STRIPE_PRODUCTION.md`](../../coppergate-architecture/docs/STRIPE_PRODUCTION.md).  
 Env shape: `pnpm ops:stripe-env`.
 
 ## Env (web)
@@ -14,7 +14,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_…
 APP_URL=http://localhost:3000          # or https://www.coppergate.ai
 ```
 
-Prices must match **Starter $99** and **Pro $199** in `@coppergate/billing` `HOSTED_PLANS` / [`docs/GTM.md`](../docs/GTM.md).
+Prices must match **Starter $99** and **Pro $199** in `@coppergate/billing` `HOSTED_PLANS` / architecture [`docs/GTM.md`](../../coppergate-architecture/docs/GTM.md) (public paid UI deferred).
 
 ## Local webhook forward
 
@@ -45,4 +45,4 @@ pnpm ops:waitlist -- --csv
 pnpm ops:pilot-go-no-go
 ```
 
-Set `PILOT_INVITE_REQUIRED=true` on staging when gating signups. Outreach: [`docs/PILOT_OUTREACH.md`](../docs/PILOT_OUTREACH.md) · master ops: [`docs/PHASE0_OPS.md`](../docs/PHASE0_OPS.md).
+Set `PILOT_INVITE_REQUIRED=true` on staging when gating signups. Outreach: architecture [`PILOT_OUTREACH.md`](../../coppergate-architecture/docs/PILOT_OUTREACH.md) · master ops: [`PHASE0_OPS.md`](../../coppergate-architecture/docs/PHASE0_OPS.md).

@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Build outreach email bodies from docs/ops/icp-40.csv + invite codes.
+ * Build outreach email bodies from architecture docs/ops/icp-40.csv + invite codes.
  * Usage:
  *   DATABASE_URL=… pnpm ops:outreach-pack
  *   pnpm ops:outreach-pack -- --dry-run   # CSV only, no DB
+ *   COPPERGATE_ARCHITECTURE_ROOT=/path/to/coppergate-architecture pnpm ops:outreach-pack
  *
- * Writes docs/ops/outreach-outbox.jsonl (gitignored pattern via ops/_generated/).
+ * Writes docs/ops/_generated/ under the architecture repo (gitignored there).
  */
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -19,9 +20,20 @@ import { opsArgv } from "./ops-argv.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
-const csvPath = join(root, "docs/ops/icp-40.csv");
-const outDir = join(root, "docs/ops/_generated");
+const architectureRoot =
+  process.env.COPPERGATE_ARCHITECTURE_ROOT?.trim() ||
+  join(root, "..", "coppergate-architecture");
+const csvPath = join(architectureRoot, "docs/ops/icp-40.csv");
+const outDir = join(architectureRoot, "docs/ops/_generated");
 const dryRun = opsArgv().includes("--dry-run");
+
+if (!existsSync(csvPath)) {
+  console.error(
+    `Missing ICP CSV at ${csvPath}\n` +
+      "Clone coppergate-architecture next to this repo, or set COPPERGATE_ARCHITECTURE_ROOT.",
+  );
+  process.exit(1);
+}
 
 function parseCsv(text) {
   const lines = text.trim().split(/\r?\n/);

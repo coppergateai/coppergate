@@ -33,8 +33,8 @@ tmp/
 temp/
 .vercel
 
-# Phase 0 outreach outbox (regenerate via pnpm ops:outreach-pack)
-docs/ops/_generated/
+# Local leftover from pre-move outreach outbox (now written under coppergate-architecture)
+docs/ops/
 
 # Hosted Playwright e2e (auth cookies + local reports)
 e2e/.auth/*

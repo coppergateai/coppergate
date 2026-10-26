@@ -26,4 +26,4 @@ Policy for platform surface expansion after the $1M GTM wedge is locked.
 2. Open architecture backlog item only after written customer ask.
 3. Prefer deepening one adapter over adding a tenth half-adapter.
 
-See [GTM.md](./GTM.md) and architecture [`PRODUCTION_SIGNAL_BACKLOG.md`](../../coppergate-architecture/docs/PRODUCTION_SIGNAL_BACKLOG.md) Phase W/X.
+See architecture [`GTM.md`](../../coppergate-architecture/docs/GTM.md) and [`PRODUCTION_SIGNAL_BACKLOG.md`](../../coppergate-architecture/docs/PRODUCTION_SIGNAL_BACKLOG.md) Phase W/X.

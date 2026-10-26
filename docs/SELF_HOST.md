@@ -117,6 +117,6 @@ After login, connect a GitLab project from workspace settings (Project Access To
 ## Related
 
 - Local dev: [README.md](../README.md)
-- Staging ops (Coppergate SaaS): [STAGING.md](./STAGING.md)
+- Staging ops (Coppergate SaaS): private `coppergate-architecture` → `docs/STAGING.md`
 - Signal Adapters (D13): [SIGNALS.md](./SIGNALS.md)
 - Architecture decisions: `coppergate-architecture` → `DECISIONS.md` (D4, D9, D12, D13)

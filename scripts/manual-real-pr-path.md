@@ -2,12 +2,12 @@
 
 Automated CI covers the **FakeAgent** happy path (`apps/worker/src/e2e-happy-path.test.ts`).
 Use this checklist when verifying against a staged GitHub App + real repository.
-Full staging deploy notes: [`docs/STAGING.md`](../docs/STAGING.md).
+Full staging deploy notes: architecture [`docs/STAGING.md`](../../coppergate-architecture/docs/STAGING.md).
 
 ## Prerequisites
 
 - Coppergate GitHub App installed on a throwaway org/user
-- Staging env per `docs/STAGING.md` (incl. `GITHUB_DELIVERY_MODE=http` on the worker)
+- Staging env per architecture `docs/STAGING.md` (incl. `GITHUB_DELIVERY_MODE=http` on the worker)
 - Worker running with the same `DATABASE_URL` + `CREDENTIALS_ENCRYPTION_KEY` as web
 - Optional: `LLM_API_KEY` for the real coding agent; omit to stay on FakeCodingAgent
 - Smoke: `STAGING_URL=https://… node scripts/staging-smoke.mjs`

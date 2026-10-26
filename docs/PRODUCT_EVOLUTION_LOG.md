@@ -44,7 +44,7 @@
 |---------|----------|--------|
 | Delivery tab badge counted **all** tasks (drafts/done/failed) | Project shell `taskCount={boardTasks.length}` → badge “6” | Simplify |
 | Evidence had no badge for review-ready work | Same shell | Improve |
-| Pilot outreach still sold $99/$199 | `PILOT_OUTREACH.md` vs product.txt pricing lock | Align |
+| Pilot outreach still sold $99/$199 | architecture `PILOT_OUTREACH.md` vs product.txt pricing lock | Align |
 | Billing note named Starter/Pro while paid off | Settings → Billing | Simplify |
 
 ### Decisions
@@ -57,7 +57,7 @@
 - `project-shell.tsx` / `page.tsx` — `deliveryCount` + `evidenceCount`.
 - `billing-panel.tsx` — drop SKU names from “not offered” note.
 - `changelog` historical Stripe line clarified as later deferred.
-- `PILOT_OUTREACH.md` + `CONCIERGE_RUNBOOK.md` — design partners, no paid upsell.
+- architecture `PILOT_OUTREACH.md` + `CONCIERGE_RUNBOOK.md` — design partners, no paid upsell.
 - Hero: “Agents compete” (not “war”) — aligns with calm Survivor positioning.
 
 ### Validation

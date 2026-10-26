@@ -5,7 +5,7 @@ Use this checklist for **staging** against a live GitHub App + throwaway repo.
 
 ## Prerequisites
 
-- Staging stack per [`docs/STAGING.md`](../docs/STAGING.md) (`GITHUB_DELIVERY_MODE=http`)
+- Staging stack per architecture [`docs/STAGING.md`](../../coppergate-architecture/docs/STAGING.md) (`GITHUB_DELIVERY_MODE=http`)
 - Workspace: GitHub App installed, repo connected, budget, autonomy ≥ L1
 - Approved product brief on the project
 - Arena armed with contender budgets (`ensureArenaForProject` / UI)
