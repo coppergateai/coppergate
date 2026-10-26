@@ -4,97 +4,64 @@ import (
 	"testing"
 )
 
-func TestNewArenaBudgetExceeded(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetUSD: 1.0,  // less than cost per arena
-		CostPerArenaUSD:  2.0,
-		CostPerMicroUSD:  0.01,
+func TestArenaAllocWithinCapacity(t *testing.T) {
+	const capacity = 1024
+	a := New(capacity)
+
+	mem, err := a.Alloc(512)
+	if err != nil {
+		t.Fatalf("unexpected error allocating 512 bytes: %v", err)
 	}
-	_, err := NewArena(cfg)
-	if err != ErrBudgetExceeded {
-		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
+	if len(mem) != 512 {
+		t.Fatalf("expected 512 bytes allocated, got %d", len(mem))
+	}
+
+	mem2, err := a.Alloc(512)
+	if err != nil {
+		t.Fatalf("unexpected error allocating second 512 bytes: %v", err)
+	}
+	if len(mem2) != 512 {
+		t.Fatalf("expected 512 bytes allocated, got %d", len(mem2))
+	}
+
+	// Next allocation should fail due to capacity exceeded
+	_, err = a.Alloc(1)
+	if err != ErrFullArena {
+		t.Fatalf("expected ErrFullArena, got %v", err)
 	}
 }
 
-func TestAllocMicroWithinBudget(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetUSD: 8.0,
-		CostPerArenaUSD:  5.0,
-		CostPerMicroUSD:  0.01,
+func TestArenaAllocZeroOrNegative(t *testing.T) {
+	a := New(100)
+	_, err := a.Alloc(0)
+	if err == nil {
+		t.Fatal("expected error allocating zero bytes")
 	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error creating arena: %v", err)
-	}
-	for i := 0; i < 100; i++ {
-		buf, err := a.AllocMicro(10)
-		if err != nil {
-			t.Fatalf("unexpected error allocating micro: %v", err)
-		}
-		if len(buf) != 10 {
-			t.Fatalf("expected buffer size 10, got %d", len(buf))
-		}
+	_, err = a.Alloc(-1)
+	if err == nil {
+		t.Fatal("expected error allocating negative bytes")
 	}
 }
 
-func TestAllocMicroBudgetExceeded(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetUSD: 0.15,
-		CostPerArenaUSD:  5.0,
-		CostPerMicroUSD:  0.01,
-	}
-	a, err := NewArena(cfg)
+func TestArenaReset(t *testing.T) {
+	a := New(100)
+	_, err := a.Alloc(100)
 	if err != nil {
-		t.Fatalf("unexpected error creating arena: %v", err)
+		t.Fatalf("unexpected error allocating 100 bytes: %v", err)
 	}
-	// Allocate 10 bytes * 10 = 0.1 USD, should succeed
-	for i := 0; i < 10; i++ {
-		_, err := a.AllocMicro(10)
-		if err != nil {
-			t.Fatalf("unexpected error allocating micro: %v", err)
-		}
-	}
-	// Next allocation should exceed budget
-	_, err = a.AllocMicro(10)
-	if err != ErrBudgetExceeded {
-		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
-	}
-}
 
-func TestIsFullArena(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetUSD: 8.0,
-		CostPerArenaUSD:  5.0,
-		CostPerMicroUSD:  0.01,
+	_, err = a.Alloc(1)
+	if err != ErrFullArena {
+		t.Fatalf("expected ErrFullArena before reset, got %v", err)
 	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error creating arena: %v", err)
-	}
-	if a.IsFullArena() {
-		t.Fatalf("expected IsFullArena false under lean arena")
-	}
-}
 
-func TestReset(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetUSD: 8.0,
-		CostPerArenaUSD:  5.0,
-		CostPerMicroUSD:  0.01,
-	}
-	a, err := NewArena(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error creating arena: %v", err)
-	}
-	_, err = a.AllocMicro(10)
-	if err != nil {
-		t.Fatalf("unexpected error allocating micro: %v", err)
-	}
 	a.Reset()
-	if len(a.micros) != 0 {
-		t.Fatalf("expected micros slice to be empty after reset")
+
+	mem, err := a.Alloc(100)
+	if err != nil {
+		t.Fatalf("unexpected error allocating 100 bytes after reset: %v", err)
 	}
-	if a.spentUSD != 0 {
-		t.Fatalf("expected spentUSD to be zero after reset")
+	if len(mem) != 100 {
+		t.Fatalf("expected 100 bytes allocated after reset, got %d", len(mem))
 	}
 }
