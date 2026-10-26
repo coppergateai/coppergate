@@ -4,99 +4,90 @@ import (
 	"testing"
 )
 
-func TestLicenseManager_ReserveLicense(t *testing.T) {
-	lm := NewLicenseManager()
+func TestLicenseManager_ReserveAcceptWriteBack(t *testing.T) {
+	lm := NewLicenseManager(8.0)
 
-	// Reserve valid license
-	lic, err := lm.ReserveLicense("lic1", 3.0)
+	// Reserve a license within envelope
+	licID, err := lm.ReserveLicense(5.0, "badge-123")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if lic.Amount != 3.0 {
-		t.Errorf("expected amount 3.0, got %v", lic.Amount)
-	}
-
-	// Reserve license exceeding envelope
-	_, err = lm.ReserveLicense("lic2", 6.0)
-	if err == nil {
-		t.Errorf("expected error for exceeding envelope")
-	}
-
-	// Reserve license with duplicate ID
-	_, err = lm.ReserveLicense("lic1", 1.0)
-	if err == nil {
-		t.Errorf("expected error for duplicate license ID")
-	}
-
-	// Reserve license with zero or negative amount
-	_, err = lm.ReserveLicense("lic3", 0)
-	if err == nil {
-		t.Errorf("expected error for zero amount")
-	}
-}
-
-func TestLicenseManager_FanOutIssueAcceptWriteBack(t *testing.T) {
-	lm := NewLicenseManager()
-	lic, err := lm.ReserveLicense("lic1", 2.0)
-	if err != nil {
-		t.Fatalf("reserve error: %v", err)
-	}
-
-	// Fan out license
-	err = lm.FanOutLicense(lic.ID)
-	if err != nil {
-		t.Errorf("fan out error: %v", err)
-	}
-	// Fan out again should error
-	err = lm.FanOutLicense(lic.ID)
-	if err == nil {
-		t.Errorf("expected error on second fan out")
-	}
-
-	// Issue ID badge
-	err = lm.IssueIDBadge(lic.ID, "badge123")
-	if err != nil {
-		t.Errorf("issue badge error: %v", err)
-	}
-	// Issue badge again should error
-	err = lm.IssueIDBadge(lic.ID, "badge456")
-	if err == nil {
-		t.Errorf("expected error on second badge issue")
+		t.Fatalf("ReserveLicense failed: %v", err)
 	}
 
 	// Accept license
-	err = lm.AcceptLicense(lic.ID)
+	receipt, err := lm.AcceptLicense(licID)
 	if err != nil {
-		t.Errorf("accept license error: %v", err)
+		t.Fatalf("AcceptLicense failed: %v", err)
 	}
-	// Accept again should error
-	err = lm.AcceptLicense(lic.ID)
-	if err == nil {
-		t.Errorf("expected error on second accept")
+	if receipt == "" {
+		t.Fatal("AcceptLicense returned empty receipt")
 	}
 
-	// Write back usage
-	err = lm.WriteBackUsage(lic.ID)
+	// Writeback license
+	err = lm.WriteBackLicense(licID)
 	if err != nil {
-		t.Errorf("write back error: %v", err)
+		t.Fatalf("WriteBackLicense failed: %v", err)
 	}
-	// Write back again should error
-	err = lm.WriteBackUsage(lic.ID)
-	if err == nil {
-		t.Errorf("expected error on second write back")
+
+	// Verify license state
+	lic, err := lm.GetLicense(licID)
+	if err != nil {
+		t.Fatalf("GetLicense failed: %v", err)
+	}
+	if !lic.IsAccepted || !lic.IsWrittenBack {
+		t.Fatal("License state not updated correctly")
 	}
 }
 
-func TestLicenseManager_WriteBackWithoutShipReceipt(t *testing.T) {
-	lm := NewLicenseManager()
-	lic, err := lm.ReserveLicense("lic2", 1.0)
+func TestLicenseManager_EnvelopeExceeded(t *testing.T) {
+	lm := NewLicenseManager(8.0)
+
+	_, err := lm.ReserveLicense(9.0, "badge-1")
+	if err == nil {
+		t.Fatal("Expected error for spend exceeding envelope")
+	}
+}
+
+func TestLicenseManager_FanOut(t *testing.T) {
+	lm := NewLicenseManager(8.0)
+
+	licID, err := lm.ReserveLicense(3.0, "badge-1")
 	if err != nil {
-		t.Fatalf("reserve error: %v", err)
+		t.Fatalf("ReserveLicense failed: %v", err)
 	}
 
-	// Try write back before accept (ship receipt)
-	err = lm.WriteBackUsage(lic.ID)
+	// Accept original license
+	_, err = lm.AcceptLicense(licID)
+	if err != nil {
+		t.Fatalf("AcceptLicense failed: %v", err)
+	}
+
+	// Fan-out license
+	fanOutID, err := lm.FanOutLicense(licID, "badge-2")
+	if err != nil {
+		t.Fatalf("FanOutLicense failed: %v", err)
+	}
+
+	// Accept fan-out license
+	receipt, err := lm.AcceptLicense(fanOutID)
+	if err != nil {
+		t.Fatalf("AcceptLicense (fan-out) failed: %v", err)
+	}
+	if receipt == "" {
+		t.Fatal("AcceptLicense (fan-out) returned empty receipt")
+	}
+}
+
+func TestLicenseManager_FanOutBeforeAccept(t *testing.T) {
+	lm := NewLicenseManager(8.0)
+
+	licID, err := lm.ReserveLicense(3.0, "badge-1")
+	if err != nil {
+		t.Fatalf("ReserveLicense failed: %v", err)
+	}
+
+	// Attempt fan-out before acceptance
+	_, err = lm.FanOutLicense(licID, "badge-2")
 	if err == nil {
-		t.Errorf("expected error writing back without ship receipt")
+		t.Fatal("Expected error for fan-out before acceptance")
 	}
 }

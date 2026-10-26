@@ -2,142 +2,143 @@ package programruntime
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
 
-// MonthlyEnvelope defines the spend cap per month.
-const MonthlyEnvelope = 8.00
-
-// License represents a spend license reserved for a program runtime.
+// License represents a spend license for program runtime.
 type License struct {
 	ID           string    // Unique license ID
-	ReservedAt   time.Time // Timestamp when reserved
-	Amount       float64   // Amount reserved (<= MonthlyEnvelope)
-	FannedOut    bool      // Whether license has been fanned out
-	Accepted     bool      // Whether license has been accepted
-	ShipReceipt  bool      // Whether ship receipt confirmed
-	IDBadge      string    // ID badge issued to runtime
-	WrittenBack  bool      // Whether usage has been written back
+	BadgeID      string    // Associated ID badge
+	ReservedAt   time.Time // Timestamp of reservation
+	AcceptedAt   time.Time // Timestamp of acceptance
+	ShipReceipt  string    // Ship receipt ID after acceptance
+	SpendAmount  float64   // Amount reserved/spent in dollars
+	IsAccepted   bool      // Whether license is accepted
+	IsWrittenBack bool     // Whether state is written back
 }
 
-// LicenseManager manages licenses and spend accounting.
+// LicenseManager manages licenses with reservation, fan-out, acceptance, and writeback.
 type LicenseManager struct {
 	mu            sync.Mutex
-	totalReserved float64
 	licenses      map[string]*License
+	monthlyEnvelope float64
+	usedAmount    float64
 }
 
-// NewLicenseManager creates a new LicenseManager.
-func NewLicenseManager() *LicenseManager {
+// NewLicenseManager creates a new LicenseManager with a spend envelope.
+func NewLicenseManager(monthlyEnvelope float64) *LicenseManager {
 	return &LicenseManager{
-		licenses: make(map[string]*License),
+		licenses:       make(map[string]*License),
+		monthlyEnvelope: monthlyEnvelope,
+		usedAmount:     0,
 	}
 }
 
-// ReserveLicense reserves a license amount if within monthly envelope.
-func (lm *LicenseManager) ReserveLicense(id string, amount float64) (*License, error) {
+// ReserveLicense reserves a license with a given spend amount and badge ID.
+// Returns license ID or error if envelope exceeded.
+func (lm *LicenseManager) ReserveLicense(spendAmount float64, badgeID string) (string, error) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	if amount <= 0 {
-		return nil, errors.New("amount must be positive")
+	if spendAmount <= 0 {
+		return "", errors.New("spend amount must be positive")
 	}
-	if lm.totalReserved+amount > MonthlyEnvelope {
-		return nil, errors.New("monthly envelope exceeded")
-	}
-	if _, exists := lm.licenses[id]; exists {
-		return nil, errors.New("license ID already exists")
+	if lm.usedAmount+spendAmount > lm.monthlyEnvelope {
+		return "", fmt.Errorf("monthly spend envelope exceeded: requested %.2f, available %.2f", spendAmount, lm.monthlyEnvelope-lm.usedAmount)
 	}
 
+	licenseID := fmt.Sprintf("lic-%d", time.Now().UnixNano())
 	license := &License{
-		ID:         id,
-		ReservedAt: time.Now(),
-		Amount:     amount,
+		ID:          licenseID,
+		BadgeID:     badgeID,
+		ReservedAt:  time.Now(),
+		SpendAmount: spendAmount,
+		IsAccepted:  false,
 	}
-	lm.licenses[id] = license
-	lm.totalReserved += amount
-	return license, nil
+	lm.licenses[licenseID] = license
+	lm.usedAmount += spendAmount
+
+	return licenseID, nil
 }
 
-// FanOutLicense marks the license as fanned out.
-func (lm *LicenseManager) FanOutLicense(id string) error {
+// FanOutLicense duplicates a license for fan-out to multiple agents.
+// Returns new license ID or error.
+func (lm *LicenseManager) FanOutLicense(originalID, newBadgeID string) (string, error) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	license, exists := lm.licenses[id]
-	if !exists {
-		return errors.New("license not found")
+	orig, ok := lm.licenses[originalID]
+	if !ok {
+		return "", errors.New("original license not found")
 	}
-	if license.FannedOut {
-		return errors.New("license already fanned out")
+	if !orig.IsAccepted {
+		return "", errors.New("original license must be accepted before fan-out")
 	}
-	license.FannedOut = true
-	return nil
+
+	// Fan-out licenses do not consume additional spend, just duplicates with new badge.
+	newID := fmt.Sprintf("lic-%d", time.Now().UnixNano())
+	license := &License{
+		ID:          newID,
+		BadgeID:     newBadgeID,
+		ReservedAt:  time.Now(),
+		SpendAmount: orig.SpendAmount,
+		IsAccepted:  false,
+	}
+	lm.licenses[newID] = license
+	return newID, nil
 }
 
-// IssueIDBadge issues an ID badge to the license.
-func (lm *LicenseManager) IssueIDBadge(id string, badge string) error {
+// AcceptLicense marks a license as accepted and generates a ship receipt.
+func (lm *LicenseManager) AcceptLicense(licenseID string) (string, error) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	license, exists := lm.licenses[id]
-	if !exists {
-		return errors.New("license not found")
+	lic, ok := lm.licenses[licenseID]
+	if !ok {
+		return "", errors.New("license not found")
 	}
-	if license.IDBadge != "" {
-		return errors.New("ID badge already issued")
+	if lic.IsAccepted {
+		return "", errors.New("license already accepted")
 	}
-	license.IDBadge = badge
-	return nil
+
+	lic.IsAccepted = true
+	lic.AcceptedAt = time.Now()
+	lic.ShipReceipt = fmt.Sprintf("ship-%d", time.Now().UnixNano())
+	return lic.ShipReceipt, nil
 }
 
-// AcceptLicense marks the license as accepted and triggers ship receipt.
-func (lm *LicenseManager) AcceptLicense(id string) error {
+// WriteBackLicense marks the license state as written back.
+func (lm *LicenseManager) WriteBackLicense(licenseID string) error {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	license, exists := lm.licenses[id]
-	if !exists {
+	lic, ok := lm.licenses[licenseID]
+	if !ok {
 		return errors.New("license not found")
 	}
-	if license.Accepted {
-		return errors.New("license already accepted")
+	if !lic.IsAccepted {
+		return errors.New("license must be accepted before writeback")
 	}
-	license.Accepted = true
-	license.ShipReceipt = true
-	return nil
-}
+	if lic.IsWrittenBack {
+		return errors.New("license already written back")
+	}
 
-// WriteBackUsage marks the license usage as written back.
-func (lm *LicenseManager) WriteBackUsage(id string) error {
-	lm.mu.Lock()
-	defer lm.mu.Unlock()
-
-	license, exists := lm.licenses[id]
-	if !exists {
-		return errors.New("license not found")
-	}
-	if !license.ShipReceipt {
-		return errors.New("ship receipt not confirmed")
-	}
-	if license.WrittenBack {
-		return errors.New("usage already written back")
-	}
-	license.WrittenBack = true
+	lic.IsWrittenBack = true
 	return nil
 }
 
 // GetLicense returns a copy of the license by ID.
-func (lm *LicenseManager) GetLicense(id string) (*License, error) {
+func (lm *LicenseManager) GetLicense(licenseID string) (*License, error) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	license, exists := lm.licenses[id]
-	if !exists {
+	lic, ok := lm.licenses[licenseID]
+	if !ok {
 		return nil, errors.New("license not found")
 	}
-	// Return a copy to avoid external mutation
-	copy := *license
-	return &copy, nil
+	// Return a copy to avoid external mutation.
+	copyLic := *lic
+	return &copyLic, nil
 }
