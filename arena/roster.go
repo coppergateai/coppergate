@@ -5,111 +5,102 @@ import (
 	"sync"
 )
 
-// Roster manages a lean set of micros under a tight budget.
-// It only allows Engineer+reviewer roles and disallows FULL_ARENA spawns
-// when the monthly spend envelope is tight (<= $8).
-//
-// This implementation enforces:
-// - Micros cost under $2 each
-// - Only Engineer and Reviewer roles allowed
-// - No FULL_ARENA spawn under tight budget
-//
-// This is the AG-012 lean roster implementation.
+// RosterType defines the type of roster to spawn.
+type RosterType int
 
 const (
-	RoleEngineer = "Engineer"
-	RoleReviewer = "Reviewer"
-
-	MaxMicroCostUSD = 2.00
-	MonthlyBudgetUSD = 8.00
+	// FullArena spawns a full arena roster.
+	FullArena RosterType = iota
+	// LeanRoster spawns a lean roster with minimal micros.
+	LeanRoster
 )
 
-var (
-	ErrRoleNotAllowed      = errors.New("role not allowed in lean roster")
-	ErrCostExceeded        = errors.New("micro cost exceeds max allowed")
-	ErrBudgetExceeded      = errors.New("monthly budget exceeded")
-	ErrFullArenaNotAllowed = errors.New("FULL_ARENA spawn not allowed under tight budget")
-)
-
-type Micro struct {
-	ID    string
-	Role  string
-	Cost  float64 // USD cost per micro
-	Spawn string  // spawn type, e.g. "LEAN_ARENA", "FULL_ARENA"
+// Config holds configuration for roster spawning.
+type Config struct {
+	MonthlyBudgetCents int64 // Monthly budget in cents
+	AvailableMicros    int64 // Micros available for this roster spawn
+	Role               string
 }
 
+// ErrBudgetExceeded is returned when budget is too tight for full arena.
+var ErrBudgetExceeded = errors.New("budget too tight for full arena spawn")
+
+// Roster represents a spawned roster.
 type Roster struct {
-	mu     sync.Mutex
-	micros map[string]Micro
-	spend  float64
+	Type      RosterType
+	Micros    int64
+	Role      string
+	SpawnedAt int64 // Unix timestamp for spawn time (optional)
 }
 
-// NewLeanRoster returns a new lean roster enforcing AG-012 constraints.
-func NewLeanRoster() *Roster {
+// SpawnRoster decides which roster to spawn based on config and budget.
+func SpawnRoster(cfg Config) (*Roster, error) {
+	// Enforce $8 monthly budget envelope (800 cents)
+	if cfg.MonthlyBudgetCents > 800 {
+		// Over budget, fallback to lean roster
+		return spawnLeanRoster(cfg)
+	}
+
+	// If available micros under $2 (200 cents) and role is engineer or reviewer only,
+	// spawn lean roster.
+	if cfg.AvailableMicros < 200 && (cfg.Role == "engineer" || cfg.Role == "reviewer") {
+		return spawnLeanRoster(cfg)
+	}
+
+	// Otherwise, spawn full arena roster.
+	return spawnFullArena(cfg)
+}
+
+func spawnLeanRoster(cfg Config) (*Roster, error) {
 	return &Roster{
-		micros: make(map[string]Micro),
-		spend:  0,
+		Type:   LeanRoster,
+		Micros: cfg.AvailableMicros,
+		Role:   cfg.Role,
+	}, nil
+}
+
+func spawnFullArena(cfg Config) (*Roster, error) {
+	// If budget is tight, disallow full arena spawn.
+	if cfg.MonthlyBudgetCents < 800 {
+		return nil, ErrBudgetExceeded
+	}
+	return &Roster{
+		Type:   FullArena,
+		Micros: cfg.AvailableMicros,
+		Role:   cfg.Role,
+	}, nil
+}
+
+// RosterManager manages roster spawning with concurrency safety.
+type RosterManager struct {
+	mu     sync.Mutex
+	config Config
+	roster *Roster
+}
+
+// NewRosterManager creates a new roster manager with config.
+func NewRosterManager(cfg Config) *RosterManager {
+	return &RosterManager{
+		config: cfg,
 	}
 }
 
-// AddMicro attempts to add a micro to the roster.
-// Returns error if constraints are violated.
-func (r *Roster) AddMicro(m Micro) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+// Spawn spawns a roster according to the config and updates the manager state.
+func (rm *RosterManager) Spawn() (*Roster, error) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
 
-	// Validate role
-	if m.Role != RoleEngineer && m.Role != RoleReviewer {
-		return ErrRoleNotAllowed
+	r, err := SpawnRoster(rm.config)
+	if err != nil {
+		return nil, err
 	}
-
-	// Validate cost
-	if m.Cost > MaxMicroCostUSD {
-		return ErrCostExceeded
-	}
-
-	// Validate spawn type
-	if m.Spawn == "FULL_ARENA" {
-		return ErrFullArenaNotAllowed
-	}
-
-	// Check if adding this micro exceeds monthly budget
-	if r.spend+m.Cost > MonthlyBudgetUSD {
-		return ErrBudgetExceeded
-	}
-
-	// Add micro
-	r.micros[m.ID] = m
-	r.spend += m.Cost
-	return nil
+	rm.roster = r
+	return r, nil
 }
 
-// RemoveMicro removes a micro by ID, reducing spend accordingly.
-func (r *Roster) RemoveMicro(id string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if m, ok := r.micros[id]; ok {
-		delete(r.micros, id)
-		r.spend -= m.Cost
-	}
-}
-
-// ListMicros returns a copy of current micros in the roster.
-func (r *Roster) ListMicros() []Micro {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	mics := make([]Micro, 0, len(r.micros))
-	for _, m := range r.micros {
-		mics = append(mics, m)
-	}
-	return mics
-}
-
-// CurrentSpend returns the current total spend of the roster.
-func (r *Roster) CurrentSpend() float64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.spend
+// Current returns the current roster.
+func (rm *RosterManager) Current() *Roster {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+	return rm.roster
 }
