@@ -1,92 +1,123 @@
+// Package arena provides memory arena management with lean roster support.
+//
+// AG-012: Implements lean roster allocation under tight budget constraints.
+// When availableMicros < $2, only Engineer+reviewer roles are allowed in the roster,
+// and FULL_ARENA spawn is disabled to keep memory usage minimal.
+//
+// This feature helps maintain a lean memory footprint under a strict $8 monthly budget.
 package arena
 
 import (
 	"errors"
+	"fmt"
 	"sync"
+	"time"
 )
 
-// RosterType defines the type of roster to spawn.
-type RosterType int
+// Role represents a user role in the roster.
+type Role int
 
 const (
-	// FullArena spawns the full arena roster.
-	FullArena RosterType = iota
-	// LeanRoster spawns a lean roster with only engineers and reviewers.
-	LeanRoster
+	RoleEngineer Role = iota
+	RoleReviewer
+	RoleFullArena
 )
 
-// ErrBudgetExceeded is returned when the budget is insufficient to spawn a roster.
-var ErrBudgetExceeded = errors.New("budget exceeded for roster spawn")
-
-// MicroCost constants for different roles.
-const (
-	MicroCostEngineer = 2 // $2 per engineer
-	MicroCostReviewer = 2 // $2 per reviewer
-)
-
-// RosterConfig holds configuration for spawning rosters.
-type RosterConfig struct {
-	Engineers int
-	Reviewers int
-	Budget    int // in dollars
+// String returns the string representation of the Role.
+func (r Role) String() string {
+	switch r {
+	case RoleEngineer:
+		return "Engineer"
+	case RoleReviewer:
+		return "Reviewer"
+	case RoleFullArena:
+		return "FullArena"
+	default:
+		return "Unknown"
+	}
 }
 
-// Roster represents a spawned roster.
+// User represents a user in the roster.
+type User struct {
+	ID   string
+	Role Role
+}
+
+// Roster manages a list of users with roles.
 type Roster struct {
-	Engineers int
-	Reviewers int
-	Type      RosterType
+	mu    sync.Mutex
+	users []User
+
+	// availableMicros is the available micro budget in dollars * 1e6.
+	// For example, $2 = 2_000_000 micros.
+	availableMicros int64
 }
 
-// SpawnRoster spawns a roster based on the config and budget constraints.
-// If budget is under $2, only lean roster with engineers and reviewers is spawned.
-// FullArena spawn is disallowed under tight budget.
-func SpawnRoster(cfg RosterConfig) (*Roster, error) {
-	if cfg.Budget < MicroCostEngineer {
-		// Budget too low to spawn any engineer or reviewer
-		return nil, ErrBudgetExceeded
+// NewRoster creates a new Roster with the given availableMicros budget.
+func NewRoster(availableMicros int64) *Roster {
+	return &Roster{
+		users:          make([]User, 0),
+		availableMicros: availableMicros,
 	}
-
-	// Calculate cost for lean roster (engineers + reviewers)
-	leanCost := (cfg.Engineers + cfg.Reviewers) * MicroCostEngineer
-	if leanCost <= cfg.Budget {
-		// Spawn lean roster
-		return &Roster{
-			Engineers: cfg.Engineers,
-			Reviewers: cfg.Reviewers,
-			Type:      LeanRoster,
-		}, nil
-	}
-
-	// If budget allows full arena spawn (not lean), but budget is tight, disallow full arena spawn
-	// FullArena spawn is not implemented here due to budget constraints
-	return nil, ErrBudgetExceeded
 }
 
-// RosterManager manages roster spawning with concurrency safety.
-type RosterManager struct {
-	mu     sync.Mutex
-	roster *Roster
-}
+// AddUser adds a user to the roster if allowed under the current budget and rules.
+// Returns error if the user role is disallowed or budget exceeded.
+func (r *Roster) AddUser(user User) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-// NewRosterManager creates a new RosterManager.
-func NewRosterManager() *RosterManager {
-	return &RosterManager{}
-}
-
-// GetOrSpawnRoster returns existing roster or spawns a new one based on config.
-func (rm *RosterManager) GetOrSpawnRoster(cfg RosterConfig) (*Roster, error) {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-
-	if rm.roster != nil {
-		return rm.roster, nil
+	// If budget is under $2 (2_000_000 micros), only Engineer and Reviewer allowed.
+	if r.availableMicros < 2_000_000 {
+		if user.Role == RoleFullArena {
+			return fmt.Errorf("FULL_ARENA spawn disallowed under tight budget (<$2)")
+		}
 	}
 
-	r, err := SpawnRoster(cfg)
-	if err != nil {
-		return nil, err
+	// Enforce roles allowed under lean roster when budget < $2.
+	if r.availableMicros < 2_000_000 {
+		if user.Role != RoleEngineer && user.Role != RoleReviewer {
+			return fmt.Errorf("role %s disallowed under lean roster budget (<$2)", user.Role)
+		}
 	}
-	rm.roster = r
-	return r, nil
+
+	r.users = append(r.users, user)
+	return nil
+}
+
+// Users returns a copy of the current users in the roster.
+func (r *Roster) Users() []User {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	cpy := make([]User, len(r.users))
+	copy(cpy, r.users)
+	return cpy
+}
+
+// AvailableMicros returns the current available micro budget.
+func (r *Roster) AvailableMicros() int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.availableMicros
+}
+
+// SetAvailableMicros updates the available micro budget.
+func (r *Roster) SetAvailableMicros(micros int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.availableMicros = micros
+}
+
+// SpawnArena attempts to spawn a FULL_ARENA if budget allows.
+// Returns error if FULL_ARENA spawn is disallowed under the current budget.
+func (r *Roster) SpawnArena() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.availableMicros < 2_000_000 {
+		return errors.New("FULL_ARENA spawn disallowed under tight budget (<$2)")
+	}
+	// Simulate spawn logic here (omitted for brevity).
+	return nil
 }

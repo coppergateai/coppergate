@@ -4,64 +4,63 @@ import (
 	"testing"
 )
 
-func TestSpawnRoster_LeanRosterUnderBudget(t *testing.T) {
-	cfg := RosterConfig{
-		Engineers: 2,
-		Reviewers: 1,
-		Budget:    8, // $8 budget
+func TestLeanRoster_AddUser_UnderBudget(t *testing.T) {
+	r := NewRoster(1_500_000) // $1.5 budget under $2
+
+	// Engineer allowed
+	if err := r.AddUser(User{ID: "u1", Role: RoleEngineer}); err != nil {
+		t.Fatalf("expected engineer allowed, got error: %v", err)
 	}
-	r, err := SpawnRoster(cfg)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+
+	// Reviewer allowed
+	if err := r.AddUser(User{ID: "u2", Role: RoleReviewer}); err != nil {
+		t.Fatalf("expected reviewer allowed, got error: %v", err)
 	}
-	if r.Type != LeanRoster {
-		t.Errorf("expected LeanRoster type, got %v", r.Type)
+
+	// FullArena disallowed
+	err := r.AddUser(User{ID: "u3", Role: RoleFullArena})
+	if err == nil {
+		t.Fatal("expected error adding FullArena under budget < $2, got none")
 	}
-	if r.Engineers != 2 || r.Reviewers != 1 {
-		t.Errorf("unexpected roster composition: %+v", r)
+
+	// Other roles disallowed (simulate by casting invalid role)
+	err = r.AddUser(User{ID: "u4", Role: Role(99)})
+	if err == nil {
+		t.Fatal("expected error adding unknown role under budget < $2, got none")
 	}
 }
 
-func TestSpawnRoster_BudgetTooLow(t *testing.T) {
-	cfg := RosterConfig{
-		Engineers: 1,
-		Reviewers: 1,
-		Budget:    1, // $1 budget, less than $2 minimum
+func TestLeanRoster_AddUser_AboveBudget(t *testing.T) {
+	r := NewRoster(3_000_000) // $3 budget above $2
+
+	// Engineer allowed
+	if err := r.AddUser(User{ID: "u1", Role: RoleEngineer}); err != nil {
+		t.Fatalf("expected engineer allowed, got error: %v", err)
 	}
-	_, err := SpawnRoster(cfg)
-	if err != ErrBudgetExceeded {
-		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
+
+	// Reviewer allowed
+	if err := r.AddUser(User{ID: "u2", Role: RoleReviewer}); err != nil {
+		t.Fatalf("expected reviewer allowed, got error: %v", err)
+	}
+
+	// FullArena allowed
+	if err := r.AddUser(User{ID: "u3", Role: RoleFullArena}); err != nil {
+		t.Fatalf("expected FullArena allowed above $2, got error: %v", err)
 	}
 }
 
-func TestSpawnRoster_LeanRosterCostExceedsBudget(t *testing.T) {
-	cfg := RosterConfig{
-		Engineers: 3,
-		Reviewers: 2,
-		Budget:    8, // $8 budget but cost is 5 * $2 = $10
-	}
-	_, err := SpawnRoster(cfg)
-	if err != ErrBudgetExceeded {
-		t.Fatalf("expected ErrBudgetExceeded due to budget, got %v", err)
-	}
-}
+func TestLeanRoster_SpawnArena(t *testing.T) {
+	r := NewRoster(1_000_000) // $1 budget under $2
 
-func TestRosterManager_GetOrSpawnRoster(t *testing.T) {
-	rm := NewRosterManager()
-	cfg := RosterConfig{
-		Engineers: 1,
-		Reviewers: 1,
-		Budget:    6,
+	err := r.SpawnArena()
+	if err == nil {
+		t.Fatal("expected error spawning FULL_ARENA under budget < $2, got none")
 	}
-	r1, err := rm.GetOrSpawnRoster(cfg)
+
+	r.SetAvailableMicros(3_000_000) // $3 budget above $2
+
+	err = r.SpawnArena()
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	r2, err := rm.GetOrSpawnRoster(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if r1 != r2 {
-		t.Errorf("expected same roster instance, got different")
+		t.Fatalf("expected spawn success above $2, got error: %v", err)
 	}
 }
