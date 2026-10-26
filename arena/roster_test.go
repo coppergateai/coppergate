@@ -4,112 +4,82 @@ import (
 	"testing"
 )
 
-func TestSpawnRoster(t *testing.T) {
-	tests := []struct {
-		name       string
-		cfg        RosterConfig
-		wantType   RosterType
-		wantErr    bool
-		wantMicros int
-	}{
-		{
-			name: "Lean roster under $2 for Engineer",
-			cfg: RosterConfig{
-				MonthlyBudgetUSD: 1.99,
-				Role:             "Engineer",
-			},
-			wantType:   LeanRoster,
-			wantErr:    false,
-			wantMicros: 2,
-		},
-		{
-			name: "Lean roster under $2 for Reviewer",
-			cfg: RosterConfig{
-				MonthlyBudgetUSD: 1.5,
-				Role:             "Reviewer",
-			},
-			wantType:   LeanRoster,
-			wantErr:    false,
-			wantMicros: 2,
-		},
-		{
-			name: "Lean roster under $2 for other role disallowed",
-			cfg: RosterConfig{
-				MonthlyBudgetUSD: 1.5,
-				Role:             "Manager",
-			},
-			wantErr: true,
-		},
-		{
-			name: "Full arena roster at $2 budget for Engineer",
-			cfg: RosterConfig{
-				MonthlyBudgetUSD: 2.0,
-				Role:             "Engineer",
-			},
-			wantType:   FullArena,
-			wantErr:    false,
-			wantMicros: 8,
-		},
-		{
-			name: "Full arena roster capped at $8 budget",
-			cfg: RosterConfig{
-				MonthlyBudgetUSD: 20.0,
-				Role:             "Engineer",
-			},
-			wantType:   FullArena,
-			wantErr:    false,
-			wantMicros: 8,
-		},
-		{
-			name: "Invalid negative budget",
-			cfg: RosterConfig{
-				MonthlyBudgetUSD: -1,
-				Role:             "Engineer",
-			},
-			wantErr: true,
-		},
+func TestAllocateRoster_LeanRosterUnderBudget(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 800,          // $8 budget (tight)
+		AvailableMicros:    1_500_000,    // under $2 micros limit
+		Role:               "Engineer",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r, err := SpawnRoster(tt.cfg)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("SpawnRoster() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if err != nil {
-				return
-			}
-			if r.Type != tt.wantType {
-				t.Errorf("SpawnRoster() roster type = %v, want %v", r.Type, tt.wantType)
-			}
-			if len(r.Micros) != tt.wantMicros {
-				t.Errorf("SpawnRoster() micros count = %d, want %d", len(r.Micros), tt.wantMicros)
-			}
-		})
+	r, err := AllocateRoster(cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if r.Type != LeanRoster {
+		t.Errorf("expected lean roster, got %v", r.Type)
+	}
+	if r.Engineers != 1 || r.Reviewers != 1 {
+		t.Errorf("expected 1 engineer and 1 reviewer, got %d engineers and %d reviewers", r.Engineers, r.Reviewers)
 	}
 }
 
-func TestRosterManager_GetOrSpawnRoster(t *testing.T) {
-	rm := NewRosterManager()
+func TestAllocateRoster_LeanRosterReviewerRole(t *testing.T) {
 	cfg := RosterConfig{
-		MonthlyBudgetUSD: 1.5,
-		Role:             "Engineer",
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    1_000_000,
+		Role:               "Reviewer",
 	}
 
-	r1, err := rm.GetOrSpawnRoster(cfg)
+	r, err := AllocateRoster(cfg)
 	if err != nil {
-		t.Fatalf("GetOrSpawnRoster() error = %v", err)
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if r1.Type != LeanRoster {
-		t.Errorf("Expected lean roster, got %v", r1.Type)
+	if r.Type != LeanRoster {
+		t.Errorf("expected lean roster, got %v", r.Type)
+	}
+}
+
+func TestAllocateRoster_FullArenaDeniedUnderTightBudget(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    3_000_000, // above lean limit
+		Role:               "Engineer",
 	}
 
-	// Call again should return same roster instance
-	r2, err := rm.GetOrSpawnRoster(cfg)
-	if err != nil {
-		t.Fatalf("GetOrSpawnRoster() error = %v", err)
+	_, err := AllocateRoster(cfg)
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
 	}
-	if r1 != r2 {
-		t.Errorf("Expected same roster instance on second call")
+}
+
+func TestAllocateRoster_FullArenaAllowedAboveBudget(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 1000,        // above $8 budget
+		AvailableMicros:    5_000_000,
+		Role:               "Engineer",
+	}
+
+	r, err := AllocateRoster(cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if r.Type != FullArenaRoster {
+		t.Errorf("expected full arena roster, got %v", r.Type)
+	}
+	if r.Engineers != 5 || r.Reviewers != 3 {
+		t.Errorf("expected 5 engineers and 3 reviewers, got %d engineers and %d reviewers", r.Engineers, r.Reviewers)
+	}
+}
+
+func TestAllocateRoster_NonEngineerReviewerRoleDeniedLean(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    1_000_000,
+		Role:               "Manager",
+	}
+
+	_, err := AllocateRoster(cfg)
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded for non-engineer/reviewer role, got %v", err)
 	}
 }
