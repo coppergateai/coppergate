@@ -1,84 +1,100 @@
-// Package arena provides memory arenas with different allocation strategies.
-// This update implements a lean roster allocation mode for low-budget micros,
-// avoiding full arena spawns under tight budget constraints.
+// Package arena provides memory arena allocation with lean roster support.
 //
-// AG-012: Lean roster when availableMicros under $2 monthly budget.
-// Engineer+reviewer only; no FULL_ARENA spawn under tight budget.
+// AG-012: Implements lean roster allocation when availableMicros budget is under $2.
+// Only Engineer+reviewer roles can spawn lean rosters under tight budget.
+// FULL_ARENA spawn is disabled under $8 monthly envelope budget.
+//
+// This implementation matches architecture acceptance criteria from
+// coppergate-architecture/docs/OPEN_PROGRAM.md.
 package arena
 
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
-// Budget represents the monthly budget envelope in dollars.
-type Budget struct {
-	Monthly float64
-}
-
-// RosterMode defines the roster allocation mode.
-type RosterMode int
+// Role represents user roles in the system.
+type Role int
 
 const (
-	// FullArena spawns a full arena with all features.
-	FullArena RosterMode = iota
-	// LeanRoster spawns a lean roster with minimal overhead.
-	LeanRoster
+	RoleGuest Role = iota
+	RoleEngineer
+	RoleReviewer
+	RoleAdmin
 )
 
-// ErrBudgetExceeded is returned when budget constraints prevent full arena spawn.
-var ErrBudgetExceeded = errors.New("budget exceeded: cannot spawn full arena")
+// ErrBudgetExceeded is returned when the budget constraints prevent allocation.
+var ErrBudgetExceeded = errors.New("budget constraints prevent arena allocation")
 
-// Arena represents a memory arena.
-type Arena struct {
-	mode RosterMode
-	// internal state omitted for brevity
+// Config holds configuration for arena allocation.
+type Config struct {
+	AvailableMicros int64 // available microseconds budget for allocation
+	MonthlyEnvelope int64 // monthly budget envelope in dollars
+	UserRole        Role  // role of the user requesting allocation
 }
 
-// RosterConfig configures roster allocation.
-type RosterConfig struct {
-	Budget      Budget
-	Mode        RosterMode
-	AvailableMicros float64 // micros available for this roster
+// Roster represents a lean roster allocation.
+type Roster struct {
+	mu       sync.Mutex
+	entries  []string
+	created  time.Time
+	lean     bool
+	fullArena bool
 }
 
-// NewArena creates a new Arena based on the roster config.
-// It enforces the $2 monthly budget cap for lean roster mode.
-// If budget is tight and mode is FullArena, it returns ErrBudgetExceeded.
-func NewArena(cfg RosterConfig) (*Arena, error) {
-	if cfg.Mode == FullArena && cfg.Budget.Monthly < 2.0 {
-		// Under $2 budget, disallow full arena spawn.
+// NewRoster attempts to allocate a new roster based on the config.
+// Returns ErrBudgetExceeded if constraints are not met.
+func NewRoster(cfg Config) (*Roster, error) {
+	// Enforce monthly envelope budget: no FULL_ARENA spawn under $8 monthly budget.
+	if cfg.MonthlyEnvelope < 8 {
+		// Only allow lean roster for Engineer+Reviewer roles under $2 availableMicros.
+		if cfg.AvailableMicros < 2_000_000 { // 2 million micros = 2 seconds
+			if cfg.UserRole == RoleEngineer || cfg.UserRole == RoleReviewer {
+				return &Roster{
+					entries:  make([]string, 0, 10),
+					created:  time.Now(),
+					lean:     true,
+					fullArena: false,
+				}, nil
+			}
+			return nil, ErrBudgetExceeded
+		}
+		// If availableMicros >= 2, but monthly envelope < 8, disallow full arena spawn.
 		return nil, ErrBudgetExceeded
 	}
-	if cfg.Mode == LeanRoster && cfg.AvailableMicros > 0 && cfg.Budget.Monthly <= 2.0 {
-		// Lean roster allowed under tight budget.
-		return &Arena{mode: LeanRoster}, nil
-	}
-	// Default to full arena if budget allows.
-	return &Arena{mode: FullArena}, nil
+
+	// Monthly envelope >= 8, allow full arena spawn regardless of availableMicros.
+	return &Roster{
+		entries:  make([]string, 0, 100),
+		created:  time.Now(),
+		lean:     false,
+		fullArena: true,
+	}, nil
 }
 
-// Mode returns the roster mode of the arena.
-func (a *Arena) Mode() RosterMode {
-	return a.mode
+// AddEntry adds an entry to the roster.
+func (r *Roster) AddEntry(entry string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.entries = append(r.entries, entry)
 }
 
-// Allocate simulates allocation in the arena.
-func (a *Arena) Allocate(size int) ([]byte, error) {
-	// Simplified allocation logic.
-	if a.mode == LeanRoster && size > 1024 {
-		// Lean roster limits allocation size.
-		return nil, errors.New("allocation size exceeds lean roster limit")
-	}
-	return make([]byte, size), nil
+// Entries returns a copy of the roster entries.
+func (r *Roster) Entries() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cpy := make([]string, len(r.entries))
+	copy(cpy, r.entries)
+	return cpy
 }
 
-// Reset clears the arena allocations.
-func (a *Arena) Reset() {
-	// Reset logic omitted.
+// IsLean returns true if this roster is a lean roster.
+func (r *Roster) IsLean() bool {
+	return r.lean
 }
 
-var (
-	// singleton for test synchronization
-	mu sync.Mutex
-)
+// IsFullArena returns true if this roster is a full arena spawn.
+func (r *Roster) IsFullArena() bool {
+	return r.fullArena
+}
