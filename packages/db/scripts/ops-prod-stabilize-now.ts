@@ -142,14 +142,14 @@ try {
   // --- coppergate ---
   const cgArenas = await db.select().from(arenas).where(eq(arenas.workspaceId, CG));
   for (const a of cgArenas) {
-    if (a.defaultContenderN !== 1) {
+    if (a.defaultContenderN !== 2) {
       await db
         .update(arenas)
-        .set({ defaultContenderN: 1, updatedAt: new Date() })
+        .set({ defaultContenderN: 2, updatedAt: new Date() })
         .where(eq(arenas.id, a.id));
     }
   }
-  // Pin architecture + lean maintainer on primary; resume for self-pilot
+  // Pin architecture + duel maintainer on primary; resume for self-pilot
   await updateMaintainerPolicy(db, {
     workspaceId: CG,
     projectId: CG_PRIMARY,
@@ -158,7 +158,7 @@ try {
       enabled: true,
       continuousBacklog: true,
       autoQueueReplanTasks: true,
-      maxTournamentN: 1,
+      maxTournamentN: 2,
       architectureRepo: "coppergateai/coppergate-architecture",
       architecturePaths: "docs/OPEN_PROGRAM.md",
       monthlyBudgetMicros: 8_000_000,

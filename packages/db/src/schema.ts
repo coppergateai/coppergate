@@ -371,8 +371,8 @@ export const arenas = pgTable(
     minHuman: boolean("min_human").notNull().default(true),
     prodWritesEnabled: boolean("prod_writes_enabled").notNull().default(false),
     defaultContenderN: integer("default_contender_n").notNull().default(2),
-    /** Efficiency payoff exponent α — GAME_THEORY.md (default 0.5). */
-    payoffAlpha: doublePrecision("payoff_alpha").notNull().default(0.5),
+    /** Efficiency payoff exponent α — aligned with DEFAULT_PAYOFF_ALPHA (0.25). */
+    payoffAlpha: doublePrecision("payoff_alpha").notNull().default(0.25),
     /** ARMED | RUNNING | KILLED | PAUSED */
     status: text("status").notNull().default("ARMED"),
     killedAt: timestamp("killed_at", { withTimezone: true }),

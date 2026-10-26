@@ -9,31 +9,32 @@ import {
 } from "./plan-policy.js";
 
 describe("plan policy", () => {
-  it("Starter is stricter than Pro on concurrency; both solo fan-out", () => {
+  it("Starter is stricter than Pro on concurrency; Starter stays solo", () => {
     const starter = limitsForPlan("starter");
     const pro = limitsForPlan("pro");
     assert.ok(starter.maxConcurrentRuns < pro.maxConcurrentRuns);
     assert.equal(starter.maxTournamentFanout, 1);
-    assert.equal(pro.maxTournamentFanout, 1);
+    assert.equal(pro.maxTournamentFanout, 2);
     assert.equal(starter.previewEnabled, false);
     assert.equal(pro.previewEnabled, true);
   });
 
-  it("Starter / Community / Pro solo fan-out under BYOK throttle", () => {
+  it("Community / Pro duel fan-out; Starter solo; Team full width", () => {
     assert.equal(clampTournamentFanout(3, "starter"), 1);
-    assert.equal(clampTournamentFanout(11, "community"), 1);
-    assert.equal(clampTournamentFanout(11, "pro"), 1);
+    assert.equal(clampTournamentFanout(11, "community"), 2);
+    assert.equal(clampTournamentFanout(11, "pro"), 2);
+    assert.equal(clampTournamentFanout(1, "community"), 1);
     assert.equal(clampTournamentFanout(99, "team"), 11);
     assert.equal(PLAN_LIMITS.starter.maxConcurrentRuns, 1);
   });
 
-  it("Community and Pro share the BYOK-throttled concurrency cap", () => {
+  it("Community and Pro share duel concurrency + fan-out for Survivor", () => {
     assert.equal(PLAN_LIMITS.community.maxConcurrentRuns, 6);
     assert.equal(PLAN_LIMITS.pro.maxConcurrentRuns, 6);
-    assert.equal(PLAN_LIMITS.community.maxConcurrentRunsPerProject, 1);
-    assert.equal(PLAN_LIMITS.pro.maxConcurrentRunsPerProject, 1);
-    assert.equal(PLAN_LIMITS.community.maxTournamentFanout, 1);
-    assert.equal(PLAN_LIMITS.pro.maxTournamentFanout, 1);
+    assert.equal(PLAN_LIMITS.community.maxConcurrentRunsPerProject, 2);
+    assert.equal(PLAN_LIMITS.pro.maxConcurrentRunsPerProject, 2);
+    assert.equal(PLAN_LIMITS.community.maxTournamentFanout, 2);
+    assert.equal(PLAN_LIMITS.pro.maxTournamentFanout, 2);
   });
 
   it("remainingConcurrencySlots never goes negative", () => {

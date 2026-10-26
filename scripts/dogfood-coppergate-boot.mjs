@@ -178,7 +178,7 @@ try {
     patch: {
       enabled: false,
       monthlyBudgetMicros: budgetMicros,
-      maxTournamentN: 1,
+      maxTournamentN: 2,
       architectureRepo: process.env.ARCHITECTURE_REPO,
       architecturePaths: process.env.ARCHITECTURE_PATHS,
     },
@@ -189,7 +189,8 @@ try {
     projectId,
     actor,
     contenderBudgetMicros: 100_000,
-    defaultContenderN: 1,
+    defaultContenderN: 2,
+    contenderCount: 2,
     minHuman: true,
   });
 

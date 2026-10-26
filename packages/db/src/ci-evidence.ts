@@ -181,7 +181,23 @@ export async function ingestCiEvidence(
         .from(agentRuns)
         .where(eq(agentRuns.id, run.id))
         .limit(1);
-      return { run: fresh ?? run, attached: true };
+      const promoted = fresh ?? run;
+      // Tournament scoring waits for REVIEW_REQUIRED — resolve once peers are ready.
+      if (promoted.tournamentId) {
+        try {
+          const { maybeScoreAndResolveTournament } = await import(
+            "./fitness.js"
+          );
+          await maybeScoreAndResolveTournament(db, {
+            workspaceId: promoted.workspaceId,
+            tournamentId: promoted.tournamentId,
+            actor: "system:ci-evidence",
+          });
+        } catch {
+          /* peer may still be WAITING_CI */
+        }
+      }
+      return { run: promoted, attached: true };
     } catch {
       /* best-effort */
     }

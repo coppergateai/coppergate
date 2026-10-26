@@ -8,6 +8,18 @@ type TournamentView = {
   n: number;
   status: string;
   winnerRunId: string | null;
+  provisional?: boolean;
+};
+
+type FitnessBreakdown = {
+  ci: number;
+  validation: number;
+  delivery: number;
+  criticPenalty: number;
+  sonar: number;
+  coverage: number;
+  e2e: number;
+  meaningful: number;
 };
 
 type ContenderRun = {
@@ -21,6 +33,8 @@ type ContenderRun = {
   agentProfileKey: string;
   estimatedCostMicros: number;
   actualCostMicros: number;
+  fitnessReasons?: string[];
+  fitnessBreakdown?: FitnessBreakdown | null;
 };
 
 type Props = {
@@ -33,6 +47,28 @@ function formatUsd(micros: number): string {
   if (!Number.isFinite(dollars) || dollars === 0) return "$0";
   if (dollars < 0.01) return `$${dollars.toFixed(4)}`;
   return `$${dollars.toFixed(2)}`;
+}
+
+function reasonLabel(reason: string): string {
+  return reason.replace(/_/g, " ");
+}
+
+function topBreakdownBits(b: FitnessBreakdown | null | undefined): string[] {
+  if (!b) return [];
+  const bits: Array<[string, number]> = [
+    ["CI", b.ci],
+    ["validation", b.validation],
+    ["delivery", b.delivery],
+    ["meaningful", b.meaningful],
+    ["Sonar", b.sonar],
+    ["coverage", b.coverage],
+    ["e2e", b.e2e],
+  ];
+  return bits
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([k, v]) => `${k} ${v.toFixed(2)}`);
 }
 
 export function TournamentPanel({ workspaceId, taskId }: Props) {
@@ -85,6 +121,14 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
     (r) =>
       r.tournamentResult === "WINNER" || r.id === tournament.winnerRunId,
   );
+  const losers = sorted.filter(
+    (r) =>
+      r.tournamentResult === "LOSER" || r.tournamentResult === "CANCELLED",
+  );
+  const primary = sorted.filter(
+    (r) =>
+      r.tournamentResult !== "LOSER" && r.tournamentResult !== "CANCELLED",
+  );
   const allQuiet =
     sorted.length > 0 &&
     sorted.every(
@@ -104,7 +148,12 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
         Hard gates first, then rank by efficiency. Status{" "}
         <strong>{tournament.status.replace(/_/g, " ")}</strong>
         {" · "}N={tournament.n}
-        {tournament.winnerRunId ? " · winner selected" : null}
+        {tournament.provisional
+          ? " · provisional — awaiting CI before final decision"
+          : null}
+        {!tournament.provisional && tournament.winnerRunId
+          ? " · winner selected"
+          : null}
       </p>
 
       {allQuiet ? (
@@ -125,69 +174,134 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
           {winner.fitnessScore == null ? "—" : winner.fitnessScore.toFixed(2)}
           {" · "}spend{" "}
           {formatUsd(winner.actualCostMicros || winner.estimatedCostMicros)}
+          {winner.fitnessReasons && winner.fitnessReasons.length > 0 ? (
+            <>
+              {" · "}
+              {winner.fitnessReasons.slice(0, 4).map(reasonLabel).join(", ")}
+            </>
+          ) : null}
         </p>
       ) : null}
 
       {!allQuiet ? (
-        <ul className={styles.tournamentList}>
-          {sorted.map((run) => {
-            const isWinner =
-              run.tournamentResult === "WINNER" ||
-              run.id === tournament.winnerRunId;
-            const label = run.tournamentResult ?? run.status;
-            return (
-              <li
-                key={run.id}
-                className={`${styles.tournamentItem} ${
-                  isWinner ? styles.tournamentItemWin : ""
-                }`}
-              >
-                <div className={styles.tournamentTop}>
-                  <strong>{run.agentProfileKey}</strong>
-                  <span
-                    className={`${styles.tournamentPill} ${
-                      label === "WINNER"
-                        ? styles.tournamentPillWin
-                        : label === "LOSER" || label === "CANCELLED"
-                          ? styles.tournamentPillBad
-                          : ""
-                    }`}
-                  >
-                    {label}
-                  </span>
-                </div>
-                <div className={styles.tournamentMeta}>
-                  <span>
-                    fitness{" "}
-                    {run.fitnessScore == null
-                      ? "—"
-                      : run.fitnessScore.toFixed(2)}
-                  </span>
-                  <span>
-                    efficiency{" "}
-                    {run.efficiencyScore == null
-                      ? "—"
-                      : run.efficiencyScore.toFixed(3)}
-                  </span>
-                  <span>{run.branchName ?? "no branch"}</span>
-                  <span>
-                    {formatUsd(run.actualCostMicros || run.estimatedCostMicros)}
-                  </span>
-                </div>
-                {run.prUrl ? (
-                  <a
-                    href={run.prUrl}
-                    className={styles.inlineLink}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Pull request →
-                  </a>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className={styles.tournamentList}>
+            {primary.map((run) => {
+              const isWinner =
+                run.tournamentResult === "WINNER" ||
+                run.id === tournament.winnerRunId;
+              const label = run.tournamentResult ?? run.status;
+              const bits = topBreakdownBits(run.fitnessBreakdown);
+              return (
+                <li
+                  key={run.id}
+                  className={`${styles.tournamentItem} ${
+                    isWinner ? styles.tournamentItemWin : ""
+                  }`}
+                >
+                  <div className={styles.tournamentTop}>
+                    <strong>{run.agentProfileKey}</strong>
+                    <span
+                      className={`${styles.tournamentPill} ${
+                        label === "WINNER"
+                          ? styles.tournamentPillWin
+                          : label === "LOSER" || label === "CANCELLED"
+                            ? styles.tournamentPillBad
+                            : ""
+                      }`}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                  <div className={styles.tournamentMeta}>
+                    <span>
+                      fitness{" "}
+                      {run.fitnessScore == null
+                        ? "—"
+                        : run.fitnessScore.toFixed(2)}
+                    </span>
+                    <span>
+                      efficiency{" "}
+                      {run.efficiencyScore == null
+                        ? "—"
+                        : run.efficiencyScore.toFixed(3)}
+                    </span>
+                    <span>{run.branchName ?? "no branch"}</span>
+                    <span>
+                      {formatUsd(
+                        run.actualCostMicros || run.estimatedCostMicros,
+                      )}
+                    </span>
+                  </div>
+                  {bits.length > 0 ? (
+                    <p className={styles.muted}>
+                      Why: {bits.join(" · ")}
+                      {run.fitnessReasons?.includes("stub_or_toy_disqualified")
+                        ? " · stub disqualified"
+                        : null}
+                      {run.fitnessReasons?.includes("ci_failed")
+                        ? " · CI failed (e=0)"
+                        : null}
+                    </p>
+                  ) : run.fitnessReasons && run.fitnessReasons.length > 0 ? (
+                    <p className={styles.muted}>
+                      Why:{" "}
+                      {run.fitnessReasons
+                        .slice(0, 4)
+                        .map(reasonLabel)
+                        .join(", ")}
+                    </p>
+                  ) : null}
+                  {run.prUrl ? (
+                    <a
+                      href={run.prUrl}
+                      className={styles.inlineLink}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Pull request →
+                    </a>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {losers.length > 0 && tournament.status === "RESOLVED" ? (
+            <details className={styles.muted}>
+              <summary>
+                {losers.length} eliminated contender
+                {losers.length === 1 ? "" : "s"}
+              </summary>
+              <ul className={styles.tournamentList}>
+                {losers.map((run) => (
+                  <li key={run.id} className={styles.tournamentItem}>
+                    <div className={styles.tournamentTop}>
+                      <strong>{run.agentProfileKey}</strong>
+                      <span
+                        className={`${styles.tournamentPill} ${styles.tournamentPillBad}`}
+                      >
+                        {run.tournamentResult ?? run.status}
+                      </span>
+                    </div>
+                    <div className={styles.tournamentMeta}>
+                      <span>
+                        fitness{" "}
+                        {run.fitnessScore == null
+                          ? "—"
+                          : run.fitnessScore.toFixed(2)}
+                      </span>
+                      <span>
+                        {formatUsd(
+                          run.actualCostMicros || run.estimatedCostMicros,
+                        )}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </>
       ) : null}
     </section>
   );

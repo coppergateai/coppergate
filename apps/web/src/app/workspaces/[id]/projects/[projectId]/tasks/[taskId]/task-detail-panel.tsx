@@ -33,6 +33,7 @@ type Run = {
   cancelRequestedAt: string | null;
   leaseUntil: string | null;
   prUrl: string | null;
+  tournamentResult?: string | null;
 };
 
 type RunEvent = {
@@ -162,7 +163,15 @@ export function TaskDetailPanel({
     if (!res.ok) throw new Error(body.error?.message ?? "Failed to load runs");
     const list = body.runs ?? [];
     setRuns(list);
-    setSelectedRunId((prev) => prev ?? list[0]?.id ?? null);
+    setSelectedRunId((prev) => {
+      if (prev && list.some((r) => r.id === prev)) return prev;
+      const winner = list.find((r) => r.tournamentResult === "WINNER");
+      const nonLoser = list.find(
+        (r) =>
+          r.tournamentResult !== "LOSER" && r.tournamentResult !== "CANCELLED",
+      );
+      return winner?.id ?? nonLoser?.id ?? list[0]?.id ?? null;
+    });
   }, [taskId, workspaceId]);
 
   const refreshEvents = useCallback(async () => {

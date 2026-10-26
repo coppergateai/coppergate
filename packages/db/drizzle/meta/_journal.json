@@ -211,6 +211,13 @@
       "when": 1729500000000,
       "tag": "0029_signed_states",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1729600000000,
+      "tag": "0030_payoff_alpha_default",
+      "breakpoints": true
     }
   ]
 }

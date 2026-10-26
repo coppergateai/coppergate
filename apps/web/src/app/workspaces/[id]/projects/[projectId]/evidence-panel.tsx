@@ -15,6 +15,8 @@ type DeliveryRow = {
   updatedAt: string;
   runId: string | null;
   acceptReady: boolean | null;
+  winnerRunId?: string | null;
+  isSurvivor?: boolean;
 };
 
 type Gate = {
@@ -31,11 +33,18 @@ type Props = {
   initialDeliveries?: DeliveryRow[];
 };
 
-function statusHint(status: string, acceptReady: boolean | null): string {
+function statusHint(
+  status: string,
+  acceptReady: boolean | null,
+  isSurvivor?: boolean,
+): string {
   if (status === "REVIEW_REQUIRED") {
-    return acceptReady
-      ? "Ready for Accept — gates clear"
-      : "Review required — check hard gates";
+    if (acceptReady) {
+      return isSurvivor
+        ? "Arena survivor — Accept delivery for Ship Receipt"
+        : "Ready for Accept — gates clear";
+    }
+    return "Review required — check hard gates";
   }
   if (status === "ACCEPTED" || status === "DONE") return "Verified delivery";
   if (status === "WAITING_CI") return "Awaiting CI evidence";
@@ -54,11 +63,16 @@ function statusTone(
   return "mute";
 }
 
-function statusPillLabel(status: string, acceptReady: boolean | null): string {
+function statusPillLabel(
+  status: string,
+  acceptReady: boolean | null,
+  isSurvivor?: boolean,
+): string {
   if (status === "ACCEPTED" || status === "DONE") return "Verified";
   if (status === "FAILED") return "Failed";
   if (status === "REVIEW_REQUIRED") {
-    return acceptReady ? "Accept ready" : "Needs review";
+    if (acceptReady) return isSurvivor ? "Survivor ready" : "Accept ready";
+    return "Needs review";
   }
   if (status === "WAITING_CI") return "CI";
   if (status === "VALIDATING") return "Validating";
@@ -268,6 +282,7 @@ export function EvidencePanel({
             const open = expandedId === d.taskId;
             const tone = statusTone(d.status, d.acceptReady);
             const title = displayTaskTitle(d.title) || d.title;
+            const survivor = Boolean(d.isSurvivor);
             return (
               <li key={d.taskId} className={styles.evidenceRow}>
                 <div className={styles.evidenceMain}>
@@ -283,7 +298,7 @@ export function EvidencePanel({
                               : styles.evidencePillMute
                       }`}
                     >
-                      {statusPillLabel(d.status, d.acceptReady)}
+                      {statusPillLabel(d.status, d.acceptReady, survivor)}
                     </span>
                     <OpenIdBadge title={d.title} />
                     <button
@@ -296,7 +311,7 @@ export function EvidencePanel({
                     </button>
                   </div>
                   <p className={styles.evidenceMeta}>
-                    {statusHint(d.status, d.acceptReady)}
+                    {statusHint(d.status, d.acceptReady, survivor)}
                     {d.prUrl ? " · PR attached" : ""}
                     {d.updatedAt ? ` · ${formatWhen(d.updatedAt)}` : ""}
                     {!open ? " · Expand gates" : ""}
@@ -336,7 +351,11 @@ export function EvidencePanel({
                       disabled={acceptingId === d.taskId}
                       onClick={() => void acceptDelivery(d.taskId)}
                     >
-                      {acceptingId === d.taskId ? "Accepting…" : "Accept"}
+                      {acceptingId === d.taskId
+                        ? "Accepting…"
+                        : survivor
+                          ? "Accept delivery"
+                          : "Accept"}
                     </button>
                   ) : null}
                   {d.status === "FAILED" ? (

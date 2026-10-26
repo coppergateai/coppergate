@@ -121,8 +121,13 @@ try {
     actor,
     contenderBudgetMicros: 100_000,
     defaultContenderN: 2,
+    contenderCount: 2,
     minHuman: true,
   });
+
+  const strategies = [
+    ...new Set(contenders.filter((c) => c.status === "ACTIVE").map((c) => c.strategy)),
+  ];
 
   console.log(
     JSON.stringify(
@@ -136,6 +141,10 @@ try {
         arenaId: arena.id,
         arenaStatus: arena.status,
         contenderCount: contenders.length,
+        activeContenders: contenders.filter((c) => c.status === "ACTIVE").length,
+        strategies,
+        payoffAlpha: arena.payoffAlpha,
+        note: "Community duel N=2 — Survivor requires ≥2 ACTIVE seats",
       },
       null,
       2,

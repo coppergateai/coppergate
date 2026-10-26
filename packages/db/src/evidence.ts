@@ -65,10 +65,13 @@ export type TaskEvidenceBundle = {
     prUrl: string | null;
     actualCostMicros: number;
     fitnessScore: number | null;
+    tournamentResult: string | null;
     updatedAt: string;
   }>;
   selectedRunId: string | null;
   selected: RunEvidenceBundle | null;
+  /** Tournament WINNER run id when resolved — preferred Accept target. */
+  winnerRunId: string | null;
 };
 
 function parseInlineBody(meta: string | null): unknown {
@@ -338,8 +341,12 @@ export async function getTaskEvidenceBundle(
     prUrl: r.prUrl,
     actualCostMicros: r.actualCostMicros,
     fitnessScore: r.fitnessScore,
+    tournamentResult: r.tournamentResult,
     updatedAt: r.updatedAt.toISOString(),
   }));
+
+  const winner = runs.find((r) => r.tournamentResult === "WINNER");
+  const winnerRunId = winner?.id ?? null;
 
   let selectedRunId =
     preferredRunId && runs.some((r) => r.id === preferredRunId)
@@ -347,14 +354,21 @@ export async function getTaskEvidenceBundle(
       : null;
 
   if (!selectedRunId && runs.length > 0) {
-    const withDelivery = runs.find(
-      (r) =>
-        r.prUrl ||
-        r.status === "SUCCEEDED" ||
-        r.status === "AWAITING_REVIEW" ||
-        r.tournamentResult === "WINNER",
-    );
-    selectedRunId = (withDelivery ?? runs[0])!.id;
+    // Survivor first: never pick a LOSER over the WINNER when both have PRs.
+    const withDelivery =
+      winner ??
+      runs.find(
+        (r) =>
+          r.tournamentResult !== "LOSER" &&
+          r.tournamentResult !== "CANCELLED" &&
+          (r.prUrl ||
+            r.status === "SUCCEEDED" ||
+            r.status === "AWAITING_REVIEW" ||
+            r.status === "REVIEW_REQUIRED"),
+      ) ??
+      runs.find((r) => r.prUrl) ??
+      runs[0];
+    selectedRunId = withDelivery!.id;
   }
 
   const selected = selectedRunId
@@ -370,6 +384,7 @@ export async function getTaskEvidenceBundle(
     runs: runViews,
     selectedRunId,
     selected,
+    winnerRunId,
   };
 }
 
@@ -388,6 +403,8 @@ export async function listProjectEvidenceDeliveries(
     updatedAt: string;
     runId: string | null;
     acceptReady: boolean | null;
+    winnerRunId: string | null;
+    isSurvivor: boolean;
   }>
 > {
   const rows = await db
@@ -424,15 +441,23 @@ export async function listProjectEvidenceDeliveries(
     updatedAt: string;
     runId: string | null;
     acceptReady: boolean | null;
+    winnerRunId: string | null;
+    isSurvivor: boolean;
   }> = [];
 
   for (const t of rows) {
     let runId: string | null = null;
     let acceptReady: boolean | null = null;
+    let winnerRunId: string | null = null;
+    let isSurvivor = false;
     if (t.status === "REVIEW_REQUIRED" || t.status === "WAITING_CI") {
       const bundle = await getTaskEvidenceBundle(db, workspaceId, t.id);
       runId = bundle?.selectedRunId ?? null;
       acceptReady = bundle?.selected?.acceptReady ?? null;
+      winnerRunId = bundle?.winnerRunId ?? null;
+      isSurvivor = Boolean(
+        winnerRunId && runId && winnerRunId === runId,
+      );
     }
     out.push({
       taskId: t.id,
@@ -442,6 +467,8 @@ export async function listProjectEvidenceDeliveries(
       updatedAt: t.updatedAt.toISOString(),
       runId,
       acceptReady,
+      winnerRunId,
+      isSurvivor,
     });
   }
   return out;

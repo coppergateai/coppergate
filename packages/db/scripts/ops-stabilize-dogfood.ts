@@ -2,7 +2,7 @@
  * Stabilize dual-workspace dogfood (idempotent):
  * - Pause kprompt arenas + disable maintainer
  * - Cancel open kprompt runs / fail queued tasks; release orphan reserves
- * - Pin coppergate defaultN=1; cancel WAITING_CI run stuck on closed PR #1
+ * - Pin coppergate defaultN=2 (Community duel); cancel WAITING_CI run stuck on closed PR #1
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
@@ -152,7 +152,7 @@ try {
   // --- coppergate ---
   await db
     .update(arenas)
-    .set({ defaultContenderN: 1, updatedAt: new Date() })
+    .set({ defaultContenderN: 2, updatedAt: new Date() })
     .where(eq(arenas.workspaceId, CG));
 
   await updateMaintainerPolicy(db, {
@@ -161,7 +161,7 @@ try {
     actor,
     patch: {
       enabled: true,
-      maxTournamentN: 1,
+      maxTournamentN: 2,
       continuousBacklog: true,
       architectureRepo: "coppergateai/coppergate-architecture",
       architecturePaths: "docs/OPEN_PROGRAM.md",

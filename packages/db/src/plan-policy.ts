@@ -17,17 +17,18 @@ export type PlanLimits = {
 
 export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
   /**
-   * Self-host / unpaid — arena on, but capped for typical BYOK org spend
-   * limits (~$10/mo OpenAI hobby). Prefer solo fan-out over tournaments.
+   * Self-host / unpaid — arena on with a cheap duel (N=2).
+   * Per-project concurrency matches fan-out so the second ContenderRun is not clamped away.
+   * Spend still gated by estimate × N + workspace capacity (clampFanoutToCapacity).
    */
   community: {
     maxConcurrentRuns: 6,
-    maxConcurrentRunsPerProject: 1,
-    maxTournamentFanout: 1,
+    maxConcurrentRunsPerProject: 2,
+    maxTournamentFanout: 2,
     previewEnabled: false,
     arenaEnabled: true,
   },
-  /** Hosted Starter — modest concurrency (SKU promise). */
+  /** Hosted Starter — modest concurrency (SKU promise; arena off). */
   starter: {
     maxConcurrentRuns: 1,
     maxConcurrentRunsPerProject: 1,
@@ -35,10 +36,11 @@ export const PLAN_LIMITS: Record<BillingPlan, PlanLimits> = {
     previewEnabled: false,
     arenaEnabled: false,
   },
+  /** Hosted Pro — same duel width as Community while paid SKUs stay deferred. */
   pro: {
     maxConcurrentRuns: 6,
-    maxConcurrentRunsPerProject: 1,
-    maxTournamentFanout: 1,
+    maxConcurrentRunsPerProject: 2,
+    maxTournamentFanout: 2,
     previewEnabled: true,
     arenaEnabled: true,
   },

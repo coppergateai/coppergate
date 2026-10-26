@@ -37,7 +37,7 @@ describe("tournament fan-out (TASK049)", { skip: !url }, () => {
         ownerUserId: user.id,
       })
     ).workspace.id;
-    // Community plan clamps fan-out to 1; team unlocks MAX_TOURNAMENT_FANOUT.
+    // Community duel is N=2; team unlocks MAX_TOURNAMENT_FANOUT (concurrency still caps).
     await upsertWorkspaceSubscription(db, {
       workspaceId,
       plan: "team",

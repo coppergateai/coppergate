@@ -6,7 +6,7 @@ import {
   DEFAULT_PAYOFF_ALPHA,
   debitTournamentLosers,
   getArenaForProject,
-  isTerminalRunStatus,
+  isTournamentScoreReadyStatus,
   listRunsForTournament,
   resolveTournamentByFitness,
 } from "./arena.js";
@@ -570,7 +570,8 @@ export async function maybeScoreAndResolveTournament(
     tournamentId: tournament.id,
   });
   if (runs.length === 0) return null;
-  if (!runs.every((r) => isTerminalRunStatus(r.status))) return null;
+  // Delay final score until CI is known (or run failed/cancelled) — not WAITING_CI.
+  if (!runs.every((r) => isTournamentScoreReadyStatus(r.status))) return null;
 
   const { claimed, tournament: claimedTournament } =
     await claimTournamentForScoring(db, {

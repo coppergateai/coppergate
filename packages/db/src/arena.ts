@@ -42,9 +42,14 @@ import {
  */
 export const MAX_TOURNAMENT_FANOUT = 11;
 
-/** Default spend exponent for efficiency payoff — GAME_THEORY.md */
-/** Lower α reduces thrift bias so meaningful fitness can beat tiny cheap diffs. */
+/**
+ * Default spend exponent for efficiency payoff (canonical — keep schema/docs aligned).
+ * Lower α reduces thrift bias so meaningful fitness can beat tiny cheap diffs.
+ */
 export const DEFAULT_PAYOFF_ALPHA = 0.25;
+
+/** Minimum ACTIVE contenders for a cheap Community duel (N=2 Survivor). */
+export const MIN_DUEL_CONTENDERS = 2;
 
 export const CONTENDER_STRATEGIES = ["balanced", "blitz", "fortress"] as const;
 export type ContenderStrategy = (typeof CONTENDER_STRATEGIES)[number];
@@ -53,6 +58,7 @@ export function isContenderStrategy(value: string): value is ContenderStrategy {
   return (CONTENDER_STRATEGIES as readonly string[]).includes(value);
 }
 
+/** Run finished executing (includes WAITING_CI — CI may still be pending). */
 export const TERMINAL_RUN_STATUSES = new Set([
   "WAITING_CI",
   "REVIEW_REQUIRED",
@@ -62,6 +68,20 @@ export const TERMINAL_RUN_STATUSES = new Set([
 
 export function isTerminalRunStatus(status: string): boolean {
   return TERMINAL_RUN_STATUSES.has(status);
+}
+
+/**
+ * Statuses where fitness scoring is honest (CI known or run failed/cancelled).
+ * WAITING_CI is intentionally excluded — provisional standings stay OPEN until promote.
+ */
+export const TOURNAMENT_SCORE_READY_STATUSES = new Set([
+  "REVIEW_REQUIRED",
+  "FAILED",
+  "CANCELLED",
+]);
+
+export function isTournamentScoreReadyStatus(status: string): boolean {
+  return TOURNAMENT_SCORE_READY_STATUSES.has(status);
 }
 
 export class ArenaError extends Error {
@@ -263,6 +283,83 @@ export async function getArenaForProject(
   return row ?? null;
 }
 
+/**
+ * Ensure ≥ MIN_DUEL_CONTENDERS ACTIVE seats with distinct strategies (cheap duel).
+ * Tops up thin pools left from older N=1 arenas without wiping existing contenders.
+ */
+export async function ensureDuelContenderPool(
+  db: Database,
+  input: {
+    workspaceId: string;
+    arenaId: string;
+    budgetMicros?: number;
+  },
+): Promise<Contender[]> {
+  const budgetEach = Math.max(
+    input.budgetMicros ?? DEFAULT_CONTENDER_BUDGET_MICROS,
+    1,
+  );
+  assertNonNegativeBudget(budgetEach);
+
+  let pool = await listContendersForArena(db, {
+    workspaceId: input.workspaceId,
+    arenaId: input.arenaId,
+  });
+  const now = new Date();
+  let active = pool.filter((c) => c.status === "ACTIVE");
+
+  // Diversify strategies on the first two ACTIVE seats when they collide.
+  if (active.length >= 2 && active[0]!.strategy === active[1]!.strategy) {
+    const alt =
+      CONTENDER_STRATEGIES.find((s) => s !== active[0]!.strategy) ?? "blitz";
+    const [updated] = await db
+      .update(contenders)
+      .set({ strategy: alt, updatedAt: now })
+      .where(eq(contenders.id, active[1]!.id))
+      .returning();
+    if (updated) {
+      pool = pool.map((c) => (c.id === updated.id ? updated : c));
+      active = pool.filter((c) => c.status === "ACTIVE");
+    }
+  }
+
+  const usedKeys = new Set(pool.map((c) => c.profileKey));
+  const usedStrategies = new Set(active.map((c) => c.strategy));
+  let nextIndex = pool.length;
+  while (active.length < MIN_DUEL_CONTENDERS) {
+    const strategy =
+      CONTENDER_STRATEGIES.find((s) => !usedStrategies.has(s)) ??
+      CONTENDER_STRATEGIES[active.length % CONTENDER_STRATEGIES.length]!;
+    let profileKey =
+      nextIndex === 0 ? "engineer" : `engineer_${nextIndex + 1}`;
+    while (usedKeys.has(profileKey)) {
+      nextIndex += 1;
+      profileKey = `engineer_${nextIndex + 1}`;
+    }
+    const [c] = await db
+      .insert(contenders)
+      .values({
+        id: crypto.randomUUID(),
+        arenaId: input.arenaId,
+        workspaceId: input.workspaceId,
+        profileKey,
+        strategy,
+        budgetMicrosRemaining: budgetEach,
+        status: "ACTIVE",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    pool.push(c!);
+    active.push(c!);
+    usedKeys.add(profileKey);
+    usedStrategies.add(strategy);
+    nextIndex += 1;
+  }
+
+  return pool;
+}
+
 export async function ensureArenaForProject(
   db: Database,
   input: {
@@ -277,11 +374,26 @@ export async function ensureArenaForProject(
 ): Promise<{ arena: Arena; contenders: Contender[]; created: boolean }> {
   const existing = await getArenaForProject(db, input);
   if (existing) {
-    const pool = await listContendersForArena(db, {
+    const budgetEach =
+      input.contenderBudgetMicros ?? DEFAULT_CONTENDER_BUDGET_MICROS;
+    const pool = await ensureDuelContenderPool(db, {
       workspaceId: input.workspaceId,
       arenaId: existing.id,
+      budgetMicros: budgetEach,
     });
-    return { arena: existing, contenders: pool, created: false };
+    let arena = existing;
+    if (existing.defaultContenderN < MIN_DUEL_CONTENDERS) {
+      const [updated] = await db
+        .update(arenas)
+        .set({
+          defaultContenderN: MIN_DUEL_CONTENDERS,
+          updatedAt: new Date(),
+        })
+        .where(eq(arenas.id, existing.id))
+        .returning();
+      if (updated) arena = updated;
+    }
+    return { arena, contenders: pool, created: false };
   }
 
   const [project] = await db
@@ -298,11 +410,12 @@ export async function ensureArenaForProject(
     throw new ArenaError("not_found", "project not found");
   }
 
-  const n = input.defaultContenderN ?? 2;
+  const n = input.defaultContenderN ?? MIN_DUEL_CONTENDERS;
   if (!Number.isInteger(n) || n < 1 || n > 16) {
     throw new ArenaError("invalid", "defaultContenderN must be 1..16");
   }
-  const contenderCount = input.contenderCount ?? n;
+  // Default seat count is a duel; callers may still pass contenderCount: 1 for fixtures.
+  const contenderCount = input.contenderCount ?? Math.max(n, MIN_DUEL_CONTENDERS);
   const budgetEach =
     input.contenderBudgetMicros ?? DEFAULT_CONTENDER_BUDGET_MICROS;
   assertNonNegativeBudget(budgetEach);
@@ -318,6 +431,7 @@ export async function ensureArenaForProject(
       minHuman: input.minHuman ?? true,
       prodWritesEnabled: false,
       defaultContenderN: n,
+      payoffAlpha: DEFAULT_PAYOFF_ALPHA,
       status: "ARMED",
       createdAt: now,
       updatedAt: now,
@@ -680,6 +794,11 @@ export async function startTournamentFanout(
     task.estimateMicros ?? 0,
     DEFAULT_CONTENDER_BUDGET_MICROS,
   );
+  await ensureDuelContenderPool(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+    budgetMicros: minPurse,
+  });
   await ensureContenderEnqueueBudget(db, {
     workspaceId: input.workspaceId,
     arenaId: arena.id,
@@ -697,8 +816,13 @@ export async function startTournamentFanout(
       budgetMicrosRemaining: c.budgetMicrosRemaining,
     }),
   );
-  const { plan } = await resolveWorkspacePlanLimits(db, input.workspaceId);
-  const requested = input.n ?? arena.defaultContenderN;
+  const { plan, limits } = await resolveWorkspacePlanLimits(
+    db,
+    input.workspaceId,
+  );
+  // Prefer a duel when the plan allows it, even if an older arena still has defaultN=1.
+  const duelFloor = Math.min(MIN_DUEL_CONTENDERS, limits.maxTournamentFanout);
+  const requested = input.n ?? Math.max(arena.defaultContenderN, duelFloor);
   const planCapped = clampTournamentFanout(requested, plan);
   const concurrency = await getWorkspaceConcurrency(
     db,
