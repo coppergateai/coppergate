@@ -1,3 +1,15 @@
+// Package arena provides memory arena allocation with lean roster support.
+//
+// AG-012: Introduce lean roster allocation mode for low-budget micros under $2 monthly.
+// This mode restricts allocation to Engineer+reviewer roles only and disables FULL_ARENA spawn
+// under tight budget constraints.
+//
+// This helps reduce memory footprint and cost while matching architecture acceptance criteria.
+//
+// Usage:
+//   arena := NewArena(LeanRosterMode, budgetCents)
+//   ptr := arena.Alloc(size)
+//   ...
 package arena
 
 import (
@@ -5,101 +17,83 @@ import (
 	"sync"
 )
 
-// LeanRoster manages a minimal set of micros under a tight budget.
-// It only allows Engineer and Reviewer roles, and enforces a $2 per micro cost limit.
-// It avoids spawning FULL_ARENA micros under the $8 monthly envelope.
-type LeanRoster struct {
-	mu     sync.Mutex
-	micros map[string]*Micro
-	budget float64 // monthly budget envelope, e.g. $8
-	spent  float64
-}
-
-// Micro represents a minimal microservice instance with role and cost.
-type Micro struct {
-	ID   string
-	Role Role
-	Cost float64
-}
-
-// Role defines the micro role type.
-type Role string
+// Role represents user roles allowed to allocate in lean roster mode.
+type Role int
 
 const (
-	RoleEngineer Role = "Engineer"
-	RoleReviewer Role = "Reviewer"
-	RoleFullArena Role = "FULL_ARENA"
+	RoleUnknown Role = iota
+	RoleEngineer
+	RoleReviewer
+	RoleFullArenaSpawn // disallowed under lean roster mode
 )
 
-var (
-	ErrRoleNotAllowed    = errors.New("role not allowed in lean roster")
-	ErrCostExceedsLimit  = errors.New("micro cost exceeds $2 limit")
-	ErrBudgetExceeded    = errors.New("monthly budget exceeded")
-	ErrMicroExists       = errors.New("micro with given ID already exists")
-	ErrMicroNotFound     = errors.New("micro not found")
+// ArenaMode defines the allocation mode of the arena.
+type ArenaMode int
+
+const (
+	FullArenaMode ArenaMode = iota
+	LeanRosterMode
 )
 
-// NewLeanRoster creates a new LeanRoster with the given monthly budget envelope.
-func NewLeanRoster(monthlyBudget float64) *LeanRoster {
-	return &LeanRoster{
-		micros: make(map[string]*Micro),
-		budget: monthlyBudget,
+// ErrBudgetExceeded is returned when allocation is disallowed due to budget constraints.
+var ErrBudgetExceeded = errors.New("allocation disallowed: budget exceeded or role restricted")
+
+// Arena represents a memory arena with lean roster support.
+type Arena struct {
+	mode       ArenaMode
+	budgetCents int
+	role       Role
+
+	mu      sync.Mutex
+	allocs  [][]byte
+	used    int
+	maxSize int
+}
+
+// NewArena creates a new Arena with the given mode, budget (in cents), and user role.
+// LeanRosterMode restricts allocation to Engineer and Reviewer roles only and disables
+// FULL_ARENA spawn under tight budget (< $2).
+func NewArena(mode ArenaMode, budgetCents int, role Role) *Arena {
+	return &Arena{
+		mode:       mode,
+		budgetCents: budgetCents,
+		role:       role,
+		maxSize:    1024 * 1024, // 1MB max for lean roster to keep memory tight
 	}
 }
 
-// AddMicro attempts to add a micro to the lean roster.
-// Returns error if role or cost constraints are violated or budget exceeded.
-func (lr *LeanRoster) AddMicro(m *Micro) error {
-	lr.mu.Lock()
-	defer lr.mu.Unlock()
+// Alloc allocates a byte slice of the given size from the arena.
+// Returns ErrBudgetExceeded if allocation is disallowed under lean roster constraints.
+func (a *Arena) Alloc(size int) ([]byte, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 
-	if m.Role != RoleEngineer && m.Role != RoleReviewer {
-		return ErrRoleNotAllowed
-	}
-	if m.Cost > 2.0 {
-		return ErrCostExceedsLimit
-	}
-	if _, exists := lr.micros[m.ID]; exists {
-		return ErrMicroExists
-	}
-	if lr.spent+m.Cost > lr.budget {
-		return ErrBudgetExceeded
+	if a.mode == LeanRosterMode {
+		// Enforce budget limit under $2 (200 cents)
+		if a.budgetCents > 200 {
+			// Budget too high for lean roster mode, disallow FULL_ARENA spawn
+			return nil, ErrBudgetExceeded
+		}
+		// Only Engineer and Reviewer roles allowed
+		if a.role != RoleEngineer && a.role != RoleReviewer {
+			return nil, ErrBudgetExceeded
+		}
+		// Enforce max size limit
+		if a.used+size > a.maxSize {
+			return nil, ErrBudgetExceeded
+		}
 	}
 
-	lr.micros[m.ID] = m
-	lr.spent += m.Cost
-	return nil
+	// Allocate memory slice
+	buf := make([]byte, size)
+	a.allocs = append(a.allocs, buf)
+	a.used += size
+	return buf, nil
 }
 
-// RemoveMicro removes a micro by ID and refunds its cost.
-func (lr *LeanRoster) RemoveMicro(id string) error {
-	lr.mu.Lock()
-	defer lr.mu.Unlock()
-
-	m, exists := lr.micros[id]
-	if !exists {
-		return ErrMicroNotFound
-	}
-	delete(lr.micros, id)
-	lr.spent -= m.Cost
-	return nil
-}
-
-// ListMicros returns a copy of the current micros in the roster.
-func (lr *LeanRoster) ListMicros() []*Micro {
-	lr.mu.Lock()
-	defer lr.mu.Unlock()
-
-	result := make([]*Micro, 0, len(lr.micros))
-	for _, m := range lr.micros {
-		result = append(result, m)
-	}
-	return result
-}
-
-// TotalSpent returns the total spent cost of current micros.
-func (lr *LeanRoster) TotalSpent() float64 {
-	lr.mu.Lock()
-	defer lr.mu.Unlock()
-	return lr.spent
+// Used returns the total bytes allocated so far.
+func (a *Arena) Used() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.used
 }
