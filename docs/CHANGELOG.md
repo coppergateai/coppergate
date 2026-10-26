@@ -3,8 +3,11 @@
 ## [Unreleased]
 
 ### Added
-- AG-012: Implemented lean roster spawning under tight budget constraints.
-  - Spawn lean roster only when available micros are under $2 each.
-  - No full arena spawn allowed if monthly budget is below $8.
-  - Requires at least one engineer and one reviewer to spawn lean roster.
-  - Added tests covering budget and staff constraints.
+
+- AG-012: Implemented Lean Roster capability in arena package.
+  - Supports micros with roles Engineer and Reviewer only.
+  - Enforces per-micro cost limit of $2.
+  - Enforces monthly budget envelope of $8.
+  - Prevents spawning FULL_ARENA micros under tight budget.
+  - Includes thread-safe management and validation.
+  - Covered by unit tests.
