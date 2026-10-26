@@ -4,62 +4,49 @@ import (
 	"testing"
 )
 
-func TestNewArena_LeanRosterUnderBudget(t *testing.T) {
-	cfg := ArenaConfig{
-		BudgetEnvelope:      8.0,
-		MicrosRequested:     3, // 3 * 0.5 = $1.5 < $2
-		EngineerReviewerOnly: true,
-	}
-	a, err := NewArena(cfg)
+func TestLeanRoster_AddEntry(t *testing.T) {
+	cfg := Config{MonthlyBudgetCents: 800} // $8.00 budget
+	lr := NewLeanRoster(cfg)
+
+	// Add Engineer under $2 cost - should succeed
+	err := lr.AddEntry("user1", RoleEngineer, 150)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error adding Engineer: %v", err)
 	}
-	if a.Type != LEAN_ROSTER {
-		t.Errorf("expected LEAN_ROSTER, got %v", a.TypeString())
-	}
-	if a.micros != 3 {
-		t.Errorf("expected 3 micros, got %d", a.micros)
-	}
-}
 
-func TestNewArena_LeanRosterOverBudget(t *testing.T) {
-	cfg := ArenaConfig{
-		BudgetEnvelope:      1.0,
-		MicrosRequested:     3, // cost $1.5 > budget $1.0
-		EngineerReviewerOnly: true,
-	}
-	_, err := NewArena(cfg)
-	if err != ErrBudgetExceeded {
-		t.Errorf("expected ErrBudgetExceeded, got %v", err)
-	}
-}
-
-func TestNewArena_FullArenaUnderBudget(t *testing.T) {
-	cfg := ArenaConfig{
-		BudgetEnvelope:      8.0,
-		MicrosRequested:     10, // cost $5.0 < $8.0
-		EngineerReviewerOnly: false,
-	}
-	a, err := NewArena(cfg)
+	// Add Reviewer under $2 cost - should succeed
+	err = lr.AddEntry("user2", RoleReviewer, 199)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error adding Reviewer: %v", err)
 	}
-	if a.Type != FULL_ARENA {
-		t.Errorf("expected FULL_ARENA, got %v", a.TypeString())
-	}
-	if a.micros != 10 {
-		t.Errorf("expected 10 micros, got %d", a.micros)
-	}
-}
 
-func TestNewArena_FullArenaOverBudget(t *testing.T) {
-	cfg := ArenaConfig{
-		BudgetEnvelope:      4.0,
-		MicrosRequested:     10, // cost $5.0 > budget $4.0
-		EngineerReviewerOnly: false,
+	// Add FULL_ARENA role - should fail
+	err = lr.AddEntry("user3", RoleFullArena, 100)
+	if err == nil {
+		t.Fatal("expected error adding FULL_ARENA role, got none")
 	}
-	_, err := NewArena(cfg)
-	if err != ErrBudgetExceeded {
-		t.Errorf("expected ErrBudgetExceeded, got %v", err)
+
+	// Add unknown role - should fail
+	err = lr.AddEntry("user4", RoleUnknown, 100)
+	if err == nil {
+		t.Fatal("expected error adding unknown role, got none")
+	}
+
+	// Add Engineer exceeding budget - should fail
+	err = lr.AddEntry("user5", RoleEngineer, 600)
+	if err == nil {
+		t.Fatal("expected budget exceeded error, got none")
+	}
+
+	// Check entries count
+	entries := lr.Entries()
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+
+	// Check spent cents
+	spent := lr.Spent()
+	if spent != 349 {
+		t.Fatalf("expected spent 349 cents, got %d", spent)
 	}
 }
