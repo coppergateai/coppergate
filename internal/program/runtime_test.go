@@ -1,123 +1,97 @@
 package program
 
 import (
+	"context"
 	"testing"
 	"time"
 )
 
-func TestReserveSpend(t *testing.T) {
-	rt := NewRuntime("prog1")
+func TestReserveSpendLicense(t *testing.T) {
+	pr := NewProgramRuntime("prog1")
+	ctx := context.Background()
 
 	// Reserve within envelope
-	if err := rt.ReserveSpend(5); err != nil {
+	if err := pr.ReserveSpendLicense(ctx, 500); err != nil {
 		t.Fatalf("unexpected error reserving spend: %v", err)
 	}
 
 	// Reserve exceeding envelope
-	if err := rt.ReserveSpend(4); err == nil {
-		t.Fatalf("expected error when exceeding spend envelope")
+	if err := pr.ReserveSpendLicense(ctx, 400); err != ErrSpendLimitExceeded {
+		t.Fatalf("expected ErrSpendLimitExceeded, got %v", err)
 	}
 
-	// Reserve zero or negative amount
-	if err := rt.ReserveSpend(0); err == nil {
-		t.Fatalf("expected error for zero amount")
-	}
-	if err := rt.ReserveSpend(-1); err == nil {
-		t.Fatalf("expected error for negative amount")
+	// Simulate new month resets reservation
+	pr.monthStart = time.Now().Add(-31 * 24 * time.Hour)
+	if err := pr.ReserveSpendLicense(ctx, 800); err != nil {
+		t.Fatalf("unexpected error reserving spend after month reset: %v", err)
 	}
 }
 
-func TestSpendResetAfterMonth(t *testing.T) {
-	rt := NewRuntime("prog2")
+func TestIDBadgeIssueAndValidate(t *testing.T) {
+	pr := NewProgramRuntime("prog2")
+	ctx := context.Background()
 
-	if err := rt.ReserveSpend(8); err != nil {
-		t.Fatalf("unexpected error reserving spend: %v", err)
+	badge := pr.IssueIDBadge(ctx)
+	if badge == nil {
+		t.Fatal("expected badge, got nil")
 	}
 
-	// Simulate time passing > 30 days
-	rt.mu.Lock()
-	rt.lastReset = rt.lastReset.Add(-31 * 24 * time.Hour)
-	rt.mu.Unlock()
+	// Validate correct badge
+	if err := pr.ValidateIDBadge(badge.Token); err != nil {
+		t.Fatalf("unexpected error validating badge: %v", err)
+	}
 
-	// Should reset spend and allow new reservation
-	if err := rt.ReserveSpend(8); err != nil {
-		t.Fatalf("expected spend reset, got error: %v", err)
+	// Validate wrong token
+	if err := pr.ValidateIDBadge("wrong-token"); err != ErrInvalidBadge {
+		t.Fatalf("expected ErrInvalidBadge for wrong token, got %v", err)
+	}
+
+	// Expire badge and validate
+	pr.badge.ExpiresAt = time.Now().Add(-time.Minute)
+	if err := pr.ValidateIDBadge(badge.Token); err != ErrInvalidBadge {
+		t.Fatalf("expected ErrInvalidBadge for expired badge, got %v", err)
 	}
 }
 
-func TestBadgeLifecycle(t *testing.T) {
-	rt := NewRuntime("prog3")
+func TestAcceptContractAndShipReceipt(t *testing.T) {
+	pr := NewProgramRuntime("prog3")
+	ctx := context.Background()
 
-	badge, err := rt.IssueBadge("badge1", time.Minute)
+	badge := pr.IssueIDBadge(ctx)
+
+	// Accept contract with valid badge
+	receipt, err := pr.AcceptContract(ctx, badge.Token)
 	if err != nil {
-		t.Fatalf("failed to issue badge: %v", err)
+		t.Fatalf("unexpected error accepting contract: %v", err)
+	}
+	if receipt == nil {
+		t.Fatal("expected ship receipt, got nil")
 	}
 
-	if !rt.ValidateBadge("badge1") {
-		t.Fatalf("badge should be valid immediately after issuance")
+	// Accept contract again should fail
+	_, err = pr.AcceptContract(ctx, badge.Token)
+	if err == nil {
+		t.Fatal("expected error accepting contract twice, got nil")
 	}
 
-	// Duplicate badge ID
-	if _, err := rt.IssueBadge("badge1", time.Minute); err == nil {
-		t.Fatalf("expected error issuing duplicate badge ID")
-	}
-
-	// Empty badge ID
-	if _, err := rt.IssueBadge("", time.Minute); err == nil {
-		t.Fatalf("expected error issuing empty badge ID")
-	}
-
-	// Revoke badge
-	if err := rt.RevokeBadge("badge1"); err != nil {
-		t.Fatalf("failed to revoke badge: %v", err)
-	}
-
-	if rt.ValidateBadge("badge1") {
-		t.Fatalf("revoked badge should not be valid")
-	}
-
-	// Revoke non-existent badge
-	if err := rt.RevokeBadge("nonexistent"); err == nil {
-		t.Fatalf("expected error revoking non-existent badge")
-	}
-
-	// Revoke already revoked badge
-	if err := rt.RevokeBadge("badge1"); err == nil {
-		t.Fatalf("expected error revoking already revoked badge")
-	}
-}
-
-func TestBadgeExpiration(t *testing.T) {
-	rt := NewRuntime("prog4")
-
-	badge, err := rt.IssueBadge("badge2", time.Millisecond*10)
+	// Get ship receipt
+	gotReceipt, err := pr.GetShipReceipt()
 	if err != nil {
-		t.Fatalf("failed to issue badge: %v", err)
+		t.Fatalf("unexpected error getting ship receipt: %v", err)
 	}
-
-	time.Sleep(20 * time.Millisecond)
-
-	if rt.ValidateBadge(badge.ID) {
-		t.Fatalf("badge should be expired")
+	if gotReceipt != receipt {
+		t.Fatal("ship receipt mismatch")
 	}
 }
 
-func TestAcceptActionAndReceipts(t *testing.T) {
-	rt := NewRuntime("prog5")
+func TestAcceptContractInvalidBadge(t *testing.T) {
+	pr := NewProgramRuntime("prog4")
+	ctx := context.Background()
 
-	receipt := rt.AcceptAction("Accepted contract #123")
-	if receipt.ProgramID != "prog5" {
-		t.Fatalf("receipt ProgramID mismatch")
-	}
-	if receipt.Details != "Accepted contract #123" {
-		t.Fatalf("receipt Details mismatch")
-	}
+	pr.IssueIDBadge(ctx)
 
-	receipts := rt.GetReceipts()
-	if len(receipts) != 1 {
-		t.Fatalf("expected 1 receipt, got %d", len(receipts))
-	}
-	if receipts[0].Details != "Accepted contract #123" {
-		t.Fatalf("receipt Details mismatch in GetReceipts")
+	_, err := pr.AcceptContract(ctx, "invalid-token")
+	if err != ErrInvalidBadge {
+		t.Fatalf("expected ErrInvalidBadge, got %v", err)
 	}
 }
