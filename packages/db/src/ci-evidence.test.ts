@@ -2,7 +2,6 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import {
-  appendRunEvent,
   closeDb,
   createDb,
   createWorkspaceWithOwner,
