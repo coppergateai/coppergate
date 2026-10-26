@@ -4,94 +4,84 @@ import (
 	"testing"
 )
 
-func TestSpawnRoster_EngineerLeanRosterUnderBudget(t *testing.T) {
-	cfg := RosterConfig{
-		BudgetDollars: 5.00,
-		Role:          "Engineer",
-		AllowFullArena: false,
-	}
-	roster, err := SpawnRoster(cfg)
+func TestSpawnRosterLeanSuccess(t *testing.T) {
+	budget := 8.0
+	r, err := SpawnRoster(LeanRoster, budget)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if roster.Type != LeanRoster {
-		t.Errorf("expected lean roster, got %v", roster.Type)
+	if r.Type != LeanRoster {
+		t.Errorf("expected roster type LeanRoster, got %v", r.Type)
 	}
-	if roster.TotalCost > cfg.BudgetDollars {
-		t.Errorf("roster cost %v exceeds budget %v", roster.TotalCost, cfg.BudgetDollars)
-	}
-	for _, m := range roster.Micros {
-		if m.Cost >= 2.00 {
-			t.Errorf("micro %s cost %v exceeds $2 limit for lean roster", m.Name, m.Cost)
+	for _, m := range r.Members {
+		if m.Micro >= 2.0 {
+			t.Errorf("member %s has micro %v, expected under 2.0", m.Name, m.Micro)
+		}
+		if m.Role != Engineer && m.Role != Reviewer {
+			t.Errorf("member %s has role %v, expected Engineer or Reviewer", m.Name, m.Role)
 		}
 	}
 }
 
-func TestSpawnRoster_ReviewerLeanRosterUnderBudget(t *testing.T) {
-	cfg := RosterConfig{
-		BudgetDollars: 7.00,
-		Role:          "Reviewer",
-		AllowFullArena: false,
-	}
-	roster, err := SpawnRoster(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if roster.Type != LeanRoster {
-		t.Errorf("expected lean roster, got %v", roster.Type)
-	}
-}
-
-func TestSpawnRoster_UnauthorizedRole(t *testing.T) {
-	cfg := RosterConfig{
-		BudgetDollars: 10.00,
-		Role:          "Intern",
-		AllowFullArena: true,
-	}
-	_, err := SpawnRoster(cfg)
+func TestSpawnRosterLeanBudgetExceeded(t *testing.T) {
+	budget := 3.0 // less than sum of lean members
+	_, err := SpawnRoster(LeanRoster, budget)
 	if err == nil {
-		t.Fatal("expected error for unauthorized role")
+		t.Fatal("expected budget exceeded error, got nil")
 	}
-}
-
-func TestSpawnRoster_FullArenaAllowedAndBudgetSufficient(t *testing.T) {
-	cfg := RosterConfig{
-		BudgetDollars: 10.00,
-		Role:          "Engineer",
-		AllowFullArena: true,
-	}
-	roster, err := SpawnRoster(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if roster.Type != FullArena {
-		t.Errorf("expected full arena roster, got %v", roster.Type)
-	}
-}
-
-func TestSpawnRoster_FullArenaNotAllowedUnderTightBudget(t *testing.T) {
-	cfg := RosterConfig{
-		BudgetDollars: 7.00,
-		Role:          "Engineer",
-		AllowFullArena: true,
-	}
-	roster, err := SpawnRoster(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if roster.Type != LeanRoster {
-		t.Errorf("expected lean roster under tight budget, got %v", roster.Type)
-	}
-}
-
-func TestSpawnRoster_BudgetTooLow(t *testing.T) {
-	cfg := RosterConfig{
-		BudgetDollars: 1.00,
-		Role:          "Engineer",
-		AllowFullArena: false,
-	}
-	_, err := SpawnRoster(cfg)
 	if err != ErrBudgetExceeded {
 		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
+	}
+}
+
+func TestSpawnRosterFullArenaDisallowedUnderTightBudget(t *testing.T) {
+	budget := 8.0
+	_, err := SpawnRoster(FullArena, budget)
+	if err == nil {
+		t.Fatal("expected budget exceeded error for full arena under tight budget, got nil")
+	}
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
+	}
+}
+
+func TestSpawnRosterFullArenaAllowedOverBudget(t *testing.T) {
+	budget := 15.0
+	r, err := SpawnRoster(FullArena, budget)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if r.Type != FullArena {
+		t.Errorf("expected roster type FullArena, got %v", r.Type)
+	}
+}
+
+func TestRosterManagerGetRosterCaching(t *testing.T) {
+	rm := NewRosterManager(8.0)
+	r1, err := rm.GetRoster(LeanRoster)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r2, err := rm.GetRoster(LeanRoster)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if r1 != r2 {
+		t.Errorf("expected cached roster instance, got different instances")
+	}
+}
+
+func TestRosterManagerGetRosterDifferentType(t *testing.T) {
+	rm := NewRosterManager(15.0)
+	r1, err := rm.GetRoster(LeanRoster)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r2, err := rm.GetRoster(FullArena)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if r1 == r2 {
+		t.Errorf("expected different roster instances for different types")
 	}
 }
