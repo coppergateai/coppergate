@@ -1,54 +1,65 @@
 # Program Runtime (Contracted Autonomy)
 
-This document describes the **Program Runtime** capability (P-104) which enables managing spend licenses on reserve/fan-out, handling ID badges, and processing acceptance through to ship receipts.
+This document describes the **Program Runtime** capability introduced in P-104, which enables managing spend licenses on reserve/fan-out, handling ID badges, and processing Accept → Ship Receipt transitions.
 
 ## Overview
 
-The Program Runtime feature supports:
+The Program Runtime feature supports contracted autonomy for program spend management within the coppergate platform. It includes:
 
-- **Spend License on Reserve/Fan-out:** Manage and track spend licenses with a monthly envelope of $8.
-- **ID Badges:** Assign and validate ID badges for program participants.
-- **Accept → Ship Receipt Workflow:** Transition accepted items into shipped receipts with proper logging and writeback.
-- **Landing and Writeback:** Landing of program runtime data and writeback to persistent storage.
+- **Spend License on Reserve/Fan-out**: Programs can reserve a spend license to control monthly spend envelopes efficiently.
+- **ID Badges**: Unique identifiers for program instances to authenticate and authorize runtime operations.
+- **Accept → Ship Receipt Workflow**: Programs can accept a contract and generate a ship receipt as proof of delivery and fulfillment.
 
-This capability aligns with the architecture defined in [OPEN_PROGRAM.md](../../coppergate-architecture/docs/OPEN_PROGRAM.md).
+This capability aligns with the architecture defined in [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md) and is designed to operate within an $8 monthly spend envelope.
 
 ## Usage
 
-### Reserve/Fan-out Spend License
+### Reserving Spend License
 
-The system reserves spend licenses for program runtime operations, ensuring the monthly spend envelope of $8 is not exceeded.
+Programs can reserve a spend license to allocate funds for runtime operations. This ensures spend is controlled and does not exceed the monthly envelope.
 
 ### ID Badges
 
-Each program participant is assigned an ID badge that is validated during runtime operations.
+Each program runtime instance is issued an ID badge that must be presented to perform authorized actions such as accepting contracts or shipping receipts.
 
 ### Accept → Ship Receipt
 
-When a program runtime item is accepted, it transitions to a ship receipt state, confirming the operation's completion.
+Once a program accepts a contract, it can generate a ship receipt to confirm delivery. This receipt is recorded and can be queried for verification.
 
-### Landing + Writeback
+## API
 
-Program runtime data is landed and written back to persistent storage under `/docs/-program-runtime`.
+The primary API endpoints exposed are:
 
-## Configuration
+- `POST /programs/{programID}/reserve`  
+  Reserve spend license for the program runtime.
 
-- Monthly spend envelope: $8
-- ID badges are managed internally and validated on each operation.
+- `POST /programs/{programID}/id-badge`  
+  Issue or refresh an ID badge for the program runtime.
+
+- `POST /programs/{programID}/accept`  
+  Accept a contract and transition to ship receipt.
+
+- `GET /programs/{programID}/ship-receipt`  
+  Retrieve the ship receipt for the accepted contract.
+
+## Implementation Notes
+
+- The spend license reservation enforces the $8 monthly envelope limit.
+- ID badges are cryptographically signed tokens with expiration.
+- Accept → Ship Receipt transitions are atomic and recorded in the program ledger.
 
 ## Testing
 
 Unit and integration tests cover:
 
-- Spend license reservation and fan-out logic.
-- ID badge assignment and validation.
-- Accept to ship receipt transition.
-- Landing and writeback operations.
+- Spend license reservation and enforcement.
+- ID badge issuance and validation.
+- Accept → Ship Receipt workflow correctness.
 
-## Changelog
+## Change Log
 
-- **v1.0.0** - Initial release of Program Runtime (P-104) capability.
+- Added Program Runtime capability with spend license, ID badges, and accept → ship receipt workflow (P-104).
 
 ---
 
-For detailed architecture, see [OPEN_PROGRAM.md](../../coppergate-architecture/docs/OPEN_PROGRAM.md).
+For detailed architecture and design, see [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md).
