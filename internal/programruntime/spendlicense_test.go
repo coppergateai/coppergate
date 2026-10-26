@@ -2,93 +2,48 @@ package programruntime
 
 import (
 	"testing"
-	"time"
 )
 
-func TestSpendLicense_Reserve(t *testing.T) {
-	sl := NewSpendLicense("license1", 8.0)
+func TestSpendLicense_ReserveSpend(t *testing.T) {
+	sl := NewSpendLicense(800, "badge-123")
 
-	err := sl.Reserve(5.0)
-	if err != nil {
-		t.Fatalf("unexpected error reserving 5.0: %v", err)
+	// Reserve within limit
+	if err := sl.ReserveSpend(500); err != nil {
+		t.Fatalf("unexpected error reserving spend: %v", err)
 	}
 
-	if sl.Reserved != 5.0 {
-		t.Errorf("expected reserved 5.0, got %.2f", sl.Reserved)
-	}
-
-	err = sl.Reserve(4.0)
-	if err == nil {
-		t.Errorf("expected error reserving 4.0 exceeding budget, got none")
+	// Reserve exceeding limit
+	if err := sl.ReserveSpend(400); err != ErrSpendLimitExceeded {
+		t.Fatalf("expected ErrSpendLimitExceeded, got %v", err)
 	}
 }
 
-func TestSpendLicense_FanOut(t *testing.T) {
-	sl := NewSpendLicense("license1", 8.0)
-	err := sl.Reserve(6.0)
-	if err != nil {
-		t.Fatalf("reserve failed: %v", err)
+func TestSpendLicense_FanOutSpend(t *testing.T) {
+	sl := NewSpendLicense(800, "badge-456")
+
+	// Fan-out within limit
+	if err := sl.FanOutSpend(300); err != nil {
+		t.Fatalf("unexpected error on fan-out spend: %v", err)
 	}
 
-	newLicense, err := sl.FanOut(3.0, "license2")
-	if err != nil {
-		t.Fatalf("fanout failed: %v", err)
-	}
-
-	if newLicense.TotalBudget != 3.0 {
-		t.Errorf("expected new license budget 3.0, got %.2f", newLicense.TotalBudget)
-	}
-
-	if sl.Reserved != 3.0 {
-		t.Errorf("expected original reserved reduced to 3.0, got %.2f", sl.Reserved)
-	}
-
-	_, err = sl.FanOut(4.0, "license3")
-	if err == nil {
-		t.Errorf("expected error fanout exceeding reserved budget, got none")
+	// Fan-out exceeding limit
+	if err := sl.FanOutSpend(600); err != ErrSpendLimitExceeded {
+		t.Fatalf("expected ErrSpendLimitExceeded on fan-out, got %v", err)
 	}
 }
 
-func TestSpendLicense_IssueBadge(t *testing.T) {
-	sl := NewSpendLicense("license1", 8.0)
+func TestSpendLicense_AcceptSpend(t *testing.T) {
+	sl := NewSpendLicense(800, "badge-789")
 
-	badge, err := sl.IssueBadge("badge1", "Alice", time.Hour*24)
-	if err != nil {
-		t.Fatalf("issue badge failed: %v", err)
+	if err := sl.ReserveSpend(700); err != nil {
+		t.Fatalf("unexpected error reserving spend: %v", err)
 	}
 
-	if badge.BadgeID != "badge1" || badge.HolderName != "Alice" {
-		t.Errorf("badge fields mismatch")
+	receipt := sl.AcceptSpend()
+	if receipt.BadgeID != "badge-789" {
+		t.Errorf("expected badge ID 'badge-789', got %s", receipt.BadgeID)
 	}
-
-	_, err = sl.IssueBadge("badge1", "Bob", time.Hour*24)
-	if err == nil {
-		t.Errorf("expected error issuing duplicate badgeID, got none")
-	}
-}
-
-func TestSpendLicense_AcceptReservation(t *testing.T) {
-	sl := NewSpendLicense("license1", 8.0)
-	err := sl.Reserve(7.0)
-	if err != nil {
-		t.Fatalf("reserve failed: %v", err)
-	}
-
-	receipt, err := sl.AcceptReservation(5.0, "receipt1", "Test acceptance")
-	if err != nil {
-		t.Fatalf("accept reservation failed: %v", err)
-	}
-
-	if receipt.Amount != 5.0 || receipt.ReceiptID != "receipt1" {
-		t.Errorf("receipt fields mismatch")
-	}
-
-	if sl.Reserved != 2.0 {
-		t.Errorf("expected reserved 2.0 after acceptance, got %.2f", sl.Reserved)
-	}
-
-	_, err = sl.AcceptReservation(3.0, "receipt2", "Over acceptance")
-	if err == nil {
-		t.Errorf("expected error accepting more than reserved, got none")
+	if receipt.Amount != 700 {
+		t.Errorf("expected amount 700, got %d", receipt.Amount)
 	}
 }
