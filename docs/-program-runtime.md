@@ -2,41 +2,46 @@
 
 ## Overview
 
-This document describes the Program Runtime feature introduced in P-104, which enables contracted autonomy spend license management on reserve/fan-out operations. It also covers ID badge issuance, the acceptance flow leading to ship receipts, and the integration with the runtime landing and writeback process.
+This document describes the Program Runtime feature (P-104) which enables contracted autonomy spend licenses on reserve/fan-out operations. It introduces ID badges for program identity and a new acceptance flow from Accept → Ship Receipt.
 
-## Features
+This feature is designed to operate within the $8 monthly envelope spend cap and aligns with the architecture defined in [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md).
 
-- **Spend License on Reserve/Fan-out**  
-  The system now tracks and enforces spend licenses during program runtime, ensuring that contracted autonomy operations respect the $8 monthly envelope spend cap.
+## Key Features
 
-- **ID Badges**  
-  Each program runtime instance is assigned an ID badge to uniquely identify and authorize its operations within the system.
-
-- **Accept → Ship Receipt Flow**  
-  Upon acceptance of a runtime operation, a ship receipt is generated to confirm the transaction and update the system state accordingly.
-
-- **Landing and Writeback**  
-  Runtime operations land in the system under `/docs/-program-runtime` and perform writebacks to maintain consistency and auditability.
+- **Spend License on Reserve/Fan-out**: Programs can reserve spend licenses for runtime autonomy, ensuring controlled spend within the monthly envelope.
+- **ID Badges**: Unique program identity badges are issued and validated during runtime operations.
+- **Accept → Ship Receipt Flow**: After acceptance, programs receive a ship receipt confirming the spend license allocation and runtime authorization.
+- **Landing + Writeback**: Runtime spend license state is landed and written back to persistent storage for audit and reconciliation.
 
 ## Usage
 
-1. When a program runtime operation is initiated, the system checks the spend license availability.
-2. If sufficient spend license remains, the operation proceeds, and an ID badge is assigned.
-3. Upon acceptance, a ship receipt is generated and logged.
-4. The runtime operation lands in the system and performs writeback to update the state.
+1. **Reserve Spend License**  
+   Programs request a spend license for runtime autonomy. The system verifies the request against the $8 monthly envelope and issues a license if available.
+
+2. **ID Badge Validation**  
+   Each program runtime operation must present a valid ID badge. The badge is checked against the Open IDs registry.
+
+3. **Accept and Ship Receipt**  
+   Upon acceptance of the spend license, a ship receipt is generated and returned to the program. This receipt serves as proof of authorization.
+
+4. **Landing and Writeback**  
+   The runtime spend license usage is landed into the system and written back to persistent storage to maintain accurate spend accounting.
 
 ## Architecture
 
-This feature aligns with the Open IDs architecture described in `coppergate-architecture/docs/OPEN_PROGRAM.md`. It uses lean Arena principles to maintain efficiency and scalability.
+This feature integrates with the primary coppergate repo and follows the Open IDs architecture as specified in `coppergate-architecture/docs/OPEN_PROGRAM.md`.
 
 ## Testing
 
-The feature is covered by automated tests validating spend license enforcement, ID badge issuance, acceptance flow, and landing/writeback correctness.
+The feature is covered by unit and integration tests validating spend license reservation, ID badge issuance and validation, acceptance flow, and landing/writeback operations.
 
-## Change History
+## Change Log
 
-- **P-104**: Initial implementation of Program Runtime Spend License, ID badges, accept-to-ship receipt flow, and landing/writeback.
+- Added Program Runtime Spend License capability (P-104)
+- Introduced ID badges for program identity
+- Implemented Accept → Ship Receipt flow
+- Added landing and writeback of spend license state
 
 ---
 
-For more details, see the source code and tests in the primary coppergate repository.
+For detailed API usage and examples, refer to the code documentation.
