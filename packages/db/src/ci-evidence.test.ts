@@ -427,28 +427,21 @@ describe("CI evidence ingestion", { skip: !url }, () => {
       .update(agentRuns)
       .set({
         headSha: pendingSha,
-        status: "REVIEW_REQUIRED",
+        status: "WAITING_CI",
+        finishedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(agentRuns.id, run.id));
 
-    await appendRunEvent(db, {
-      runId: run.id,
-      workspaceId,
-      kind: "evidence",
-      payload: {
-        message: "Awaiting live CI evidence (github_check_run)",
-        fitness: "pending",
-      },
-    });
     const fitness = await getRunCiFitness(db, run.id);
     assert.equal(fitness.awaitingLive, true);
+    assert.equal(fitness.ciSatisfied, false);
     assert.equal(fitness.acceptReady, false);
 
-    await ingestCiEvidence(db, {
+    const { run: afterIngest } = await ingestCiEvidence(db, {
       workspaceId,
       headSha: pendingSha,
-      name: "ci",
+      name: "test",
       status: "completed",
       conclusion: "success",
       passed: true,
@@ -457,7 +450,9 @@ describe("CI evidence ingestion", { skip: !url }, () => {
       detailsUrl: null,
       repoFullName: "org-ci/app",
     });
-    const ready = await getRunCiFitness(db, run.id);
+    assert.ok(afterIngest);
+    assert.equal(afterIngest!.status, "REVIEW_REQUIRED");
+    const ready = await getRunCiFitness(db, afterIngest!.id);
     assert.equal(ready.passed, true);
     assert.equal(ready.acceptReady, true);
   });

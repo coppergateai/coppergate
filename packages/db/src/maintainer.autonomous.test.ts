@@ -205,7 +205,8 @@ describe("maintainer autonomous accept (winner-gated)", { skip: !url }, () => {
     await ingestCiEvidence(db, {
       workspaceId,
       headSha,
-      name: "go-test",
+      // Must match default CI_REQUIRED_CHECK_NAMES ("test") for acceptReady.
+      name: "test",
       status: "completed",
       conclusion: "success",
       passed: true,
