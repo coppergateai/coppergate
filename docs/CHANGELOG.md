@@ -2,5 +2,10 @@
 
 ## [Unreleased]
 
-### Added
-- AG-012: Implemented Lean Roster capability with $2 micro cost limit per member, Engineer and Reviewer roles only, no FULL_ARENA spawn under $8 monthly budget envelope.
+### Features
+
+- AG-012: Implement lean roster mode in arena package.
+  - When availableMicros budget is under 2ms and monthly envelope is $8 or less,
+    only Engineer and Reviewer roles can spawn.
+  - FULL_ARENA spawn is disabled under this tight budget to reduce resource usage.
+  - Matches architecture acceptance criteria from coppergate-architecture/docs/OPEN_PROGRAM.md.
