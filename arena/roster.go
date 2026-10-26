@@ -9,81 +9,95 @@ import (
 // ErrBudgetExceeded is returned when the monthly budget envelope is exceeded.
 var ErrBudgetExceeded = errors.New("monthly budget envelope exceeded")
 
-// ErrFullArenaSpawnNotAllowed is returned when a full arena spawn is attempted under tight budget.
-var ErrFullArenaSpawnNotAllowed = errors.New("full arena spawn not allowed under tight budget")
+// Micros represents microcurrency units.
+type Micros int64
 
-// Roster represents a lean roster of micros under a budget envelope.
+// Constants for budget and pricing.
+const (
+	MonthlyBudgetMicros Micros = 8_000_000 // $8.00 in micros
+	EngineerCostMicros  Micros = 2_000_000 // $2.00 in micros
+)
+
+// Role defines the role of a roster member.
+type Role int
+
+const (
+	RoleEngineer Role = iota
+	RoleReviewer
+	RoleFullArena // disallowed under tight budget
+)
+
+// Member represents a roster member.
+type Member struct {
+	ID   string
+	Role Role
+	Cost Micros
+}
+
+// Roster manages a lean set of members under budget constraints.
 type Roster struct {
-	mu       sync.Mutex
-	micros   map[string]*Micro
-	budget   float64 // monthly budget envelope in dollars
-	spent    float64
-	allowFullArena bool
+	members map[string]Member
+	budget  Micros
+	spent   Micros
+	mu      sync.Mutex
 }
 
-// Micro represents a microservice or micro unit in the roster.
-type Micro struct {
-	ID       string
-	Cost     float64 // cost per month in dollars
-	Role     string  // e.g. "Engineer", "Reviewer"
-	FullArena bool   // whether this micro requires full arena spawn
-}
-
-// NewRoster creates a new lean roster with the given monthly budget envelope.
-// If allowFullArena is false, full arena spawns are disallowed.
-func NewRoster(monthlyBudget float64, allowFullArena bool) *Roster {
+// NewLeanRoster creates a new roster with a tight $8 monthly budget envelope.
+func NewLeanRoster() *Roster {
 	return &Roster{
-		micros:   make(map[string]*Micro),
-		budget:   monthlyBudget,
-		allowFullArena: allowFullArena,
+		members: make(map[string]Member),
+		budget:  MonthlyBudgetMicros,
+		spent:   0,
 	}
 }
 
-// AddMicro attempts to add a micro to the roster.
-// It enforces the budget envelope and disallows full arena spawns if configured.
-// Only micros with role "Engineer" or "Reviewer" are allowed.
-// Micros costing $2 or more are rejected.
-func (r *Roster) AddMicro(m *Micro) error {
+// AddMember adds a member to the roster if it fits the budget and role constraints.
+// Only Engineer and Reviewer roles allowed; no FullArena under tight budget.
+func (r *Roster) AddMember(id string, role Role) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if m.Cost >= 2.0 {
-		return errors.New("micro cost exceeds $2 limit")
+	if role == RoleFullArena {
+		return errors.New("FULL_ARENA spawn disallowed under tight budget")
 	}
-	if m.Role != "Engineer" && m.Role != "Reviewer" {
-		return errors.New("micro role not allowed; only Engineer or Reviewer allowed")
+
+	cost := EngineerCostMicros
+	if role == RoleReviewer {
+		cost = EngineerCostMicros // same cost for reviewer and engineer
 	}
-	if m.FullArena && !r.allowFullArena {
-		return ErrFullArenaSpawnNotAllowed
-	}
-	if r.spent+m.Cost > r.budget {
+
+	if r.spent+cost > r.budget {
 		return ErrBudgetExceeded
 	}
 
-	r.micros[m.ID] = m
-	r.spent += m.Cost
+	r.members[id] = Member{
+		ID:   id,
+		Role: role,
+		Cost: cost,
+	}
+	r.spent += cost
 	return nil
 }
 
-// RemoveMicro removes a micro from the roster by ID.
-func (r *Roster) RemoveMicro(id string) {
+// RemoveMember removes a member by ID and refunds their cost.
+func (r *Roster) RemoveMember(id string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if m, ok := r.micros[id]; ok {
+	if m, ok := r.members[id]; ok {
 		r.spent -= m.Cost
-		delete(r.micros, id)
+		delete(r.members, id)
 	}
 }
 
-// ListMicros returns a snapshot list of all micros in the roster.
-func (r *Roster) ListMicros() []*Micro {
+// Members returns a copy of current members.
+func (r *Roster) Members() []Member {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	result := make([]*Micro, 0, len(r.micros))
-	for _, m := range r.micros {
-		result = append(result, m)
+	members := make([]Member, 0, len(r.members))
+	for _, m := range r.members {
+		members = append(members, m)
 	}
-	return result
+	return members
 }
