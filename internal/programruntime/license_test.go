@@ -2,96 +2,105 @@ package programruntime
 
 import (
 	"testing"
-	"time"
 )
 
-func TestReserveSpendLicense_Success(t *testing.T) {
+func TestReserveLicenseSuccess(t *testing.T) {
 	lm := NewLicenseManager()
-	license, err := lm.ReserveSpendLicense(500)
+	programID := "prog1"
+
+	badge, err := lm.ReserveLicense(programID, 5)
 	if err != nil {
-		t.Fatalf("unexpected error reserving license: %v", err)
+		t.Fatalf("ReserveLicense failed: %v", err)
 	}
-	if license.AmountCents != 500 {
-		t.Errorf("expected amount 500, got %d", license.AmountCents)
+	if badge.ProgramID != programID {
+		t.Errorf("Badge ProgramID mismatch: got %s, want %s", badge.ProgramID, programID)
 	}
-	if license.IDBadge == "" {
-		t.Error("expected non-empty ID badge")
+	balance := lm.GetBalance(programID)
+	expectedBalance := MonthlySpendEnvelope - 5
+	if balance != expectedBalance {
+		t.Errorf("Balance mismatch: got %.2f, want %.2f", balance, expectedBalance)
 	}
 }
 
-func TestReserveSpendLicense_ExceedEnvelope(t *testing.T) {
+func TestReserveLicenseInsufficientBalance(t *testing.T) {
 	lm := NewLicenseManager()
-	_, err := lm.ReserveSpendLicense(700)
-	if err != nil {
-		t.Fatalf("unexpected error reserving license: %v", err)
-	}
-	_, err = lm.ReserveSpendLicense(200)
+	programID := "prog2"
+
+	_, err := lm.ReserveLicense(programID, 9)
 	if err == nil {
-		t.Fatal("expected error due to envelope exceeded, got nil")
+		t.Fatal("Expected error for amount exceeding monthly envelope")
 	}
 }
 
-func TestReserveSpendLicense_ResetMonthlySpend(t *testing.T) {
+func TestValidateBadge(t *testing.T) {
 	lm := NewLicenseManager()
-	_, err := lm.ReserveSpendLicense(800)
+	programID := "prog3"
+
+	badge, err := lm.ReserveLicense(programID, 3)
 	if err != nil {
-		t.Fatalf("unexpected error reserving license: %v", err)
+		t.Fatalf("ReserveLicense failed: %v", err)
 	}
 
-	// Simulate month change
-	lm.mu.Lock()
-	lm.currentMonth--
-	lm.mu.Unlock()
+	valid := lm.ValidateBadge(badge.ID, programID)
+	if !valid {
+		t.Error("Expected badge to be valid")
+	}
 
-	_, err = lm.ReserveSpendLicense(800)
-	if err != nil {
-		t.Fatalf("expected reset monthly spend, got error: %v", err)
+	invalid := lm.ValidateBadge("nonexistent", programID)
+	if invalid {
+		t.Error("Expected nonexistent badge to be invalid")
 	}
 }
 
-func TestFanOutLicense(t *testing.T) {
+func TestAcceptLicenseSuccess(t *testing.T) {
 	lm := NewLicenseManager()
-	license, err := lm.ReserveSpendLicense(100)
+	programID := "prog4"
+
+	badge, err := lm.ReserveLicense(programID, 4)
 	if err != nil {
-		t.Fatalf("unexpected error reserving license: %v", err)
+		t.Fatalf("ReserveLicense failed: %v", err)
 	}
 
-	err = lm.FanOutLicense(license.ID)
+	receipt, err := lm.AcceptLicense(badge.ID, 4)
 	if err != nil {
-		t.Fatalf("unexpected error fanning out license: %v", err)
+		t.Fatalf("AcceptLicense failed: %v", err)
+	}
+	if receipt.ProgramID != programID {
+		t.Errorf("Receipt ProgramID mismatch: got %s, want %s", receipt.ProgramID, programID)
 	}
 
-	err = lm.FanOutLicense(license.ID)
+	// Badge should be invalid after acceptance
+	valid := lm.ValidateBadge(badge.ID, programID)
+	if valid {
+		t.Error("Expected badge to be invalid after acceptance")
+	}
+}
+
+func TestAcceptLicenseInvalidBadge(t *testing.T) {
+	lm := NewLicenseManager()
+
+	_, err := lm.AcceptLicense("invalid-badge", 1)
 	if err == nil {
-		t.Fatal("expected error on double fan-out, got nil")
+		t.Fatal("Expected error for invalid badge")
 	}
 }
 
-func TestAcceptLicense_Success(t *testing.T) {
+func TestGetReceipts(t *testing.T) {
 	lm := NewLicenseManager()
-	license, err := lm.ReserveSpendLicense(100)
+	programID := "prog5"
+
+	badge, err := lm.ReserveLicense(programID, 2)
 	if err != nil {
-		t.Fatalf("unexpected error reserving license: %v", err)
+		t.Fatalf("ReserveLicense failed: %v", err)
 	}
 
-	receipt, err := lm.AcceptLicense(license.ID, license.IDBadge)
+	_, err = lm.AcceptLicense(badge.ID, 2)
 	if err != nil {
-		t.Fatalf("unexpected error accepting license: %v", err)
-	}
-	if receipt.LicenseID != license.ID {
-		t.Errorf("receipt license ID mismatch: got %s want %s", receipt.LicenseID, license.ID)
-	}
-}
-
-func TestAcceptLicense_InvalidBadge(t *testing.T) {
-	lm := NewLicenseManager()
-	license, err := lm.ReserveSpendLicense(100)
-	if err != nil {
-		t.Fatalf("unexpected error reserving license: %v", err)
+		t.Fatalf("AcceptLicense failed: %v", err)
 	}
 
-	_, err = lm.AcceptLicense(license.ID, "BADGE-999")
-	if err == nil {
-		t.Fatal("expected error for invalid badge, got nil")
+	receipts := lm.GetReceipts()
+	if len(receipts) != 1 {
+		t.Errorf("Expected 1 receipt, got %d", len(receipts))
 	}
 }
