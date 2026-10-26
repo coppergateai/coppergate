@@ -1,103 +1,115 @@
-// Package arena provides memory arena allocation with lean roster support.
-//
-// AG-012: Implements a lean roster mode that activates when availableMicros budget is under $2.
-// In this mode, only Engineer+reviewer roles are allowed to spawn; FULL_ARENA spawn is disabled
-// to keep memory and CPU usage within tight budget constraints.
-//
-// This feature matches architecture acceptance criteria from coppergate-architecture/docs/OPEN_PROGRAM.md.
 package arena
 
 import (
 	"errors"
 	"sync"
-	"time"
 )
 
-// Role represents a user role in the arena.
-type Role int
+// Roster manages a lean set of micros under a tight budget.
+// It only allows Engineer+reviewer roles and disallows FULL_ARENA spawns
+// when the monthly spend envelope is tight (<= $8).
+//
+// This implementation enforces:
+// - Micros cost under $2 each
+// - Only Engineer and Reviewer roles allowed
+// - No FULL_ARENA spawn under tight budget
+//
+// This is the AG-012 lean roster implementation.
 
 const (
-	RoleEngineer Role = iota
-	RoleReviewer
-	RoleFullArena
+	RoleEngineer = "Engineer"
+	RoleReviewer = "Reviewer"
+
+	MaxMicroCostUSD = 2.00
+	MonthlyBudgetUSD = 8.00
 )
 
-// ErrSpawnNotAllowed is returned when spawn is disallowed under lean roster mode.
-var ErrSpawnNotAllowed = errors.New("spawn not allowed under lean roster mode")
+var (
+	ErrRoleNotAllowed      = errors.New("role not allowed in lean roster")
+	ErrCostExceeded        = errors.New("micro cost exceeds max allowed")
+	ErrBudgetExceeded      = errors.New("monthly budget exceeded")
+	ErrFullArenaNotAllowed = errors.New("FULL_ARENA spawn not allowed under tight budget")
+)
 
-// RosterConfig configures the roster behavior.
-type RosterConfig struct {
-	AvailableMicros int64 // microseconds budget available for this roster cycle
-	MonthlyEnvelope int64 // monthly budget envelope in dollars (cents internally)
+type Micro struct {
+	ID    string
+	Role  string
+	Cost  float64 // USD cost per micro
+	Spawn string  // spawn type, e.g. "LEAN_ARENA", "FULL_ARENA"
 }
 
-// Roster manages the set of active roles and spawn permissions.
 type Roster struct {
-	mu             sync.Mutex
-	config         RosterConfig
-	activeRoles    map[Role]bool
-	leanRosterMode bool
+	mu     sync.Mutex
+	micros map[string]Micro
+	spend  float64
 }
 
-// NewRoster creates a new Roster with given config.
-func NewRoster(cfg RosterConfig) *Roster {
-	r := &Roster{
-		config:      cfg,
-		activeRoles: make(map[Role]bool),
-	}
-	r.evaluateLeanRosterMode()
-	return r
-}
-
-// evaluateLeanRosterMode sets leanRosterMode based on availableMicros and budget envelope.
-func (r *Roster) evaluateLeanRosterMode() {
-	// Activate lean roster if availableMicros under 2,000 (2ms) and monthly envelope <= $8 (800 cents)
-	if r.config.AvailableMicros < 2000 && r.config.MonthlyEnvelope <= 800 {
-		r.leanRosterMode = true
-	} else {
-		r.leanRosterMode = false
+// NewLeanRoster returns a new lean roster enforcing AG-012 constraints.
+func NewLeanRoster() *Roster {
+	return &Roster{
+		micros: make(map[string]Micro),
+		spend:  0,
 	}
 }
 
-// SpawnRole attempts to spawn a role in the roster.
-// Returns ErrSpawnNotAllowed if spawn is disallowed under lean roster mode.
-func (r *Roster) SpawnRole(role Role) error {
+// AddMicro attempts to add a micro to the roster.
+// Returns error if constraints are violated.
+func (r *Roster) AddMicro(m Micro) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.leanRosterMode {
-		// Only Engineer and Reviewer allowed under lean roster
-		if role != RoleEngineer && role != RoleReviewer {
-			return ErrSpawnNotAllowed
-		}
+	// Validate role
+	if m.Role != RoleEngineer && m.Role != RoleReviewer {
+		return ErrRoleNotAllowed
 	}
 
-	r.activeRoles[role] = true
+	// Validate cost
+	if m.Cost > MaxMicroCostUSD {
+		return ErrCostExceeded
+	}
+
+	// Validate spawn type
+	if m.Spawn == "FULL_ARENA" {
+		return ErrFullArenaNotAllowed
+	}
+
+	// Check if adding this micro exceeds monthly budget
+	if r.spend+m.Cost > MonthlyBudgetUSD {
+		return ErrBudgetExceeded
+	}
+
+	// Add micro
+	r.micros[m.ID] = m
+	r.spend += m.Cost
 	return nil
 }
 
-// DespawnRole removes a role from the roster.
-func (r *Roster) DespawnRole(role Role) {
+// RemoveMicro removes a micro by ID, reducing spend accordingly.
+func (r *Roster) RemoveMicro(id string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.activeRoles, role)
-}
 
-// ActiveRoles returns a snapshot of currently active roles.
-func (r *Roster) ActiveRoles() []Role {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	roles := make([]Role, 0, len(r.activeRoles))
-	for role := range r.activeRoles {
-		roles = append(roles, role)
+	if m, ok := r.micros[id]; ok {
+		delete(r.micros, id)
+		r.spend -= m.Cost
 	}
-	return roles
 }
 
-// UpdateConfig updates the roster config and reevaluates lean roster mode.
-func (r *Roster) UpdateConfig(cfg RosterConfig) {
+// ListMicros returns a copy of current micros in the roster.
+func (r *Roster) ListMicros() []Micro {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.config = cfg
-	r.evaluateLeanRosterMode()
+
+	mics := make([]Micro, 0, len(r.micros))
+	for _, m := range r.micros {
+		mics = append(mics, m)
+	}
+	return mics
+}
+
+// CurrentSpend returns the current total spend of the roster.
+func (r *Roster) CurrentSpend() float64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.spend
 }
