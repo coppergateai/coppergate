@@ -2,106 +2,144 @@ package programruntime
 
 import (
 	"errors"
+	"fmt"
 	"sync"
+	"time"
 )
 
-// SpendLicense represents a spend license with a monthly envelope and reserved amount.
+// SpendLicense represents a contracted autonomy spend license with a budget envelope.
 type SpendLicense struct {
-	MonthlyEnvelopeCents int64 // e.g. 800 cents = $8.00
-	ReservedCents        int64
-	mu                   sync.Mutex
+	ID           string
+	TotalBudget  float64
+	Reserved     float64
+	Badges       map[string]*IDBadge
+	Mutex        sync.Mutex
+	CreatedAt    time.Time
+	LastModified time.Time
 }
 
-// NewSpendLicense creates a new SpendLicense with the given monthly envelope.
-func NewSpendLicense(monthlyEnvelopeCents int64) *SpendLicense {
+// IDBadge represents an identity badge issued to a spend license holder.
+type IDBadge struct {
+	BadgeID    string
+	HolderName string
+	IssuedAt   time.Time
+	ValidUntil time.Time
+}
+
+// ShipReceipt represents a receipt generated upon acceptance of a spend license reservation.
+type ShipReceipt struct {
+	ReceiptID   string
+	LicenseID   string
+	Amount      float64
+	IssuedAt    time.Time
+	Description string
+}
+
+// NewSpendLicense creates a new spend license with the specified total budget.
+func NewSpendLicense(id string, totalBudget float64) *SpendLicense {
 	return &SpendLicense{
-		MonthlyEnvelopeCents: monthlyEnvelopeCents,
-		ReservedCents:        0,
+		ID:           id,
+		TotalBudget:  totalBudget,
+		Reserved:     0,
+		Badges:       make(map[string]*IDBadge),
+		CreatedAt:    time.Now(),
+		LastModified: time.Now(),
 	}
 }
 
-// Reserve attempts to reserve the specified amount of cents from the envelope.
-// Returns an error if insufficient funds.
-func (sl *SpendLicense) Reserve(amountCents int64) error {
-	sl.mu.Lock()
-	defer sl.mu.Unlock()
+// Reserve attempts to reserve an amount from the spend license budget.
+// Returns error if insufficient budget available.
+func (sl *SpendLicense) Reserve(amount float64) error {
+	sl.Mutex.Lock()
+	defer sl.Mutex.Unlock()
 
-	if amountCents <= 0 {
+	if amount <= 0 {
 		return errors.New("reserve amount must be positive")
 	}
 
-	if sl.ReservedCents+amountCents > sl.MonthlyEnvelopeCents {
-		return errors.New("insufficient funds in spend license envelope")
+	available := sl.TotalBudget - sl.Reserved
+	if amount > available {
+		return fmt.Errorf("insufficient budget: requested %.2f, available %.2f", amount, available)
 	}
 
-	sl.ReservedCents += amountCents
+	sl.Reserved += amount
+	sl.LastModified = time.Now()
 	return nil
 }
 
-// FanOut distributes reserved spend license to multiple agents.
-// The sum of fanOutAmounts must not exceed ReservedCents.
-func (sl *SpendLicense) FanOut(fanOutAmounts []int64) error {
-	sl.mu.Lock()
-	defer sl.mu.Unlock()
+// FanOut splits a reserved amount into smaller spend licenses.
+// Returns error if amount exceeds reserved budget.
+func (sl *SpendLicense) FanOut(amount float64, newID string) (*SpendLicense, error) {
+	sl.Mutex.Lock()
+	defer sl.Mutex.Unlock()
 
-	var total int64
-	for _, amt := range fanOutAmounts {
-		if amt <= 0 {
-			return errors.New("fan-out amounts must be positive")
-		}
-		total += amt
+	if amount <= 0 {
+		return nil, errors.New("fan-out amount must be positive")
 	}
 
-	if total > sl.ReservedCents {
-		return errors.New("fan-out amounts exceed reserved spend license")
+	if amount > sl.Reserved {
+		return nil, fmt.Errorf("insufficient reserved budget: requested %.2f, reserved %.2f", amount, sl.Reserved)
 	}
 
-	// Deduct the fan-out amounts from reserved
-	sl.ReservedCents -= total
-	return nil
+	// Reduce reserved budget by amount to fan out
+	sl.Reserved -= amount
+	sl.LastModified = time.Now()
+
+	// Create new spend license with the fan-out amount
+	newLicense := NewSpendLicense(newID, amount)
+	return newLicense, nil
 }
 
-// IDBadge represents an ID badge issued to an agent for autonomy authorization.
-type IDBadge struct {
-	AgentID string
-	Amount  int64 // spend license amount authorized
-	Valid   bool
+// IssueBadge issues an ID badge to a holder for this spend license.
+func (sl *SpendLicense) IssueBadge(badgeID, holderName string, validDuration time.Duration) (*IDBadge, error) {
+	sl.Mutex.Lock()
+	defer sl.Mutex.Unlock()
+
+	if badgeID == "" || holderName == "" {
+		return nil, errors.New("badgeID and holderName must be non-empty")
+	}
+
+	if _, exists := sl.Badges[badgeID]; exists {
+		return nil, fmt.Errorf("badgeID %s already issued", badgeID)
+	}
+
+	now := time.Now()
+	badge := &IDBadge{
+		BadgeID:    badgeID,
+		HolderName: holderName,
+		IssuedAt:   now,
+		ValidUntil: now.Add(validDuration),
+	}
+
+	sl.Badges[badgeID] = badge
+	sl.LastModified = now
+	return badge, nil
 }
 
-// AcceptUsage accepts usage of spend license and returns a ShipReceipt.
-func (sl *SpendLicense) AcceptUsage(amountCents int64) (*ShipReceipt, error) {
-	sl.mu.Lock()
-	defer sl.mu.Unlock()
+// AcceptReservation accepts a reserved amount and generates a ship receipt.
+// The amount must be less or equal to reserved budget.
+func (sl *SpendLicense) AcceptReservation(amount float64, receiptID, description string) (*ShipReceipt, error) {
+	sl.Mutex.Lock()
+	defer sl.Mutex.Unlock()
 
-	if amountCents <= 0 {
+	if amount <= 0 {
 		return nil, errors.New("accept amount must be positive")
 	}
 
-	if amountCents > sl.MonthlyEnvelopeCents {
-		return nil, errors.New("accept amount exceeds monthly envelope")
+	if amount > sl.Reserved {
+		return nil, fmt.Errorf("insufficient reserved budget to accept: requested %.2f, reserved %.2f", amount, sl.Reserved)
 	}
 
-	// For simplicity, assume acceptance reduces the monthly envelope.
-	sl.MonthlyEnvelopeCents -= amountCents
+	sl.Reserved -= amount
+	sl.LastModified = time.Now()
 
 	receipt := &ShipReceipt{
-		AmountCents: amountCents,
-		ReceiptID:   generateReceiptID(),
+		ReceiptID:   receiptID,
+		LicenseID:   sl.ID,
+		Amount:      amount,
+		IssuedAt:    time.Now(),
+		Description: description,
 	}
 
 	return receipt, nil
-}
-
-// ShipReceipt represents a receipt generated after accepting spend license usage.
-type ShipReceipt struct {
-	AmountCents int64
-	ReceiptID   string
-}
-
-// generateReceiptID generates a unique receipt ID.
-// In production, this would be a UUID or similar.
-func generateReceiptID() string {
-	// For demonstration, use a simple counter or timestamp.
-	// Here we use a static string for simplicity.
-	return "SHIP-RECEIPT-0001"
 }
