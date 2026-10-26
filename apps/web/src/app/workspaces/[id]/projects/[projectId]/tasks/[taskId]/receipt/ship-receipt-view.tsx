@@ -53,11 +53,13 @@ export function ShipReceiptView({
       <main className={styles.main}>
         <p className={styles.kicker}>Ship Receipt</p>
         <h1 className={styles.title}>{taskTitle}</h1>
-        <p className={styles.lede}>
-          No Ship Receipt yet. Accept a REVIEW_REQUIRED delivery with gates
-          clear — Accept writes Done and issues this receipt against the Open
-          Program ID.
-        </p>
+        <div className={styles.emptyCard}>
+          <p className={styles.lede}>
+            No Ship Receipt yet. Accept a REVIEW_REQUIRED delivery with gates
+            clear — Accept writes Done and issues this receipt against the Open
+            Program ID.
+          </p>
+        </div>
         <div className={styles.actions}>
           <Link href={taskHref} className={styles.primary}>
             Back to task

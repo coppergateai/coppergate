@@ -778,7 +778,8 @@ html[data-theme="light"] .legendFree {
   background: transparent;
   color: var(--paper);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 550;
   text-decoration: none;
   cursor: pointer;
   transition:
@@ -1214,9 +1215,16 @@ html[data-theme="light"] .legendFree {
 
 .evidenceHead {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.45rem 0.55rem;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .evidenceHead {
+    flex-wrap: wrap;
+  }
 }
 
 .evidencePill {
@@ -1250,8 +1258,8 @@ html[data-theme="light"] .legendFree {
 
 .evidencePillMute {
   border-color: var(--line);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--mute);
+  background: var(--overlay-strong, var(--overlay));
+  color: var(--mute-strong, var(--mute));
 }
 
 .evidenceTitle {
@@ -1266,6 +1274,11 @@ html[data-theme="light"] .legendFree {
   text-align: left;
   letter-spacing: -0.015em;
   cursor: pointer;
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .evidenceTitle:hover {
@@ -1281,9 +1294,17 @@ html[data-theme="light"] .legendFree {
 
 .evidenceActions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 0.45rem;
   flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .evidenceActions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
 }
 
 .gateList {

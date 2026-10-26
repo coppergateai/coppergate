@@ -8,7 +8,7 @@
   --mc-attention: #d4655a;
   --mc-idle: #6b7280;
   --mc-text: #e8eaed;
-  --mc-text-mute: rgba(232, 234, 237, 0.55);
+  --mc-text-mute: rgba(232, 234, 237, 0.68);
   --mc-line: rgba(197, 139, 100, 0.18);
   --mc-line-strong: rgba(197, 139, 100, 0.35);
   position: relative;
@@ -278,8 +278,8 @@
 .laneHeader {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(12rem, 1.2fr) minmax(0, 1fr) auto;
-  gap: 0.75rem 1rem;
+  grid-template-columns: minmax(11rem, 1.15fr) minmax(0, 1.1fr) minmax(7rem, auto);
+  gap: 0.65rem 0.85rem;
   align-items: center;
   padding: 0.95rem 1.05rem;
   border: 0;
@@ -291,7 +291,17 @@
 }
 
 .laneHeader:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+@media (max-width: 1100px) {
+  .laneHeader {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .hotAgents {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 860px) {
@@ -406,6 +416,9 @@
   color: var(--mc-copper);
   white-space: nowrap;
   justify-self: end;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
 }
 
 .laneBody {

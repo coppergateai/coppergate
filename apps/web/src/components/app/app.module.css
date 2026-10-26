@@ -34,9 +34,9 @@
   gap: 0.45rem;
   margin: 0 0.2rem 0.55rem;
   padding: 0.38rem 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay);
   color: var(--paper);
   font-size: 0.8rem;
   font-weight: 600;
@@ -48,7 +48,7 @@
 }
 
 .quickAction:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--overlay-strong);
   border-color: var(--copper-border);
 }
 
@@ -263,12 +263,12 @@
 }
 
 .navItem:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay);
   color: var(--mute-strong);
 }
 
 .navItemActive {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--overlay-strong);
   color: var(--paper);
   padding-left: 0.85rem;
 }
@@ -352,7 +352,7 @@
 }
 
 .footerItem:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay);
   color: var(--mute-strong);
 }
 
@@ -415,7 +415,7 @@
 
 .logoutLinkFooter:hover {
   color: var(--paper);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay);
 }
 
 .userAvatar,
@@ -479,7 +479,7 @@
 
 .logoutLink:hover {
   color: var(--paper);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-strong);
 }
 
 .main {

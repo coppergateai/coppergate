@@ -280,7 +280,7 @@ export function MissionControl({ data, recentEvents }: Props) {
             <strong>{metrics.arenaRunning}</strong> running
           </Link>
           <span className={styles.summaryMute}>
-            · {metrics.arenaAwaitingCi} awaiting CI
+            {metrics.arenaAwaitingCi} awaiting CI
             {metrics.activeRuns >
             metrics.arenaRunning + metrics.arenaAwaitingCi
               ? ` · ${metrics.activeRuns} slots`
@@ -293,7 +293,7 @@ export function MissionControl({ data, recentEvents }: Props) {
             {attentionTotal === 1 ? "needs" : "need"} attention
           </Link>
           <span className={styles.summaryMute}>
-            · {humanGates} inbox · {evidenceGates} evidence ·{" "}
+            {humanGates} inbox · {evidenceGates} evidence ·{" "}
             {metrics.arenaNeedsAttention} arena
           </span>
         </p>
@@ -304,7 +304,7 @@ export function MissionControl({ data, recentEvents }: Props) {
           >
             <strong>{metrics.verifiedPrsThisMonth}</strong> verified PRs
           </Link>
-          <span className={styles.summaryMute}> this month</span>
+          <span className={styles.summaryMute}>this month</span>
         </p>
         <p className={styles.summaryItem}>
           <Link
@@ -323,7 +323,7 @@ export function MissionControl({ data, recentEvents }: Props) {
           </Link>
           {hasBudget ? (
             <span className={styles.summaryMute}>
-              · reserved{" "}
+              reserved{" "}
               {formatUsd(
                 metrics.budgetReservedMicros,
                 metrics.budgetCurrency,
