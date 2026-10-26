@@ -2,127 +2,148 @@ package program
 
 import (
 	"errors"
-	"fmt"
 	"sync"
+	"time"
 )
 
-// Constants for spend limits
-const (
-	MonthlyEnvelope = 8
-)
+// SpendEnvelope defines the monthly spend limit for a program runtime.
+const SpendEnvelopeMonthly = 8.00 // $8 monthly envelope
 
-// IDBadge represents an authorization badge for an agent.
-type IDBadge struct {
-	AgentID string
-	Amount  int
+// Badge represents an ID badge for a program runtime.
+type Badge struct {
+	ID        string
+	IssuedAt  time.Time
+	ExpiresAt time.Time
+	Revoked   bool
 }
 
-// ShipReceipt represents a confirmation of accepted spend license.
-type ShipReceipt struct {
-	AgentID string
-	Amount  int
+// Receipt represents a ship receipt confirming acceptance.
+type Receipt struct {
+	ProgramID string
+	Timestamp time.Time
+	Details   string
 }
 
-// Runtime manages the contracted autonomy spend license state.
+// Runtime manages the contracted autonomy spend license and identity badges.
 type Runtime struct {
 	mu             sync.Mutex
-	reserved       int
-	badges         map[string]*IDBadge
-	shipReceipts   map[string]*ShipReceipt
-	totalFanOut    int
+	programID      string
+	spendUsed      float64
+	badges         map[string]*Badge
+	lastReset      time.Time
+	receiptHistory []Receipt
 }
 
-// NewRuntime creates a new Runtime instance.
-func NewRuntime() *Runtime {
+// NewRuntime creates a new Runtime instance for a given program ID.
+func NewRuntime(programID string) *Runtime {
 	return &Runtime{
-		badges:       make(map[string]*IDBadge),
-		shipReceipts: make(map[string]*ShipReceipt),
+		programID: programID,
+		badges:    make(map[string]*Badge),
+		lastReset: time.Now(),
 	}
 }
 
-// ReserveSpend reserves a portion of the monthly envelope for contracted autonomy.
-// Returns error if reservation exceeds monthly envelope.
-func (r *Runtime) ReserveSpend(amount int) error {
+// resetSpendIfNeeded resets the spendUsed if a new month has started.
+func (r *Runtime) resetSpendIfNeeded() {
+	now := time.Now()
+	if now.Sub(r.lastReset) >= 30*24*time.Hour {
+		r.spendUsed = 0
+		r.lastReset = now
+	}
+}
+
+// ReserveSpend attempts to reserve spend amount on the runtime's envelope.
+// Returns error if the spend envelope would be exceeded.
+func (r *Runtime) ReserveSpend(amount float64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.resetSpendIfNeeded()
+
 	if amount <= 0 {
-		return errors.New("reserve amount must be positive")
+		return errors.New("amount must be positive")
 	}
 
-	if r.reserved+amount > MonthlyEnvelope {
-		return fmt.Errorf("reservation exceeds monthly envelope: reserved %d + amount %d > %d", r.reserved, amount, MonthlyEnvelope)
+	if r.spendUsed+amount > SpendEnvelopeMonthly {
+		return errors.New("spend envelope exceeded")
 	}
 
-	r.reserved += amount
+	r.spendUsed += amount
 	return nil
 }
 
-// FanOutSpend fans out reserved spend to an agent, issuing an ID badge.
-// Returns error if fan-out exceeds reserved amount.
-func (r *Runtime) FanOutSpend(agentID string, amount int) (*IDBadge, error) {
+// IssueBadge issues a new ID badge valid for the specified duration.
+func (r *Runtime) IssueBadge(id string, validFor time.Duration) (*Badge, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if amount <= 0 {
-		return nil, errors.New("fan-out amount must be positive")
+	if id == "" {
+		return nil, errors.New("badge ID cannot be empty")
 	}
 
-	if r.totalFanOut+amount > r.reserved {
-		return nil, fmt.Errorf("fan-out exceeds reserved amount: total fan-out %d + amount %d > reserved %d", r.totalFanOut, amount, r.reserved)
+	if _, exists := r.badges[id]; exists {
+		return nil, errors.New("badge ID already exists")
 	}
 
-	badge := &IDBadge{
-		AgentID: agentID,
-		Amount:  amount,
+	now := time.Now()
+	badge := &Badge{
+		ID:        id,
+		IssuedAt:  now,
+		ExpiresAt: now.Add(validFor),
+		Revoked:   false,
 	}
-	r.badges[agentID] = badge
-	r.totalFanOut += amount
+	r.badges[id] = badge
 	return badge, nil
 }
 
-// AcceptSpend accepts a spend license by an agent, generating a Ship Receipt.
-// Returns error if agent has no badge or already accepted.
-func (r *Runtime) AcceptSpend(agentID string) (*ShipReceipt, error) {
+// ValidateBadge checks if a badge is valid (exists, not revoked, not expired).
+func (r *Runtime) ValidateBadge(id string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	badge, ok := r.badges[agentID]
-	if !ok {
-		return nil, fmt.Errorf("no badge found for agent %s", agentID)
+	badge, exists := r.badges[id]
+	if !exists || badge.Revoked {
+		return false
 	}
-
-	if _, accepted := r.shipReceipts[agentID]; accepted {
-		return nil, fmt.Errorf("agent %s already accepted spend license", agentID)
-	}
-
-	receipt := &ShipReceipt{
-		AgentID: agentID,
-		Amount:  badge.Amount,
-	}
-	r.shipReceipts[agentID] = receipt
-	return receipt, nil
+	return time.Now().Before(badge.ExpiresAt)
 }
 
-// GetShipReceipt returns the Ship Receipt for an agent if exists.
-func (r *Runtime) GetShipReceipt(agentID string) (*ShipReceipt, bool) {
+// RevokeBadge revokes a badge by ID.
+func (r *Runtime) RevokeBadge(id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	receipt, ok := r.shipReceipts[agentID]
-	return receipt, ok
+	badge, exists := r.badges[id]
+	if !exists {
+		return errors.New("badge not found")
+	}
+	if badge.Revoked {
+		return errors.New("badge already revoked")
+	}
+	badge.Revoked = true
+	return nil
 }
 
-// GetReserved returns the total reserved amount.
-func (r *Runtime) GetReserved() int {
+// AcceptAction records acceptance and generates a ship receipt.
+func (r *Runtime) AcceptAction(details string) Receipt {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.reserved
+
+	receipt := Receipt{
+		ProgramID: r.programID,
+		Timestamp: time.Now(),
+		Details:   details,
+	}
+	r.receiptHistory = append(r.receiptHistory, receipt)
+	return receipt
 }
 
-// GetTotalFanOut returns the total fan-out amount.
-func (r *Runtime) GetTotalFanOut() int {
+// GetReceipts returns all ship receipts.
+func (r *Runtime) GetReceipts() []Receipt {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.totalFanOut
+
+	copies := make([]Receipt, len(r.receiptHistory))
+	copy(copies, r.receiptHistory)
+	return copies
 }
