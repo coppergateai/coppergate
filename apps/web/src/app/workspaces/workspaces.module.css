@@ -443,9 +443,9 @@
 }
 
 .createPanel {
-  padding: 1.25rem 1.3rem 1.35rem;
+  padding: 1.2rem 1.25rem 1.3rem;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius, 16px);
   background:
     radial-gradient(
       80% 70% at 0% 0%,
@@ -470,10 +470,10 @@
   text-transform: uppercase;
 }
 
-/* Create form (panel + modal) */
+/* Create form (panel + modal) — shared with projects create panel language */
 .panel {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.75rem;
 }
 
 .panelWide {
@@ -489,13 +489,13 @@
 }
 
 .input {
-  padding: 0.6rem 0.75rem;
-  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--paper);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   transition:
     border-color 0.12s ease,
     box-shadow 0.12s ease;
@@ -512,15 +512,15 @@
 }
 
 .submit {
-  min-height: 2.45rem;
-  padding: 0.5rem 1rem;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.95rem;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--copper);
   color: var(--on-copper);
   font: inherit;
   font-weight: 650;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   cursor: pointer;
   box-shadow: 0 8px 18px var(--copper-ring);
   transition: filter 0.12s ease;
@@ -547,6 +547,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
+  width: 100%;
 }
 
 .inlineInput {
@@ -554,26 +555,38 @@
   min-width: 0;
   min-height: 2.2rem;
   padding: 0.35rem 0.6rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: var(--ink);
+  background: var(--surface);
   color: var(--paper);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
+}
+
+.inlineInput:focus {
+  outline: none;
+  border-color: var(--copper-border-strong);
+  box-shadow: 0 0 0 3px var(--copper-ring);
 }
 
 .inlineSubmit {
   flex-shrink: 0;
   min-height: 2.2rem;
-  padding: 0.35rem 0.75rem;
+  padding: 0.35rem 0.85rem;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--copper);
   color: var(--on-copper);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 650;
   cursor: pointer;
+  box-shadow: 0 8px 18px var(--copper-ring);
+  transition: filter 0.12s ease;
+}
+
+.inlineSubmit:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .inlineSubmit:disabled {
@@ -681,10 +694,16 @@
 
 .modal {
   width: min(100%, 24rem);
-  padding: 1.25rem 1.3rem 1.35rem;
+  padding: 1.2rem 1.25rem 1.3rem;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface-elevated);
+  border-radius: var(--radius, 16px);
+  background:
+    radial-gradient(
+      80% 70% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    var(--surface-elevated);
   box-shadow: var(--shadow-elevated);
 }
 

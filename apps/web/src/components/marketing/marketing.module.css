@@ -628,7 +628,7 @@
   }
 
   .hero {
-    padding-top: 1.35rem;
+    padding-top: clamp(1.75rem, 5vw, 2.25rem);
   }
 }
 
@@ -648,10 +648,10 @@
   }
 }
 
-/* —— Hero —— */
+/* —— Hero (rhythm aligned with contentPage docs/legal) —— */
 .hero {
   position: relative;
-  padding: clamp(1.75rem, 4vw, 3rem) 0 clamp(2.5rem, 6vw, 4rem);
+  padding: clamp(2.25rem, 5.5vw, 3.5rem) 0 clamp(2.75rem, 6.5vw, 4.25rem);
 }
 
 .heroInner {
@@ -752,7 +752,7 @@
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  margin: 0 0 0.85rem;
+  margin: 0 0 0.7rem;
 }
 
 .eyebrowRow .eyebrow {
@@ -817,7 +817,7 @@
 }
 
 .eyebrow {
-  margin: 0 0 0.85rem;
+  margin: 0 0 0.7rem;
   color: var(--copper);
   font-size: 0.72rem;
   font-weight: 600;
@@ -840,7 +840,7 @@
 }
 
 .lede {
-  margin: 1.25rem 0 0;
+  margin: 0.9rem 0 0;
   max-width: 32rem;
   color: var(--mute);
   font-size: clamp(1.02rem, 1.4vw, 1.125rem);
@@ -2631,7 +2631,7 @@
 }
 
 .pageEyebrow {
-  margin: 0 0 0.7rem;
+  margin: 0 0 0.55rem;
   color: var(--copper);
   font-size: 0.72rem;
   font-weight: 600;
@@ -2645,23 +2645,40 @@
   font-size: clamp(1.9rem, 3.6vw, 2.55rem);
   font-weight: 650;
   letter-spacing: -0.032em;
-  line-height: 1.1;
+  line-height: 1.12;
   color: var(--paper);
 }
 
 .pageLede {
-  margin: 0.85rem 0 0;
+  margin: 0.9rem 0 0;
   max-width: 40rem;
   color: var(--mute);
   font-size: 1.05rem;
   line-height: 1.65;
 }
 
+/* Title stack without a lede still breathes before body */
+.pageTitle + .prose,
+.pageTitle + .docsList,
+.pageTitle + .pricingGrid,
+.pageTitle + .changelogList,
+.pageTitle + .blogEmpty {
+  margin-top: 1.85rem;
+}
+
+.pageLede + .prose,
+.pageLede + .docsList,
+.pageLede + .pricingGrid,
+.pageLede + .changelogList,
+.pageLede + .blogEmpty {
+  margin-top: 2rem;
+}
+
 .backLink {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  margin: 0 0 1.35rem;
+  margin: 0 0 1.25rem;
   color: var(--mute);
   font-size: 0.875rem;
   font-weight: 500;
@@ -2672,11 +2689,15 @@
   color: var(--copper-hot);
 }
 
+.backLink + .pageEyebrow {
+  margin-top: 0.1rem;
+}
+
 .prose {
   display: flex;
   flex-direction: column;
   gap: 1.65rem;
-  margin-top: 2.25rem;
+  margin-top: 2rem;
 }
 
 .prose h2 {
@@ -2726,7 +2747,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
-  margin-top: 2rem;
+  margin-top: 2.15rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--line-soft);
 }
@@ -2739,13 +2760,13 @@
 
 .docsList {
   list-style: none;
-  margin: 2.25rem 0 0;
+  margin: 2rem 0 0;
   padding: 0;
   border-top: 1px solid var(--line);
 }
 
 .docsItem {
-  padding: 1.2rem 0;
+  padding: 1.25rem 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -2755,6 +2776,7 @@
   font-size: 1.05rem;
   text-decoration: none;
   letter-spacing: -0.015em;
+  transition: color 0.15s ease;
 }
 
 .docsItem a:hover {
@@ -2762,7 +2784,7 @@
 }
 
 .docsItem p {
-  margin: 0.4rem 0 0;
+  margin: 0.45rem 0 0;
   color: var(--mute-soft);
   font-size: 0.875rem;
   line-height: 1.55;
@@ -2770,11 +2792,17 @@
 }
 
 .blogEmpty {
-  margin: 2.25rem 0 0;
-  padding: 1.35rem 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  margin: 2rem 0 0;
+  padding: 1.55rem 1.35rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(
+      80% 70% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    var(--surface);
   color: var(--mute);
   font-size: 0.95rem;
   line-height: 1.55;
@@ -2797,7 +2825,7 @@
 }
 
 .relatedPosts h2 {
-  margin: 0 0 0.85rem;
+  margin: 0 0 0.95rem;
   font-size: 0.72rem;
   font-weight: 650;
   letter-spacing: 0.1em;
@@ -2811,7 +2839,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.65rem;
 }
 
 .relatedPosts a {
@@ -2819,25 +2847,26 @@
   font-weight: 550;
   text-decoration: none;
   letter-spacing: -0.01em;
+  transition: color 0.15s ease;
 }
 
 .relatedPosts a:hover {
   color: var(--copper-hot);
 }
 
-/* —— Pricing —— */
+/* —— Pricing (Community $0 only — do not reintroduce paid plan cards) —— */
 .pricingGrid {
   display: grid;
   gap: 1rem;
-  margin-top: 2.25rem;
+  margin-top: 2rem;
   max-width: 36rem;
 }
 
 .pricingCard {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  padding: 1.5rem 0 0;
+  gap: 0.9rem;
+  padding: 1.6rem 0 0;
   border: 0;
   border-top: 1px solid var(--line);
   border-radius: 0;
@@ -2938,7 +2967,9 @@
 }
 
 .pricingFootnote {
-  margin-top: 1.75rem;
+  margin-top: 1.85rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--line-soft);
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
@@ -2964,7 +2995,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin-top: 2.25rem;
+  margin-top: 2rem;
   border-top: 1px solid var(--line);
 }
 
@@ -3126,30 +3157,34 @@
   display: flex;
   justify-content: center;
   text-align: center;
-  padding: clamp(4rem, 12vw, 7rem) var(--gutter);
+  padding: clamp(3.5rem, 11vw, 6.5rem) var(--gutter);
+  animation: cg-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .notFoundCode {
   margin: 0;
   color: var(--copper);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 650;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .notFoundTitle {
-  margin: 0.75rem 0 0;
-  font-size: clamp(1.85rem, 4vw, 2.5rem);
+  margin: 0.7rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 4vw, 2.45rem);
   font-weight: 650;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.032em;
+  line-height: 1.12;
 }
 
 .notFoundLede {
-  margin: 0.85rem auto 0;
+  margin: 0.9rem auto 0;
   max-width: 28rem;
   color: var(--mute);
   font-size: 1.025rem;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .notFoundActions {
@@ -3157,12 +3192,18 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.75rem;
-  margin-top: 1.75rem;
+  margin-top: 1.85rem;
 }
 
 .notFoundActions .authCta {
   width: auto;
   padding: 0 1.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notFound {
+    animation: none;
+  }
 }
 
 /* —— Signal → Arena / Popular integrations (marquee) —— */

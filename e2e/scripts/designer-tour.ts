@@ -20,7 +20,7 @@ const artifactsRoot = path.resolve(
 );
 const outDir = process.env.OUT_SUBDIR
   ? path.join(artifactsRoot, process.env.OUT_SUBDIR)
-  : artifactsRoot;
+  : path.join(artifactsRoot, "pass-2/full");
 
 async function main() {
   loadE2eEnv();

@@ -152,7 +152,7 @@
 }
 
 .tabPane {
-  padding: 0 1.15rem 2.25rem;
+  padding: 0 var(--app-pad-x) 2.25rem;
   max-width: 56rem;
 }
 
@@ -178,12 +178,12 @@
 .overviewPrimary {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 0.15rem;
 }
 
 .overviewFold {
-  margin-top: 1.25rem;
-  padding-top: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.15rem;
   border-top: 1px solid var(--line-soft);
 }
 
@@ -202,16 +202,16 @@
 }
 
 .overviewFold[open] .overviewFoldSummary {
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.45rem;
   color: var(--mute);
 }
 
 .overviewFold .section {
-  margin-top: 1rem;
+  margin-top: 1.15rem;
 }
 
 .section {
-  margin-top: 1.75rem;
+  margin-top: 2rem;
   animation: cg-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -414,12 +414,20 @@
 .panel {
   display: grid;
   gap: 0.9rem;
-  padding: 1.25rem 1.2rem 1.3rem;
-  border: 1px solid var(--line);
+  padding: 1.15rem 1.1rem 1.2rem;
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 48%),
-    rgba(255, 255, 255, 0.015);
+  background: var(--surface);
+}
+
+/* Nested panels: drop double frames so overview/config stay quieter */
+.panel .panel,
+.overviewFold .panel,
+.editEnvelope .panel,
+.configFold .panel {
+  border-color: transparent;
+  background: var(--panel-inset, var(--overlay-muted));
+  padding: 0.95rem 1rem 1rem;
 }
 
 .stack {
@@ -886,23 +894,33 @@ html[data-theme="light"] .legendFree {
 }
 
 .configFold {
-  margin-top: 1rem;
-  border: 1px solid var(--line);
+  margin-top: 1.15rem;
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--surface);
   overflow: hidden;
+}
+
+.configFold + .configFold {
+  margin-top: 0.65rem;
 }
 
 .configFoldSummary {
   list-style: none;
   cursor: pointer;
-  padding: 0.7rem 0.95rem;
-  color: var(--mute-strong);
-  font-size: 0.78rem;
+  padding: 0.75rem 1rem;
+  color: var(--mute);
+  font-size: 0.72rem;
   font-weight: 650;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   user-select: none;
+  background: var(--overlay-muted);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.configFoldSummary:hover {
+  color: var(--paper);
 }
 
 .configFoldSummary::-webkit-details-marker {
@@ -914,6 +932,14 @@ html[data-theme="light"] .legendFree {
   float: right;
   color: var(--mute-soft);
   font-weight: 500;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.configFold[open] > .configFoldSummary {
+  color: var(--paper);
+  background: transparent;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .configFold[open] > .configFoldSummary::after {
@@ -923,10 +949,10 @@ html[data-theme="light"] .legendFree {
 .configGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem 1.15rem;
+  gap: 0.75rem 1.15rem;
   margin: 0;
-  padding: 0.85rem 0.95rem 0.95rem;
-  border-top: 1px solid var(--line);
+  padding: 0.95rem 1rem 1.05rem;
+  border-top: 0;
 }
 
 .configGrid > div {
@@ -1017,15 +1043,16 @@ html[data-theme="light"] .legendFree {
 .boardGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-  gap: 0.65rem;
+  gap: 0.55rem;
 }
 
 .boardCol {
   min-width: 0;
+  min-height: 6.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  padding: 0.65rem 0.7rem 0.75rem;
+  padding: 0.6rem 0.65rem 0.7rem;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
   border-top: 2px solid var(--copper-border);
@@ -1034,9 +1061,30 @@ html[data-theme="light"] .legendFree {
     var(--board-bg);
 }
 
+/* Empty columns: quieter shell so filled lanes read first */
+.boardCol:not(:has(.boardCard)) {
+  min-height: 7.25rem;
+  border-style: dashed;
+  border-top-style: solid;
+  border-top-color: var(--line);
+  background: transparent;
+}
+
+.boardCol:not(:has(.boardCard)) .boardHead {
+  margin-bottom: 0.25rem;
+  opacity: 0.85;
+}
+
+.boardCol:not(:has(.boardCard)) .taskList {
+  flex: 1;
+  min-height: 3.25rem;
+  border-radius: var(--radius-sm);
+  background: var(--overlay-muted);
+}
+
 .boardHead {
-  margin-bottom: 0.45rem;
-  font-size: 0.72rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1046,10 +1094,11 @@ html[data-theme="light"] .legendFree {
 .boardCount {
   color: var(--mute-soft);
   font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 
 .boardCard {
-  padding: 0.55rem 0.15rem;
+  padding: 0.5rem 0.1rem;
   border-bottom: 1px solid var(--line-soft);
 }
 
@@ -1199,37 +1248,36 @@ html[data-theme="light"] .legendFree {
 .evidenceSummary {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0.15rem 0 0.85rem;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background:
-    linear-gradient(180deg, var(--overlay-muted) 0%, transparent 70%),
-    var(--surface);
-  color: var(--mute);
-  font-size: 0.8rem;
+  align-items: baseline;
+  gap: 0.55rem 1rem;
+  margin: 0.1rem 0 0.7rem;
+  padding: 0.15rem 0 0.55rem;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
+  color: var(--mute-soft);
+  font-size: 0.75rem;
 }
 
 .evidenceSummary > span {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.3rem;
-  padding: 0.22rem 0.55rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-elevated);
-  color: var(--mute-strong);
+  gap: 0.28rem;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--mute);
 }
 
 .evidenceSummary strong {
-  color: var(--paper);
-  font-weight: 650;
+  color: var(--mute-strong);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  letter-spacing: -0.02em;
+  font-family: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0;
 }
 
 .evidenceList {

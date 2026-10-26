@@ -17,9 +17,13 @@ export default function WorkspacesError({
 
   return (
     <div className={styles.pad}>
+      <p className={styles.statusTitle}>Something went wrong</p>
+      <p className={styles.statusLede}>
+        This view failed to load. Try again, or open the recovery guide if it
+        keeps happening.
+      </p>
       <Banner tone="danger" role="alert">
-        <strong>Something went wrong.</strong>{" "}
-        {error.message || "This view failed to load. Try again or open Recovery docs."}
+        {error.message || "Unexpected error"}
       </Banner>
       <div className={styles.actions}>
         <Button variant="primary" onClick={reset}>

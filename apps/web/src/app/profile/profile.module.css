@@ -26,6 +26,10 @@
       transparent 55%
     ),
     var(--page-bar-bg);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .kicker {
@@ -38,9 +42,10 @@
 }
 
 .meta {
-  margin: 0.25rem 0 0;
+  margin: 0.3rem 0 0;
   color: var(--mute-soft);
   font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 .headAside {
@@ -51,7 +56,7 @@
 
 .body {
   display: grid;
-  gap: 1.5rem;
+  gap: 1.75rem;
   padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 3rem;
   background:
     radial-gradient(
@@ -60,6 +65,7 @@
       transparent 50%
     ),
     transparent;
+  animation: cg-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (min-width: 960px) {
@@ -78,8 +84,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem 1.25rem;
-  padding: 1.15rem 1.2rem;
+  gap: 1.1rem 1.35rem;
+  padding: 1.25rem 1.3rem;
   border: 1px solid var(--line);
   border-radius: 12px;
   background:
@@ -122,13 +128,14 @@
   margin: 0;
   color: var(--paper);
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: 1.4rem;
   font-weight: 650;
   letter-spacing: -0.03em;
+  line-height: 1.2;
 }
 
 .heroLogin {
-  margin: 0.2rem 0 0;
+  margin: 0.25rem 0 0;
   color: var(--mute);
   font-size: 0.9rem;
 }
@@ -137,13 +144,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 0.65rem;
+  margin-top: 0.75rem;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.55rem;
+  padding: 0.22rem 0.55rem;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--mute-strong);
@@ -155,10 +162,12 @@
 
 .section {
   min-width: 0;
+  display: grid;
+  gap: 0;
 }
 
 .sectionLabel {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.4rem;
   color: var(--mute-soft);
   font-size: 0.68rem;
   font-weight: 650;
@@ -167,16 +176,16 @@
 }
 
 .sectionLede {
-  margin: 0 0 1rem;
+  margin: 0 0 1.15rem;
   color: var(--mute);
   font-size: 0.92rem;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .panel {
   display: grid;
-  gap: 0.9rem;
-  padding: 1.15rem 1.2rem 1.25rem;
+  gap: 1rem;
+  padding: 1.25rem 1.3rem 1.35rem;
   border: 1px solid var(--line);
   border-radius: 12px;
   background:
@@ -188,15 +197,21 @@
     var(--surface);
 }
 
+.panel > .sectionLabel {
+  margin: 0;
+  padding-bottom: 0.1rem;
+}
+
 .field {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.45rem;
   font-size: 0.875rem;
   color: var(--mute);
+  align-content: start;
 }
 
 .input {
-  padding: 0.65rem 0.75rem;
+  padding: 0.7rem 0.8rem;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--surface);
@@ -204,8 +219,8 @@
   font: inherit;
   font-size: 0.95rem;
   transition:
-    border-color 0.12s ease,
-    box-shadow 0.12s ease;
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .input:focus {
@@ -228,13 +243,13 @@
 
 .dl {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.95rem;
   margin: 0;
 }
 
 .dlRow {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.25rem;
 }
 
 .dlRow dt {
@@ -265,11 +280,14 @@
   font-size: 0.88rem;
   cursor: pointer;
   box-shadow: 0 8px 18px var(--copper-ring);
-  transition: filter 0.12s ease;
+  transition:
+    filter 0.15s ease,
+    transform 0.15s ease;
 }
 
 .submit:hover:not(:disabled) {
   filter: brightness(1.05);
+  transform: translateY(-1px);
 }
 
 .submit:disabled {
@@ -291,13 +309,15 @@
   display: inline-flex;
   align-items: center;
   transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .ghostBtn:hover {
   border-color: var(--copper-border);
   background: var(--copper-fill-soft);
+  color: var(--mute-strong);
 }
 
 .dangerBtn {
@@ -311,6 +331,7 @@
   font-weight: 600;
   font-size: 0.88rem;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .dangerBtn:hover {
@@ -334,7 +355,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.55rem;
+  gap: 0.65rem;
 }
 
 .wsItem {
@@ -343,10 +364,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.55rem 1rem;
-  padding: 0.85rem 0.95rem;
+  padding: 0.9rem 1rem;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+
+.wsItem:hover {
+  border-color: var(--copper-border);
 }
 
 .wsName {
@@ -354,6 +380,7 @@
   font-weight: 650;
   letter-spacing: -0.02em;
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 
 .wsName:hover {
@@ -374,16 +401,33 @@
 
 .empty {
   margin: 0;
-  padding: 1.5rem 1.15rem;
+  padding: 1.65rem 1.25rem;
   border: 1px dashed var(--line);
   border-radius: var(--radius);
-  text-align: center;
+  text-align: left;
   color: var(--mute-soft);
   font-size: 0.9rem;
-  background: var(--surface);
+  line-height: 1.5;
+  background:
+    radial-gradient(
+      80% 70% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    var(--surface);
 }
 
 .stack {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .body {
+    animation: none;
+  }
+
+  .submit:hover:not(:disabled) {
+    transform: none;
+  }
 }

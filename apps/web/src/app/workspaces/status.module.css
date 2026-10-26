@@ -2,7 +2,8 @@
   box-sizing: border-box;
   width: 100%;
   max-width: 36rem;
-  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 2.5rem;
+  padding: clamp(2rem, 5vw, 3rem) var(--app-pad-x-lg) 2.75rem;
+  animation: cg-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .padWide {
@@ -11,17 +12,56 @@
 
 .stack {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.35rem;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: 0.55rem;
+  margin-top: 1.15rem;
 }
 
 .emptyWrap {
+  box-sizing: border-box;
+  width: 100%;
   max-width: 32rem;
-  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 2.5rem;
+  padding: clamp(2.25rem, 6vw, 3.5rem) var(--app-pad-x-lg) 3rem;
+  animation: cg-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.emptyCard {
+  padding: 1.65rem 1.4rem;
+  border-style: dashed;
+  border-radius: var(--radius);
+  background:
+    radial-gradient(
+      80% 70% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    var(--surface);
+}
+
+.statusTitle {
+  margin: 0 0 0.45rem;
+  color: var(--paper);
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.statusLede {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  max-width: 32rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pad,
+  .emptyWrap {
+    animation: none;
+  }
 }

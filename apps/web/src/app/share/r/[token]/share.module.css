@@ -1,13 +1,25 @@
 .page {
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
   width: min(48rem, 100%);
   margin: 0 auto;
-  padding: clamp(2.5rem, 6vw, 4rem) var(--gutter) clamp(3.5rem, 8vw, 5.5rem);
+  min-height: 100dvh;
+  padding: clamp(2.75rem, 6.5vw, 4rem) max(var(--gutter), env(safe-area-inset-left))
+    clamp(3.75rem, 8vw, 5.5rem);
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+  background:
+    radial-gradient(
+      55% 40% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    transparent;
+  animation: cg-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .eyebrow {
-  margin: 0 0 0.45rem;
+  margin: 0 0 0.55rem;
   color: var(--copper);
   font-size: 0.72rem;
   font-weight: 700;
@@ -18,19 +30,19 @@
 .title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.55rem, 3vw, 2rem);
+  font-size: clamp(1.65rem, 3.2vw, 2.15rem);
   font-weight: 650;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  letter-spacing: -0.032em;
+  line-height: 1.15;
   color: var(--paper);
 }
 
 .lede {
-  margin: 0.75rem 0 0;
+  margin: 0.85rem 0 0;
   max-width: 36rem;
   color: var(--mute);
-  font-size: 0.95rem;
-  line-height: 1.55;
+  font-size: 1.02rem;
+  line-height: 1.6;
 }
 
 .lede a {
@@ -44,22 +56,42 @@
 }
 
 .report {
-  margin: 1.5rem 0 0;
-  padding: var(--app-pad-y) var(--app-pad-x);
+  position: relative;
+  margin: 2rem 0 0;
+  padding: 1.2rem 1.25rem 1.3rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow-elevated);
   overflow: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.8rem;
-  line-height: 1.5;
   color: var(--mute-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  tab-size: 2;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+.report::before {
+  content: "JSON · redacted";
+  display: block;
+  margin: -1.2rem -1.25rem 1rem;
+  padding: 0.7rem 1.25rem;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--panel-inset);
+  color: var(--mute-soft);
+  font-family: var(--font);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .footer {
-  margin: 1.5rem 0 0;
+  margin: 1.75rem 0 0;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--line-soft);
   max-width: 36rem;
   color: var(--mute);
   font-size: 0.9rem;
@@ -74,4 +106,10 @@
 
 .footer a:hover {
   color: var(--copper-hot);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    animation: none;
+  }
 }

@@ -6,6 +6,7 @@ export default function WorkspacesNotFound() {
   return (
     <div className={styles.emptyWrap}>
       <EmptyState
+        className={styles.emptyCard}
         title="Workspace or page not found"
         body="This path isn’t in your account — or the gate isn’t open for it yet."
         action={

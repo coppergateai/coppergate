@@ -58,15 +58,33 @@
   z-index: 12;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 1.25rem;
   margin-left: calc(-1 * var(--app-pad-x-lg));
   margin-right: calc(-1 * var(--app-pad-x-lg));
   padding: 0.85rem var(--app-pad-x-lg);
+  padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--line);
   background: var(--page-bar-bg);
   backdrop-filter: blur(10px);
   box-shadow: 0 -8px 24px var(--panel-inset);
+}
+
+@media (max-width: 959px) {
+  .actions {
+    margin-left: calc(-1 * var(--app-pad-x));
+    margin-right: calc(-1 * var(--app-pad-x));
+    padding-left: var(--app-pad-x);
+    padding-right: var(--app-pad-x);
+    gap: 0.4rem;
+  }
+
+  .actions .btn,
+  .actions .btnGhost {
+    flex: 1 1 auto;
+    min-width: calc(50% - 0.4rem);
+  }
 }
 
 .btn {

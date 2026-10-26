@@ -457,6 +457,22 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem 0.65rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius, 16px);
+  background:
+    radial-gradient(
+      80% 70% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    var(--surface-elevated);
+  box-shadow: var(--shadow-elevated);
+  max-width: 100%;
+}
+
+.createSlot:empty {
+  display: none;
 }
 
 .chip {
@@ -948,34 +964,35 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  width: 100%;
 }
 
 .inlineInput,
 .inlineSelect,
 .inlineSelectWide {
-  min-height: 1.9rem;
-  padding: 0.28rem 0.5rem;
-  border-radius: 5px;
+  min-height: 2.2rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--paper);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
 }
 
 .inlineInput {
-  flex: 1 1 7rem;
+  flex: 1 1 8rem;
   min-width: 0;
 }
 
 .inlineSelect {
-  flex: 0 1 8.5rem;
+  flex: 0 1 9rem;
   min-width: 0;
 }
 
 .inlineSelectWide {
-  flex: 1 1 10rem;
+  flex: 1 1 11rem;
   min-width: 0;
 }
 
@@ -984,21 +1001,27 @@
 .inlineSelectWide:focus {
   outline: none;
   border-color: var(--copper-border-strong);
-  box-shadow: 0 0 0 2px var(--copper-ring);
+  box-shadow: 0 0 0 3px var(--copper-ring);
 }
 
 .inlineSubmit {
   flex-shrink: 0;
-  min-height: 1.9rem;
-  padding: 0.28rem 0.7rem;
+  min-height: 2.2rem;
+  padding: 0.35rem 0.85rem;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: var(--copper);
   color: var(--on-copper);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   font-weight: 650;
   cursor: pointer;
+  box-shadow: 0 8px 18px var(--copper-ring);
+  transition: filter 0.12s ease;
+}
+
+.inlineSubmit:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .inlineSubmit:disabled {
@@ -1016,9 +1039,9 @@
 .panel {
   display: grid;
   gap: 0.75rem;
-  padding: 1.1rem 1.15rem 1.2rem;
+  padding: 1.2rem 1.25rem 1.3rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius, 16px);
   background:
     radial-gradient(
       80% 70% at 0% 0%,
@@ -1148,5 +1171,21 @@
   .heroActions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .createSlot {
+    padding: 0.75rem 0.85rem;
+    justify-content: stretch;
+  }
+
+  .inlineForm {
+    gap: 0.35rem;
+  }
+
+  .inlineInput,
+  .inlineSelect,
+  .inlineSelectWide,
+  .inlineSubmit {
+    flex: 1 1 100%;
   }
 }
