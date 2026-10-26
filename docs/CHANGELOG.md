@@ -3,9 +3,5 @@
 ## [Unreleased]
 
 ### Added
-- AG-012: Implement lean roster management supporting only Engineer and Reviewer roles.
-  - Enforces $8 monthly micros envelope.
-  - Each user costs 2 micros.
-  - Prevents FULL_ARENA spawn under tight budget.
-  - Provides thread-safe AddUser, RemoveUser, and Users listing.
-  - Includes tests covering budget enforcement and role filtering.
+- AG-012: Added LeanRoster to arena package for lean memory and CPU usage under $2 micros budget.
+  Supports only Engineer and Reviewer roles, no full arena spawn.
