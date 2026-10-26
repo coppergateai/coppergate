@@ -9,95 +9,85 @@ import (
 type RosterType int
 
 const (
-	// FullArena spawns the full arena roster.
+	// FullArena spawns a full arena roster.
 	FullArena RosterType = iota
 	// LeanRoster spawns a lean roster with minimal micros.
 	LeanRoster
 )
 
-// Config holds configuration for roster spawning.
-type Config struct {
-	MonthlyBudgetCents int // Monthly budget in cents
-	AvailableMicros    int // Number of available micros
-	EngineerCount      int // Number of engineers available
-	ReviewerCount      int // Number of reviewers available
+// ErrBudgetExceeded is returned when the budget is too tight for FullArena.
+var ErrBudgetExceeded = errors.New("budget too tight for full arena spawn")
+
+// RosterConfig holds configuration for spawning rosters.
+type RosterConfig struct {
+	BudgetCents int     // Monthly budget in cents
+	MicroCost   float64 // Cost per micro in dollars
+	EngineerOnly bool   // Only engineer+reviewer allowed micros
 }
 
 // Roster represents a spawned roster.
 type Roster struct {
-	Type          RosterType
-	Engineers     int
-	Reviewers     int
-	SpawnedMicros int
+	Type       RosterType
+	Micros     int
+	EngineerOnly bool
 }
 
-// SpawnRoster decides and spawns the appropriate roster based on config and budget.
-// Returns an error if constraints cannot be met.
-func SpawnRoster(cfg Config) (*Roster, error) {
+// SpawnRoster spawns a roster based on the config and budget.
+// Under tight budget (< $8), no FullArena spawn allowed.
+// If micros cost under $2 and EngineerOnly is true, spawn LeanRoster.
+// Otherwise, spawn FullArena if budget allows.
+func SpawnRoster(cfg RosterConfig) (*Roster, error) {
 	const (
-		microCostCents      = 200  // $2 per micro
-		fullArenaCostCents  = 800  // $8 monthly envelope for full arena
-		minEngineerCount    = 1
-		minReviewerCount    = 1
+		fullArenaCostCents = 800 // $8.00
+		leanRosterMaxMicroCost = 2.00
 	)
 
-	if cfg.MonthlyBudgetCents < fullArenaCostCents {
-		// Tight budget: no full arena spawn allowed
-		// Check if lean roster can be spawned
-		if cfg.AvailableMicros <= 0 {
-			return nil, errors.New("no micros available for lean roster")
+	if cfg.BudgetCents < fullArenaCostCents {
+		// Budget too tight for full arena spawn
+		if cfg.MicroCost <= leanRosterMaxMicroCost && cfg.EngineerOnly {
+			// Spawn lean roster
+			return &Roster{
+				Type:        LeanRoster,
+				Micros:      1, // minimal micros
+				EngineerOnly: true,
+			}, nil
 		}
-		if cfg.AvailableMicros*microCostCents > cfg.MonthlyBudgetCents {
-			return nil, errors.New("budget too low for available micros")
-		}
-		if cfg.EngineerCount < minEngineerCount || cfg.ReviewerCount < minReviewerCount {
-			return nil, errors.New("insufficient engineer or reviewer count for lean roster")
-		}
-		// Spawn lean roster with available micros under $2 each
-		return &Roster{
-			Type:          LeanRoster,
-			Engineers:     cfg.EngineerCount,
-			Reviewers:     cfg.ReviewerCount,
-			SpawnedMicros: cfg.AvailableMicros,
-		}, nil
+		return nil, ErrBudgetExceeded
 	}
 
 	// Budget allows full arena spawn
 	return &Roster{
-		Type:          FullArena,
-		Engineers:     cfg.EngineerCount,
-		Reviewers:     cfg.ReviewerCount,
-		SpawnedMicros: cfg.AvailableMicros,
+		Type:        FullArena,
+		Micros:      10, // default full arena micros count
+		EngineerOnly: cfg.EngineerOnly,
 	}, nil
 }
 
-// RosterManager manages roster spawning with concurrency safety.
+// RosterManager manages rosters with concurrency safety.
 type RosterManager struct {
 	mu     sync.Mutex
 	roster *Roster
+	cfg    RosterConfig
 }
 
 // NewRosterManager creates a new RosterManager.
-func NewRosterManager() *RosterManager {
-	return &RosterManager{}
+func NewRosterManager(cfg RosterConfig) *RosterManager {
+	return &RosterManager{cfg: cfg}
 }
 
-// UpdateRoster updates the roster based on config.
-func (rm *RosterManager) UpdateRoster(cfg Config) error {
+// GetOrSpawnRoster returns existing roster or spawns a new one.
+func (rm *RosterManager) GetOrSpawnRoster() (*Roster, error) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
-	r, err := SpawnRoster(cfg)
+	if rm.roster != nil {
+		return rm.roster, nil
+	}
+
+	r, err := SpawnRoster(rm.cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	rm.roster = r
-	return nil
-}
-
-// GetRoster returns the current roster.
-func (rm *RosterManager) GetRoster() *Roster {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-	return rm.roster
+	return r, nil
 }

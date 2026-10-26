@@ -4,87 +4,97 @@ import (
 	"testing"
 )
 
-func TestSpawnRoster_FullArenaAllowed(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetCents: 800, // $8
-		AvailableMicros:    10,
-		EngineerCount:      2,
-		ReviewerCount:      2,
+func TestSpawnRoster(t *testing.T) {
+	tests := []struct {
+		name       string
+		cfg        RosterConfig
+		wantType   RosterType
+		wantErr    bool
+	}{
+		{
+			name: "Full arena allowed with sufficient budget",
+			cfg: RosterConfig{
+				BudgetCents: 800,
+				MicroCost:   3.0,
+				EngineerOnly: false,
+			},
+			wantType: FullArena,
+			wantErr:  false,
+		},
+		{
+			name: "Lean roster under $2 micro cost and engineer only with tight budget",
+			cfg: RosterConfig{
+				BudgetCents: 700,
+				MicroCost:   1.99,
+				EngineerOnly: true,
+			},
+			wantType: LeanRoster,
+			wantErr:  false,
+		},
+		{
+			name: "Error on tight budget but micro cost too high",
+			cfg: RosterConfig{
+				BudgetCents: 700,
+				MicroCost:   2.01,
+				EngineerOnly: true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Error on tight budget but engineer only false",
+			cfg: RosterConfig{
+				BudgetCents: 700,
+				MicroCost:   1.50,
+				EngineerOnly: false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Full arena allowed with exactly $8 budget",
+			cfg: RosterConfig{
+				BudgetCents: 800,
+				MicroCost:   1.50,
+				EngineerOnly: true,
+			},
+			wantType: FullArena,
+			wantErr:  false,
+		},
 	}
-	r, err := SpawnRoster(cfg)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := SpawnRoster(tt.cfg)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("SpawnRoster() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil && r.Type != tt.wantType {
+				t.Errorf("SpawnRoster() got type = %v, want %v", r.Type, tt.wantType)
+			}
+		})
+	}
+}
+
+func TestRosterManager_GetOrSpawnRoster(t *testing.T) {
+	cfg := RosterConfig{
+		BudgetCents: 700,
+		MicroCost:   1.5,
+		EngineerOnly: true,
+	}
+	rm := NewRosterManager(cfg)
+
+	r1, err := rm.GetOrSpawnRoster()
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("GetOrSpawnRoster() error = %v", err)
 	}
-	if r.Type != FullArena {
-		t.Errorf("expected FullArena roster, got %v", r.Type)
+	if r1.Type != LeanRoster {
+		t.Errorf("Expected LeanRoster, got %v", r1.Type)
 	}
-	if r.Engineers != 2 || r.Reviewers != 2 {
-		t.Errorf("unexpected engineer/reviewer count: %d/%d", r.Engineers, r.Reviewers)
-	}
-}
 
-func TestSpawnRoster_LeanRosterUnderBudget(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetCents: 400, // $4, less than full arena $8
-		AvailableMicros:    1,   // 1 micro under $2
-		EngineerCount:      1,
-		ReviewerCount:      1,
-	}
-	r, err := SpawnRoster(cfg)
+	r2, err := rm.GetOrSpawnRoster()
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("GetOrSpawnRoster() second call error = %v", err)
 	}
-	if r.Type != LeanRoster {
-		t.Errorf("expected LeanRoster, got %v", r.Type)
-	}
-	if r.SpawnedMicros != 1 {
-		t.Errorf("expected 1 micro spawned, got %d", r.SpawnedMicros)
-	}
-}
-
-func TestSpawnRoster_LeanRosterBudgetTooLow(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetCents: 100, // $1, less than $2 per micro
-		AvailableMicros:    1,
-		EngineerCount:      1,
-		ReviewerCount:      1,
-	}
-	_, err := SpawnRoster(cfg)
-	if err == nil {
-		t.Fatal("expected error due to budget too low, got nil")
-	}
-}
-
-func TestSpawnRoster_LeanRosterInsufficientStaff(t *testing.T) {
-	cfg := Config{
-		MonthlyBudgetCents: 400,
-		AvailableMicros:    1,
-		EngineerCount:      0,
-		ReviewerCount:      1,
-	}
-	_, err := SpawnRoster(cfg)
-	if err == nil {
-		t.Fatal("expected error due to insufficient engineer count, got nil")
-	}
-}
-
-func TestRosterManager_UpdateAndGet(t *testing.T) {
-	rm := NewRosterManager()
-	cfg := Config{
-		MonthlyBudgetCents: 400,
-		AvailableMicros:    2,
-		EngineerCount:      1,
-		ReviewerCount:      1,
-	}
-	err := rm.UpdateRoster(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	r := rm.GetRoster()
-	if r == nil {
-		t.Fatal("expected roster, got nil")
-	}
-	if r.Type != LeanRoster {
-		t.Errorf("expected LeanRoster, got %v", r.Type)
+	if r2 != r1 {
+		t.Errorf("Expected same roster instance on second call")
 	}
 }
