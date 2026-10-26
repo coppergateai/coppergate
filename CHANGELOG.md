@@ -3,9 +3,10 @@
 ## [Unreleased]
 
 ### Added
-- P-104: Program Runtime (Contracted Autonomy) spend license reservation and fan-out management.
-- ID badge issuance, validation, and invalidation for runtime instances.
-- Accept runtime execution results with ship receipt issuance.
-- Landing and writeback support for program runtime data.
+- Program Runtime (Contracted Autonomy) spend license management:
+  - Reserve and fan-out spend licenses within an $8 monthly envelope.
+  - ID badge issuance and validation for contracted programs.
+  - Accept → Ship Receipt flow for spend license acceptance.
+  - Landing and writeback mechanisms for runtime state consistency.
 - User documentation added under `/docs/-program-runtime.md`.
-- Tests covering spend license manager, ID badge manager, ship receipt manager, and runtime manager flow.
+- Unit tests covering license reservation, fan-out, acceptance, and envelope enforcement.

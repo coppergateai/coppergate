@@ -1,61 +1,50 @@
-# Program Runtime (Contracted Autonomy) Spend License
+# Program Runtime (Contracted Autonomy)
 
 ## Overview
 
-The Program Runtime feature enables contracted autonomy spend licenses to be reserved and fan-out managed within the system. This includes:
+The Program Runtime feature enables contracted autonomy spend license management within the Coppergate platform. This includes reserving and fan-out of spend licenses, issuance and verification of ID badges, and the acceptance flow culminating in a Ship Receipt.
 
-- Reserving spend licenses on program runtime execution.
-- Managing ID badges for authorization and tracking.
-- Accepting program runtime execution results and generating ship receipts.
-- Landing program runtime data and performing writeback operations.
-
-This feature aligns with the architecture defined in [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md) and operates within the $8 monthly spend envelope.
+This feature is designed to operate within a monthly spend envelope of $8, ensuring controlled and auditable program runtime spend.
 
 ## Key Concepts
 
-### Spend License Reserve / Fan-out
-
-When a program runtime is executed, a spend license is reserved to cover the cost of the runtime. The system supports fan-out scenarios where multiple spend licenses may be reserved concurrently for parallel or distributed execution.
-
-### ID Badges
-
-ID badges are issued to runtime instances to authenticate and track their execution and spend license usage.
-
-### Accept → Ship Receipt
-
-Upon successful completion of a program runtime, the system accepts the results and issues a ship receipt. This receipt confirms the spend license consumption and finalizes the transaction.
-
-### Landing + Writeback
-
-Program runtime data is landed into the system's storage and writeback operations update the state accordingly.
+- **Spend License Reserve/Fan-out**: Allocate and distribute spend licenses to contracted programs or agents, ensuring spend limits are respected.
+- **ID Badges**: Unique identifiers issued to contracted agents or programs, used for authentication and authorization during runtime.
+- **Accept → Ship Receipt**: The acceptance process of a spend license or runtime contract, resulting in a Ship Receipt that confirms the transaction.
+- **Landing + Writeback**: The runtime landing process records the acceptance and writes back the state to the system, ensuring consistency and traceability.
 
 ## Usage
 
-1. **Reserve Spend License**: The runtime requests a spend license reservation before execution.
-2. **Obtain ID Badge**: The runtime instance receives an ID badge for authorization.
-3. **Execute Program Runtime**: The program runs under the contracted autonomy.
-4. **Accept Results**: The system accepts the runtime results and issues a ship receipt.
-5. **Landing and Writeback**: The runtime data is landed and state is updated.
+### Reserving Spend License
 
-## Architecture Alignment
+To reserve a spend license, use the `ReserveSpendLicense` API with the desired amount. The system will verify the monthly envelope and allocate accordingly.
 
-This feature implements the Open IDs and spend license management as specified in the architecture document:
+### Fan-out
 
-- Open IDs for runtime instances.
-- Spend license reservation and fan-out.
-- Receipt issuance on acceptance.
-- Landing and writeback mechanisms.
+Fan-out distributes reserved licenses to multiple contracted agents or programs. This is handled automatically by the runtime system based on configured rules.
 
-## Limitations
+### ID Badges
 
-- The monthly spend envelope is capped at $8.
-- Only lean Arena runtime environments are supported currently.
+ID badges are issued upon successful reservation and fan-out. They must be presented during acceptance to verify identity and authorization.
 
-## See Also
+### Accept and Ship Receipt
 
-- [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md)
-- [CHANGELOG.md](../CHANGELOG.md)
+When a contracted program accepts a spend license, a Ship Receipt is generated. This receipt serves as proof of acceptance and spend authorization.
 
----
+## Architecture
 
-*This document is part of the P-104 Program Runtime feature implementation.*
+This feature aligns with the Open IDs architecture described in [coppergate-architecture/docs/OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md).
+
+## Testing
+
+Unit and integration tests cover:
+
+- Spend license reservation respecting the $8 monthly envelope.
+- Fan-out logic correctness.
+- ID badge issuance and validation.
+- Acceptance flow and Ship Receipt generation.
+
+## Changelog
+
+- Added Program Runtime spend license management with reservation, fan-out, ID badges, and acceptance flow.
+- Implemented landing and writeback mechanisms for runtime state consistency.
