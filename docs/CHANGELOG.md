@@ -2,9 +2,8 @@
 
 ## [Unreleased]
 
-### Features
-
-- AG-012: Implement lean roster mode with micros limited to Engineer+Reviewer roles under $8 monthly budget.
-  - FULL_ARENA spawn disallowed under tight budget.
-  - Micros cost capped at $2 each.
-  - Added tests covering lean mode enforcement and budget constraints.
+### Added
+- AG-012: Implemented lean roster with micros under $2 monthly cost, restricted to Engineer and Reviewer roles only.
+- Disallow full arena spawn under tight budget ($8 monthly envelope).
+- Enforced budget envelope and role/cost constraints in roster management.
+- Added tests covering budget enforcement, role restrictions, and full arena spawn disallowance.
