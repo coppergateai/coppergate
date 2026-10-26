@@ -232,12 +232,9 @@ function resolveWorkerAgent(
                 cursorCredentialId: cursorFb.byok.id,
                 model: cursorFb.model,
               });
-            } else if (process.env.CURSOR_API_KEY?.trim()) {
-              fallback = { kind: "cursor" };
-              log.info("wiring CURSOR_API_KEY as OpenAI quota failover", {
-                workspaceId,
-              });
             }
+            // Hosted production: Cursor failover only via workspace BYOK.
+            // Env CURSOR_API_KEY is ignored unless ALLOW_ENV_LLM_KEYS=1.
           }
 
           return createCodingAgent({
@@ -254,8 +251,8 @@ function resolveWorkerAgent(
         });
       }
 
+      // Env LLM/CURSOR keys: local/self-host only (gated inside createCodingAgent).
       const envAgent = createCodingAgent();
-      // createCodingAgent returns Fake when no key — only keep it if real provider.
       if (!(envAgent instanceof FakeCodingAgent)) {
         log.info("using coding agent from env (OpenAI and/or Cursor)", {
           workspaceId,

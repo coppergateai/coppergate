@@ -17,6 +17,6 @@ const harness = createContenderHarness({ kind: "cursor_local" });
 const agent = harnessAsCodingAgent(harness);
 ```
 
-Prefer workspace Settings → LLM BYOK (`cursor` vendor) and per-agent routing over `CONTENDER_HARNESS`. When an OpenAI-compatible primary hits `provider_quota`, a workspace Cursor credential (or `CURSOR_API_KEY`) is used once via `FailoverCodingAgent`.
+Prefer workspace Settings → LLM BYOK (`cursor` vendor) and per-agent routing over `CONTENDER_HARNESS`. When an OpenAI-compatible primary hits `provider_quota`, a workspace Cursor BYOK credential is used once via `FailoverCodingAgent`. Hosted production does not share operator `CURSOR_API_KEY` / `LLM_*` env across tenants (`ALLOW_ENV_LLM_KEYS=1` for single-tenant self-host only).
 
 Security: harnesses must not escalate autonomy; secrets stay scrubbed via existing run event redaction. Cursor mutates the sandbox workdir in place; path allowlists are enforced on the post-run diff.

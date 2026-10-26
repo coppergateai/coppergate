@@ -30,6 +30,7 @@ export {
 } from "./openai-compatible.js";
 export {
   createCodingAgent,
+  envLlmKeysAllowed,
   type CodingAgentKind,
   type CreateCodingAgentFallback,
   type CreateCodingAgentOptions,

@@ -57,8 +57,9 @@ Upgrade: pull/rebuild images, run compose up again (migrate job re-applies pendi
 | `GITLAB_*` | if using GitLab | Base URL + OAuth + webhook secret |
 | `GITHUB_DELIVERY_MODE` / `SCM_DELIVERY_MODE` | for real PRs/MRs | Set `http` in production |
 | `LLM_*` | optional | Else FakeCodingAgent or workspace BYOK |
-| `CURSOR_API_KEY` / `CURSOR_MODEL` | optional | Cursor local SDK (`@cursor/sdk`) on the worker; also used as OpenAI quota failover when BYOK Cursor is absent |
-| `CONTENDER_HARNESS=cursor_local` | optional | Force Cursor harness (prefer BYOK routing) |
+| `CURSOR_API_KEY` / `CURSOR_MODEL` | optional | Single-tenant only: Cursor local SDK when `ALLOW_ENV_LLM_KEYS=1` (or non-production). Hosted multi-tenant must use Settings → LLM BYOK. |
+| `ALLOW_ENV_LLM_KEYS=1` | optional | Permit host `LLM_*` / `CURSOR_*` env keys (default off in `NODE_ENV=production`) |
+| `CONTENDER_HARNESS=cursor_local` | optional | Force Cursor harness (prefer BYOK routing; needs BYOK or allowed env key) |
 
 Web and worker **must** share the same database and `CREDENTIALS_ENCRYPTION_KEY`.
 

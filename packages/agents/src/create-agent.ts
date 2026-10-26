@@ -42,6 +42,36 @@ function normalizeBase(url: string | undefined, fallback: string): string {
   return (url?.trim() || fallback).replace(/\/$/, "");
 }
 
+/**
+ * Host-level LLM/CURSOR env keys are for single-tenant self-host / local only.
+ * Hosted production must use workspace BYOK so one tenant cannot spend
+ * another tenant's (or the operator's) provider quota.
+ * Opt in with ALLOW_ENV_LLM_KEYS=1 when intentionally running single-tenant.
+ */
+export function envLlmKeysAllowed(): boolean {
+  if (process.env.ALLOW_ENV_LLM_KEYS === "1") return true;
+  return process.env.NODE_ENV !== "production";
+}
+
+function envCursorApiKey(): string {
+  if (!envLlmKeysAllowed()) return "";
+  return process.env.CURSOR_API_KEY?.trim() || "";
+}
+
+function envOpenAiApiKey(): string {
+  if (!envLlmKeysAllowed()) return "";
+  return (
+    process.env.LLM_API_KEY?.trim() ||
+    process.env.OPENAI_API_KEY?.trim() ||
+    ""
+  );
+}
+
+function envFallbackApiKey(): string {
+  if (!envLlmKeysAllowed()) return "";
+  return process.env.LLM_FALLBACK_API_KEY?.trim() || "";
+}
+
 function resolveKind(options: CreateCodingAgentOptions): CodingAgentKind {
   if (options.kind === "cursor" || options.kind === "openai") {
     return options.kind;
@@ -52,10 +82,7 @@ function resolveKind(options: CreateCodingAgentOptions): CodingAgentKind {
 function buildPrimary(options: CreateCodingAgentOptions): CodingAgent | null {
   const kind = resolveKind(options);
   if (kind === "cursor") {
-    const apiKey =
-      options.apiKey?.trim() ||
-      process.env.CURSOR_API_KEY?.trim() ||
-      "";
+    const apiKey = options.apiKey?.trim() || envCursorApiKey();
     if (!apiKey) return null;
     return new CursorSdkCodingAgent({
       apiKey,
@@ -64,19 +91,18 @@ function buildPrimary(options: CreateCodingAgentOptions): CodingAgent | null {
     });
   }
 
-  const apiKey =
-    options.apiKey?.trim() ||
-    process.env.LLM_API_KEY?.trim() ||
-    process.env.OPENAI_API_KEY?.trim() ||
-    "";
+  const apiKey = options.apiKey?.trim() || envOpenAiApiKey();
   if (!apiKey) return null;
 
   const primaryBase = normalizeBase(
-    options.baseUrl ?? process.env.LLM_BASE_URL,
+    options.baseUrl ??
+      (envLlmKeysAllowed() ? process.env.LLM_BASE_URL : undefined),
     "https://api.openai.com/v1",
   );
   const primaryModel =
-    options.model?.trim() || process.env.LLM_MODEL?.trim() || "gpt-4o-mini";
+    options.model?.trim() ||
+    (envLlmKeysAllowed() ? process.env.LLM_MODEL?.trim() : undefined) ||
+    "gpt-4o-mini";
 
   return new OpenAiCompatibleCodingAgent({
     apiKey,
@@ -99,22 +125,17 @@ function buildSecondary(
   const fbKind: CodingAgentKind =
     fb?.kind === "cursor" || fb?.kind === "openai"
       ? fb.kind
-      : !fb &&
-          process.env.CURSOR_API_KEY?.trim() &&
-          primaryKind === "openai"
+      : !fb && envCursorApiKey() && primaryKind === "openai"
         ? "cursor"
         : "openai";
 
   if (fbKind === "cursor") {
-    const key =
-      fb?.apiKey?.trim() ||
-      process.env.CURSOR_API_KEY?.trim() ||
-      "";
+    const key = fb?.apiKey?.trim() || envCursorApiKey();
     if (!key) return null;
     if (primaryKind === "cursor" && key === primaryKey) return null;
     const model =
       fb?.model?.trim() ||
-      process.env.CURSOR_MODEL?.trim() ||
+      (envLlmKeysAllowed() ? process.env.CURSOR_MODEL?.trim() : undefined) ||
       "composer-2.5";
     return {
       agent: new CursorSdkCodingAgent({
@@ -126,22 +147,19 @@ function buildSecondary(
     };
   }
 
-  const fallbackKey =
-    fb?.apiKey?.trim() ||
-    process.env.LLM_FALLBACK_API_KEY?.trim() ||
-    "";
+  const fallbackKey = fb?.apiKey?.trim() || envFallbackApiKey();
   if (!fallbackKey) return null;
 
   const fallbackBase = normalizeBase(
-    fb?.baseUrl ?? process.env.LLM_FALLBACK_BASE_URL,
+    fb?.baseUrl ??
+      (envLlmKeysAllowed() ? process.env.LLM_FALLBACK_BASE_URL : undefined),
     primaryBase || "https://api.openai.com/v1",
   );
   const fallbackModel =
     fb?.model?.trim() ||
-    process.env.LLM_FALLBACK_MODEL?.trim() ||
+    (envLlmKeysAllowed() ? process.env.LLM_FALLBACK_MODEL?.trim() : undefined) ||
     primaryModel ||
     "gpt-4o-mini";
-
   if (
     primaryKind === "openai" &&
     fallbackKey === primaryKey &&
@@ -181,26 +199,26 @@ export function createCodingAgent(
 
   const primaryKey =
     options.apiKey?.trim() ||
-    (primaryKind === "cursor"
-      ? process.env.CURSOR_API_KEY?.trim()
-      : process.env.LLM_API_KEY?.trim() ||
-        process.env.OPENAI_API_KEY?.trim()) ||
+    (primaryKind === "cursor" ? envCursorApiKey() : envOpenAiApiKey()) ||
     "";
   const primaryBase = normalizeBase(
-    options.baseUrl ?? process.env.LLM_BASE_URL,
+    options.baseUrl ??
+      (envLlmKeysAllowed() ? process.env.LLM_BASE_URL : undefined),
     "https://api.openai.com/v1",
   );
   const primaryModel =
     options.model?.trim() ||
     (primaryKind === "cursor"
-      ? process.env.CURSOR_MODEL?.trim() || "composer-2.5"
-      : process.env.LLM_MODEL?.trim() || "gpt-4o-mini");
+      ? (envLlmKeysAllowed() ? process.env.CURSOR_MODEL?.trim() : undefined) ||
+        "composer-2.5"
+      : (envLlmKeysAllowed() ? process.env.LLM_MODEL?.trim() : undefined) ||
+        "gpt-4o-mini");
 
   const withAutoCursorFallback: CreateCodingAgentOptions = {
     ...options,
     fallback:
       options.fallback ??
-      (primaryKind === "openai" && process.env.CURSOR_API_KEY?.trim()
+      (primaryKind === "openai" && envCursorApiKey()
         ? { kind: "cursor" as const }
         : undefined),
   };

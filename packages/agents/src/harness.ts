@@ -222,12 +222,17 @@ export function createContenderHarness(
         }),
       );
     case "cursor_local": {
+      const allowEnv =
+        process.env.ALLOW_ENV_LLM_KEYS === "1" ||
+        process.env.NODE_ENV !== "production";
       const apiKey =
         opts.cursor?.apiKey?.trim() ||
-        process.env.CURSOR_API_KEY?.trim() ||
+        (allowEnv ? process.env.CURSOR_API_KEY?.trim() : "") ||
         "";
       if (!apiKey) {
-        throw new Error("cursor_local harness requires cursor.apiKey or CURSOR_API_KEY");
+        throw new Error(
+          "cursor_local harness requires cursor.apiKey (or CURSOR_API_KEY when ALLOW_ENV_LLM_KEYS=1 / non-production)",
+        );
       }
       return new CursorLocalHarness(
         new CursorSdkCodingAgent({
