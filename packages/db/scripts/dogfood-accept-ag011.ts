@@ -1,7 +1,7 @@
 /**
  * Accept AG-011 on coppergate self-pilot and prove Ship Receipt exists.
  */
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import {
   closeDb,
   createDb,

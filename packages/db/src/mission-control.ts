@@ -379,16 +379,30 @@ export async function getWorkspaceMissionControl(
         ? `/workspaces/${workspaceId}/projects/${projectId}`
         : `/workspaces/${workspaceId}/activity`;
       const errBit = error ? error.replace(/\s+/g, " ").slice(0, 120) : null;
+      // Per-project / plan concurrency is expected throttle — not a crisis.
+      const concurrencyThrottle =
+        !!error &&
+        (/concurrent run/i.test(error) ||
+          /in flight on this project/i.test(error) ||
+          /plan allows/i.test(error));
       attention.push({
         id: `replan-${dedupeKey}`,
         kind: "replan_failed",
-        title: projectLabel
-          ? `Replan queue failed · ${projectLabel}`
-          : "Replan queue failed",
-        detail: errBit ?? "Maintainer could not queue the next task",
-        href,
-        priority: "high",
-        ctaLabel: "Open project",
+        title: concurrencyThrottle
+          ? projectLabel
+            ? `Waiting on capacity · ${projectLabel}`
+            : "Waiting on capacity"
+          : projectLabel
+            ? `Replan queue failed · ${projectLabel}`
+            : "Replan queue failed",
+        detail: concurrencyThrottle
+          ? "Another run is already in flight — wait or pause Arena"
+          : (errBit ?? "Maintainer could not queue the next task"),
+        href: concurrencyThrottle
+          ? `/workspaces/${workspaceId}/arena`
+          : href,
+        priority: concurrencyThrottle ? "normal" : "high",
+        ctaLabel: concurrencyThrottle ? "Open Arena" : "Open project",
       });
     }
 

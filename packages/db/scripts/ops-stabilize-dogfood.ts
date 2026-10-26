@@ -4,7 +4,7 @@
  * - Cancel open kprompt runs / fail queued tasks; release orphan reserves
  * - Pin coppergate defaultN=1; cancel WAITING_CI run stuck on closed PR #1
  */
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   closeDb,
   createDb,

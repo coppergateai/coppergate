@@ -64,7 +64,9 @@ function isQuietFailureErrorCode(errorCode: string | null | undefined): boolean 
     errorCode === "stub_delivery" ||
     errorCode === "waiting_ci_timeout" ||
     errorCode === "validating_lease_expired" ||
-    errorCode === "lease_expired_poison"
+    errorCode === "lease_expired_poison" ||
+    // Operator closed the PR (or GitHub already closed it) — terminal, not an ops fire.
+    errorCode === "pr_closed"
   );
 }
 

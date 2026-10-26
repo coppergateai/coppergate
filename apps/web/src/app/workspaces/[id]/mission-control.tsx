@@ -110,12 +110,15 @@ export function MissionControl({ data, recentEvents }: Props) {
   const needsAttention = attention.length > 0;
   const budgetPaused = metrics.budgetStatus === "paused";
   const arenaHot = metrics.arenaNeedsAttention > 0;
-  const opsWarn = needsAttention || budgetPaused || arenaHot;
   const recent = groupActivityEvents(recentEvents).slice(0, 8);
 
   const concurrencyItem = attention.find((a) => a.kind === "concurrency");
   const providerQuotaItem = attention.find((a) => a.kind === "provider_quota");
   const crisisItem = concurrencyItem || providerQuotaItem;
+  // Capacity-wait / normal rows are advisory — don't paint the ops chip red.
+  const hasHighAttention = attention.some((a) => a.priority === "high");
+  const opsWarn =
+    hasHighAttention || budgetPaused || arenaHot || !!crisisItem;
   const evidenceItem = attention.find((a) => a.kind === "review_required");
   const humanGates = metrics.needsApproval;
   const evidenceGates = metrics.needsEvidenceAccept;
@@ -146,8 +149,11 @@ export function MissionControl({ data, recentEvents }: Props) {
     if (arenaHot) {
       return `${metrics.arenaNeedsAttention} agent${metrics.arenaNeedsAttention === 1 ? "" : "s"} ${metrics.arenaNeedsAttention === 1 ? "needs" : "need"} attention in Arena${evidenceGates > 0 ? ` · ${evidenceGates} Accept` : ""}${humanGates > 0 ? ` · ${humanGates} inbox` : ""}.`;
     }
+    if (needsAttention && hasHighAttention) {
+      return `${attention.length} item${attention.length === 1 ? "" : "s"} ${attention.length === 1 ? "needs" : "need"} your review.`;
+    }
     if (needsAttention) {
-      return `${attention.length} item${attention.length === 1 ? "" : "s"} need your review.`;
+      return "Queue is throttled on capacity — wait or pause Arena.";
     }
     return "All systems operational. No items need your review.";
   })();
@@ -283,7 +289,8 @@ export function MissionControl({ data, recentEvents }: Props) {
         </p>
         <p className={styles.summaryItem}>
           <Link href={attentionHref} className={styles.summaryLink}>
-            <strong>{attentionTotal}</strong> need attention
+            <strong>{attentionTotal}</strong>{" "}
+            {attentionTotal === 1 ? "needs" : "need"} attention
           </Link>
           <span className={styles.summaryMute}>
             · {humanGates} inbox · {evidenceGates} evidence ·{" "}
@@ -336,7 +343,10 @@ export function MissionControl({ data, recentEvents }: Props) {
           >
             <div className={styles.panelHead}>
               <h2 id="attention-heading" className={styles.sectionTitle}>
-                Needs your attention
+                {attentionRows.length > 0 &&
+                attentionRows.every((a) => a.priority === "normal")
+                  ? "Waiting on capacity"
+                  : "Needs your attention"}
               </h2>
               <p className={styles.sectionMeta}>
                 {attentionRows.length} pending

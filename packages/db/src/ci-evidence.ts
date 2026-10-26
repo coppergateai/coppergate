@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { createArtifact } from "./artifacts.js";
-import { appendRunEvent, listRunEvents } from "./run-events.js";
+import { appendRunEvent } from "./run-events.js";
 import { agentRuns, artifacts, type AgentRun } from "./schema.js";
 
 export type CiEvidenceInput = {

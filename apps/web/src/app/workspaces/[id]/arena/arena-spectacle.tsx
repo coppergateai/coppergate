@@ -120,7 +120,8 @@ function classifyRuntime(
     if (
       run.errorCode === "waiting_ci_timeout" ||
       run.errorCode === "validating_lease_expired" ||
-      run.errorCode === "lease_expired_poison"
+      run.errorCode === "lease_expired_poison" ||
+      run.errorCode === "pr_closed"
     ) {
       return "idle";
     }
@@ -182,6 +183,7 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
   if (state === "needsAttention" && c.budgetMicrosRemaining <= 0) {
     return `Failed · budget spent · ${run.errorCode?.replace(/_/g, " ") ?? run.status}`;
   }
+  if (run.errorCode === "pr_closed") return "PR closed — terminal";
   if (run.errorCode) return run.errorCode.replace(/_/g, " ");
   if (run.taskTitle) {
     if (state === "running") return run.taskTitle;
