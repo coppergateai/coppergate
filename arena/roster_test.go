@@ -4,75 +4,91 @@ import (
 	"testing"
 )
 
-func TestNewRoster_LeanRoster(t *testing.T) {
-	available := []Micro{
-		{"micro1", 1.5, "Engineer"},
-		{"micro2", 2.5, "Engineer"},
-		{"micro3", 1.0, "Reviewer"},
-		{"micro4", 3.0, "Reviewer"},
-		{"micro5", 1.9, "Other"},
-		{"micro6", 1.8, "Engineer"},
+func TestNewRoster_LeanRosterAllowed(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    1_500_000, // under $2
 	}
-
-	config := RosterConfig{
-		BudgetMonthly: 8.0,
-		AllowFullArena: false,
-	}
-
-	r, err := NewRoster(config, available, LeanRoster)
+	r, err := NewRoster(cfg)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("expected lean roster, got error: %v", err)
 	}
-
-	expectedNames := map[string]bool{"micro1": true, "micro3": true, "micro6": true}
-	if r.Count() != len(expectedNames) {
-		t.Errorf("expected %d micros, got %d", len(expectedNames), r.Count())
-	}
-
-	for _, m := range r.Micros {
-		if !expectedNames[m.Name] {
-			t.Errorf("unexpected micro included: %v", m.Name)
-		}
+	if r == nil {
+		t.Fatal("expected roster instance, got nil")
 	}
 }
 
-func TestNewRoster_FullArenaAllowed(t *testing.T) {
-	available := []Micro{
-		{"micro1", 3.0, "Engineer"},
-		{"micro2", 4.0, "Reviewer"},
+func TestNewRoster_FullArenaRefused(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    3_000_000, // over $2
 	}
-
-	config := RosterConfig{
-		BudgetMonthly: 8.0,
-		AllowFullArena: true,
-	}
-
-	r, err := NewRoster(config, available, FullArena)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if r.Count() != len(available) {
-		t.Errorf("expected %d micros, got %d", len(available), r.Count())
-	}
-}
-
-func TestNewRoster_FullArenaNotAllowed(t *testing.T) {
-	available := []Micro{
-		{"micro1", 3.0, "Engineer"},
-		{"micro2", 4.0, "Reviewer"},
-	}
-
-	config := RosterConfig{
-		BudgetMonthly: 8.0,
-		AllowFullArena: false,
-	}
-
-	_, err := NewRoster(config, available, FullArena)
-	if err == nil {
-		t.Fatal("expected error due to budget, got nil")
-	}
+	r, err := NewRoster(cfg)
 	if err != ErrBudgetExceeded {
 		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
+	}
+	if r != nil {
+		t.Fatal("expected nil roster on budget exceed")
+	}
+}
+
+func TestNewRoster_BudgetTooLow(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 700,       // under $8
+		AvailableMicros:    1_000_000, // under $2
+	}
+	r, err := NewRoster(cfg)
+	if err != ErrBudgetExceeded {
+		t.Fatalf("expected ErrBudgetExceeded, got %v", err)
+	}
+	if r != nil {
+		t.Fatal("expected nil roster on low budget")
+	}
+}
+
+func TestRoster_AddEntryAndCapacity(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    1_000_000,
+	}
+	r, err := NewRoster(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for i := 0; i < r.capacity; i++ {
+		err := r.AddEntry(
+			"id"+string(i),
+			"engineer"+string(i),
+			"reviewer"+string(i),
+		)
+		if err != nil {
+			t.Fatalf("unexpected error adding entry %d: %v", i, err)
+		}
+	}
+	err = r.AddEntry("overflow", "eng", "rev")
+	if err == nil {
+		t.Fatal("expected error on capacity overflow, got none")
+	}
+}
+
+func TestRoster_EntriesCopy(t *testing.T) {
+	cfg := RosterConfig{
+		MonthlyBudgetCents: 800,
+		AvailableMicros:    1_000_000,
+	}
+	r, err := NewRoster(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	r.AddEntry("id1", "eng1", "rev1")
+	entries := r.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	entries[0].Engineer = "changed"
+	// Ensure original is not changed
+	orig := r.Entries()
+	if orig[0].Engineer == "changed" {
+		t.Fatal("entries copy is not deep")
 	}
 }
