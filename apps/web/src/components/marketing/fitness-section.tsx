@@ -81,10 +81,10 @@ export function FitnessSection() {
 
         <div className={styles.sectionCtas}>
           <a className={styles.btnSecondary} href="#evidence">
-            See evidence
+            See Ship Receipt
           </a>
-          <Link className={styles.btnSecondary} href="/docs/limitations">
-            Limitations
+          <Link className={styles.btnSecondary} href="/docs/open-program-runtime">
+            Open Program Runtime
           </Link>
           <a className={styles.inlineDocLink} href="#get-started">
             Get started →

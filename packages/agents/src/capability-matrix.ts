@@ -30,10 +30,18 @@ export const HARNESS_CAPABILITY_MATRIX: HarnessCapability[] = [
       "Sandbox-backed MVP: writes scoped fix into worker LocalSandbox workdir; Fake fallback if no workdir.",
   },
   {
+    id: "cursor_local",
+    displayName: "Cursor local SDK",
+    status: "live",
+    notes:
+      "Requires CURSOR_API_KEY / BYOK vendor=cursor and @cursor/sdk; mutates sandbox workdir.",
+  },
+  {
     id: "cursor_cloud",
     displayName: "Cursor Cloud",
     status: "wait",
-    notes: "Blocked on public agent API availability.",
+    notes:
+      "Cloud Background Agents still wait-state; use cursor_local / BYOK Cursor for live runs.",
   },
   {
     id: "codex",

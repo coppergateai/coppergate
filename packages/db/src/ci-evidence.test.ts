@@ -235,7 +235,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     await ingestCiEvidence(db, {
       workspaceId,
       headSha: sha,
-      name: "lint",
+      name: "test",
       status: "completed",
       conclusion: "failure",
       passed: false,
@@ -249,7 +249,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     await ingestCiEvidence(db, {
       workspaceId,
       headSha: sha,
-      name: "lint",
+      name: "test",
       status: "completed",
       conclusion: "success",
       passed: true,
@@ -371,7 +371,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     const { run: afterIngest } = await ingestCiEvidence(db, {
       workspaceId,
       headSha: sha,
-      name: "ci",
+      name: "test",
       status: "completed",
       conclusion: "success",
       passed: true,

@@ -15,9 +15,9 @@ export function PilotProjectsSection() {
           Coppergate is built by Coppergate.
         </h2>
         <p className={styles.sectionLede}>
-          We dogfood the Survivor arena on our own repos — issue → verified PR
-          under a real spend cap — and ship adjacent open-source pilots like
-          kprompt from the same shop.
+          We dogfood Contracted Autonomy on our own repos — Open Program → spend
+          license → Accept + Ship Receipt under a real cap — and ship adjacent
+          open-source pilots like kprompt from the same shop.
         </p>
 
         <ul className={styles.pilotGrid}>

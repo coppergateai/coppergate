@@ -41,7 +41,8 @@ export async function ingestSonarFitness(
       .limit(1);
     run = row ?? null;
   } else if (input.headSha && input.workspaceId) {
-    const [row] = await db
+    // Require a unique match — ambiguous SHAs must supply runId.
+    const rows = await db
       .select()
       .from(agentRuns)
       .where(
@@ -51,8 +52,8 @@ export async function ingestSonarFitness(
         ),
       )
       .orderBy(desc(agentRuns.createdAt))
-      .limit(1);
-    run = row ?? null;
+      .limit(2);
+    run = rows.length === 1 ? (rows[0] ?? null) : null;
   }
 
   if (!run) return { run: null, attached: false };

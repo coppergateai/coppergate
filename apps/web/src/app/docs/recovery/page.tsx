@@ -118,13 +118,13 @@ export default function RecoveryPage() {
             enqueue until resume. Use when spend or policy blows up.
           </p>
 
-          <h2>Issue → PR wedge tips</h2>
+          <h2>Open Program wedge tips</h2>
           <ul>
-            <li>Start with one tiny open issue on a low-risk repo.</li>
+            <li>Bind a tiny Open ID on a low-risk repo before first Arena.</li>
             <li>Keep autonomy at L1 (PR only) until you trust the path.</li>
             <li>
-              Share a redacted delivery report from the task after accept —
-              useful for feedback without dumping private source.
+              After Accept, share a redacted Ship Receipt — useful for feedback
+              without dumping private source.
             </li>
           </ul>
 
@@ -144,8 +144,11 @@ export default function RecoveryPage() {
           >
             Self-host guide
           </a>
-          <Link className={styles.btnSecondary} href="/login">
-            Try hosted
+          <Link
+            className={styles.btnSecondary}
+            href="/docs/open-program-runtime"
+          >
+            Open Program Runtime
           </Link>
           <Link className={styles.btnSecondary} href="/docs/limitations">
             Limitations

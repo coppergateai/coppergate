@@ -14,7 +14,6 @@ export const metadata: Metadata = publicPageMetadata({
 
 const SELF_HOST =
   "https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md";
-const REPO = "https://github.com/coppergateai/coppergate";
 
 export default function PricingPage() {
   return (
@@ -48,15 +47,15 @@ export default function PricingPage() {
             </p>
             <p className={styles.pricingBlurb}>
               Full product source under MIT. Compose self-host, BYOK, and
-              user-managed sandboxes. Budget is selection pressure — weak paths
-              starve; survivors ship with a cost ledger.
+              user-managed sandboxes. Open Program Runtime licenses spend —
+              weak paths starve; survivors earn Accept with a Ship Receipt.
             </p>
             <ul className={styles.pricingFeatures}>
               <li>MIT-licensed source on GitHub</li>
               <li>Self-host with Docker Compose</li>
               <li>Bring your own LLM keys</li>
               <li>Spend caps + kill-switch</li>
-              <li>Issue → verified PR arena</li>
+              <li>Open Program → Accept → Ship Receipt</li>
             </ul>
             <div className={styles.pricingActions}>
               <a
@@ -67,14 +66,12 @@ export default function PricingPage() {
               >
                 Self-host guide
               </a>
-              <a
+              <Link
                 className={styles.btnSecondary}
-                href={REPO}
-                target="_blank"
-                rel="noreferrer"
+                href="/docs/open-program-runtime"
               >
-                View on GitHub
-              </a>
+                Open Program Runtime
+              </Link>
               <Link className={styles.btnSecondary} href="/login">
                 Try hosted
               </Link>

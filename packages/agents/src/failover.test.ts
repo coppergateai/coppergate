@@ -71,6 +71,63 @@ describe("FailoverCodingAgent", () => {
     assert.ok(events.some((e) => e.kind === "completion"));
   });
 
+  it("fails over to secondary after primary provider_quota error event", async () => {
+    let secondaryHits = 0;
+    const primary: CodingAgent = {
+      async *run() {
+        yield {
+          kind: "progress",
+          message: "primary planning",
+        };
+        yield {
+          kind: "error",
+          message: "insufficient_quota",
+          payload: { code: "provider_quota" },
+        };
+      },
+    };
+    const secondary: CodingAgent = {
+      async *run() {
+        secondaryHits += 1;
+        yield {
+          kind: "completion",
+          message: "fallback ok",
+          payload: {
+            branchName: "b",
+            headSha: "h",
+            prNumber: 1,
+            prUrl: "u",
+            filesChanged: ["README.md"],
+            estimatedTokens: 1,
+            actualCostMicros: 1,
+          },
+        };
+      },
+    };
+
+    const agent = new FailoverCodingAgent(primary, secondary, "cursor");
+    const events: AgentEvent[] = [];
+    for await (const ev of agent.run(baseInput)) {
+      events.push(ev);
+    }
+
+    assert.equal(secondaryHits, 1);
+    assert.ok(
+      events.some(
+        (e) =>
+          e.kind === "progress" &&
+          e.payload?.code === "provider_failover" &&
+          e.payload?.trigger === "provider_quota",
+      ),
+    );
+    assert.ok(events.some((e) => e.kind === "completion"));
+    assert.ok(
+      !events.some(
+        (e) => e.kind === "error" && e.payload?.code === "provider_quota",
+      ),
+    );
+  });
+
   it("does not failover after policy error events (no throw)", async () => {
     let secondaryHits = 0;
     const primary = new OpenAiCompatibleCodingAgent({

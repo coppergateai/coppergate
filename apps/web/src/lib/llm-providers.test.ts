@@ -13,6 +13,7 @@ import {
 describe("llm-providers", () => {
   it("recognizes vendor ids", () => {
     assert.equal(isLlmVendorId("openai"), true);
+    assert.equal(isLlmVendorId("cursor"), true);
     assert.equal(isLlmVendorId("ollama"), true);
     assert.equal(isLlmVendorId("default"), false);
   });
@@ -64,6 +65,14 @@ describe("llm-providers", () => {
     );
     assert.equal(normalizeLlmBaseUrl("ollama", ""), "http://127.0.0.1:11434/v1");
     assert.equal(normalizeLlmBaseUrl("custom", "  "), null);
+    assert.equal(normalizeLlmBaseUrl("cursor", "https://evil.example/v1"), null);
+  });
+
+  it("cursor preset requires key and hides base URL", () => {
+    const p = getLlmProvider("cursor")!;
+    assert.equal(p.hideBaseUrl, true);
+    assert.equal(p.requiresKey, true);
+    assert.ok(p.curatedModels.includes("composer-2.5"));
   });
 
   it("openai preset hides base and requires key", () => {

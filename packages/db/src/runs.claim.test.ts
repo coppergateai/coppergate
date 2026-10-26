@@ -281,6 +281,36 @@ describe("agent run claim/lease", { skip: !url }, () => {
     assert.equal(after?.errorCode, "lease_expired_poison");
   });
 
+  it("hard-cancels soft-cancel after lease expiry instead of requeueing", async () => {
+    const { run } = await enqueueAgentRun(db, {
+      workspaceId,
+      projectId,
+      taskId,
+      idempotencyKey: `cancel-reap-${Date.now()}`,
+      estimatedCostMicros: 5_000,
+    });
+    const claimed = await claimRunById(db, run.id, "cancel-reaper", 60_000);
+    assert.ok(claimed);
+
+    await db
+      .update(agentRuns)
+      .set({
+        status: "RUNNING",
+        leaseUntil: new Date(Date.now() - 1_000),
+        cancelRequestedAt: new Date(),
+        startedAt: new Date(),
+      })
+      .where(eq(agentRuns.id, claimed!.id));
+
+    const reaped = await reapStaleRuns(db);
+    assert.ok(reaped.cancelledSoft >= 1);
+    assert.ok(reaped.cancelledRuns.some((r) => r.id === claimed!.id));
+    const after = await getAgentRun(db, claimed!.id);
+    assert.equal(after?.status, "CANCELLED");
+    assert.equal(after?.errorCode, "cancelled");
+    assert.equal(after?.leaseOwner, null);
+  });
+
   it("fails stalled WAITING_CI past finished_at timeout", async () => {
     const prev = process.env.WAITING_CI_TIMEOUT_MS;
     process.env.WAITING_CI_TIMEOUT_MS = "60000";

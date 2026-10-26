@@ -9,7 +9,7 @@ import {
 import { agentRuns, tasks, type AgentRun } from "./schema.js";
 
 export class RunError extends Error {
-  readonly code: "not_found" | "conflict" | "not_owner" | "policy";
+  readonly code: "not_found" | "conflict" | "not_owner" | "policy" | "cancelled";
 
   constructor(code: RunError["code"], message: string) {
     super(message);
@@ -529,11 +529,32 @@ export async function renewRunLease(
         eq(agentRuns.id, runId),
         eq(agentRuns.leaseOwner, workerId),
         sql`${agentRuns.status} in ('RUNNING', 'VALIDATING')`,
+        sql`${agentRuns.cancelRequestedAt} is null`,
       ),
     )
     .returning();
 
   if (!updated) {
+    const [row] = await db
+      .select({
+        leaseOwner: agentRuns.leaseOwner,
+        status: agentRuns.status,
+        cancelRequestedAt: agentRuns.cancelRequestedAt,
+      })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, runId))
+      .limit(1);
+    if (
+      row &&
+      row.leaseOwner === workerId &&
+      row.cancelRequestedAt != null &&
+      (row.status === "RUNNING" || row.status === "VALIDATING")
+    ) {
+      throw new RunError(
+        "cancelled",
+        "Cannot renew lease — cancel requested",
+      );
+    }
     throw new RunError(
       "not_owner",
       "Cannot renew lease — not owner or not RUNNING/VALIDATING",
@@ -560,6 +581,10 @@ export type ReapStaleRunsResult = {
   failedValidating: number;
   /** WAITING_CI past wall-clock without CI accept-ready. */
   failedWaitingCi: number;
+  /** Soft-cancel honored after lease expiry / VALIDATING stuck (never requeue). */
+  cancelledSoft: number;
+  /** Soft-cancelled runs — caller should CANCEL matching tasks. */
+  cancelledRuns: ReapedFailedRun[];
   /** VALIDATING recovered via delivery_checkpoint (PR already shipped). */
   recoveredDelivered: number;
   /** Runs recovered from checkpoint — caller should align task status. */
@@ -608,6 +633,7 @@ async function releaseFailedEstimates(
 
 /**
  * Reaper:
+ * - soft-cancel + expired/stuck lease → CANCELLED (never requeue / recover / poison)
  * - expired RUNNING + reclaim budget / wall-clock OK → QUEUED (increment reclaim count)
  * - expired RUNNING + poison (max reclaims or wall-clock) → FAILED
  * - expired VALIDATING → FAILED (fail closed; not safe to re-queue mid-validation)
@@ -622,6 +648,36 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
   const waitingCiCutoff = new Date(
     Date.now() - resolveWaitingCiTimeoutMs(),
   ).toISOString();
+
+  // Soft-cancel first: cancel-requested runs must not requeue, recover to
+  // WAITING_CI, or sit immortal because other reaper paths skip them.
+  const cancelledSoftRows = await db.$client<FailedRow[]>`
+    UPDATE agent_runs
+    SET
+      status = 'CANCELLED',
+      error_code = 'cancelled',
+      error_message = 'Cancel requested — lease expired without worker honor',
+      lease_owner = NULL,
+      lease_until = NULL,
+      finished_at = now(),
+      updated_at = now()
+    WHERE status IN ('RUNNING', 'VALIDATING')
+      AND cancel_requested_at IS NOT NULL
+      AND (
+        (lease_until IS NOT NULL AND lease_until < now())
+        OR (
+          lease_until IS NULL
+          AND status = 'VALIDATING'
+          AND updated_at < ${validatingStuckCutoff}::timestamptz
+        )
+        OR (
+          status = 'RUNNING'
+          AND started_at IS NOT NULL
+          AND started_at < ${wallCutoff}::timestamptz
+        )
+      )
+    RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
+  `;
 
   const poisonRows = await db.$client<FailedRow[]>`
     UPDATE agent_runs
@@ -766,6 +822,7 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
     RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
   `;
 
+  const cancelledRuns = mapFailedRows(cancelledSoftRows);
   const failedPoison = mapFailedRows(poisonRows);
   const failedValidatingRuns = mapFailedRows(failedValidatingRows);
   const failedWaitingCi = mapFailedRows(failedWaitingCiRows);
@@ -774,13 +831,15 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
     ...failedValidatingRuns,
     ...failedWaitingCi,
   ];
-  await releaseFailedEstimates(db, failedRuns);
+  await releaseFailedEstimates(db, [...cancelledRuns, ...failedRuns]);
 
   return {
     requeued: requeuedRows.length,
     failedPoison: failedPoison.length,
     failedValidating: failedValidatingRuns.length,
     failedWaitingCi: failedWaitingCi.length,
+    cancelledSoft: cancelledRuns.length,
+    cancelledRuns,
     recoveredDelivered: recoveredDeliveredRuns.length,
     recoveredDeliveredRuns,
     failedRuns,

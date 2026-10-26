@@ -62,9 +62,12 @@ export function SecuritySection() {
           <Link className={styles.btnSecondary} href="/security">
             Read security overview
           </Link>
-          <Link className={styles.btnSecondary} href="/docs/limitations">
-            See limitations
+          <Link className={styles.btnSecondary} href="/docs/open-program-runtime">
+            Open Program Runtime
           </Link>
+          <a className={styles.inlineDocLink} href="#get-started">
+            Get started →
+          </a>
         </div>
       </div>
     </section>

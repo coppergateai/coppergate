@@ -705,6 +705,21 @@
   color: var(--paper);
 }
 
+.heroDocLink {
+  margin: 0.85rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 550;
+}
+
+.heroDocLink a {
+  color: var(--copper-hot);
+  text-decoration: none;
+}
+
+.heroDocLink a:hover {
+  text-decoration: underline;
+}
+
 .trustList {
   list-style: none;
   margin: 1.15rem 0 0;

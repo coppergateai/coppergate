@@ -13,7 +13,7 @@
 - Validation failures → run `FAILED` + `validation_report` artifact; task `FAILED`; user retries with a new attempt/idempotency key.
 - CI failure evidence → `ci_failed` blocks accept; user requests changes or rejects.
 - Budget paused / insufficient → enqueue and worker execute fail closed; resume spend in settings.
-- LLM provider outages: set `LLM_FALLBACK_API_KEY` (+ optional `LLM_FALLBACK_BASE_URL` / `LLM_FALLBACK_MODEL`) for one automatic failover on thrown 429/5xx/network failures only.
+- LLM provider outages / OpenAI quota: set a Cursor BYOK connection (Settings → LLM, vendor Cursor) or `CURSOR_API_KEY` (+ optional `CURSOR_MODEL`) so the worker wraps `FailoverCodingAgent` and switches once on thrown 429/5xx/network **or** `provider_quota` error events. Alternatively use OpenAI-compatible `LLM_FALLBACK_API_KEY` (+ optional `LLM_FALLBACK_BASE_URL` / `LLM_FALLBACK_MODEL`). Arena pauses only when primary **and** fallback both fail.
 - Accept is blocked while the latest run status is `WAITING_CI` (status is authoritative; missing `fitness:pending` events must not open Accept).
 
 ## Credential / deletion

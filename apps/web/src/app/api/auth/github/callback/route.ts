@@ -6,7 +6,7 @@ import {
   establishSession,
   sessionCookieOptions,
 } from "@coppergate/auth";
-import { upsertGithubUser } from "@coppergate/db";
+import { tryConsumeSignedState, upsertGithubUser } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -41,6 +41,16 @@ export async function GET(request: Request) {
     const expected = jar.get(OAUTH_STATE_COOKIE)?.value;
     if (!expected || expected !== state) {
       throw new ApiError("forbidden", "Invalid OAuth state");
+    }
+
+    // Single-use — cookie clear alone does not stop replay within the TTL window.
+    const consumed = await tryConsumeSignedState(db, {
+      jti: `oauth_login:github:${state}`,
+      kind: "oauth_login",
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    });
+    if (!consumed) {
+      throw new ApiError("forbidden", "OAuth state already used");
     }
 
     const config = githubOAuthConfig();

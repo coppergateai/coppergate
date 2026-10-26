@@ -27,7 +27,8 @@ async function resolveRun(
     return row ?? null;
   }
   if (input.headSha && input.workspaceId) {
-    const [row] = await db
+    // Require a unique match — ambiguous SHAs must supply runId.
+    const rows = await db
       .select()
       .from(agentRuns)
       .where(
@@ -37,8 +38,9 @@ async function resolveRun(
         ),
       )
       .orderBy(desc(agentRuns.createdAt))
-      .limit(1);
-    return row ?? null;
+      .limit(2);
+    if (rows.length !== 1) return null;
+    return rows[0] ?? null;
   }
   return null;
 }

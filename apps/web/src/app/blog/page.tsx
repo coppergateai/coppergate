@@ -61,8 +61,8 @@ export default async function BlogIndexPage() {
         <p className={styles.pageEyebrow}>Blog</p>
         <h1 className={styles.pageTitle}>Blog</h1>
         <p className={styles.pageLede}>
-          Notes on selection pressure, spend caps, and verified delivery — from
-          the Coppergate team.
+          Notes on Open Program Runtime, Contracted Autonomy, and Ship Receipts
+          — from the Coppergate team.
         </p>
 
         {posts.length === 0 ? (
@@ -99,14 +99,12 @@ export default async function BlogIndexPage() {
           >
             Self-host guide
           </a>
-          <a
+          <Link
             className={styles.btnSecondary}
-            href="https://github.com/coppergateai/coppergate"
-            target="_blank"
-            rel="noreferrer"
+            href="/docs/open-program-runtime"
           >
-            View on GitHub
-          </a>
+            Open Program Runtime
+          </Link>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted
           </Link>

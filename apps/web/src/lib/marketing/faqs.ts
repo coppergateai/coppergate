@@ -31,7 +31,7 @@ export const LANDING_FAQS: readonly FaqItem[] = [
   },
   {
     q: "What are Signal Adapters?",
-    a: "Inbound webhooks from tools you already run — Jira, Linear, Sonar, Sentry, CI failures, and others. Coppergate verifies and dedupes the event, then can arm a bounded Arena. Notify supports Slack, Teams, or Discord webhooks.",
+    a: "Inbound webhooks from tools you already run — Jira, Linear, Sonar, Sentry, CI failures, and others. Coppergate verifies and dedupes the event, then can arm a bounded Arena against an Open ID. Notify supports Slack, Teams, or Discord webhooks.",
   },
   {
     q: "What happens when a contender hits its budget?",

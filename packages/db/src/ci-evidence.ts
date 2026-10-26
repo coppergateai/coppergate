@@ -256,48 +256,81 @@ export async function listRunCiChecks(
   return [...byName.values()];
 }
 
+/** Parse CI_REQUIRED_CHECK_NAMES (default: branch-protection "test"). */
+export function resolveRequiredCheckNames(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  return (env.CI_REQUIRED_CHECK_NAMES ?? "test")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Score CI checks for accept / promote.
+ *
+ * When required names are configured, unrelated helper greens must NOT satisfy
+ * the gate while the required context is still missing (fail closed / pending).
+ * Empty checks remain vacuous (synthetic `no_required_checks` evidence path).
+ */
+export function scoreCiChecks(
+  checks: Pick<RunCiCheckSummary, "name" | "passed" | "blocksAccept">[],
+  options: {
+    requiredNames: string[];
+    statusAwaitingCi: boolean;
+  },
+): Omit<RunCiFitness, "checks"> {
+  const requiredNames = new Set(options.requiredNames);
+  const requiredConfigured = requiredNames.size > 0;
+  const isRequired = (name: string) =>
+    !requiredConfigured || requiredNames.has(name);
+  const requiredReported = checks.filter((c) => isRequired(c.name));
+  // Only required contexts block accept — helper jobs often fail without gating merge.
+  const blocking = requiredReported.some((c) => c.blocksAccept);
+
+  let passed: boolean;
+  if (!requiredConfigured) {
+    passed =
+      checks.some((c) => c.passed && !c.blocksAccept) || checks.length === 0;
+  } else if (requiredReported.length === 0) {
+    // Required configured but none reported: empty = vacuous; helpers alone ≠ pass.
+    passed = checks.length === 0;
+  } else {
+    passed = requiredReported.some((c) => c.passed) && !blocking;
+  }
+
+  const awaitingLive = options.statusAwaitingCi;
+  const ciSatisfied = !blocking && passed;
+  const acceptReady = !options.statusAwaitingCi && !blocking && passed;
+
+  return {
+    blocking,
+    passed,
+    awaitingLive,
+    ciSatisfied,
+    acceptReady,
+  };
+}
+
 export async function getRunCiFitness(
   db: Database,
   runId: string,
 ): Promise<RunCiFitness> {
   const checks = await listRunCiChecks(db, runId);
-  // Only required contexts block accept (default: branch-protection "test").
-  // Helper jobs (branch-name validate, auto-merge enable) often fail without gating merge.
-  const requiredNames = new Set(
-    (process.env.CI_REQUIRED_CHECK_NAMES ?? "test")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
-  const isRequired = (name: string) =>
-    requiredNames.size === 0 || requiredNames.has(name);
-  const requiredReported = checks.filter((c) => isRequired(c.name));
-  const blocking = requiredReported.some((c) => c.blocksAccept);
-  const passed =
-    requiredReported.length === 0
-      ? checks.some((c) => c.passed && !c.blocksAccept) || checks.length === 0
-      : requiredReported.some((c) => c.passed) && !blocking;
-
   const [run] = await db
     .select({ status: agentRuns.status })
     .from(agentRuns)
     .where(eq(agentRuns.id, runId))
     .limit(1);
   const statusAwaitingCi = run?.status === "WAITING_CI";
-
-  // Run status is source of truth — ignore stale fitness:pending events after promote.
-  const awaitingLive = statusAwaitingCi;
-  const ciSatisfied = !blocking && passed;
-  // Accept stays fail-closed until promoted out of WAITING_CI.
-  const acceptReady = !statusAwaitingCi && !blocking && passed;
+  const scored = scoreCiChecks(checks, {
+    requiredNames: resolveRequiredCheckNames(),
+    statusAwaitingCi,
+  });
 
   return {
     checks,
-    blocking,
-    passed,
-    awaitingLive,
-    ciSatisfied,
-    acceptReady,
+    ...scored,
   };
 }
 

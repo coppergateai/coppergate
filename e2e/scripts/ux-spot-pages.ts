@@ -20,6 +20,10 @@ const pages = [
     path: `/workspaces/${ws}/arena`,
   },
   {
+    id: "spot-inbox",
+    path: `/workspaces/${ws}/inbox`,
+  },
+  {
     id: "spot-project-overview",
     path: `/workspaces/${ws}/projects/1cf9259c-3ee3-439e-b6f5-d76ce775eea3`,
   },
@@ -30,6 +34,14 @@ const pages = [
   {
     id: "spot-task-detail",
     path: `/workspaces/${ws}/projects/3a045149-ae58-4321-a4f2-2099f89fd720/tasks/ff2e0570-d8bd-4478-876e-b2adb0367610`,
+  },
+  {
+    id: "spot-settings",
+    path: `/workspaces/${ws}/settings`,
+  },
+  {
+    id: "spot-projects",
+    path: `/workspaces/${ws}/projects`,
   },
 ];
 

@@ -13,7 +13,6 @@ export class FakeSignalAdapter implements SignalAdapter {
     headers: Headers | Record<string, string | null | undefined>;
     secret?: string | null;
   }) {
-    if (!input.secret) return { ok: true as const };
     return verifySharedSecret(input);
   }
 

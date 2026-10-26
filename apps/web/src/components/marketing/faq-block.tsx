@@ -18,8 +18,8 @@ export function FaqBlock() {
               Straight answers.
             </h2>
             <p className={styles.faqLede}>
-              What it does, how selection works, and what stays under your
-              control — before you clone or try hosted.
+              Contracted Autonomy, Open Program spend licenses, and Ship
+              Receipts — before you clone or try hosted.
             </p>
             <div className={styles.faqCtas}>
               <a
@@ -30,14 +30,12 @@ export function FaqBlock() {
               >
                 Self-host guide
               </a>
-              <a
+              <Link
                 className={styles.btnSecondary}
-                href="https://github.com/coppergateai/coppergate"
-                target="_blank"
-                rel="noreferrer"
+                href="/docs/open-program-runtime"
               >
-                View on GitHub
-              </a>
+                Open Program Runtime
+              </Link>
               <Link className={styles.btnSecondary} href="/login">
                 Try hosted
               </Link>

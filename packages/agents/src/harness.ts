@@ -2,6 +2,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AgentEvent, AgentRunInput, CodingAgent } from "./types.js";
 import { createCodingAgent } from "./create-agent.js";
+import {
+  CursorSdkCodingAgent,
+  type CursorSdkBridge,
+} from "./cursor-sdk.js";
 import { FakeCodingAgent } from "./fake.js";
 import type { OpenAiCompatibleConfig } from "./openai-compatible.js";
 import { resolveSafeWorkdirPath } from "./path-policy.js";
@@ -16,6 +20,7 @@ export type ContenderHarnessKind =
   | "native_openai"
   | "openhands"
   | "aider"
+  | "cursor_local"
   | "cursor_cloud"
   | "codex";
 
@@ -152,6 +157,17 @@ export class OpenHandsSandboxHarness implements ContenderHarness {
 /** @deprecated Use OpenHandsSandboxHarness — kept as alias for imports. */
 export const OpenHandsHarnessStub = OpenHandsSandboxHarness;
 
+/** Live Cursor local SDK harness (BYOK / CURSOR_API_KEY). */
+export class CursorLocalHarness implements ContenderHarness {
+  readonly kind = "cursor_local" as const;
+  readonly capability =
+    "Cursor local SDK (@cursor/sdk) — mutates sandbox workdir; BYOK vendor=cursor";
+  constructor(private readonly agent: CodingAgent) {}
+  run(input: AgentRunInput) {
+    return this.agent.run(input);
+  }
+}
+
 /** Cursor Cloud / Codex stub (TASK115) — API wait-state. */
 export class CursorCloudHarnessStub implements ContenderHarness {
   readonly kind = "cursor_cloud" as const;
@@ -164,7 +180,7 @@ export class CursorCloudHarnessStub implements ContenderHarness {
       yield {
         kind: "error",
         message:
-          "Cursor Cloud / Codex harness not available. Use workspace BYOK native OpenAI-compatible agent.",
+          "Cursor Cloud harness not available. Use BYOK vendor=cursor (cursor_local) or OpenAI-compatible agent.",
         payload: { code: "harness_stub_disabled", harness: this.kind },
       };
       return;
@@ -181,6 +197,11 @@ export class CursorCloudHarnessStub implements ContenderHarness {
 export type CreateHarnessOptions = {
   kind?: ContenderHarnessKind;
   openai?: OpenAiCompatibleConfig;
+  cursor?: {
+    apiKey: string;
+    model?: string;
+    bridge?: CursorSdkBridge;
+  };
 };
 
 export function createContenderHarness(
@@ -200,6 +221,22 @@ export function createContenderHarness(
           fetchImpl: opts.openai.fetchImpl,
         }),
       );
+    case "cursor_local": {
+      const apiKey =
+        opts.cursor?.apiKey?.trim() ||
+        process.env.CURSOR_API_KEY?.trim() ||
+        "";
+      if (!apiKey) {
+        throw new Error("cursor_local harness requires cursor.apiKey or CURSOR_API_KEY");
+      }
+      return new CursorLocalHarness(
+        new CursorSdkCodingAgent({
+          apiKey,
+          model: opts.cursor?.model,
+          bridge: opts.cursor?.bridge,
+        }),
+      );
+    }
     case "openhands":
     case "aider":
       return new OpenHandsSandboxHarness();

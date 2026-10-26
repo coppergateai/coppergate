@@ -345,6 +345,8 @@ export function TaskDetailPanel({
         };
       }
       if (task.status === "FAILED") {
+        // Gate banner already owns delivery-failed + recovery when evidence rows exist.
+        if (evidenceGates.length > 0) return null;
         return {
           title: "Run failed",
           body: "Open the activity log, then Retry. See /docs/recovery for self-serve steps.",
