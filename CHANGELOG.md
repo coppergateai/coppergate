@@ -3,9 +3,6 @@
 ## [Unreleased]
 
 ### Added
-- P-104: Program Runtime (Contracted Autonomy) Spend License capability.
-  - Reserve and fan-out spend licenses within $8 monthly envelope.
-  - Issue ID badges to agents.
-  - Accept spend license and generate Ship Receipt.
-  - User-facing docs added under `/docs/-program-runtime.md`.
-  - Comprehensive unit tests for runtime logic.
+- Implemented Program Runtime Spend License (P-104) with reservation, fan-out, ID badges, acceptance, ship receipt, and writeback.
+- Added `/docs/-program-runtime.md` documentation landing page.
+- Added unit tests covering license lifecycle and spend envelope enforcement.
