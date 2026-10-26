@@ -2,141 +2,99 @@ package runtime
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 )
 
-// Constants for spend limits
-const (
-	MonthlyEnvelopeLimit = 8.00 // $8 monthly envelope
-)
-
-// IDBadge represents a program identity badge
-type IDBadge struct {
-	ProgramID string
-	IssuedAt  time.Time
-	Valid     bool
-}
-
-// SpendLicense represents a reserved spend license for runtime autonomy
-type SpendLicense struct {
-	LicenseID   string
-	ProgramID   string
-	Amount      float64
-	IssuedAt    time.Time
-	Accepted    bool
-	ShipReceipt string
-}
-
-// SpendLicenseManager manages spend licenses and ID badges
+// SpendLicenseManager manages spend licenses for program runtime executions.
 type SpendLicenseManager struct {
-	mu             sync.Mutex
-	badges         map[string]IDBadge
-	licenses       map[string]SpendLicense
-	monthlySpend   map[string]float64 // programID -> spend this month
-	currentMonth   time.Month
-	currentYear    int
+	mu            sync.Mutex
+	monthlyBudget int64 // in cents
+	usedThisMonth int64 // in cents
+	reservations  map[string]*SpendReservation
 }
 
-// NewSpendLicenseManager creates a new SpendLicenseManager
-func NewSpendLicenseManager() *SpendLicenseManager {
-	now := time.Now()
+// SpendReservation represents a reserved spend license.
+type SpendReservation struct {
+	ID        string
+	Amount    int64 // in cents
+	CreatedAt time.Time
+	Used      bool
+}
+
+// NewSpendLicenseManager creates a new SpendLicenseManager with the given monthly budget (in cents).
+func NewSpendLicenseManager(monthlyBudget int64) *SpendLicenseManager {
 	return &SpendLicenseManager{
-		badges:       make(map[string]IDBadge),
-		licenses:     make(map[string]SpendLicense),
-		monthlySpend: make(map[string]float64),
-		currentMonth: now.Month(),
-		currentYear:  now.Year(),
+		monthlyBudget: monthlyBudget,
+		reservations:  make(map[string]*SpendReservation),
 	}
 }
 
-// IssueIDBadge issues a new ID badge for a program
-func (m *SpendLicenseManager) IssueIDBadge(programID string) IDBadge {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	badge := IDBadge{
-		ProgramID: programID,
-		IssuedAt:  time.Now(),
-		Valid:     true,
-	}
-	m.badges[programID] = badge
-	return badge
-}
-
-// ValidateIDBadge checks if the badge is valid
-func (m *SpendLicenseManager) ValidateIDBadge(badge IDBadge) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	stored, ok := m.badges[badge.ProgramID]
-	if !ok {
-		return false
-	}
-	return stored.Valid && stored.IssuedAt.Equal(badge.IssuedAt)
-}
-
-// ReserveSpendLicense reserves a spend license for a program if within monthly envelope
-func (m *SpendLicenseManager) ReserveSpendLicense(programID string, amount float64) (SpendLicense, error) {
+// Reserve attempts to reserve a spend license for the given amount (in cents).
+// Returns a reservation ID or error if budget exceeded.
+func (m *SpendLicenseManager) Reserve(id string, amount int64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	now := time.Now()
-	if now.Month() != m.currentMonth || now.Year() != m.currentYear {
-		// Reset monthly spend tracking on month change
-		m.monthlySpend = make(map[string]float64)
-		m.currentMonth = now.Month()
-		m.currentYear = now.Year()
+	if amount <= 0 {
+		return errors.New("amount must be positive")
 	}
 
-	currentSpend := m.monthlySpend[programID]
-	if currentSpend+amount > MonthlyEnvelopeLimit {
-		return SpendLicense{}, fmt.Errorf("monthly spend envelope exceeded for program %s", programID)
+	if m.usedThisMonth+amount > m.monthlyBudget {
+		return errors.New("monthly spend budget exceeded")
 	}
 
-	licenseID := fmt.Sprintf("%s-%d", programID, now.UnixNano())
-	license := SpendLicense{
-		LicenseID: licenseID,
-		ProgramID: programID,
+	if _, exists := m.reservations[id]; exists {
+		return errors.New("reservation ID already exists")
+	}
+
+	m.reservations[id] = &SpendReservation{
+		ID:        id,
 		Amount:    amount,
-		IssuedAt:  now,
-		Accepted:  false,
+		CreatedAt: time.Now(),
+		Used:      false,
 	}
-	m.licenses[licenseID] = license
-	m.monthlySpend[programID] = currentSpend + amount
-	return license, nil
-}
-
-// AcceptSpendLicense marks a spend license as accepted and generates a ship receipt
-func (m *SpendLicenseManager) AcceptSpendLicense(licenseID string) (string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	license, ok := m.licenses[licenseID]
-	if !ok {
-		return "", errors.New("license not found")
-	}
-	if license.Accepted {
-		return "", errors.New("license already accepted")
-	}
-	license.Accepted = true
-	license.ShipReceipt = fmt.Sprintf("SHIP-RECEIPT-%s-%d", license.LicenseID, time.Now().UnixNano())
-	m.licenses[licenseID] = license
-	return license.ShipReceipt, nil
-}
-
-// LandingWriteback simulates landing and writing back spend license state
-func (m *SpendLicenseManager) LandingWriteback(licenseID string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	license, ok := m.licenses[licenseID]
-	if !ok {
-		return errors.New("license not found")
-	}
-	if !license.Accepted {
-		return errors.New("license not accepted yet")
-	}
-	// Here we would persist the license state to durable storage.
-	// For this implementation, we simulate success.
+	m.usedThisMonth += amount
 	return nil
+}
+
+// Use marks a reservation as used and returns an error if not found or already used.
+func (m *SpendLicenseManager) Use(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	r, exists := m.reservations[id]
+	if !exists {
+		return errors.New("reservation not found")
+	}
+	if r.Used {
+		return errors.New("reservation already used")
+	}
+	r.Used = true
+	return nil
+}
+
+// Release releases a reservation, freeing up the reserved amount.
+func (m *SpendLicenseManager) Release(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	r, exists := m.reservations[id]
+	if !exists {
+		return errors.New("reservation not found")
+	}
+	if !r.Used {
+		m.usedThisMonth -= r.Amount
+	}
+	delete(m.reservations, id)
+	return nil
+}
+
+// ResetMonthlyUsage resets the monthly usage counter. Should be called once per month.
+func (m *SpendLicenseManager) ResetMonthlyUsage() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.usedThisMonth = 0
+	m.reservations = make(map[string]*SpendReservation)
 }
