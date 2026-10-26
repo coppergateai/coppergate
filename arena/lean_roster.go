@@ -6,63 +6,82 @@ import (
 )
 
 // LeanRoster manages a minimal set of micros under a tight budget.
-// It only allows Engineer and Reviewer roles, and disallows FULL_ARENA spawns.
+// It only allows Engineer+reviewer roles and prevents FULL_ARENA spawn.
+// Designed for monthly budget envelope of $8 and micros under $2 each.
 type LeanRoster struct {
-	mu     sync.Mutex
-	micros map[string]*Micro
-	budget float64 // monthly budget envelope in dollars
-	spent  float64
+	mu      sync.Mutex
+	micros  map[string]*Micro
+	budget  float64
+	spent   float64
+	maxCost float64
 }
 
-// Micro represents a minimal unit with role and cost.
+// Micro represents a microservice or micro unit with cost and role.
 type Micro struct {
-	ID   string
-	Role Role
-	Cost float64
+	ID    string
+	Cost  float64
+	Role  Role
+	Alive bool
 }
 
-// Role defines allowed roles for micros.
-type Role string
+// Role defines the role of a micro.
+type Role int
 
 const (
-	RoleEngineer Role = "Engineer"
-	RoleReviewer Role = "Reviewer"
-	RoleFullArena Role = "FULL_ARENA"
+	RoleUnknown Role = iota
+	RoleEngineer
+	RoleReviewer
+	RoleFullArena // disallowed in lean roster
 )
 
-// NewLeanRoster creates a new LeanRoster with given budget envelope.
-func NewLeanRoster(budget float64) *LeanRoster {
+var (
+	ErrBudgetExceeded   = errors.New("budget exceeded")
+	ErrRoleNotAllowed   = errors.New("role not allowed in lean roster")
+	ErrFullArenaDisallow = errors.New("FULL_ARENA spawn disallowed under tight budget")
+)
+
+// NewLeanRoster creates a new lean roster with given monthly budget envelope and max micro cost.
+func NewLeanRoster(monthlyBudget float64, maxMicroCost float64) *LeanRoster {
 	return &LeanRoster{
-		micros: make(map[string]*Micro),
-		budget: budget,
+		micros:  make(map[string]*Micro),
+		budget:  monthlyBudget,
+		maxCost: maxMicroCost,
 	}
 }
 
-// AddMicro attempts to add a micro to the roster.
-// Returns error if role is disallowed, cost exceeds budget, or ID duplicate.
+// AddMicro attempts to add a micro to the lean roster.
+// Only Engineer and Reviewer roles allowed.
+// Reject FULL_ARENA role.
+// Reject if cost exceeds maxMicroCost or budget exceeded.
 func (lr *LeanRoster) AddMicro(m *Micro) error {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
 
-	if m.Role != RoleEngineer && m.Role != RoleReviewer {
-		return errors.New("disallowed role: only Engineer and Reviewer allowed in lean roster")
+	if m.Role == RoleFullArena {
+		return ErrFullArenaDisallow
 	}
-	if m.Cost > 2.0 {
-		return errors.New("micro cost exceeds $2 limit")
+	if m.Role != RoleEngineer && m.Role != RoleReviewer {
+		return ErrRoleNotAllowed
+	}
+	if m.Cost > lr.maxCost {
+		return ErrBudgetExceeded
 	}
 	if lr.spent+m.Cost > lr.budget {
-		return errors.New("budget exceeded")
+		return ErrBudgetExceeded
 	}
+
 	if _, exists := lr.micros[m.ID]; exists {
-		return errors.New("micro ID already exists")
+		// Already present, no cost increment
+		return nil
 	}
 
 	lr.micros[m.ID] = m
 	lr.spent += m.Cost
+	m.Alive = true
 	return nil
 }
 
-// RemoveMicro removes a micro by ID, freeing budget.
+// RemoveMicro removes a micro from the roster and frees budget.
 func (lr *LeanRoster) RemoveMicro(id string) {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
@@ -70,23 +89,24 @@ func (lr *LeanRoster) RemoveMicro(id string) {
 	if m, exists := lr.micros[id]; exists {
 		delete(lr.micros, id)
 		lr.spent -= m.Cost
+		m.Alive = false
 	}
 }
 
-// GetMicros returns a snapshot list of current micros.
-func (lr *LeanRoster) GetMicros() []*Micro {
+// ListMicros returns a snapshot list of current micros.
+func (lr *LeanRoster) ListMicros() []*Micro {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
 
-	result := make([]*Micro, 0, len(lr.micros))
+	list := make([]*Micro, 0, len(lr.micros))
 	for _, m := range lr.micros {
-		result = append(result, m)
+		list = append(list, m)
 	}
-	return result
+	return list
 }
 
-// TotalSpent returns the current spent budget.
-func (lr *LeanRoster) TotalSpent() float64 {
+// CurrentSpent returns the current spent budget.
+func (lr *LeanRoster) CurrentSpent() float64 {
 	lr.mu.Lock()
 	defer lr.mu.Unlock()
 	return lr.spent
