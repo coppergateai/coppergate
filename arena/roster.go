@@ -1,15 +1,12 @@
 // Package arena provides memory arena management with lean roster support.
 //
 // AG-012: Implements lean roster allocation under tight budget constraints.
-// When availableMicros < $2, only Engineer+reviewer roles are allowed in the roster,
-// and FULL_ARENA spawn is disabled to keep memory usage minimal.
-//
-// This feature helps maintain a lean memory footprint under a strict $8 monthly budget.
+// When availableMicros budget is under $2, only Engineer+reviewer roles are allowed,
+// and FULL_ARENA spawn is disabled to keep memory usage lean.
 package arena
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -23,101 +20,68 @@ const (
 	RoleFullArena
 )
 
-// String returns the string representation of the Role.
-func (r Role) String() string {
-	switch r {
-	case RoleEngineer:
-		return "Engineer"
-	case RoleReviewer:
-		return "Reviewer"
-	case RoleFullArena:
-		return "FullArena"
-	default:
-		return "Unknown"
-	}
+// ErrFullArenaNotAllowed indicates FULL_ARENA spawn is disallowed under budget.
+var ErrFullArenaNotAllowed = errors.New("FULL_ARENA spawn disallowed under tight budget")
+
+// RosterEntry represents a single user in the roster.
+type RosterEntry struct {
+	UserID string
+	Role   Role
 }
 
-// User represents a user in the roster.
-type User struct {
-	ID   string
-	Role Role
-}
-
-// Roster manages a list of users with roles.
+// Roster manages a list of users allocated in the arena.
 type Roster struct {
-	mu    sync.Mutex
-	users []User
+	mu      sync.Mutex
+	entries []RosterEntry
 
-	// availableMicros is the available micro budget in dollars * 1e6.
-	// For example, $2 = 2_000_000 micros.
+	// availableMicros is the current budget in microseconds.
 	availableMicros int64
 }
 
-// NewRoster creates a new Roster with the given availableMicros budget.
+// NewRoster creates a new Roster with a given availableMicros budget.
 func NewRoster(availableMicros int64) *Roster {
 	return &Roster{
-		users:          make([]User, 0),
+		entries:        []RosterEntry{},
 		availableMicros: availableMicros,
 	}
 }
 
-// AddUser adds a user to the roster if allowed under the current budget and rules.
-// Returns error if the user role is disallowed or budget exceeded.
-func (r *Roster) AddUser(user User) error {
+// AddEntry attempts to add a user with a role to the roster.
+// Under $2 (2,000,000 micros) budget, only Engineer and Reviewer roles are allowed.
+// FULL_ARENA spawn is disallowed under this budget.
+func (r *Roster) AddEntry(userID string, role Role) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// If budget is under $2 (2_000_000 micros), only Engineer and Reviewer allowed.
 	if r.availableMicros < 2_000_000 {
-		if user.Role == RoleFullArena {
-			return fmt.Errorf("FULL_ARENA spawn disallowed under tight budget (<$2)")
+		if role == RoleFullArena {
+			return ErrFullArenaNotAllowed
+		}
+		// Only Engineer and Reviewer allowed under tight budget.
+		if role != RoleEngineer && role != RoleReviewer {
+			return errors.New("role not allowed under tight budget")
 		}
 	}
 
-	// Enforce roles allowed under lean roster when budget < $2.
-	if r.availableMicros < 2_000_000 {
-		if user.Role != RoleEngineer && user.Role != RoleReviewer {
-			return fmt.Errorf("role %s disallowed under lean roster budget (<$2)", user.Role)
-		}
-	}
-
-	r.users = append(r.users, user)
+	r.entries = append(r.entries, RosterEntry{
+		UserID: userID,
+		Role:   role,
+	})
 	return nil
 }
 
-// Users returns a copy of the current users in the roster.
-func (r *Roster) Users() []User {
+// Entries returns a copy of the current roster entries.
+func (r *Roster) Entries() []RosterEntry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	cpy := make([]User, len(r.users))
-	copy(cpy, r.users)
-	return cpy
+	entriesCopy := make([]RosterEntry, len(r.entries))
+	copy(entriesCopy, r.entries)
+	return entriesCopy
 }
 
-// AvailableMicros returns the current available micro budget.
-func (r *Roster) AvailableMicros() int64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.availableMicros
-}
-
-// SetAvailableMicros updates the available micro budget.
+// SetAvailableMicros updates the availableMicros budget.
 func (r *Roster) SetAvailableMicros(micros int64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.availableMicros = micros
-}
-
-// SpawnArena attempts to spawn a FULL_ARENA if budget allows.
-// Returns error if FULL_ARENA spawn is disallowed under the current budget.
-func (r *Roster) SpawnArena() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if r.availableMicros < 2_000_000 {
-		return errors.New("FULL_ARENA spawn disallowed under tight budget (<$2)")
-	}
-	// Simulate spawn logic here (omitted for brevity).
-	return nil
 }
