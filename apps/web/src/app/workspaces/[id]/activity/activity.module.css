@@ -31,7 +31,7 @@
 }
 
 .head {
-  padding: 1.35rem 1.35rem 0;
+  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 0;
 }
 
 .eyebrow {
@@ -98,7 +98,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
-  margin: 0.95rem 1.35rem 0;
+  margin: 0.95rem var(--app-pad-x-lg) 0;
   padding: 0.15rem 0;
   color: var(--mute);
   font-size: 0.8rem;
@@ -141,7 +141,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem 1rem;
-  margin: 1.1rem 1.35rem 0;
+  margin: 1.1rem var(--app-pad-x-lg) 0;
   padding-bottom: 0.15rem;
   border-bottom: 1px solid var(--line);
 }
@@ -226,7 +226,7 @@
 }
 
 .body {
-  padding: 0.85rem 1.35rem 2.5rem;
+  padding: 0.85rem var(--app-pad-x-lg) 2.5rem;
   flex: 1;
 }
 
@@ -408,7 +408,7 @@
 }
 
 .badgeFailed {
-  border-color: rgba(181, 61, 61, 0.35);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   color: var(--danger);
 }
 
@@ -482,31 +482,47 @@
 }
 
 .empty {
-  padding: 2.5rem 1.25rem;
+  display: grid;
+  place-items: center;
+  gap: 0.35rem;
+  padding: 3rem var(--app-pad-x) 3.25rem;
   border: 1px dashed var(--line);
   border-radius: var(--radius);
   text-align: center;
-  background: var(--surface);
+  background:
+    radial-gradient(
+      70% 80% at 50% 0%,
+      var(--copper-fill-soft),
+      transparent 60%
+    ),
+    var(--surface);
 }
 
 .emptyTitle {
   margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
   color: var(--paper);
 }
 
 .emptyBody {
-  margin: 0.4rem 0 0;
-  font-size: 0.85rem;
+  margin: 0.15rem 0 0;
+  max-width: 26rem;
+  font-size: 0.88rem;
   color: var(--mute);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .emptyLink {
   color: var(--copper-hot);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.emptyLink:hover {
+  color: var(--copper);
 }
 
 .kbdHint {
@@ -704,13 +720,13 @@
 }
 
 .outcomeBoxOk {
-  border-color: rgba(31, 122, 69, 0.28);
-  background: rgba(31, 122, 69, 0.06);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
 }
 
 .outcomeBoxFail {
-  border-color: rgba(181, 61, 61, 0.28);
-  background: rgba(181, 61, 61, 0.06);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
 }
 
 .outcomeTitle {
@@ -731,6 +747,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.actionsSpaced {
+  margin-top: 0.75rem;
 }
 
 .actionPrimary,

@@ -695,7 +695,7 @@ export function ActivityShell({
                         This event links to a delivery. Open the related task to
                         inspect CI, fitness, and delivery artifacts.
                       </p>
-                      <div className={styles.actions} style={{ marginTop: "0.75rem" }}>
+                      <div className={`${styles.actions} ${styles.actionsSpaced}`}>
                         <Link
                           href={selected.href}
                           className={styles.actionPrimary}

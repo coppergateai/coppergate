@@ -109,7 +109,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         />
 
         {related.length > 0 ? (
-          <section className={styles.prose} aria-labelledby="related-posts">
+          <section className={styles.relatedPosts} aria-labelledby="related-posts">
             <h2 id="related-posts">Related posts</h2>
             <ul>
               {related.map((item) => (

@@ -19,7 +19,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 0.75rem 1.5rem;
-  padding: 1.1rem 1.35rem 1rem;
+  padding: var(--app-pad-y) var(--app-pad-x-lg) 1rem;
   border-bottom: 1px solid var(--line);
   background:
     radial-gradient(
@@ -62,7 +62,7 @@
   align-items: flex-end;
   gap: 0.85rem 1.15rem;
   overflow-x: auto;
-  padding: 0.55rem 1.15rem 0.65rem;
+  padding: 0.55rem var(--app-pad-x-lg) 0.65rem;
   border-bottom: 1px solid var(--line);
   background: var(--overlay-muted);
   scrollbar-width: thin;
@@ -112,7 +112,7 @@
 
 .tabBtn:hover {
   color: var(--paper);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay);
 }
 
 .tabBtnActive {
@@ -122,20 +122,20 @@
 }
 
 .tabBtnDanger.tabBtnActive {
-  border-color: rgba(248, 113, 113, 0.45);
-  background: rgba(248, 113, 113, 0.1);
-  color: #fecaca;
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 
 .tabPanel {
   flex: 1;
   width: 100%;
   max-width: none;
-  padding: 1.15rem 1.35rem 3rem;
+  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 3rem;
   background:
     radial-gradient(
       60% 40% at 100% 0%,
-      rgba(200, 137, 73, 0.035),
+      var(--copper-fill-soft),
       transparent 50%
     ),
     transparent;
@@ -201,20 +201,20 @@
   height: 3rem;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--ink-soft);
   color: var(--paper);
   flex-shrink: 0;
 }
 
 .scmCardIcon[data-provider="github"] {
-  background: #0d1117;
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #f0f6fc;
+  background: var(--ink-soft);
+  border-color: var(--line);
+  color: var(--paper);
 }
 
 .scmCardIcon[data-provider="gitlab"] {
-  background: #1a1a1a;
-  border-color: rgba(252, 109, 38, 0.35);
+  background: var(--ink-soft);
+  border-color: var(--copper-border);
 }
 
 .scmCardIcon[data-size="sm"] {
@@ -362,7 +362,7 @@
       var(--copper-fill-soft),
       transparent 55%
     ),
-    rgba(255, 255, 255, 0.025);
+    var(--surface);
 }
 
 .statLabel {
@@ -465,15 +465,15 @@
 
 @media (min-width: 960px) {
   .shellHead {
-    padding: 1.25rem 1.75rem 1.1rem;
+    padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 1.1rem;
   }
 
   .tabNav {
-    padding: 0.65rem 1.55rem;
+    padding: 0.65rem var(--app-pad-x-lg);
   }
 
   .tabPanel {
-    padding: 1.4rem 1.75rem 3.25rem;
+    padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 3.25rem;
   }
 }
 
@@ -488,7 +488,7 @@
 
 .metaLink:hover {
   color: var(--copper);
-  border-bottom-color: rgba(184, 115, 51, 0.5);
+  border-bottom-color: var(--copper-border);
 }
 
 .section {
@@ -507,7 +507,7 @@
 
 .sectionLabelDanger {
   margin: 0 0 0.35rem;
-  color: #f87171;
+  color: var(--danger);
   font-size: 0.68rem;
   font-weight: 650;
   letter-spacing: 0.1em;
@@ -530,7 +530,7 @@
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--panel-inset);
   cursor: pointer;
 }
 
@@ -560,8 +560,8 @@
   height: 1.35rem;
   margin: 0;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
+  background: var(--overlay-strong);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -609,17 +609,17 @@
 
 .panel {
   display: grid;
-  gap: 0.85rem;
-  padding: 1.1rem 1.1rem 1.15rem;
+  gap: 0.9rem;
+  padding: 1.15rem 1.2rem 1.25rem;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background:
     radial-gradient(
       90% 70% at 100% 0%,
       var(--copper-fill-soft),
       transparent 55%
     ),
-    rgba(255, 255, 255, 0.02);
+    var(--surface);
 }
 
 .fieldGrid {
@@ -661,7 +661,7 @@
   padding: 0.85rem 0.95rem;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--panel-inset);
 }
 
 .endpointLabel {
@@ -686,7 +686,7 @@
   margin: 0;
   padding: 0.45rem 0.55rem;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay);
   color: var(--paper);
   font-size: 0.75rem;
   line-height: 1.4;
@@ -696,9 +696,9 @@
 .copyBtn {
   min-height: 1.9rem;
   padding: 0.3rem 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface);
   color: var(--paper);
   font: inherit;
   font-size: 0.75rem;
@@ -721,15 +721,15 @@
 .select {
   padding: 0.65rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: var(--paper);
   font: inherit;
   font-size: 0.95rem;
   letter-spacing: -0.01em;
   transition:
     border-color 0.15s ease,
-    background 0.15s ease;
+    box-shadow 0.15s ease;
 }
 
 .select {
@@ -747,47 +747,38 @@
 }
 
 .input::placeholder {
-  color: rgba(255, 255, 255, 0.28);
+  color: var(--mute-soft);
 }
 
 .input:focus,
 .select:focus {
   outline: none;
-  border-color: rgba(184, 115, 51, 0.65);
-  background-color: rgba(0, 0, 0, 0.45);
+  border-color: var(--copper-border-strong);
+  box-shadow: 0 0 0 3px var(--copper-ring);
 }
 
 .submit {
   justify-self: start;
   min-height: 2.25rem;
   padding: 0.45rem 0.95rem;
-  border: 1px solid var(--copper-border);
+  border: none;
   border-radius: 8px;
-  background: linear-gradient(
-    180deg,
-    var(--copper-fill-strong),
-    var(--copper-fill)
-  );
-  color: var(--paper);
+  background: var(--copper);
+  color: var(--on-copper);
   font: inherit;
   font-weight: 650;
   font-size: 0.88rem;
   letter-spacing: -0.015em;
   cursor: pointer;
+  box-shadow: 0 8px 18px var(--copper-ring);
   transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
+    filter 0.15s ease,
     opacity 0.15s ease,
     transform 0.15s ease;
 }
 
 .submit:hover:not(:disabled) {
-  border-color: var(--copper-border-strong);
-  background: linear-gradient(
-    180deg,
-    var(--copper-fill-strong),
-    var(--copper-fill)
-  );
+  filter: brightness(1.05);
   transform: translateY(-1px);
 }
 
@@ -839,31 +830,23 @@
 .primaryBtn {
   min-height: 2.25rem;
   padding: 0.45rem 0.95rem;
-  border: 1px solid var(--copper-border);
+  border: none;
   border-radius: 8px;
-  background: linear-gradient(
-    180deg,
-    var(--copper-fill-strong),
-    var(--copper-fill)
-  );
-  color: var(--paper);
+  background: var(--copper);
+  color: var(--on-copper);
   font: inherit;
   font-weight: 650;
   font-size: 0.88rem;
   letter-spacing: -0.02em;
   cursor: pointer;
+  box-shadow: 0 8px 18px var(--copper-ring);
   transition:
-    background 0.15s ease,
+    filter 0.15s ease,
     opacity 0.15s ease;
 }
 
 .primaryBtn:hover:not(:disabled) {
-  border-color: var(--copper-border-strong);
-  background: linear-gradient(
-    180deg,
-    var(--copper-fill-strong),
-    var(--copper-fill)
-  );
+  filter: brightness(1.05);
 }
 
 .primaryBtn:disabled {
@@ -874,7 +857,7 @@
 .ghostBtn {
   min-height: 2.25rem;
   padding: 0.45rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: transparent;
   color: var(--paper);
@@ -888,9 +871,9 @@
 }
 
 .ghostBtn:hover:not(:disabled) {
-  border-color: rgba(184, 115, 51, 0.55);
+  border-color: var(--copper-border);
   color: var(--mute-strong);
-  background: rgba(184, 115, 51, 0.06);
+  background: var(--copper-fill-soft);
 }
 
 .ghostBtn:disabled {
@@ -922,10 +905,10 @@
   justify-self: start;
   min-height: 2.25rem;
   padding: 0.45rem 0.95rem;
-  border: 1px solid rgba(248, 113, 113, 0.45);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
   border-radius: 8px;
   background: transparent;
-  color: #f87171;
+  color: var(--danger);
   font: inherit;
   font-weight: 600;
   font-size: 0.88rem;
@@ -936,8 +919,8 @@
 }
 
 .dangerBtn:hover:not(:disabled) {
-  background: rgba(248, 113, 113, 0.08);
-  border-color: rgba(248, 113, 113, 0.7);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 70%, transparent);
 }
 
 .dangerBtn:disabled {
@@ -947,13 +930,13 @@
 
 .error {
   margin: 0;
-  color: #f87171;
+  color: var(--danger);
   font-size: 0.875rem;
 }
 
 .ok {
   margin: 0;
-  color: #86efac;
+  color: var(--success-bright);
   font-size: 0.875rem;
 }
 
@@ -993,7 +976,7 @@
   padding: 1.15rem 1.1rem;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--surface);
 }
 
 .readOnly dt {
@@ -1093,11 +1076,15 @@
   display: grid;
   gap: 0.9rem;
   padding: 1.15rem 1.1rem 1.2rem;
-  border: 1px solid rgba(248, 113, 113, 0.22);
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
   border-radius: 10px;
   background:
-    linear-gradient(180deg, rgba(248, 113, 113, 0.05) 0%, transparent 55%),
-    rgba(255, 255, 255, 0.015);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--danger) 6%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--surface);
 }
 
 /* —— Billing —— */
@@ -1126,9 +1113,9 @@
 }
 
 .billingBannerOk {
-  border: 1px solid rgba(134, 239, 172, 0.28);
-  background: rgba(134, 239, 172, 0.08);
-  color: #bbf7d0;
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success-bright);
 }
 
 .billingBannerSync {
@@ -1139,7 +1126,7 @@
 
 .billingBannerMute {
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay);
   color: var(--mute);
 }
 
@@ -1178,7 +1165,7 @@
       var(--copper-fill-soft),
       transparent 55%
     ),
-    rgba(255, 255, 255, 0.02);
+    var(--surface);
   transition:
     border-color 0.2s ease,
     background 0.2s ease,
@@ -1221,7 +1208,7 @@
   padding: 0.15rem 0.45rem;
   border: 1px solid var(--copper-border);
   border-radius: 4px;
-  color: var(--copper-hot, #e8a86a);
+  color: var(--copper-hot);
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1280,7 +1267,7 @@
   width: 0.4rem;
   height: 0.4rem;
   border-radius: 50%;
-  background: rgba(200, 137, 73, 0.75);
+  background: var(--copper);
 }
 
 .billingPlanActions {
@@ -1361,7 +1348,7 @@
       var(--copper-fill-soft),
       transparent 60%
     ),
-    rgba(255, 255, 255, 0.02);
+    var(--surface);
 }
 
 .llmStatLabel {
@@ -1418,9 +1405,9 @@
   gap: 0.65rem;
   justify-items: start;
   padding: 1.35rem 1.25rem;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border: 1px dashed var(--line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--surface);
 }
 
 .llmEmptyTitle {
@@ -1503,7 +1490,7 @@
   padding: 0.15rem 0.45rem;
   border: 1px solid var(--copper-border);
   border-radius: 6px;
-  color: var(--copper-hot, #e8a86a);
+  color: var(--copper-hot);
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1548,7 +1535,7 @@
       var(--copper-fill-soft),
       transparent 55%
     ),
-    rgba(255, 255, 255, 0.02);
+    var(--surface);
   animation: cg-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1570,9 +1557,9 @@
 .llmProviderChip {
   min-height: 2rem;
   padding: 0.35rem 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--ink-soft);
   color: var(--mute);
   font: inherit;
   font-size: 0.82rem;
@@ -1586,7 +1573,7 @@
 
 .llmProviderChip:hover {
   color: var(--paper);
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: var(--copper-border);
 }
 
 .llmProviderChipActive {
@@ -1603,7 +1590,7 @@
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--surface);
 }
 
 .llmRouteTable {
@@ -1626,7 +1613,7 @@
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--panel-inset);
 }
 
 .llmRouteTable tbody th {
@@ -1647,7 +1634,7 @@
 }
 
 .llmRouteRowDirty {
-  background: rgba(200, 137, 73, 0.06);
+  background: var(--copper-fill-soft);
 }
 
 .llmAgentName {
@@ -1661,8 +1648,8 @@
   width: 0.45rem;
   height: 0.45rem;
   border-radius: 50%;
-  background: var(--copper-hot, #e8a86a);
-  box-shadow: 0 0 0 3px rgba(200, 137, 73, 0.18);
+  background: var(--copper-hot);
+  box-shadow: 0 0 0 3px var(--copper-ring);
 }
 
 .llmStickyBar {

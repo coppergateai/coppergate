@@ -66,7 +66,7 @@ export default async function BlogIndexPage() {
         </p>
 
         {posts.length === 0 ? (
-          <p className={styles.pageLede}>
+          <p className={styles.blogEmpty}>
             No posts yet. Follow{" "}
             <a
               href="https://github.com/coppergateai/coppergate"

@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  padding: 1.15rem 1.35rem 2.5rem;
+  padding: var(--app-pad-y) var(--app-pad-x-lg) 2.5rem;
   background:
     radial-gradient(ellipse 70% 45% at 8% -8%, var(--copper-fill-soft), transparent 55%),
     linear-gradient(180deg, var(--ink-soft), var(--ink) 42%);
@@ -44,10 +44,10 @@
   justify-content: center;
   width: 3.25rem;
   height: 3.25rem;
-  border-radius: 12px;
-  background: #18181b;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
   border: 1px solid var(--line);
-  color: #fafafa;
+  color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.95rem;
   font-weight: 700;
@@ -131,7 +131,7 @@
   border: none;
   border-radius: 10px;
   background: var(--copper);
-  color: var(--on-copper, #09090b);
+  color: var(--on-copper);
   font: inherit;
   font-size: 0.86rem;
   font-weight: 650;
@@ -461,7 +461,7 @@
 
 .chip {
   padding: 0.12rem 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--mute);
   font-size: 0.68rem;
@@ -494,7 +494,7 @@
   font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--overlay-faint);
 }
 
 .colDate {
@@ -520,7 +520,7 @@
 }
 
 .row:nth-child(even) {
-  background: rgba(255, 255, 255, 0.012);
+  background: var(--overlay-faint);
 }
 
 .rowInner {
@@ -541,7 +541,7 @@
 }
 
 .rowInner:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay);
 }
 
 .rowInner:hover .rowTitle {
@@ -743,7 +743,7 @@
   align-items: center;
   min-height: 1.9rem;
   padding: 0.3rem 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 6px;
   background: transparent;
   color: var(--mute);
@@ -856,7 +856,7 @@
 
 .unboundError {
   margin: 0 0 0.65rem;
-  color: #f0a0a0;
+  color: var(--danger);
   font-size: 0.74rem;
 }
 
@@ -864,10 +864,10 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--surface);
 }
 
 .unboundItem {
@@ -877,7 +877,7 @@
   gap: 0.85rem;
   min-height: 2.55rem;
   padding: 0.45rem 0.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .unboundItem:last-child {
@@ -885,7 +885,7 @@
 }
 
 .unboundItem:hover {
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--overlay);
 }
 
 .unboundRepo {
@@ -912,7 +912,7 @@
   margin-left: 0.15rem;
   padding: 0.05rem 0.35rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
   color: var(--mute);
   font-size: 0.64rem;
   font-weight: 600;
@@ -925,8 +925,8 @@
   min-height: 1.75rem;
   padding: 0.25rem 0.65rem;
   border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  background: var(--ink-soft);
   color: var(--copper-hot);
   font: inherit;
   font-size: 0.76rem;
@@ -957,8 +957,8 @@
   min-height: 1.9rem;
   padding: 0.28rem 0.5rem;
   border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: var(--paper);
   font: inherit;
   font-size: 0.78rem;
@@ -983,7 +983,8 @@
 .inlineSelect:focus,
 .inlineSelectWide:focus {
   outline: none;
-  border-color: rgba(184, 115, 51, 0.65);
+  border-color: var(--copper-border-strong);
+  box-shadow: 0 0 0 2px var(--copper-ring);
 }
 
 .inlineSubmit {
@@ -992,8 +993,8 @@
   padding: 0.28rem 0.7rem;
   border: none;
   border-radius: 5px;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--copper);
+  color: var(--on-copper);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 650;
@@ -1008,45 +1009,62 @@
 .inlineError {
   flex: 1 1 100%;
   margin: 0;
-  color: #f87171;
+  color: var(--danger);
   font-size: 0.75rem;
 }
 
 .panel {
   display: grid;
-  gap: 0.65rem;
-  padding: 0.85rem 0.9rem 0.95rem;
+  gap: 0.75rem;
+  padding: 1.1rem 1.15rem 1.2rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.015);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(
+      80% 70% at 0% 0%,
+      var(--copper-fill-soft),
+      transparent 55%
+    ),
+    var(--surface-elevated);
+  box-shadow: var(--shadow-elevated);
+  max-width: 28rem;
 }
 
 .field {
   display: grid;
-  gap: 0.28rem;
-  font-size: 0.78rem;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 550;
   color: var(--mute);
 }
 
 .input,
 .select {
-  padding: 0.5rem 0.65rem;
+  padding: 0.55rem 0.7rem;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: var(--paper);
   font: inherit;
-  font-size: 0.86rem;
+  font-size: 0.88rem;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .select {
   appearance: none;
 }
 
+.input::placeholder {
+  color: var(--mute-soft);
+}
+
 .input:focus,
 .select:focus {
   outline: none;
-  border-color: rgba(184, 115, 51, 0.65);
+  border-color: var(--copper-border-strong);
+  box-shadow: 0 0 0 3px var(--copper-ring);
 }
 
 .hint {
@@ -1061,21 +1079,27 @@
 
 .error {
   margin: 0;
-  color: #f87171;
+  color: var(--danger);
   font-size: 0.8rem;
 }
 
 .submit {
-  min-height: 2.1rem;
-  padding: 0.45rem 0.85rem;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.95rem;
   border: none;
   border-radius: var(--radius-sm);
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--copper);
+  color: var(--on-copper);
   font: inherit;
-  font-weight: 600;
-  font-size: 0.86rem;
+  font-weight: 650;
+  font-size: 0.88rem;
   cursor: pointer;
+  box-shadow: 0 8px 18px var(--copper-ring);
+  transition: filter 0.12s ease;
+}
+
+.submit:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .submit:disabled {
@@ -1118,7 +1142,7 @@
 
 @media (max-width: 640px) {
   .surface {
-    padding: 0.9rem 0.9rem 2rem;
+    padding: var(--app-pad-y) var(--app-pad-x) 2rem;
   }
 
   .heroActions {

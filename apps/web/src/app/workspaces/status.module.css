@@ -1,0 +1,27 @@
+.pad {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 36rem;
+  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 2.5rem;
+}
+
+.padWide {
+  max-width: none;
+}
+
+.stack {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.emptyWrap {
+  max-width: 32rem;
+  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 2.5rem;
+}

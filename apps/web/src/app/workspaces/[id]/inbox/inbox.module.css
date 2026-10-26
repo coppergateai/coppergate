@@ -13,7 +13,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem 1rem;
-  padding: 0.7rem 1.15rem;
+  padding: 0.7rem var(--app-pad-x);
   border-bottom: 1px solid var(--line);
   background: var(--page-bar-bg);
   backdrop-filter: blur(10px);
@@ -61,7 +61,7 @@
 
 .chip {
   padding: 0.12rem 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--mute);
   font-size: 0.68rem;
@@ -73,7 +73,7 @@
   align-items: center;
   min-height: 1.9rem;
   padding: 0.3rem 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--mute);
   font-size: 0.78rem;
@@ -83,14 +83,14 @@
 
 .toolbarGhost:hover {
   color: var(--paper);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--copper-border);
 }
 
 .tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 0.15rem;
-  padding: 0.45rem 1.15rem 0;
+  padding: 0.45rem var(--app-pad-x) 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -122,7 +122,7 @@
 .tabCount {
   padding: 0.05rem 0.35rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
   color: var(--mute-soft);
   font-size: 0.65rem;
   font-variant-numeric: tabular-nums;
@@ -170,7 +170,7 @@
 }
 
 .rowBtn:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay);
 }
 
 .rowBtnActive {
@@ -253,7 +253,7 @@
   padding: 1.1rem 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--surface);
 }
 
 .emptyFull {
@@ -309,21 +309,17 @@
   min-height: 2.25rem;
   padding: 0.45rem 0.9rem;
   border-radius: var(--radius-sm);
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--copper);
+  color: var(--on-copper);
   font-size: 0.85rem;
   font-weight: 600;
   text-decoration: none;
+  box-shadow: 0 8px 18px var(--copper-ring);
+  transition: filter 0.12s ease;
 }
 
 .emptyCta:hover {
-  background: var(--mute-strong);
-  color: #fafafa;
-}
-
-html[data-theme="light"] .emptyCta:hover {
-  background: var(--mute-strong);
-  color: #fafafa;
+  filter: brightness(1.05);
 }
 
 .emptyLink {
@@ -356,20 +352,20 @@ html[data-theme="light"] .emptyCta:hover {
 }
 
 .detailPillPending {
-  border: 1px solid rgba(232, 168, 72, 0.35);
-  background: rgba(232, 168, 72, 0.1);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
   color: var(--warn);
 }
 
 .detailPillApproved {
-  border: 1px solid rgba(110, 180, 120, 0.35);
-  background: rgba(110, 180, 120, 0.1);
+  border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
   color: var(--success-bright);
 }
 
 .detailPillSettled {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  background: var(--overlay);
   color: var(--mute);
 }
 
@@ -488,34 +484,35 @@ html[data-theme="light"] .emptyCta:hover {
 }
 
 .btnPrimary {
-  border: 1px solid var(--copper-border);
-  background: var(--copper-fill);
-  color: var(--warn);
+  border: 1px solid var(--copper-border-strong);
+  background: var(--copper);
+  color: var(--on-copper);
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: var(--copper-fill-strong);
+  background: var(--copper-hot);
+  border-color: var(--copper-hot);
 }
 
 .btnDanger {
-  border: 1px solid rgba(200, 100, 100, 0.4);
-  background: rgba(200, 100, 100, 0.1);
-  color: #e8a8a8;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 
 .btnDanger:hover:not(:disabled) {
-  background: rgba(200, 100, 100, 0.18);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
 }
 
 .btnGhost {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line);
   background: transparent;
   color: var(--mute);
 }
 
 .btnGhost:hover:not(:disabled) {
   color: var(--paper);
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: var(--copper-border);
 }
 
 .btnPrimary:disabled,
@@ -576,7 +573,7 @@ html[data-theme="light"] .emptyCta:hover {
 }
 
 .rowLinkActivity:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay);
 }
 
 @media (max-width: 860px) {

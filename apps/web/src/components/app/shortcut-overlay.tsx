@@ -42,14 +42,12 @@ export function ShortcutOverlay() {
         onClick={() => setOpen(false)}
       />
       <div className={styles.panel}>
-        <p className={styles.hint} style={{ marginTop: 0, paddingTop: "0.85rem" }}>
-          Keyboard shortcuts
-        </p>
-        <ul className={styles.list}>
+        <p className={styles.shortcutTitle}>Keyboard shortcuts</p>
+        <ul className={styles.shortcutList}>
           {SHORTCUTS.map((s) => (
-            <li key={s.keys} className={styles.item} style={{ cursor: "default" }}>
-              <span className={styles.itemGroup}>{s.keys}</span>
-              <span className={styles.itemLabel}>{s.label}</span>
+            <li key={s.keys} className={styles.shortcutRow}>
+              <span className={styles.shortcutLabel}>{s.label}</span>
+              <kbd className={styles.shortcutKeys}>{s.keys}</kbd>
             </li>
           ))}
         </ul>

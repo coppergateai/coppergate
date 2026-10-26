@@ -1,6 +1,6 @@
 .main {
   width: 100%;
-  padding: 0.85rem 1.15rem 4.5rem;
+  padding: var(--app-pad-y) var(--app-pad-x-lg) 4.5rem;
 }
 
 .panel {
@@ -60,10 +60,13 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 1.25rem;
-  padding: 0.75rem 0;
+  margin-left: calc(-1 * var(--app-pad-x-lg));
+  margin-right: calc(-1 * var(--app-pad-x-lg));
+  padding: 0.85rem var(--app-pad-x-lg);
   border-top: 1px solid var(--line);
   background: var(--page-bar-bg);
   backdrop-filter: blur(10px);
+  box-shadow: 0 -8px 24px var(--panel-inset);
 }
 
 .btn {

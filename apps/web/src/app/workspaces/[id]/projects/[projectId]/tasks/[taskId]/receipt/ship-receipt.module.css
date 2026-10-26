@@ -3,7 +3,7 @@
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 1.5rem 1.35rem 3.5rem;
+  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 3.5rem;
 }
 
 .kicker {
@@ -103,20 +103,29 @@
 }
 
 .primary {
-  background: var(--paper);
-  color: var(--ink);
-  border: 1px solid var(--paper);
+  background: var(--copper);
+  color: var(--on-copper);
+  border: 1px solid var(--copper);
+  box-shadow: 0 8px 18px var(--copper-ring);
+  transition: filter 0.12s ease;
+}
+
+.primary:hover {
+  filter: brightness(1.05);
 }
 
 .ghost {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--paper);
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .ghost:hover {
-  border-color: var(--copper-border, var(--line));
-  color: var(--copper-hot, var(--copper));
+  border-color: var(--copper-border);
+  color: var(--copper-hot);
 }
 
 @media (max-width: 560px) {

@@ -5,9 +5,9 @@ import { currentUser } from "@/lib/auth";
 import { isGitlabConfigured } from "@/lib/gitlab";
 import { env } from "@/lib/env";
 import { BrandMark } from "@/components/app/ui";
-import styles from "@/components/marketing/marketing.module.css";
 import { publicPageMetadata } from "@/lib/seo";
 import { SiteChrome } from "../site-chrome";
+import styles from "./login.module.css";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Try hosted",
@@ -28,48 +28,47 @@ export default async function LoginPage() {
 
   return (
     <SiteChrome>
-      <div className={styles.authMain}>
-        <div className={styles.authCard}>
-          <BrandMark className={styles.authMark} size={52} />
-          <h1 className={styles.authTitle}>Try the hosted arena</h1>
-          <p className={styles.authLede}>
+      <div className={styles.main}>
+        <div className={styles.card}>
+          <BrandMark className={styles.mark} size={52} />
+          <h1 className={styles.title}>Try the hosted arena</h1>
+          <p className={styles.lede}>
             Free to explore — no paid plan required. Sign in with GitHub or
             GitLab to open workspaces, bind Open Programs, and review Ship
             Receipts. Identity scopes only — repository access comes later
             under your control.
           </p>
-          {githubReady ? (
-            <a className={styles.authCta} href="/api/auth/github">
-              Continue with GitHub
-            </a>
-          ) : null}
-          {gitlabReady ? (
-            <a
-              className={styles.authCta}
-              href="/api/auth/gitlab"
-              style={githubReady ? { marginTop: "0.75rem" } : undefined}
-            >
-              Continue with GitLab
-            </a>
-          ) : null}
+          <div className={styles.ctaStack}>
+            {githubReady ? (
+              <a className={styles.cta} href="/api/auth/github">
+                Continue with GitHub
+              </a>
+            ) : null}
+            {gitlabReady ? (
+              <a className={styles.cta} href="/api/auth/gitlab">
+                Continue with GitLab
+              </a>
+            ) : null}
+          </div>
           {!githubReady && !gitlabReady ? (
-            <p className={styles.authNote}>
+            <p className={styles.note}>
               OAuth is not configured. Set GitHub and/or GitLab client
               credentials.
             </p>
           ) : null}
           <a
-            className={styles.authSecondary}
+            className={styles.secondary}
             href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
             target="_blank"
             rel="noreferrer"
           >
             Prefer self-host? Read the guide →
           </a>
-          <p className={styles.authNote}>
+          <hr className={styles.divider} />
+          <p className={styles.note}>
             MIT · Community $0 · Open Program spend licenses · Kill-switch
           </p>
-          <p className={styles.authNote}>
+          <p className={styles.note}>
             <Link href="/docs/open-program-runtime">Open Program Runtime</Link>
             {" · "}
             <Link href="/docs/pricing">Pricing</Link>

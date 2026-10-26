@@ -12,9 +12,9 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  width: 14.75rem;
+  width: 15rem;
   height: 100vh;
-  padding: 0.7rem 0.55rem 0.65rem;
+  padding: 0.75rem 0.6rem 0.7rem;
   border-right: 1px solid var(--line);
   background: var(--ink-soft);
 }
@@ -188,15 +188,19 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin: 0 0 0.35rem;
-  padding: 0.35rem 0.5rem;
+  margin: 0 0 0.4rem;
+  padding: 0.4rem 0.55rem;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
+  border-radius: 7px;
+  background: var(--overlay);
   color: var(--mute);
   font: inherit;
   font-size: 0.75rem;
   cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease,
+    background 0.12s ease;
 }
 
 .cmdSidebarHint kbd {
@@ -251,11 +255,12 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.34rem 0.5rem 0.34rem 0.85rem;
-  border-radius: 6px;
+  padding: 0.38rem 0.55rem 0.38rem 0.9rem;
+  border-radius: 7px;
   color: var(--mute);
   font-size: 0.82rem;
   font-weight: 500;
+  letter-spacing: -0.01em;
   text-decoration: none;
   transition:
     background 0.12s ease,
@@ -270,6 +275,7 @@
 .navItemActive {
   background: var(--overlay-strong);
   color: var(--paper);
+  font-weight: 600;
 }
 
 .navItemActive::before {

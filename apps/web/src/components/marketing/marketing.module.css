@@ -2609,14 +2609,14 @@
   }
 }
 
-/* —— Inner content pages (docs / legal / auth) —— */
+/* —— Inner content pages (docs / legal / auth / blog) —— */
 .contentPage {
   position: relative;
   z-index: 1;
   width: min(720px, 100%);
   margin: 0 auto;
-  padding: clamp(2.5rem, 6vw, 3.75rem) max(var(--gutter), env(safe-area-inset-left))
-    clamp(3.5rem, 8vw, 5rem);
+  padding: clamp(2.75rem, 6.5vw, 4rem) max(var(--gutter), env(safe-area-inset-left))
+    clamp(3.75rem, 8vw, 5.5rem);
   padding-right: max(var(--gutter), env(safe-area-inset-right));
 }
 
@@ -2631,7 +2631,7 @@
 }
 
 .pageEyebrow {
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.7rem;
   color: var(--copper);
   font-size: 0.72rem;
   font-weight: 600;
@@ -2642,17 +2642,18 @@
 .pageTitle {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.85rem, 3.5vw, 2.5rem);
+  font-size: clamp(1.9rem, 3.6vw, 2.55rem);
   font-weight: 650;
-  letter-spacing: -0.03em;
-  line-height: 1.12;
+  letter-spacing: -0.032em;
+  line-height: 1.1;
   color: var(--paper);
 }
 
 .pageLede {
-  margin: 0.75rem 0 0;
+  margin: 0.85rem 0 0;
+  max-width: 40rem;
   color: var(--mute);
-  font-size: 1.025rem;
+  font-size: 1.05rem;
   line-height: 1.65;
 }
 
@@ -2660,7 +2661,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  margin: 0 0 1.25rem;
+  margin: 0 0 1.35rem;
   color: var(--mute);
   font-size: 0.875rem;
   font-weight: 500;
@@ -2674,8 +2675,8 @@
 .prose {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  margin-top: 2rem;
+  gap: 1.65rem;
+  margin-top: 2.25rem;
 }
 
 .prose h2 {
@@ -2725,7 +2726,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
-  margin-top: 1.5rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line-soft);
 }
 
 .docsCtaRow .btnHeroPrimary,
@@ -2736,13 +2739,13 @@
 
 .docsList {
   list-style: none;
-  margin: 2rem 0 0;
+  margin: 2.25rem 0 0;
   padding: 0;
   border-top: 1px solid var(--line);
 }
 
 .docsItem {
-  padding: 1.1rem 0;
+  padding: 1.2rem 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -2759,10 +2762,67 @@
 }
 
 .docsItem p {
-  margin: 0.35rem 0 0;
+  margin: 0.4rem 0 0;
   color: var(--mute-soft);
   font-size: 0.875rem;
-  line-height: 1.5;
+  line-height: 1.55;
+  max-width: 38rem;
+}
+
+.blogEmpty {
+  margin: 2.25rem 0 0;
+  padding: 1.35rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--mute);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  max-width: 36rem;
+}
+
+.blogEmpty a {
+  color: var(--copper-hot);
+  text-decoration: none;
+}
+
+.blogEmpty a:hover {
+  color: var(--paper);
+}
+
+.relatedPosts {
+  margin-top: 2.75rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.relatedPosts h2 {
+  margin: 0 0 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mute-soft);
+}
+
+.relatedPosts ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.relatedPosts a {
+  color: var(--paper);
+  font-weight: 550;
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.relatedPosts a:hover {
+  color: var(--copper-hot);
 }
 
 /* —— Pricing —— */
@@ -2904,7 +2964,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin-top: 2rem;
+  margin-top: 2.25rem;
   border-top: 1px solid var(--line);
 }
 
@@ -3009,19 +3069,20 @@
   width: 100%;
   height: 2.75rem;
   margin-top: 1.5rem;
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink);
+  border-radius: 12px;
+  background: var(--copper);
+  color: var(--on-copper);
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 650;
   text-decoration: none;
+  box-shadow: 0 10px 24px var(--copper-ring);
   transition:
     transform 0.15s ease,
-    background 0.15s ease;
+    filter 0.15s ease;
 }
 
 .authCta:hover {
-  background: #fff;
+  filter: brightness(1.05);
   transform: translateY(-1px);
 }
 

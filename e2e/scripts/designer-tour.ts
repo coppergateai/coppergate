@@ -1,6 +1,7 @@
 /**
  * Designer audit: capture product screens for visual review.
  * Usage: pnpm exec tsx scripts/designer-tour.ts
+ * Optional: OUT_SUBDIR=wave-1/after pnpm exec tsx scripts/designer-tour.ts
  */
 import { chromium } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -13,10 +14,13 @@ import {
   resolveProjectTarget,
 } from "../helpers/env.js";
 
-const outDir = path.resolve(
+const artifactsRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../artifacts/designer-pass",
 );
+const outDir = process.env.OUT_SUBDIR
+  ? path.join(artifactsRoot, process.env.OUT_SUBDIR)
+  : artifactsRoot;
 
 async function main() {
   loadE2eEnv();
@@ -102,34 +106,170 @@ async function main() {
   await capture("01-workspaces", `${root}/workspaces`, /Your workspaces/i);
   await capture("02-mission-control", ws, /Mission Control/i);
   await capture("03-projects", `${ws}/projects`, /Projects/i);
-  await capture("04-arena", `${ws}/arena`, /Arena/i);
   await capture(
-    "05-evidence",
+    "04-overview",
+    `${target.projectUrl}?tab=overview`,
+    /Overview|Brief|Plan|Budget/i,
+  );
+  await capture(
+    "05-delivery",
+    `${target.projectUrl}?tab=delivery`,
+    /Delivery|Backlog|Accepted/i,
+  );
+  await capture(
+    "06-project-arena",
+    `${target.projectUrl}?tab=arena`,
+    /Arena/i,
+  );
+  await capture(
+    "07-evidence",
     `${target.projectUrl}?tab=evidence`,
     /Evidence|Accept/i,
   );
   await capture(
-    "06-delivery",
-    `${target.projectUrl}?tab=delivery`,
-    /Delivery|Backlog|Accepted/i,
+    "08-configuration",
+    `${target.projectUrl}?tab=configuration`,
+    /Configuration|Policy|Maintainer|Settings/i,
   );
-  await capture("07-activity", `${ws}/activity`, /Activity/i);
-  await capture("08-inbox", `${ws}/inbox`, /Inbox|caught up|attention/i);
-  await capture(
-    "09-settings",
-    `${ws}/settings`,
-    /Settings|General|Billing|Connections/i,
-  );
+  await capture("09-arena", `${ws}/arena`, /Arena/i);
+  await capture("10-inbox", `${ws}/inbox`, /Inbox|caught up|attention/i);
+  await capture("11-activity", `${ws}/activity`, /Activity/i);
 
-  const receipt = await page
-    .locator('a[href*="/receipt"]')
+  for (const tab of [
+    "connections",
+    "general",
+    "billing",
+    "signals",
+    "llm",
+    "analytics",
+    "danger",
+  ]) {
+    await capture(
+      `12-settings-${tab}`,
+      `${ws}/settings?tab=${tab}`,
+      /Settings|General|Billing|Connections|Danger|LLM|Signals|Analytics/i,
+    );
+  }
+
+  await capture("13-profile", `${root}/profile`, /Profile|Account/i);
+
+  // Task detail + receipt
+  await page.goto(`${target.projectUrl}?tab=delivery`, {
+    waitUntil: "domcontentloaded",
+    timeout: 45000,
+  });
+  await page.evaluate(`(() => {
+    localStorage.setItem("cg-theme","light");
+    document.documentElement.setAttribute("data-theme","light");
+  })()`);
+  await page.waitForTimeout(600);
+  const taskHref = await page
+    .locator('a[href*="/tasks/"]')
     .first()
     .getAttribute("href")
     .catch(() => null);
-  if (receipt) {
-    const abs = receipt.startsWith("http") ? receipt : `${root}${receipt}`;
-    await capture("10-receipt", abs, /Ship Receipt|Accept|Back to task/i);
+  if (taskHref) {
+    const abs = taskHref.startsWith("http") ? taskHref : `${root}${taskHref}`;
+    await capture("14-task-detail", abs, /Task|Tournament|Status|Evidence|Scope/i);
+    const receipt = await page
+      .locator('a[href*="/receipt"]')
+      .first()
+      .getAttribute("href")
+      .catch(() => null);
+    if (receipt) {
+      const rAbs = receipt.startsWith("http") ? receipt : `${root}${receipt}`;
+      await capture("15-receipt", rAbs, /Ship Receipt|Accept|Back to task/i);
+    }
   }
+
+  // Overlays on Mission Control
+  await page.goto(ws, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.evaluate(`(() => {
+    localStorage.setItem("cg-theme","light");
+    document.documentElement.setAttribute("data-theme","light");
+  })()`);
+  await page
+    .getByText(/Mission Control/i)
+    .first()
+    .waitFor({ timeout: 20000 })
+    .catch(() => null);
+  await page.waitForTimeout(400);
+  await page.keyboard.press("Meta+k");
+  await page.waitForTimeout(350);
+  await page.screenshot({
+    path: path.join(outDir, "16-command-palette.png"),
+    fullPage: false,
+  });
+  shots.push({ name: "16-command-palette", url: page.url(), notes: "overlay" });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  await page.keyboard.press("Shift+/");
+  await page.waitForTimeout(350);
+  await page.screenshot({
+    path: path.join(outDir, "17-shortcuts.png"),
+    fullPage: false,
+  });
+  shots.push({ name: "17-shortcuts", url: page.url(), notes: "overlay" });
+  await page.keyboard.press("Escape");
+
+  // Create flows
+  await page.goto(`${root}/workspaces`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.evaluate(`(() => {
+    localStorage.setItem("cg-theme","light");
+    document.documentElement.setAttribute("data-theme","light");
+  })()`);
+  await page.waitForTimeout(400);
+  await page.locator('a[href="#create-workspace"]').click({ timeout: 5000 }).catch(() => null);
+  await page.waitForTimeout(400);
+  await page.screenshot({
+    path: path.join(outDir, "18-create-workspace.png"),
+    fullPage: false,
+  });
+  shots.push({ name: "18-create-workspace", url: page.url(), notes: "modal" });
+
+  // Login (unauthenticated)
+  const loginCtx = await browser.newContext({
+    colorScheme: "light",
+    viewport: { width: 1440, height: 900 },
+  });
+  const loginPage = await loginCtx.newPage();
+  await loginPage.goto(`${root}/login`, {
+    waitUntil: "domcontentloaded",
+    timeout: 45000,
+  });
+  await loginPage.waitForTimeout(500);
+  await loginPage.screenshot({
+    path: path.join(outDir, "19-login.png"),
+    fullPage: false,
+  });
+  shots.push({ name: "19-login", url: `${root}/login`, notes: "public" });
+  await loginCtx.close();
+
+  // Marketing smoke
+  const pub = await browser.newContext({
+    colorScheme: "light",
+    viewport: { width: 1440, height: 900 },
+  });
+  const p = await pub.newPage();
+  for (const [name, url, ready] of [
+    ["20-home", `${root}/`, /Coppergate|Autonomy/i],
+    ["21-docs", `${root}/docs`, /Docs|Documentation|Open Program/i],
+    ["22-pricing", `${root}/docs/pricing`, /Community|Pricing|\\$0/i],
+    ["23-security", `${root}/security`, /Security/i],
+    ["24-changelog", `${root}/changelog`, /Changelog|Change/i],
+  ] as const) {
+    await p.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await p
+      .getByText(ready)
+      .first()
+      .waitFor({ timeout: 15000 })
+      .catch(() => null);
+    await p.waitForTimeout(500);
+    await p.screenshot({ path: path.join(outDir, `${name}.png`), fullPage: false });
+    shots.push({ name, url, notes: "marketing" });
+    console.log(name);
+  }
+  await pub.close();
 
   await writeFile(
     path.join(outDir, "audit.json"),

@@ -59,6 +59,11 @@ html[data-theme="dark"] {
   --radius: 12px;
   --radius-sm: 8px;
   --shadow-elevated: 0 24px 64px rgba(0, 0, 0, 0.42);
+  /* Product app page chrome */
+  --app-pad-x: 1.25rem;
+  --app-pad-y: 1.25rem;
+  --app-pad-x-lg: 1.35rem;
+  --app-pad-y-lg: 1.35rem;
 }
 
 html[data-theme="light"] {

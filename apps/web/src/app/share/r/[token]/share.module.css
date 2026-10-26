@@ -1,0 +1,77 @@
+.page {
+  position: relative;
+  z-index: 1;
+  width: min(48rem, 100%);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 4rem) var(--gutter) clamp(3.5rem, 8vw, 5.5rem);
+}
+
+.eyebrow {
+  margin: 0 0 0.45rem;
+  color: var(--copper);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: var(--paper);
+}
+
+.lede {
+  margin: 0.75rem 0 0;
+  max-width: 36rem;
+  color: var(--mute);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.lede a {
+  color: var(--mute-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lede a:hover {
+  color: var(--copper-hot);
+}
+
+.report {
+  margin: 1.5rem 0 0;
+  padding: var(--app-pad-y) var(--app-pad-x);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--mute-strong);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.footer {
+  margin: 1.5rem 0 0;
+  max-width: 36rem;
+  color: var(--mute);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.footer a {
+  color: var(--mute-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footer a:hover {
+  color: var(--copper-hot);
+}

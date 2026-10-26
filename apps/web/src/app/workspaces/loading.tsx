@@ -1,14 +1,9 @@
 import { SkeletonStack } from "@/components/app";
+import styles from "./status.module.css";
 
 export default function WorkspacesLoading() {
   return (
-    <div
-      style={{
-        padding: "1.5rem 1.5rem 2.5rem",
-        display: "grid",
-        gap: "1.25rem",
-      }}
-    >
+    <div className={`${styles.pad} ${styles.padWide} ${styles.stack}`}>
       <SkeletonStack rows={2} />
       <SkeletonStack rows={3} />
     </div>

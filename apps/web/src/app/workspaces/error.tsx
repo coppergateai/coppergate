@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Banner, Button } from "@/components/app";
+import styles from "./status.module.css";
 
 export default function WorkspacesError({
   error,
@@ -15,12 +16,12 @@ export default function WorkspacesError({
   }, [error]);
 
   return (
-    <div style={{ padding: "1.5rem 1.15rem", maxWidth: "36rem" }}>
+    <div className={styles.pad}>
       <Banner tone="danger" role="alert">
         <strong>Something went wrong.</strong>{" "}
         {error.message || "This view failed to load. Try again or open Recovery docs."}
       </Banner>
-      <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
+      <div className={styles.actions}>
         <Button variant="primary" onClick={reset}>
           Try again
         </Button>

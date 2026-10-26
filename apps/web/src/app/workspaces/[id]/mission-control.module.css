@@ -4,7 +4,7 @@
   min-width: 0;
   max-width: none;
   margin: 0;
-  padding: 1.35rem 1.35rem 3rem;
+  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 3rem;
   overflow-x: clip;
   container-type: inline-size;
   container-name: mission;
@@ -118,17 +118,21 @@
   min-height: 2.15rem;
   padding: 0.4rem 0.9rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--paper);
-  background: var(--paper);
-  color: var(--ink);
+  border: 1px solid var(--copper-border-strong);
+  background: var(--copper);
+  color: var(--on-copper);
   font-size: 0.82rem;
   font-weight: 650;
   text-decoration: none;
-  transition: filter 150ms ease, transform 150ms ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    filter 0.12s ease;
 }
 
 .arenaCta:hover {
-  filter: brightness(1.05);
+  background: var(--copper-hot);
+  border-color: var(--copper-hot);
 }
 
 .summaryStrip {

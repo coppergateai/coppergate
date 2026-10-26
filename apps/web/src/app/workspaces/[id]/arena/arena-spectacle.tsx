@@ -540,10 +540,13 @@ export function ArenaSpectacle({
             <SkeletonStack rows={5} />
           </div>
         ) : ordered.length === 0 ? (
-          <p className={styles.empty}>
-            No Open ID, no spend. Bind a repo and an Open Program path, then
-            Resume — Arena reserves only against program lines.
-          </p>
+          <div className={styles.empty}>
+            <p className={styles.emptyTitle}>No projects armed</p>
+            <p className={styles.emptyBody}>
+              No Open ID, no spend. Bind a repo and an Open Program path, then
+              Resume — Arena reserves only against program lines.
+            </p>
+          </div>
         ) : (
           <div className={styles.lanes} role="list">
             {ordered.map((lane) => {
