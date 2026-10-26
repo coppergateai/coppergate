@@ -2,148 +2,127 @@ package program
 
 import (
 	"errors"
+	"fmt"
 	"sync"
-	"time"
 )
 
-// SpendEnvelope defines the monthly spend limit for a program runtime.
-const SpendEnvelopeMonthly = 8.00 // $8 monthly envelope
+// Constants for spend limits
+const (
+	MonthlyEnvelope = 8
+)
 
-// Badge represents an ID badge for a program runtime.
-type Badge struct {
-	ID        string
-	IssuedAt  time.Time
-	ExpiresAt time.Time
-	Revoked   bool
+// IDBadge represents an authorization badge for an agent.
+type IDBadge struct {
+	AgentID string
+	Amount  int
 }
 
-// Receipt represents a ship receipt confirming acceptance.
-type Receipt struct {
-	ProgramID string
-	Timestamp time.Time
-	Details   string
+// ShipReceipt represents a confirmation of accepted spend license.
+type ShipReceipt struct {
+	AgentID string
+	Amount  int
 }
 
-// Runtime manages the contracted autonomy spend license and identity badges.
+// Runtime manages the contracted autonomy spend license state.
 type Runtime struct {
 	mu             sync.Mutex
-	programID      string
-	spendUsed      float64
-	badges         map[string]*Badge
-	lastReset      time.Time
-	receiptHistory []Receipt
+	reserved       int
+	badges         map[string]*IDBadge
+	shipReceipts   map[string]*ShipReceipt
+	totalFanOut    int
 }
 
-// NewRuntime creates a new Runtime instance for a given program ID.
-func NewRuntime(programID string) *Runtime {
+// NewRuntime creates a new Runtime instance.
+func NewRuntime() *Runtime {
 	return &Runtime{
-		programID: programID,
-		badges:    make(map[string]*Badge),
-		lastReset: time.Now(),
+		badges:       make(map[string]*IDBadge),
+		shipReceipts: make(map[string]*ShipReceipt),
 	}
 }
 
-// resetSpendIfNeeded resets the spendUsed if a new month has started.
-func (r *Runtime) resetSpendIfNeeded() {
-	now := time.Now()
-	if now.Sub(r.lastReset) >= 30*24*time.Hour {
-		r.spendUsed = 0
-		r.lastReset = now
-	}
-}
-
-// ReserveSpend attempts to reserve spend amount on the runtime's envelope.
-// Returns error if the spend envelope would be exceeded.
-func (r *Runtime) ReserveSpend(amount float64) error {
+// ReserveSpend reserves a portion of the monthly envelope for contracted autonomy.
+// Returns error if reservation exceeds monthly envelope.
+func (r *Runtime) ReserveSpend(amount int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.resetSpendIfNeeded()
-
 	if amount <= 0 {
-		return errors.New("amount must be positive")
+		return errors.New("reserve amount must be positive")
 	}
 
-	if r.spendUsed+amount > SpendEnvelopeMonthly {
-		return errors.New("spend envelope exceeded")
+	if r.reserved+amount > MonthlyEnvelope {
+		return fmt.Errorf("reservation exceeds monthly envelope: reserved %d + amount %d > %d", r.reserved, amount, MonthlyEnvelope)
 	}
 
-	r.spendUsed += amount
+	r.reserved += amount
 	return nil
 }
 
-// IssueBadge issues a new ID badge valid for the specified duration.
-func (r *Runtime) IssueBadge(id string, validFor time.Duration) (*Badge, error) {
+// FanOutSpend fans out reserved spend to an agent, issuing an ID badge.
+// Returns error if fan-out exceeds reserved amount.
+func (r *Runtime) FanOutSpend(agentID string, amount int) (*IDBadge, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if id == "" {
-		return nil, errors.New("badge ID cannot be empty")
+	if amount <= 0 {
+		return nil, errors.New("fan-out amount must be positive")
 	}
 
-	if _, exists := r.badges[id]; exists {
-		return nil, errors.New("badge ID already exists")
+	if r.totalFanOut+amount > r.reserved {
+		return nil, fmt.Errorf("fan-out exceeds reserved amount: total fan-out %d + amount %d > reserved %d", r.totalFanOut, amount, r.reserved)
 	}
 
-	now := time.Now()
-	badge := &Badge{
-		ID:        id,
-		IssuedAt:  now,
-		ExpiresAt: now.Add(validFor),
-		Revoked:   false,
+	badge := &IDBadge{
+		AgentID: agentID,
+		Amount:  amount,
 	}
-	r.badges[id] = badge
+	r.badges[agentID] = badge
+	r.totalFanOut += amount
 	return badge, nil
 }
 
-// ValidateBadge checks if a badge is valid (exists, not revoked, not expired).
-func (r *Runtime) ValidateBadge(id string) bool {
+// AcceptSpend accepts a spend license by an agent, generating a Ship Receipt.
+// Returns error if agent has no badge or already accepted.
+func (r *Runtime) AcceptSpend(agentID string) (*ShipReceipt, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	badge, exists := r.badges[id]
-	if !exists || badge.Revoked {
-		return false
+	badge, ok := r.badges[agentID]
+	if !ok {
+		return nil, fmt.Errorf("no badge found for agent %s", agentID)
 	}
-	return time.Now().Before(badge.ExpiresAt)
+
+	if _, accepted := r.shipReceipts[agentID]; accepted {
+		return nil, fmt.Errorf("agent %s already accepted spend license", agentID)
+	}
+
+	receipt := &ShipReceipt{
+		AgentID: agentID,
+		Amount:  badge.Amount,
+	}
+	r.shipReceipts[agentID] = receipt
+	return receipt, nil
 }
 
-// RevokeBadge revokes a badge by ID.
-func (r *Runtime) RevokeBadge(id string) error {
+// GetShipReceipt returns the Ship Receipt for an agent if exists.
+func (r *Runtime) GetShipReceipt(agentID string) (*ShipReceipt, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	badge, exists := r.badges[id]
-	if !exists {
-		return errors.New("badge not found")
-	}
-	if badge.Revoked {
-		return errors.New("badge already revoked")
-	}
-	badge.Revoked = true
-	return nil
+	receipt, ok := r.shipReceipts[agentID]
+	return receipt, ok
 }
 
-// AcceptAction records acceptance and generates a ship receipt.
-func (r *Runtime) AcceptAction(details string) Receipt {
+// GetReserved returns the total reserved amount.
+func (r *Runtime) GetReserved() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	receipt := Receipt{
-		ProgramID: r.programID,
-		Timestamp: time.Now(),
-		Details:   details,
-	}
-	r.receiptHistory = append(r.receiptHistory, receipt)
-	return receipt
+	return r.reserved
 }
 
-// GetReceipts returns all ship receipts.
-func (r *Runtime) GetReceipts() []Receipt {
+// GetTotalFanOut returns the total fan-out amount.
+func (r *Runtime) GetTotalFanOut() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	copies := make([]Receipt, len(r.receiptHistory))
-	copy(copies, r.receiptHistory)
-	return copies
+	return r.totalFanOut
 }
