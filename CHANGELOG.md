@@ -1,10 +1,8 @@
-# Changelog
-
 ## [Unreleased]
 
 ### Added
-- Program Runtime Spend License feature (P-104) with:
-  - Reserve/fan-out spend license management under $8 monthly envelope.
-  - ID badge issuance and validation for program authentication.
-  - Accept-to-ship receipt workflow for license usage confirmation.
-  - Landing and writeback of spend license transactions.
+- Implemented Program Runtime (Contracted Autonomy) spend license management with reservation and fan-out capabilities.
+- Introduced ID badges for runtime component authorization.
+- Added Accept → Ship Receipt flow confirming spend and authorization.
+- Added user documentation under `/docs/-program-runtime.md`.
+- Added tests covering license reservation, fan-out, and acceptance flows.
