@@ -15,8 +15,8 @@ const (
 	LeanRoster
 )
 
-// ErrBudgetExceeded is returned when the budget is insufficient for the requested roster.
-var ErrBudgetExceeded = errors.New("budget exceeded for requested roster")
+// ErrBudgetExceeded is returned when the budget is too tight for FullArena.
+var ErrBudgetExceeded = errors.New("budget too tight for full arena spawn")
 
 // MemberRole defines the role of a roster member.
 type MemberRole string
@@ -28,100 +28,74 @@ const (
 
 // Member represents a roster member.
 type Member struct {
-	Name  string
+	ID    string
 	Role  MemberRole
-	Micro float64 // Cost in dollars
+	Micro float64 // cost in dollars
 }
 
-// Roster represents a team roster.
+// Roster manages a list of members.
 type Roster struct {
-	Members []Member
-	Type    RosterType
+	members []Member
+	mu      sync.RWMutex
 }
 
-// SpawnRoster spawns a roster based on the requested type and budget.
-// For LeanRoster, only members with micros under $2 and roles Engineer or Reviewer are included.
-// FullArena is disallowed under tight budget (<= $8).
-func SpawnRoster(requested RosterType, budget float64) (*Roster, error) {
+// NewRoster creates a new empty roster.
+func NewRoster() *Roster {
+	return &Roster{
+		members: make([]Member, 0),
+	}
+}
+
+// AddMember adds a member to the roster.
+func (r *Roster) AddMember(m Member) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.members = append(r.members, m)
+}
+
+// Members returns a copy of the current members.
+func (r *Roster) Members() []Member {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	cpy := make([]Member, len(r.members))
+	copy(cpy, r.members)
+	return cpy
+}
+
+// SpawnRoster returns a roster based on the budget and requested type.
+// If budget is <= 8 and requested FullArena, returns ErrBudgetExceeded.
+// If budget <= 8, returns a LeanRoster with only Engineer+Reviewer micros under $2.
+func SpawnRoster(budget float64, requested RosterType) (*Roster, error) {
 	if requested == FullArena && budget <= 8 {
 		return nil, ErrBudgetExceeded
 	}
 
-	// Simulated full arena members (for example)
-	fullArenaMembers := []Member{
-		{"Alice", Engineer, 3.5},
-		{"Bob", Reviewer, 2.5},
-		{"Charlie", Engineer, 4.0},
-		{"Diana", Reviewer, 3.0},
-	}
+	r := NewRoster()
 
-	// Simulated lean roster members (micros under $2, Engineer or Reviewer only)
-	leanMembers := []Member{
-		{"Eve", Engineer, 1.5},
-		{"Frank", Reviewer, 1.8},
-		{"Grace", Engineer, 1.9},
-	}
-
-	switch requested {
-	case LeanRoster:
-		totalCost := 0.0
+	// For LeanRoster or when budget is tight, spawn only Engineer+Reviewer micros under $2.
+	if budget <= 8 || requested == LeanRoster {
+		// Simulated lean roster members.
+		leanMembers := []Member{
+			{ID: "eng1", Role: Engineer, Micro: 1.8},
+			{ID: "rev1", Role: Reviewer, Micro: 1.5},
+		}
 		for _, m := range leanMembers {
-			totalCost += m.Micro
+			if m.Micro <= 2.0 && (m.Role == Engineer || m.Role == Reviewer) {
+				r.AddMember(m)
+			}
 		}
-		if totalCost > budget {
-			return nil, ErrBudgetExceeded
-		}
-		return &Roster{
-			Members: leanMembers,
-			Type:    LeanRoster,
-		}, nil
-	case FullArena:
-		totalCost := 0.0
-		for _, m := range fullArenaMembers {
-			totalCost += m.Micro
-		}
-		if totalCost > budget {
-			return nil, ErrBudgetExceeded
-		}
-		return &Roster{
-			Members: fullArenaMembers,
-			Type:    FullArena,
-		}, nil
-	default:
-		return nil, errors.New("unknown roster type")
-	}
-}
-
-// RosterManager manages roster spawning with concurrency safety.
-type RosterManager struct {
-	mu      sync.Mutex
-	budget  float64
-	roster  *Roster
-	rosterT RosterType
-}
-
-// NewRosterManager creates a new RosterManager with given budget.
-func NewRosterManager(budget float64) *RosterManager {
-	return &RosterManager{
-		budget: budget,
-	}
-}
-
-// GetRoster returns the current roster or spawns a new one if none exists.
-func (rm *RosterManager) GetRoster(requested RosterType) (*Roster, error) {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-
-	if rm.roster != nil && rm.rosterT == requested {
-		return rm.roster, nil
+		return r, nil
 	}
 
-	r, err := SpawnRoster(requested, rm.budget)
-	if err != nil {
-		return nil, err
+	// Otherwise spawn full arena roster (simulated).
+	fullMembers := []Member{
+		{ID: "eng1", Role: Engineer, Micro: 3.0},
+		{ID: "eng2", Role: Engineer, Micro: 3.0},
+		{ID: "rev1", Role: Reviewer, Micro: 2.5},
+		{ID: "qa1", Role: "QA", Micro: 2.0},
 	}
-
-	rm.roster = r
-	rm.rosterT = requested
+	for _, m := range fullMembers {
+		r.AddMember(m)
+	}
 	return r, nil
 }
