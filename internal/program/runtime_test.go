@@ -1,97 +1,84 @@
 package program
 
 import (
-	"context"
 	"testing"
 	"time"
 )
 
-func TestReserveSpendLicense(t *testing.T) {
-	pr := NewProgramRuntime("prog1")
-	ctx := context.Background()
+func TestReserveSpend(t *testing.T) {
+	rt := NewRuntime()
 
-	// Reserve within envelope
-	if err := pr.ReserveSpendLicense(ctx, 500); err != nil {
+	err := rt.ReserveSpend(5)
+	if err != nil {
 		t.Fatalf("unexpected error reserving spend: %v", err)
 	}
 
-	// Reserve exceeding envelope
-	if err := pr.ReserveSpendLicense(ctx, 400); err != ErrSpendLimitExceeded {
-		t.Fatalf("expected ErrSpendLimitExceeded, got %v", err)
-	}
-
-	// Simulate new month resets reservation
-	pr.monthStart = time.Now().Add(-31 * 24 * time.Hour)
-	if err := pr.ReserveSpendLicense(ctx, 800); err != nil {
-		t.Fatalf("unexpected error reserving spend after month reset: %v", err)
-	}
-}
-
-func TestIDBadgeIssueAndValidate(t *testing.T) {
-	pr := NewProgramRuntime("prog2")
-	ctx := context.Background()
-
-	badge := pr.IssueIDBadge(ctx)
-	if badge == nil {
-		t.Fatal("expected badge, got nil")
-	}
-
-	// Validate correct badge
-	if err := pr.ValidateIDBadge(badge.Token); err != nil {
-		t.Fatalf("unexpected error validating badge: %v", err)
-	}
-
-	// Validate wrong token
-	if err := pr.ValidateIDBadge("wrong-token"); err != ErrInvalidBadge {
-		t.Fatalf("expected ErrInvalidBadge for wrong token, got %v", err)
-	}
-
-	// Expire badge and validate
-	pr.badge.ExpiresAt = time.Now().Add(-time.Minute)
-	if err := pr.ValidateIDBadge(badge.Token); err != ErrInvalidBadge {
-		t.Fatalf("expected ErrInvalidBadge for expired badge, got %v", err)
-	}
-}
-
-func TestAcceptContractAndShipReceipt(t *testing.T) {
-	pr := NewProgramRuntime("prog3")
-	ctx := context.Background()
-
-	badge := pr.IssueIDBadge(ctx)
-
-	// Accept contract with valid badge
-	receipt, err := pr.AcceptContract(ctx, badge.Token)
-	if err != nil {
-		t.Fatalf("unexpected error accepting contract: %v", err)
-	}
-	if receipt == nil {
-		t.Fatal("expected ship receipt, got nil")
-	}
-
-	// Accept contract again should fail
-	_, err = pr.AcceptContract(ctx, badge.Token)
+	err = rt.ReserveSpend(4)
 	if err == nil {
-		t.Fatal("expected error accepting contract twice, got nil")
-	}
-
-	// Get ship receipt
-	gotReceipt, err := pr.GetShipReceipt()
-	if err != nil {
-		t.Fatalf("unexpected error getting ship receipt: %v", err)
-	}
-	if gotReceipt != receipt {
-		t.Fatal("ship receipt mismatch")
+		t.Fatalf("expected error reserving over envelope, got none")
 	}
 }
 
-func TestAcceptContractInvalidBadge(t *testing.T) {
-	pr := NewProgramRuntime("prog4")
-	ctx := context.Background()
+func TestFanOutSpend(t *testing.T) {
+	rt := NewRuntime()
 
-	pr.IssueIDBadge(ctx)
+	err := rt.ReserveSpend(5)
+	if err != nil {
+		t.Fatalf("reserve failed: %v", err)
+	}
 
-	_, err := pr.AcceptContract(ctx, "invalid-token")
-	if err != ErrInvalidBadge {
-		t.Fatalf("expected ErrInvalidBadge, got %v", err)
+	err = rt.FanOutSpend(3)
+	if err != nil {
+		t.Fatalf("fan-out failed: %v", err)
+	}
+
+	err = rt.FanOutSpend(3)
+	if err == nil {
+		t.Fatalf("expected fan-out over reserved to fail, got none")
+	}
+}
+
+func TestIssueBadge(t *testing.T) {
+	rt := NewRuntime()
+
+	badge, err := rt.IssueBadge("user123")
+	if err != nil {
+		t.Fatalf("issue badge failed: %v", err)
+	}
+	if badge.Entity != "user123" {
+		t.Errorf("badge entity mismatch: got %s", badge.Entity)
+	}
+	if badge.ExpiresAt.Before(time.Now()) {
+		t.Errorf("badge expiry is in the past")
+	}
+
+	_, err = rt.IssueBadge("")
+	if err == nil {
+		t.Errorf("expected error issuing badge with empty entity")
+	}
+}
+
+func TestAcceptOutput(t *testing.T) {
+	rt := NewRuntime()
+
+	receipt, err := rt.AcceptOutput("prog1", 2.5, "task completed")
+	if err != nil {
+		t.Fatalf("accept output failed: %v", err)
+	}
+	if receipt.ProgramID != "prog1" {
+		t.Errorf("receipt programID mismatch: got %s", receipt.ProgramID)
+	}
+	if receipt.Amount != 2.5 {
+		t.Errorf("receipt amount mismatch: got %f", receipt.Amount)
+	}
+
+	_, err = rt.AcceptOutput("", 1, "details")
+	if err == nil {
+		t.Errorf("expected error with empty programID")
+	}
+
+	_, err = rt.AcceptOutput("prog2", 0, "details")
+	if err == nil {
+		t.Errorf("expected error with zero amount")
 	}
 }
