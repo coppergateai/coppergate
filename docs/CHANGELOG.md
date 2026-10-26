@@ -2,9 +2,9 @@
 
 ## [Unreleased]
 
-### Added
-- AG-012: Implement lean roster allocation under $2 monthly budget.
-  - Arena selects LEAN_ROSTER mode when availableMicros ≤ $2 (2,000,000 micros).
-  - FULL_ARENA spawn disallowed under tight budget.
-  - Added budget-aware roster management with entry cost accounting.
-  - Added tests covering arena type selection, budget enforcement, and roster entry management.
+### Features
+
+- AG-012: Implement lean roster allocation under $2 availableMicros budget for Engineer and Reviewer roles only.
+  - FULL_ARENA spawn disabled under $8 monthly envelope budget.
+  - Matches architecture acceptance criteria from coppergate-architecture/docs/OPEN_PROGRAM.md.
+  - Includes tests covering budget and role constraints.
