@@ -3,8 +3,8 @@
 ## [Unreleased]
 
 ### Added
-- AG-012: Implement lean roster allocation under $2 monthly budget.
-  - Arena selects LEAN_ROSTER mode when availableMicros ≤ $2 (2,000,000 micros).
-  - FULL_ARENA spawn disallowed under tight budget.
-  - Added budget-aware roster management with entry cost accounting.
-  - Added tests covering arena type selection, budget enforcement, and roster entry management.
+- AG-012: Implemented lean Arena allocator with tight budget enforcement.
+  - Allocations fail with ErrFullArena when capacity exceeded.
+  - Designed for micros under $2 engineer+reviewer cost, no full arena spawn beyond budget.
+  - Includes Reset method for reuse.
+  - Covered by unit tests.
