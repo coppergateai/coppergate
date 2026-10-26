@@ -1,7 +1,6 @@
+# Change Log
+
 ## [Unreleased]
 
 ### Added
-- P-104: Program Runtime (Contracted Autonomy) Spend License on reserve/fan-out.
-- ID badges for program runtime identity.
-- Accept → Ship Receipt flow for runtime contract acceptance.
-- Landing and writeback of runtime state changes.
+- P-104: Implemented Program Runtime (Contracted Autonomy) Spend License capability with reserve/fan-out, ID badges issuance, accept → ship receipt workflow, and landing under `/docs/-program-runtime`.
