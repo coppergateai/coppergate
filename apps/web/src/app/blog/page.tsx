@@ -11,7 +11,7 @@ import { getSiteUrl } from "@/lib/site-url";
 export const metadata: Metadata = publicPageMetadata({
   title: "Blog",
   description:
-    "Notes on multi-agent arenas, agent spend caps, and fitness evidence — from the Coppergate team.",
+    "Notes on Open Program Runtime, multi-agent arenas, spend caps, and fitness evidence — from the Coppergate team.",
   path: "/blog",
 });
 

@@ -52,6 +52,8 @@ export function publicPageMetadata({
       images: [OG_IMAGE],
     },
     twitter: {
+      ...(title ? { title } : {}),
+      ...(description ? { description } : {}),
       images: [TWITTER_IMAGE],
     },
   };
@@ -62,6 +64,11 @@ export const PUBLIC_STATIC_ROUTES: MetadataRoute.Sitemap = [
   { url: "/", changeFrequency: "weekly", priority: 1 },
   { url: "/blog", changeFrequency: "weekly", priority: 0.7 },
   { url: "/docs", changeFrequency: "weekly", priority: 0.7 },
+  {
+    url: "/docs/open-program-runtime",
+    changeFrequency: "monthly",
+    priority: 0.7,
+  },
   { url: "/docs/supported-stack", changeFrequency: "monthly", priority: 0.5 },
   { url: "/docs/limitations", changeFrequency: "monthly", priority: 0.5 },
   { url: "/docs/pricing", changeFrequency: "monthly", priority: 0.5 },

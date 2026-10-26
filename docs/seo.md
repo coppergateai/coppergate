@@ -21,9 +21,10 @@ English-only public surface (`https://www.coppergate.ai`). App/auth routes are `
 ## Local checks
 
 - `/robots.txt` — disallow includes `/workspaces/`, `/login`, `/profile`, `/share/`, `/ops/`.
-- `/sitemap.xml` — home, docs, trust pages, published blog posts only.
+- `/sitemap.xml` — home, docs (incl. `/docs/open-program-runtime`), trust pages, published blog posts only.
+- `/llms.txt` — AI/search crawler summary; must list OPR + match current positioning.
 - `/manifest.webmanifest` — app name + icons.
-- View-source: home has Organization / WebSite / SoftwareApplication / FAQPage JSON-LD; docs/blog have BreadcrumbList (and Article on posts).
+- View-source: home has Organization / WebSite / SoftwareApplication / FAQPage JSON-LD; docs index has CollectionPage; OPR has TechArticle; blog has BreadcrumbList (+ Article on posts).
 
 ## Content
 

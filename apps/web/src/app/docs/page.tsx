@@ -3,8 +3,10 @@ import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
 import { IconArrow } from "@/components/marketing/icons";
+import { JsonLdScript } from "@/components/seo/json-ld-script";
 import styles from "@/components/marketing/marketing.module.css";
 import { publicPageMetadata } from "@/lib/seo";
+import { getSiteUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Docs",
@@ -50,6 +52,26 @@ const items = [
 ] as const;
 
 export default function DocsIndexPage() {
+  const siteUrl = getSiteUrl();
+  const collectionLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "Coppergate Documentation",
+    description:
+      "Open Program Runtime docs — Contracted Autonomy, stack, self-host, limitations, recovery.",
+    url: `${siteUrl}/docs`,
+    isPartOf: { "@type": "WebSite", name: "Coppergate", url: siteUrl },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: items.map((item, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: `${siteUrl}${item.href}`,
+        name: item.title,
+      })),
+    },
+  };
+
   return (
     <DocsShell>
       <DocsBreadcrumbJsonLd
@@ -58,6 +80,7 @@ export default function DocsIndexPage() {
           { name: "Docs", path: "/docs" },
         ]}
       />
+      <JsonLdScript data={collectionLd} />
       <div className={styles.contentPage}>
         <p className={styles.pageEyebrow}>Open source</p>
         <h1 className={styles.pageTitle}>Documentation</h1>
@@ -78,17 +101,15 @@ export default function DocsIndexPage() {
             Self-host guide
             <IconArrow />
           </a>
+          <Link
+            className={styles.btnSecondary}
+            href="/docs/open-program-runtime"
+          >
+            Open Program Runtime
+          </Link>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted
           </Link>
-          <a
-            className={styles.btnSecondary}
-            href={REPO}
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
         </div>
 
         <ul className={styles.docsList}>

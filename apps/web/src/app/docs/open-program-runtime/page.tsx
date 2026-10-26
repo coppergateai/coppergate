@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DocsBreadcrumbJsonLd } from "@/components/docs/docs-breadcrumb-json-ld";
 import { DocsShell } from "@/components/docs/docs-shell";
+import { JsonLdScript } from "@/components/seo/json-ld-script";
 import styles from "@/components/marketing/marketing.module.css";
 import { publicPageMetadata } from "@/lib/seo";
+import { getSiteUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Open Program Runtime",
@@ -13,15 +15,45 @@ export const metadata: Metadata = publicPageMetadata({
 });
 
 export default function OpenProgramRuntimePage() {
+  const siteUrl = getSiteUrl();
+  const path = "/docs/open-program-runtime";
+  const techArticleLd = {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    headline: "Open Program Runtime",
+    description:
+      "Contracted Autonomy — agents only spend against Open Program lines; Accept writes Done plus a Ship Receipt.",
+    mainEntityOfPage: `${siteUrl}${path}`,
+    url: `${siteUrl}${path}`,
+    author: {
+      "@type": "Organization",
+      name: "Coppergate",
+      url: siteUrl,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Coppergate",
+      url: siteUrl,
+    },
+    inLanguage: "en",
+    about: [
+      "Open Program Runtime",
+      "Contracted Autonomy",
+      "Ship Receipt",
+      "Spend License",
+    ],
+  };
+
   return (
     <DocsShell>
       <DocsBreadcrumbJsonLd
         crumbs={[
           { name: "Home", path: "/" },
           { name: "Docs", path: "/docs" },
-          { name: "Open Program Runtime", path: "/docs/open-program-runtime" },
+          { name: "Open Program Runtime", path },
         ]}
       />
+      <JsonLdScript data={techArticleLd} />
       <div className={styles.contentPage}>
         <Link className={styles.backLink} href="/docs">
           ← Docs
