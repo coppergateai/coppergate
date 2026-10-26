@@ -4,64 +4,75 @@ import (
 	"testing"
 )
 
-func TestArenaAllocWithinCapacity(t *testing.T) {
-	const capacity = 1024
-	a := New(capacity)
-
-	mem, err := a.Alloc(512)
+func TestLeanArenaAllocFree(t *testing.T) {
+	a, err := NewLeanArena(RoleEngineer, 8.0)
 	if err != nil {
-		t.Fatalf("unexpected error allocating 512 bytes: %v", err)
-	}
-	if len(mem) != 512 {
-		t.Fatalf("expected 512 bytes allocated, got %d", len(mem))
+		t.Fatalf("unexpected error creating lean arena: %v", err)
 	}
 
-	mem2, err := a.Alloc(512)
-	if err != nil {
-		t.Fatalf("unexpected error allocating second 512 bytes: %v", err)
+	buf := a.Alloc(100)
+	if buf == nil {
+		t.Fatal("expected non-nil buffer for size 100")
 	}
-	if len(mem2) != 512 {
-		t.Fatalf("expected 512 bytes allocated, got %d", len(mem2))
-	}
-
-	// Next allocation should fail due to capacity exceeded
-	_, err = a.Alloc(1)
-	if err != ErrFullArena {
-		t.Fatalf("expected ErrFullArena, got %v", err)
-	}
-}
-
-func TestArenaAllocZeroOrNegative(t *testing.T) {
-	a := New(100)
-	_, err := a.Alloc(0)
-	if err == nil {
-		t.Fatal("expected error allocating zero bytes")
-	}
-	_, err = a.Alloc(-1)
-	if err == nil {
-		t.Fatal("expected error allocating negative bytes")
-	}
-}
-
-func TestArenaReset(t *testing.T) {
-	a := New(100)
-	_, err := a.Alloc(100)
-	if err != nil {
-		t.Fatalf("unexpected error allocating 100 bytes: %v", err)
+	if len(buf) != 100 {
+		t.Errorf("expected buffer length 100, got %d", len(buf))
 	}
 
-	_, err = a.Alloc(1)
-	if err != ErrFullArena {
-		t.Fatalf("expected ErrFullArena before reset, got %v", err)
+	// Alloc too large should return nil
+	buf2 := a.Alloc(5000)
+	if buf2 != nil {
+		t.Errorf("expected nil buffer for large alloc, got %v", buf2)
+	}
+
+	// Alloc zero or negative should return nil
+	buf3 := a.Alloc(0)
+	if buf3 != nil {
+		t.Errorf("expected nil buffer for zero alloc, got %v", buf3)
+	}
+
+	// Free buffer should not panic
+	a.Free(buf)
+
+	// Free invalid buffer should be ignored
+	a.Free(nil)
+	a.Free([]byte{1, 2, 3})
+
+	// Allocated bytes tracking
+	if a.Allocated() != 100 {
+		t.Errorf("expected allocated 100, got %d", a.Allocated())
 	}
 
 	a.Reset()
-
-	mem, err := a.Alloc(100)
-	if err != nil {
-		t.Fatalf("unexpected error allocating 100 bytes after reset: %v", err)
+	if a.Allocated() != 0 {
+		t.Errorf("expected allocated 0 after reset, got %d", a.Allocated())
 	}
-	if len(mem) != 100 {
-		t.Fatalf("expected 100 bytes allocated after reset, got %d", len(mem))
+}
+
+func TestLeanArenaRoleRestrictions(t *testing.T) {
+	_, err := NewLeanArena(RoleFullArenaSpawn, 8.0)
+	if err == nil {
+		t.Fatal("expected error for disallowed role FULL_ARENA spawn")
+	}
+
+	_, err = NewLeanArena(RoleEngineer, 9.0)
+	if err == nil {
+		t.Fatal("expected error for monthly envelope > $8")
+	}
+
+	if !RoleAllowed(RoleEngineer) {
+		t.Error("expected RoleEngineer to be allowed")
+	}
+	if !RoleAllowed(RoleReviewer) {
+		t.Error("expected RoleReviewer to be allowed")
+	}
+	if RoleAllowed(RoleFullArenaSpawn) {
+		t.Error("expected RoleFullArenaSpawn to be disallowed")
+	}
+}
+
+func TestAvailableMicros(t *testing.T) {
+	micros := AvailableMicros()
+	if micros != 2_000_000 {
+		t.Errorf("expected available micros 2,000,000, got %d", micros)
 	}
 }
