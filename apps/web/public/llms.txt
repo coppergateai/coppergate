@@ -1,8 +1,8 @@
 # Coppergate
 
-> Set a budget. Agents compete. Survivors ship. Coppergate runs autonomous engineering agents inside a spend cap — contenders compete, fitness and evidence decide, you review what ships.
+> Autonomy under contract. Only what’s on the program ships. Coppergate’s Open Program Runtime binds agent spend, Survivor Arena competition, and Accept to living Open Program lines — with a Ship Receipt you can audit.
 
-Coppergate is an open-source (MIT) multi-agent arena for engineering work. Selection pressure (fitness relative to spend) ranks qualifying paths; weak agents lose budget and exit; survivors are prepared as pull/merge requests for human review.
+Coppergate is an open-source (MIT) multi-agent arena for engineering work. When a project binds an Open Program, contenders may spend only against Open IDs; fitness and CI evidence decide survivors; you Accept. Success is Done writeback plus a Ship Receipt — not a chat transcript. Community / self-host stays $0; paid hosted plan tiers are not offered.
 
 Website: https://www.coppergate.ai
 Repository: https://github.com/coppergateai/coppergate
@@ -10,8 +10,9 @@ Contact: hello@coppergate.ai
 
 ## Primary pages
 
-- [Home](https://www.coppergate.ai/): Product overview, arena thesis, FAQ
+- [Home](https://www.coppergate.ai/): Product overview, Open Program Runtime thesis, FAQ
 - [Documentation](https://www.coppergate.ai/docs): Docs index
+- [Open Program Runtime](https://www.coppergate.ai/docs/open-program-runtime): Contracted Autonomy, Spend License, Accept → Ship Receipt
 - [Supported stack](https://www.coppergate.ai/docs/supported-stack): SCM, signals, fitness surface
 - [Limitations](https://www.coppergate.ai/docs/limitations): Current-release limits and non-goals
 - [Pricing](https://www.coppergate.ai/docs/pricing): MIT self-host at $0; paid plans deferred

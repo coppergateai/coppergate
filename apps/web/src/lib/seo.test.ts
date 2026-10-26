@@ -35,6 +35,7 @@ describe("seo helpers", () => {
       "/",
       "/blog",
       "/docs",
+      "/docs/open-program-runtime",
       "/docs/pricing",
       "/security",
       "/changelog",
@@ -45,6 +46,19 @@ describe("seo helpers", () => {
     }
     assert.ok(!paths.includes("/login"));
     assert.ok(!paths.includes("/workspaces"));
+  });
+
+  it("keeps docs nav paths in the sitemap", () => {
+    const navSrc = readFileSync(
+      path.join(process.cwd(), "src/components/docs/docs-nav.tsx"),
+      "utf8",
+    );
+    const hrefs = [...navSrc.matchAll(/href:\s*"(\/[^"]+)"/g)].map((m) => m[1]);
+    assert.ok(hrefs.includes("/docs/open-program-runtime"));
+    const paths = new Set(PUBLIC_STATIC_ROUTES.map((r) => r.url));
+    for (const href of hrefs) {
+      assert.ok(paths.has(href), `docs nav ${href} missing from sitemap`);
+    }
   });
 });
 
@@ -70,10 +84,25 @@ describe("sitemap route", () => {
     assert.ok(urls.includes("https://www.coppergate.ai"));
     assert.ok(urls.includes("https://www.coppergate.ai/docs"));
     assert.ok(
+      urls.includes("https://www.coppergate.ai/docs/open-program-runtime"),
+    );
+    assert.ok(
       urls.some((u) => u.startsWith("https://www.coppergate.ai/blog/")),
     );
     assert.ok(!urls.some((u) => u.includes("/login")));
     assert.ok(!urls.some((u) => u.includes("/workspaces")));
+  });
+});
+
+describe("llms.txt", () => {
+  it("lists Open Program Runtime and current positioning", () => {
+    const src = readFileSync(
+      path.join(process.cwd(), "public/llms.txt"),
+      "utf8",
+    );
+    assert.match(src, /Autonomy under contract/);
+    assert.match(src, /\/docs\/open-program-runtime/);
+    assert.match(src, /Ship Receipt/);
   });
 });
 
@@ -89,6 +118,8 @@ describe("publicPageMetadata", () => {
     assert.ok(og && typeof og === "object" && !Array.isArray(og));
     assert.equal(og.url, "/blog");
     assert.deepEqual(og.images, [OG_IMAGE]);
+    assert.equal(meta.twitter?.title, "Blog");
+    assert.equal(meta.twitter?.description, "Notes");
     assert.deepEqual(meta.twitter?.images, [TWITTER_IMAGE]);
   });
 

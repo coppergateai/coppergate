@@ -122,8 +122,14 @@ export default async function BlogPostPage({ params }: PageProps) {
         ) : null}
 
         <div className={styles.docsCtaRow}>
-          <a
+          <Link
             className={styles.btnHeroPrimary}
+            href="/docs/open-program-runtime"
+          >
+            Open Program Runtime
+          </Link>
+          <a
+            className={styles.btnSecondary}
             href="https://github.com/coppergateai/coppergate"
             target="_blank"
             rel="noreferrer"
@@ -132,9 +138,6 @@ export default async function BlogPostPage({ params }: PageProps) {
           </a>
           <Link className={styles.btnSecondary} href="/login">
             Try hosted
-          </Link>
-          <Link className={styles.btnSecondary} href="/docs">
-            Docs
           </Link>
         </div>
       </article>

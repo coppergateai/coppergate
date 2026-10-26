@@ -100,3 +100,36 @@ Note: homepage metadata can still stream after `</head>` under dynamic auth; wit
 
 - Deploy rounds 2–3 together
 - Search Console verification / sitemap submit (ops)
+
+## 2026-10-25 — round 4 (Open Program Runtime SEO)
+
+### Verified
+
+| Issue | Severity | Evidence |
+| --- | --- | --- |
+| `/docs/open-program-runtime` missing from sitemap + `llms.txt` | High | Page + docs nav exist in code (`1c29ac0`); `PUBLIC_STATIC_ROUTES` omitted it |
+| Production still on pre-OPR HTML; OPR 404 live | Critical (ops) | Live title still “Agents compete”; `/docs/open-program-runtime` → 404; latest Vercel prod Error (~843ms) while Ready alias lagged |
+| Docs index lacked CollectionPage/ItemList | Low | Only BreadcrumbList on `/docs` |
+| OPR page lacked article-class JSON-LD | Low | Breadcrumb only |
+| Child Twitter cards relied on title inheritance only | Medium | `publicPageMetadata` set `twitter.images` but not title/description |
+| `llms.txt` still “Agents compete” after product reposition | Medium | Stale vs `SITE_TITLE` / hero |
+
+### Implemented
+
+- Add `/docs/open-program-runtime` to `PUBLIC_STATIC_ROUTES` (priority 0.7)
+- Align `public/llms.txt` with Autonomy under contract + OPR URL
+- Docs index CollectionPage + ItemList; OPR TechArticle JSON-LD
+- Explicit Twitter title/description in `publicPageMetadata`
+- SoftwareApplication `featureList`; layout keywords for OPR / Ship Receipt
+- Blog post CTA → OPR; blog meta mentions Open Program Runtime
+- Tests: OPR in sitemap, docs-nav ↔ sitemap sync, `llms.txt` positioning
+
+### Validation
+
+- `pnpm --filter @coppergate/web exec node --import tsx --test src/lib/seo.test.ts`
+
+### Remaining
+
+- **Deploy** so live title/H1/OPR/sitemap/`llms.txt` match `main` (do not ship without auth)
+- Investigate Vercel prod Error deploys blocking OPR roll-out
+- Search Console sitemap re-submit + URL Inspection for `/` and `/docs/open-program-runtime` after Ready
