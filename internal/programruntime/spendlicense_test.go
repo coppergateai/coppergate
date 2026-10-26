@@ -4,84 +4,94 @@ import (
 	"testing"
 )
 
-func TestNewSpendLicense(t *testing.T) {
-	sl, err := NewSpendLicense("id1", 800, 500)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if sl.ID != "id1" {
-		t.Errorf("expected ID 'id1', got %s", sl.ID)
-	}
-	if sl.Reserved != 500 {
-		t.Errorf("expected reserved 500, got %d", sl.Reserved)
-	}
-	if sl.Envelope != 800 {
-		t.Errorf("expected envelope 800, got %d", sl.Envelope)
-	}
-}
+func TestReserveLicense(t *testing.T) {
+	lm := NewLicenseManager(8.0)
 
-func TestNewSpendLicenseReserveExceedsEnvelope(t *testing.T) {
-	_, err := NewSpendLicense("id2", 800, 900)
+	// Reserve 5 dollars - should succeed
+	lic, err := lm.ReserveLicense("prog-1", 5.0)
+	if err != nil {
+		t.Fatalf("unexpected error reserving license: %v", err)
+	}
+	if lic.Amount != 5.0 {
+		t.Errorf("expected amount 5.0, got %.2f", lic.Amount)
+	}
+
+	// Reserve 4 dollars - should fail (exceeds envelope)
+	_, err = lm.ReserveLicense("prog-1", 4.0)
 	if err == nil {
-		t.Fatal("expected error for reserve exceeding envelope")
+		t.Errorf("expected error reserving license exceeding envelope")
 	}
-}
 
-func TestFanOut(t *testing.T) {
-	sl, _ := NewSpendLicense("id1", 800, 600)
-	sub, err := sl.FanOut("id2", 300)
+	// Reserve 3 dollars - should succeed (total 8)
+	lic2, err := lm.ReserveLicense("prog-1", 3.0)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error reserving license: %v", err)
 	}
-	if sub.ID != "id2" {
-		t.Errorf("expected sub ID 'id2', got %s", sub.ID)
-	}
-	if sub.Reserved != 300 {
-		t.Errorf("expected sub reserved 300, got %d", sub.Reserved)
-	}
-	if sl.Used != 300 {
-		t.Errorf("expected used 300, got %d", sl.Used)
+	if lic2.Amount != 3.0 {
+		t.Errorf("expected amount 3.0, got %.2f", lic2.Amount)
 	}
 }
 
-func TestFanOutInsufficientReserve(t *testing.T) {
-	sl, _ := NewSpendLicense("id1", 800, 400)
-	_, err := sl.FanOut("id2", 500)
+func TestFanOutLicense(t *testing.T) {
+	lm := NewLicenseManager(8.0)
+	lic, err := lm.ReserveLicense("prog-1", 5.0)
+	if err != nil {
+		t.Fatalf("reserve license failed: %v", err)
+	}
+
+	err = lm.FanOutLicense(lic.ID, []string{"subprog-1", "subprog-2"})
+	if err != nil {
+		t.Fatalf("fan-out license failed: %v", err)
+	}
+
+	lic2, ok := lm.GetLicense(lic.ID)
+	if !ok {
+		t.Fatalf("license not found after fan-out")
+	}
+	if len(lic2.FannedOutTo) != 2 {
+		t.Errorf("expected 2 fanned out sub-programs, got %d", len(lic2.FannedOutTo))
+	}
+
+	// Accept license and try fan-out again - should fail
+	_, err = lm.AcceptLicense(lic.ID)
+	if err != nil {
+		t.Fatalf("accept license failed: %v", err)
+	}
+	err = lm.FanOutLicense(lic.ID, []string{"subprog-3"})
 	if err == nil {
-		t.Fatal("expected error for fan out exceeding reserved")
+		t.Errorf("expected error fan-out after acceptance")
 	}
 }
 
-func TestAccept(t *testing.T) {
-	sl, _ := NewSpendLicense("id1", 800, 500)
-	receipt, err := sl.Accept()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestIssueIDBadge(t *testing.T) {
+	lm := NewLicenseManager(8.0)
+	badge := lm.IssueIDBadge("prog-1")
+	if badge.ProgramID != "prog-1" {
+		t.Errorf("badge ProgramID mismatch: got %s", badge.ProgramID)
 	}
-	if !sl.Accepted {
-		t.Error("expected license to be accepted")
-	}
-	if receipt.LicenseID != sl.ID {
-		t.Errorf("receipt LicenseID mismatch: got %s, want %s", receipt.LicenseID, sl.ID)
+	if !badge.Valid {
+		t.Errorf("badge should be valid on issue")
 	}
 }
 
-func TestAcceptTwice(t *testing.T) {
-	sl, _ := NewSpendLicense("id1", 800, 500)
-	_, err := sl.Accept()
+func TestAcceptLicense(t *testing.T) {
+	lm := NewLicenseManager(8.0)
+	lic, err := lm.ReserveLicense("prog-1", 5.0)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("reserve license failed: %v", err)
 	}
-	_, err = sl.Accept()
+
+	receipt, err := lm.AcceptLicense(lic.ID)
+	if err != nil {
+		t.Fatalf("accept license failed: %v", err)
+	}
+	if receipt == "" {
+		t.Errorf("expected non-empty receipt ID")
+	}
+
+	// Accept again should fail
+	_, err = lm.AcceptLicense(lic.ID)
 	if err == nil {
-		t.Fatal("expected error on second accept")
-	}
-}
-
-func TestLandingWriteback(t *testing.T) {
-	sl, _ := NewSpendLicense("id1", 800, 500)
-	err := sl.LandingWriteback()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Errorf("expected error on double acceptance")
 	}
 }
