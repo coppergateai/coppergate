@@ -2,50 +2,51 @@
 
 ## Overview
 
-This document describes the Program Runtime (Contracted Autonomy) spend license feature introduced in P-104. This feature enables managing spend licenses on reserve/fan-out operations, handling ID badges for program runtime authorization, and the acceptance flow from license acceptance to ship receipt.
+This document describes the Program Runtime feature (P-104) that enables contracted autonomy spend licenses on reserve/fan-out operations, ID badge issuance, and the acceptance-to-ship receipt workflow.
 
-## Key Concepts
+The feature is designed to operate within an $8 monthly envelope spend cap and aligns with the architecture outlined in [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md).
 
-- **Spend License on Reserve/Fan-Out**: The system now supports reserving spend licenses when programs fan-out operations, ensuring spend caps are respected and tracked.
-- **ID Badges**: Programs receive ID badges representing their runtime authorization and spend license status.
-- **Accept → Ship Receipt Flow**: After accepting a spend license, a ship receipt is generated to confirm the transaction and update runtime state.
-- **Landing and Writeback**: The runtime landing process integrates spend license state and writes back updated license and receipt information.
+## Features
+
+- **Spend License on Reserve/Fan-out**  
+  Allows programs to reserve and fan-out spend licenses within the contracted autonomy model, ensuring spend limits are respected.
+
+- **ID Badges**  
+  Programs can issue and manage ID badges as part of their runtime identity and authorization.
+
+- **Accept → Ship Receipt Workflow**  
+  Supports the transition from acceptance of a program action to the generation of a ship receipt, confirming the action's completion.
 
 ## Usage
 
-### Reserving Spend License
+### Reserve/Fan-out Spend License
 
-When a program runtime initiates a fan-out operation, it reserves spend license tokens from its monthly envelope (default $8). The system ensures spend does not exceed the envelope.
+Programs can request spend licenses on reserve or fan-out operations. The system enforces the $8 monthly spend envelope to prevent overspending.
 
 ### ID Badges
 
-ID badges are issued and attached to program runtime contexts to authorize spend and operations. These badges are validated during runtime operations.
+ID badges are issued to program runtimes to authenticate and authorize actions. Badge management APIs allow creation, validation, and revocation.
 
-### Accepting Spend License
+### Accept to Ship Receipt
 
-Programs must explicitly accept spend licenses before proceeding. Upon acceptance, a ship receipt is generated and recorded.
-
-### Ship Receipt
-
-The ship receipt confirms the spend license transaction and updates the runtime state accordingly.
+When a program accepts a contract or action, a ship receipt is generated to confirm the transaction. This receipt can be used for audit and tracking.
 
 ## Architecture
 
-This feature aligns with the Open IDs architecture described in [coppergate-architecture/docs/OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md).
+This feature follows the Open IDs and program runtime architecture defined in the [OPEN_PROGRAM.md](../coppergate-architecture/docs/OPEN_PROGRAM.md) document.
 
 ## Testing
 
-The feature is covered by unit and integration tests validating:
+Automated tests cover:
 
-- Spend license reservation and enforcement
+- Spend license enforcement on reserve/fan-out
 - ID badge issuance and validation
-- Accept → Ship Receipt flow correctness
-- Landing and writeback of spend license state
+- Accept to ship receipt workflow correctness
 
 ## Change History
 
-- P-104: Initial implementation of Program Runtime Spend License on reserve/fan-out, ID badges, and accept to ship receipt flow.
+- **v1.0** - Initial release of Program Runtime (Contracted Autonomy) Spend License feature.
 
 ---
 
-For detailed API and implementation notes, see the source code and tests in the primary coppergate repo.
+For more details, see the source code and tests in the primary coppergate repository.
