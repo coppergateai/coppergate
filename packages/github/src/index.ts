@@ -75,7 +75,10 @@ export {
   type RepoRef,
 } from "./delivery.js";
 export {
+  commitCheckSuitesFailed,
+  countOpenShipRollbackPrs,
   fetchCommitCheckEvidence,
+  getRepoDefaultBranchHead,
   mapCheckRunPayload,
   mapCheckSuitePayload,
   mapCommitStatusPayload,

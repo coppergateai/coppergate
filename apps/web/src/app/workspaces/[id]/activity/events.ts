@@ -485,6 +485,12 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     category: "decision",
     outcome: "completed",
   },
+  "merge.halted_ci_red": {
+    title: "Auto-merge halted (CI red)",
+    category: "decision",
+    outcome: "failed",
+    summary: (m) => str(m, "cta") ?? str(m, "reason"),
+  },
   "ship.rollback": {
     title: "Ship rollback opened",
     category: "decision",

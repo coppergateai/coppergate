@@ -1,7 +1,7 @@
 /**
  * Production health scan for coppergate + kprompt dogfood workspaces.
  */
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   closeDb,
   createDb,
@@ -15,7 +15,6 @@ import {
   budgets,
   projects,
   tasks,
-  usageEvents,
   workspaces,
 } from "../src/schema.ts";
 

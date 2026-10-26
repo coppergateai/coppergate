@@ -1,43 +1,19 @@
 /**
  * Post-merge CI failure → open GraphQL revert PR (ship rollback lane).
+ * At most one open rollback PR per repo — avoids orphan-revert storms.
  */
 import {
   maintainerEvents,
   recordAuditEvent,
   type Database,
 } from "@coppergate/db";
-import { createRevertPullRequest } from "@coppergate/github";
+import {
+  commitCheckSuitesFailed,
+  countOpenShipRollbackPrs,
+  createRevertPullRequest,
+} from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
 import { and, desc, eq } from "drizzle-orm";
-
-async function defaultBranchCiFailed(input: {
-  token: string;
-  owner: string;
-  repo: string;
-  sha: string;
-}): Promise<boolean> {
-  const res = await fetch(
-    `https://api.github.com/repos/${input.owner}/${input.repo}/commits/${input.sha}/check-suites`,
-    {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${input.token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    },
-  );
-  if (!res.ok) return false;
-  const body = (await res.json()) as {
-    check_suites?: Array<{ conclusion?: string | null; status?: string }>;
-  };
-  const suites = body.check_suites ?? [];
-  if (suites.length === 0) return false;
-  return suites.some(
-    (s) =>
-      s.status === "completed" &&
-      (s.conclusion === "failure" || s.conclusion === "timed_out"),
-  );
-}
 
 export async function maybeShipRollbackForProject(
   db: Database,
@@ -51,6 +27,19 @@ export async function maybeShipRollbackForProject(
     actor: string;
   },
 ): Promise<number> {
+  const openRollbacks = await countOpenShipRollbackPrs({
+    token: input.token,
+    owner: input.owner,
+    repo: input.repo,
+  });
+  if (openRollbacks > 0) {
+    log.info("ship rollback skipped — open rollback PR already exists", {
+      projectId: input.projectId,
+      openRollbacks,
+    });
+    return 0;
+  }
+
   const recent = await db
     .select()
     .from(maintainerEvents)
@@ -116,7 +105,7 @@ export async function maybeShipRollbackForProject(
     const sha = pr.merge_commit_sha;
     if (!pr.merged || !sha) continue;
 
-    const failed = await defaultBranchCiFailed({
+    const failed = await commitCheckSuitesFailed({
       token: input.token,
       owner: input.owner,
       repo: input.repo,
@@ -137,6 +126,7 @@ export async function maybeShipRollbackForProject(
           `Post-merge checks failed on \`${sha.slice(0, 8)}\`.`,
           `This revert PR was opened automatically by Coppergate.`,
           ``,
+          `Auto-merge stays halted while this PR (or default-branch CI) is red.`,
           `Original PR: #${payload.prNumber}`,
         ].join("\n"),
       });
@@ -170,6 +160,8 @@ export async function maybeShipRollbackForProject(
         prNumber: payload.prNumber,
         revertPrNumber: revert.number,
       });
+      // One open rollback at a time.
+      break;
     } catch (err) {
       log.warn("ship rollback failed", {
         prNumber: payload.prNumber,

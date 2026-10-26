@@ -17,8 +17,11 @@ import {
   type GithubInstallation,
 } from "@coppergate/db";
 import {
+  commitCheckSuitesFailed,
+  countOpenShipRollbackPrs,
   createGithubRelease,
   formatReleaseNotes,
+  getRepoDefaultBranchHead,
   mergePullRequest,
 } from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
@@ -146,6 +149,66 @@ export async function runMaintainerSchedulerTick(
 
     const [owner, name] = bound.repository.baseRepoFullName.split("/");
     if (!owner || !name) continue;
+
+    // Halt ship while default-branch CI is red or a rollback PR is still open.
+    // Prevents merge→red→orphan-revert storms when post-merge checks fail.
+    if (policy.shipRollbackOnCiFail) {
+      try {
+        const openRollbacks = await countOpenShipRollbackPrs({
+          token,
+          owner,
+          repo: name,
+        });
+        const head = await getRepoDefaultBranchHead({
+          token,
+          owner,
+          repo: name,
+        });
+        const headFailed = head
+          ? await commitCheckSuitesFailed({
+              token,
+              owner,
+              repo: name,
+              sha: head.sha,
+            })
+          : false;
+        if (openRollbacks > 0 || headFailed) {
+          const reason =
+            openRollbacks > 0 ? "open_ship_rollback" : "default_branch_ci_red";
+          log.info("auto-merge halted — ship gate", {
+            projectId: tick.projectId,
+            reason,
+            openRollbacks,
+            headSha: head?.sha?.slice(0, 8),
+          });
+          await recordAuditEvent(db, {
+            workspaceId: tick.workspaceId,
+            actor,
+            action: "merge.halted_ci_red",
+            targetType: "project",
+            targetId: tick.projectId,
+            meta: {
+              projectId: tick.projectId,
+              reason,
+              openRollbacks,
+              headSha: head?.sha ?? null,
+              defaultBranch: head?.defaultBranch ?? null,
+              cta:
+                openRollbacks > 0
+                  ? "Merge or close the open ship-rollback PR, then fix default-branch CI"
+                  : "Fix default-branch CI before Coppergate auto-merge resumes",
+            },
+          });
+          continue;
+        }
+      } catch (err) {
+        log.warn("ship gate check failed — skipping auto-merge this tick", {
+          projectId: tick.projectId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        continue;
+      }
+    }
 
     const candidates = await listAutoMergeCandidates(db, tick.projectId);
     const mergedTitles: string[] = [];

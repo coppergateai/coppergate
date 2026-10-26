@@ -1,7 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  commitCheckSuitesFailed,
+  countOpenShipRollbackPrs,
   fetchCommitCheckEvidence,
+  getRepoDefaultBranchHead,
   mapCheckRunPayload,
   mapCheckSuitePayload,
   mapCommitStatusPayload,
@@ -102,5 +105,69 @@ describe("CI check mapping", () => {
     });
     assert.ok(rows.some((r) => r.name === "Vercel Preview Comments" && r.passed));
     assert.ok(rows.some((r) => r.name === "Vercel" && r.passed));
+  });
+
+  it("detects failed check suites on a commit", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          check_suites: [
+            { status: "completed", conclusion: "failure" },
+            { status: "completed", conclusion: "success" },
+          ],
+        }),
+        { status: 200 },
+      );
+    assert.equal(
+      await commitCheckSuitesFailed({
+        token: "t",
+        owner: "acme",
+        repo: "app",
+        sha: "abc",
+        fetchImpl,
+      }),
+      true,
+    );
+  });
+
+  it("reads default branch head sha", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith("/repos/acme/app")) {
+        return new Response(JSON.stringify({ default_branch: "main" }), {
+          status: 200,
+        });
+      }
+      if (url.includes("/git/ref/heads/main")) {
+        return new Response(
+          JSON.stringify({ object: { sha: "deadbeef" } }),
+          { status: 200 },
+        );
+      }
+      return new Response("nope", { status: 404 });
+    };
+    const head = await getRepoDefaultBranchHead({
+      token: "t",
+      owner: "acme",
+      repo: "app",
+      fetchImpl,
+    });
+    assert.deepEqual(head, { defaultBranch: "main", sha: "deadbeef" });
+  });
+
+  it("counts open ship-rollback PRs via search", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      assert.match(String(input), /search\/issues/);
+      return new Response(JSON.stringify({ total_count: 3 }), { status: 200 });
+    };
+    assert.equal(
+      await countOpenShipRollbackPrs({
+        token: "t",
+        owner: "acme",
+        repo: "app",
+        fetchImpl,
+      }),
+      3,
+    );
   });
 });
