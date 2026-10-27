@@ -2241,6 +2241,8 @@ export async function runVisionReplan(
   }
 
   // Arm roster — lean when project budget headroom is tight (BYOK spend guard).
+  // Spawn widens the contender pool; re-pin defaultContenderN to maxTournamentN
+  // so invent/replan cannot drift dogfood N back to FULL_ARENA (11).
   try {
     const spend = await getProjectSpendSummary(
       db,
@@ -2253,6 +2255,30 @@ export async function runVisionReplan(
       actor: input.actor,
       profileKeys: rosterKeysForAvailableBudget(spend.availableMicros),
     });
+    const [proj] = await db
+      .select({ maintainerPolicyJson: projects.maintainerPolicyJson })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.id, input.projectId),
+          eq(projects.workspaceId, input.workspaceId),
+        ),
+      )
+      .limit(1);
+    const pinN = Math.max(
+      1,
+      Math.min(3, parseMaintainerPolicy(proj?.maintainerPolicyJson).maxTournamentN),
+    );
+    const arena = await getArenaForProject(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+    });
+    if (arena && arena.defaultContenderN !== pinN) {
+      await db
+        .update(arenas)
+        .set({ defaultContenderN: pinN, updatedAt: new Date() })
+        .where(eq(arenas.id, arena.id));
+    }
   } catch {
     // arena may not exist yet — tick/enable creates it
   }
