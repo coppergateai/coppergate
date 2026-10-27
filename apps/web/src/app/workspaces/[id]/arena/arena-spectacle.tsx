@@ -13,11 +13,36 @@ type ContenderRun = {
   taskId: string;
   taskTitle: string;
   actualCostMicros: number;
+  fitnessScore: number | null;
+  efficiencyScore: number | null;
   prUrl: string | null;
   prNumber: number | null;
   errorCode: string | null;
   tournamentResult?: string | null;
   updatedAt: string;
+};
+
+type EfficiencyBoardRow = {
+  contenderId: string;
+  profileKey: string;
+  runId: string;
+  fitnessScore: number | null;
+  spendMicros: number;
+  efficiencyScore: number | null;
+  ciFailed: boolean;
+  tournamentResult: string | null;
+  rank: number;
+};
+
+type EfficiencyBoard = {
+  taskId: string;
+  taskTitle: string;
+  payoffAlpha: number;
+  tournamentStatus: string | null;
+  winnerRunId: string | null;
+  provisional: boolean;
+  rows: EfficiencyBoardRow[];
+  winnerPromoteReason: string | null;
 };
 
 const STALE_FAILURE_MS = 2 * 60 * 60 * 1000;
@@ -44,6 +69,8 @@ type ProjectLane = {
   repoFullName: string;
   arenaId: string | null;
   arenaStatus: string | null;
+  payoffAlpha: number | null;
+  efficiencyBoard: EfficiencyBoard | null;
   contenders: ContenderView[];
   lastRun: {
     id: string;
@@ -206,6 +233,13 @@ function formatSyncAge(syncedAt: string | null, nowMs: number): string {
 function titleCase(key: string): string {
   if (!key) return "Agent";
   return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function formatSpendUsd(micros: number): string {
+  const dollars = micros / 1_000_000;
+  if (!Number.isFinite(dollars) || dollars === 0) return "$0";
+  if (dollars < 0.01) return "<$0.01";
+  return `$${dollars.toFixed(dollars < 1 ? 3 : 2)}`;
 }
 
 function temperLabel(temperament: string | null): string {
@@ -480,9 +514,10 @@ export function ArenaSpectacle({
               </>
             ) : (
               <>
-                Contenders compete under budget across {workspaceName}. Fitness
-                and CI pick survivors — Pause all drains the queue; Stop all
-                hard-kills runs until Resume.
+                Contenders compete under budget across {workspaceName}. Efficiency
+                payoff (f / spend
+                <sup>α</sup>) ranks CI-green paths — Pause all drains the
+                queue; Stop all hard-kills runs until Resume.
               </>
             )}
           </p>
@@ -662,6 +697,87 @@ export function ArenaSpectacle({
                           </span>
                         ))}
                       </div>
+                      {lane.efficiencyBoard ? (
+                        <section
+                          className={styles.payoffBoard}
+                          aria-label="Efficiency payoff"
+                        >
+                          <div className={styles.payoffHead}>
+                            <h3 className={styles.payoffTitle}>
+                              Efficiency payoff
+                            </h3>
+                            <p className={styles.payoffSub}>
+                              {displayTaskTitle(lane.efficiencyBoard.taskTitle, 64)}
+                              {" · "}
+                              α={lane.efficiencyBoard.payoffAlpha.toFixed(2)}
+                              {lane.efficiencyBoard.tournamentStatus
+                                ? ` · ${lane.efficiencyBoard.tournamentStatus.replace(/_/g, " ").toLowerCase()}`
+                                : null}
+                              {lane.efficiencyBoard.provisional
+                                ? " · provisional (CI pending)"
+                                : null}
+                            </p>
+                          </div>
+                          {lane.efficiencyBoard.winnerPromoteReason ? (
+                            <p className={styles.payoffPromote}>
+                              {lane.efficiencyBoard.winnerPromoteReason}
+                            </p>
+                          ) : null}
+                          <table className={styles.payoffTable}>
+                            <thead>
+                              <tr>
+                                <th scope="col">Agent</th>
+                                <th scope="col">f</th>
+                                <th scope="col">Spend</th>
+                                <th scope="col">e</th>
+                                <th scope="col">Result</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {lane.efficiencyBoard.rows.map((row) => {
+                                const isWinner =
+                                  row.runId ===
+                                    lane.efficiencyBoard!.winnerRunId ||
+                                  row.tournamentResult === "WINNER";
+                                return (
+                                  <tr
+                                    key={row.runId}
+                                    className={
+                                      isWinner ? styles.payoffRowWin : undefined
+                                    }
+                                  >
+                                    <td>{titleCase(row.profileKey)}</td>
+                                    <td>
+                                      {row.fitnessScore == null
+                                        ? "—"
+                                        : row.fitnessScore.toFixed(2)}
+                                    </td>
+                                    <td>{formatSpendUsd(row.spendMicros)}</td>
+                                    <td>
+                                      {row.efficiencyScore == null
+                                        ? "—"
+                                        : row.efficiencyScore.toFixed(3)}
+                                      {row.ciFailed ? (
+                                        <span className={styles.payoffCiFail}>
+                                          {" "}
+                                          · CI fail (e=0)
+                                        </span>
+                                      ) : null}
+                                    </td>
+                                    <td>
+                                      {row.tournamentResult ??
+                                        (isWinner ? "leading" : "—")}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                          <p className={styles.payoffFormula}>
+                            e = f / spend<sup>α</sup> · CI fail ⇒ e = 0
+                          </p>
+                        </section>
+                      ) : null}
                       {(() => {
                         const ranked = [...lane.contenders]
                           .map((c) => ({
