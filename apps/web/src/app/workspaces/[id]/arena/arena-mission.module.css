@@ -115,6 +115,15 @@
   border-color: color-mix(in srgb, var(--mc-active) 40%, transparent);
 }
 
+.pillPaused {
+  color: var(--mc-waiting);
+  border-color: color-mix(in srgb, var(--mc-waiting) 40%, transparent);
+}
+
+.pillPaused .pillDot {
+  background: var(--mc-waiting);
+}
+
 .pillLive .pillDot {
   background: var(--mc-active);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--mc-active) 50%, transparent);
