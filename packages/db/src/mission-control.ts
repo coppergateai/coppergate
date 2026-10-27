@@ -13,11 +13,7 @@ import {
   type WorkspaceArenaProjectLane,
 } from "./workspace-arena.js";
 import { agentRuns, projects, tasks } from "./schema.js";
-import {
-  sortMissionControlAttention,
-  type MissionControlAttentionItem,
-  type MissionControlAttentionKind,
-} from "./mission-control-attention.js";
+import { sortMissionControlAttention } from "./mission-control-attention.js";
 
 export type {
   MissionControlAttentionItem,
