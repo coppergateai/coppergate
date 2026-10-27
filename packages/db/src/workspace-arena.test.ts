@@ -27,6 +27,8 @@ function runStub(
     taskId: "task-1",
     taskTitle: "Stub",
     actualCostMicros: 0,
+    fitnessScore: null,
+    efficiencyScore: null,
     prUrl: null,
     prNumber: null,
     errorCode: null,
