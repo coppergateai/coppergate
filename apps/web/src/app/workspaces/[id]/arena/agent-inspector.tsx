@@ -81,6 +81,27 @@ function eventMessage(event: RunEvent): string {
   const payload = event.payload;
   if (payload && typeof payload === "object") {
     const obj = payload as Record<string, unknown>;
+    if (obj.code === "coding_path_honesty") {
+      const demoted = obj.demoted;
+      if (
+        demoted &&
+        typeof demoted === "object" &&
+        (demoted as { harness?: string }).harness === "native_openai" &&
+        typeof (demoted as { reason?: string }).reason === "string"
+      ) {
+        return `Cursor harness · native_openai demoted — ${(demoted as { reason: string }).reason}`;
+      }
+    }
+    if (obj.code === "provider_failover") {
+      const reason =
+        typeof obj.reason === "string" ? obj.reason.trim() : "";
+      const trigger =
+        typeof obj.trigger === "string" ? obj.trigger.trim() : "";
+      if (reason && trigger) {
+        return `Failover (${trigger.replace(/_/g, " ")}): ${reason}`;
+      }
+      if (reason) return `Provider failover: ${reason}`;
+    }
     if (typeof obj.message === "string") return obj.message;
     if (typeof obj.summary === "string") return obj.summary;
     if (typeof obj.text === "string") return obj.text;
