@@ -744,18 +744,19 @@ export async function executeClaimedRun(
           pathAllowlist: deliveryAllowlist,
         });
         const secretGate = assertDeliverySecretsRefused(deliveryBundle.files);
-        const deliveryBlocked = !pathGate.ok || !secretGate.ok;
+        const deliveryBlocked =
+          (!pathGate.ok ? pathGate : null) ??
+          (!secretGate.ok ? secretGate : null);
         // CI / FakeCodingAgent paths still use fixture diffs — only enforce on live http.
         if (
           (toy.toy || noRealFiles || deliveryBlocked) &&
           deliveryModeHint === "http" &&
           !(agent instanceof FakeCodingAgent)
         ) {
-          const blocked = !pathGate.ok ? pathGate : secretGate;
           const reason = deliveryBlocked
-            ? blocked.reason
+            ? deliveryBlocked.reason
             : (toy.reason ?? "no_sandbox_files");
-          const code = deliveryBlocked ? blocked.code : "stub_delivery";
+          const code = deliveryBlocked ? deliveryBlocked.code : "stub_delivery";
           await appendRunEvent(db, {
             runId: run.id,
             workspaceId: run.workspaceId,
