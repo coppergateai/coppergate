@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app";
 import { OpenIdBadge } from "@/components/app/ui";
 import { displayTaskTitle } from "@/lib/display-title";
+import { runEventDisplayBody } from "@/lib/run-event-message";
 import {
   acceptBlockedReason as computeAcceptBlocked,
   HARD_GATE_COPY,
@@ -989,9 +990,7 @@ export function TaskDetailPanel({
                   #{e.seq} {e.kind}
                 </span>
                 <div className={styles.eventBody}>
-                  {typeof e.payload.message === "string"
-                    ? e.payload.message
-                    : JSON.stringify(e.payload)}
+                  {runEventDisplayBody(e.payload) || JSON.stringify(e.payload)}
                 </div>
               </li>
             ))}
