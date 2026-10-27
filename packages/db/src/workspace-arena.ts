@@ -15,7 +15,7 @@ import {
   type Contender,
 } from "./schema.js";
 
-export type WorkspaceArenaLiveStatus = "LIVE" | "STOPPED";
+export type WorkspaceArenaLiveStatus = "LIVE" | "PAUSED" | "STOPPED";
 
 export type WorkspaceArenaContenderRun = {
   id: string;
@@ -114,9 +114,13 @@ export function isLiveArenaStatus(status: string | null | undefined): boolean {
 function deriveWorkspaceStatus(
   lanes: WorkspaceArenaProjectLane[],
 ): WorkspaceArenaLiveStatus {
-  return lanes.some((lane) => isLiveArenaStatus(lane.arenaStatus))
-    ? "LIVE"
-    : "STOPPED";
+  if (lanes.some((lane) => isLiveArenaStatus(lane.arenaStatus))) {
+    return "LIVE";
+  }
+  if (lanes.some((lane) => lane.arenaStatus === "PAUSED")) {
+    return "PAUSED";
+  }
+  return "STOPPED";
 }
 
 export type ClassifyContenderRuntimeOptions = {
@@ -144,9 +148,8 @@ export function classifyContenderRuntime(
   // Soft-cancel / stop is a quiet terminal — not an ops fire to chase.
   if (st === "CANCELLED") return "idle";
   if (st === "RUNNING" || st === "QUEUED") return "running";
-  if (st === "REVIEW_REQUIRED") return "awaitingCi";
-  if (st === "VALIDATING" || st === "WAITING_CI") {
-    // Pause/Stop is an intentional drain — don't turn mid-flight CI into ops fires.
+  if (st === "REVIEW_REQUIRED" || st === "VALIDATING" || st === "WAITING_CI") {
+    // Pause/Stop is an intentional drain — don't turn mid-flight CI/review into ops fires.
     // Reaper still fails truly stuck VALIDATING/WAITING_CI by wall-clock.
     if (!arenaLive) return "idle";
     return "awaitingCi";
