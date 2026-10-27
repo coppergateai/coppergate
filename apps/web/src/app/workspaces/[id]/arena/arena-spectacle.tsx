@@ -63,7 +63,7 @@ type Summary = {
 
 type Snapshot = {
   workspaceId: string;
-  status: "LIVE" | "STOPPED";
+  status: "LIVE" | "PAUSED" | "STOPPED";
   summary: Summary;
   syncedAt: string;
   projects: ProjectLane[];
@@ -107,9 +107,8 @@ function classifyRuntime(
   // Soft-cancel / stop is a quiet terminal — not an ops fire to chase.
   if (st === "CANCELLED") return "idle";
   if (st === "RUNNING" || st === "QUEUED") return "running";
-  if (st === "REVIEW_REQUIRED") return "awaitingCi";
-  if (st === "VALIDATING" || st === "WAITING_CI") {
-    // Pause/Stop drains the queue — mid-flight CI is not an ops fire until Resume.
+  if (st === "REVIEW_REQUIRED" || st === "VALIDATING" || st === "WAITING_CI") {
+    // Pause/Stop drains the queue — mid-flight CI/review is not an ops fire until Resume.
     if (!arenaLive) return "idle";
     return "awaitingCi";
   }
@@ -317,14 +316,16 @@ export function ArenaSpectacle({
   }, [load]);
 
   const live = snapshot?.status === "LIVE";
+  const paused = snapshot?.status === "PAUSED";
+  const workspaceStatusLabel = live ? "Live" : paused ? "Paused" : "Stopped";
 
   useEffect(() => {
-    if (!live) return;
+    if (!live && !paused) return;
     const id = window.setInterval(() => {
       void load();
     }, 7000);
     return () => window.clearInterval(id);
-  }, [live, load]);
+  }, [live, paused, load]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -455,23 +456,35 @@ export function ArenaSpectacle({
     <div
       className={`${styles.stage} ${selected ? styles.stageWithInspector : ""}`}
       data-live={live ? "true" : "false"}
+      data-paused={paused ? "true" : "false"}
     >
       <div className={styles.mainCol}>
         <header className={styles.hero}>
           <div className={styles.heroTop}>
             <p className={styles.eyebrow}>Arena / {workspaceName}</p>
             <span
-              className={`${styles.pill} ${live ? styles.pillLive : ""}`}
+              className={`${styles.pill} ${live ? styles.pillLive : paused ? styles.pillPaused : ""}`}
               aria-live="polite"
             >
               <span className={styles.pillDot} aria-hidden />
-              {live ? "Live" : "Stopped"}
+              {workspaceStatusLabel}
             </span>
           </div>
           <h1 className={styles.brand}>Arena</h1>
           <p className={styles.lede}>
-            Contenders compete under budget across {workspaceName}. Fitness and
-            CI pick survivors — Pause all drains the queue.
+            {paused ? (
+              <>
+                Pause all is draining in-flight work across {workspaceName}.
+                Resume to enqueue again, or Stop all to kill runs — idle and
+                awaiting-CI counts while paused are not ops fires.
+              </>
+            ) : (
+              <>
+                Contenders compete under budget across {workspaceName}. Fitness
+                and CI pick survivors — Pause all drains the queue; Stop all
+                hard-kills runs until Resume.
+              </>
+            )}
           </p>
 
           <div className={styles.controls}>
@@ -487,7 +500,7 @@ export function ArenaSpectacle({
                     disabled={pending}
                     onClick={() => void control("start")}
                   >
-                    Resume all
+                    {paused ? "Resume all" : "Start all"}
                   </button>
                 ) : (
                   <button
