@@ -32,6 +32,7 @@ function runStub(
     errorCode: null,
     tournamentResult: null,
     updatedAt: new Date().toISOString(),
+    activityHint: null,
     ...overrides,
   };
 }
