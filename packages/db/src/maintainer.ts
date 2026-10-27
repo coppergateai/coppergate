@@ -397,6 +397,34 @@ export function selectAutoAcceptRun<
   return runs[0] ?? null;
 }
 
+/**
+ * Pick a run to poll live GitHub CI for — must work BEFORE tournament WINNER
+ * exists. Unresolved tournaments stay WAITING_CI until CI promotes them; if we
+ * only refresh winners, dogfood N=1 deadlocks (no CI → no WINNER → no CI).
+ */
+export function selectCiRefreshRun<
+  T extends {
+    status: string;
+    tournamentId: string | null;
+    tournamentResult: string | null;
+    headSha: string | null;
+  },
+>(runs: T[]): T | null {
+  const withSha = (r: T) =>
+    Boolean(r.headSha && r.headSha !== "unknown" && r.headSha.length > 0);
+  const awaiting = runs.filter(
+    (r) =>
+      (r.status === "WAITING_CI" || r.status === "REVIEW_REQUIRED") &&
+      withSha(r),
+  );
+  if (awaiting.length === 0) return null;
+  const winner = awaiting.find((r) => r.tournamentResult === "WINNER");
+  if (winner) return winner;
+  // Prefer the delivered WAITING_CI contender over REVIEW_REQUIRED leftovers.
+  const waiting = awaiting.find((r) => r.status === "WAITING_CI");
+  return waiting ?? awaiting[0] ?? null;
+}
+
 /** True when task allowedPaths intersects policy pathAllowlist (empty allowlist = allow all). */
 export function taskMatchesPathAllowlist(
   allowedPathsJson: string | null | undefined,

@@ -16,6 +16,7 @@ import {
   resolveAutoMergeSkipPrs,
   rosterKeysForAvailableBudget,
   selectAutoAcceptRun,
+  selectCiRefreshRun,
   serializeMaintainerPolicy,
   shouldReplanVision,
   shouldRollbackProfileForFitness,
@@ -178,6 +179,59 @@ describe("selectAutoAcceptRun", () => {
       tournamentResult: null,
     };
     assert.equal(selectAutoAcceptRun([solo]), solo);
+  });
+});
+
+describe("selectCiRefreshRun", () => {
+  it("picks WAITING_CI with headSha before tournament WINNER exists", () => {
+    const waiting = {
+      id: "w",
+      status: "WAITING_CI",
+      tournamentId: "t1",
+      tournamentResult: null,
+      headSha: "abc123",
+    };
+    const cancelled = {
+      id: "c",
+      status: "CANCELLED",
+      tournamentId: "t1",
+      tournamentResult: null,
+      headSha: null,
+    };
+    assert.equal(selectCiRefreshRun([cancelled, waiting]), waiting);
+  });
+
+  it("prefers WINNER when present", () => {
+    const waiting = {
+      id: "w",
+      status: "WAITING_CI",
+      tournamentId: "t1",
+      tournamentResult: null,
+      headSha: "aaa",
+    };
+    const winner = {
+      id: "win",
+      status: "REVIEW_REQUIRED",
+      tournamentId: "t1",
+      tournamentResult: "WINNER",
+      headSha: "bbb",
+    };
+    assert.equal(selectCiRefreshRun([waiting, winner]), winner);
+  });
+
+  it("skips unknown headSha", () => {
+    assert.equal(
+      selectCiRefreshRun([
+        {
+          id: "x",
+          status: "WAITING_CI",
+          tournamentId: null,
+          tournamentResult: null,
+          headSha: "unknown",
+        },
+      ]),
+      null,
+    );
   });
 });
 

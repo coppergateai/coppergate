@@ -418,6 +418,7 @@ export {
   resolveAutoMergeSkipPrs,
   AUTO_MERGE_RETRY_COOLDOWN_MS,
   selectAutoAcceptRun,
+  selectCiRefreshRun,
   serializeMaintainerPolicy,
   shouldRollbackProfileForFitness,
   startProjectArena,

@@ -11,7 +11,7 @@ import {
   ingestCiEvidence,
   listMaintainerProjects,
   listRunsForTask,
-  selectAutoAcceptRun,
+  selectCiRefreshRun,
   tasks,
   type Database,
 } from "@coppergate/db";
@@ -90,7 +90,8 @@ export async function refreshPendingCiEvidence(
       // Imported PR review tasks are not Coppergate-delivered WAITING_CI work.
       if (task.githubPrNumber != null) continue;
       const runs = await listRunsForTask(db, project.workspaceId, task.id);
-      const candidate = selectAutoAcceptRun(runs);
+      // Must not require tournament WINNER — scoring waits on CI promotion.
+      const candidate = selectCiRefreshRun(runs);
       if (!candidate?.headSha || candidate.headSha === "unknown") continue;
 
       const fitness = await getRunCiFitness(db, candidate.id);

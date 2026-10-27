@@ -2,7 +2,7 @@
 /**
  * Coppergate self-pilot prove: after GitHub App + primary project exist,
  * boot arena (optional --start), verify Open IDs, enable maintainer,
- * and print the first Open ID to Accept once in Evidence.
+ * and print the next Open ID the unattended loop should ship (auto-accept).
  *
  * Usage (on Fly worker or with prod DATABASE_URL):
  *   WORKSPACE_SLUG=coppergate PRIMARY_NAME=coppergate \
@@ -59,9 +59,10 @@ console.log(
       nextHumanSteps: [
         "Keep kprompt Arena paused",
         "Open coppergate Arena → Start (if not --start)",
-        "Accept the first survivor PR for AG-010 (or next Open ID) in Evidence once",
-        "Confirm architecture writeback flips the row to Done",
-        "Second Open ID should auto-queue under continuous backlog",
+        "Do not Accept — wait for auto-accept + L2 merge on green CI",
+        "Confirm architecture writeback flips the Open ID to Done",
+        "Next Open ID should auto-queue under continuous backlog",
+        "Ensure Fly CI_REQUIRED_CHECK_NAMES matches workflow job name (check)",
       ],
       workspaceSlug: process.env.WORKSPACE_SLUG,
       architecture: process.env.ARCHITECTURE_PATHS,
