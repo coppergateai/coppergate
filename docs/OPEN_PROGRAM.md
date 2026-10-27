@@ -1,12 +1,13 @@
-# Open Program Architecture IDs
+# OPEN_PROGRAM — pointer
 
-...
+Coppergate self-pilot spendable backlog lives in the architecture repo:
 
-## Arena Lean Roster (AG-012)
+**[`coppergateai/coppergate-architecture` → `docs/OPEN_PROGRAM.md`](https://github.com/coppergateai/coppergate-architecture/blob/main/docs/OPEN_PROGRAM.md)**
 
-- ID: AG-012
-- Description: Lean roster implementation optimized for environments with micros under $2 monthly budget.
-- Supports only Engineer and Reviewer roles.
-- Does not spawn full arena to reduce resource consumption.
-- Located in `arena/lean_roster.go`.
-- Provides thread-safe Add, Remove, and List operations.
+Local clone (this workspace): [`../../coppergate-architecture/docs/OPEN_PROGRAM.md`](../../coppergate-architecture/docs/OPEN_PROGRAM.md)
+
+ACPP product Open Program (identity / signals / authz wedge):
+
+**[`coppergateai/acpp` → `docs/OPEN_PROGRAM.md`](https://github.com/coppergateai/acpp/blob/main/docs/OPEN_PROGRAM.md)**
+
+Bind Arena with `ARCHITECTURE_REPO` + `ARCHITECTURE_PATHS=docs/OPEN_PROGRAM.md` on the correct repo — do not invent from PRODUCT.md.
