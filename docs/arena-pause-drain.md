@@ -23,6 +23,8 @@ Workspace status pill: **Live**, **Paused**, or **Stopped** (paused is not lumpe
 
 The web Arena page mirrors the same rules in `arena-spectacle.tsx`.
 
+Expanded project lanes also surface **efficiency payoff** for the active task contest: fitness `f`, spend, `e = f/spend^α` (arena `payoffAlpha`), CI fail ⇒ `e=0`, and a winner promote reason when the tournament is resolved. Data is built in `buildEfficiencyBoard` (`arena-efficiency-board.ts`) inside the workspace arena snapshot API.
+
 ## Operator copy
 
 - Paused lede explains drain + Resume vs Stop.
