@@ -120,7 +120,7 @@ Header: repo, stack, autonomy, budget, pending approvals, last run status.
 - Proje satırları özet; expand ile agent grid + execution phase
 - Semantic agent state (role / mode / runtime ayrı); yalnızca Running’de pulse
 - Sağ panel Agent Inspector: Overview / Logs / Artifacts (run events + inline evidence)
-- Owner kontrolleri: Resume all / Pause all (soft) / Stop all (hard kill)
+- Owner kontrolleri: Resume all (paused) veya Start all (stopped) / Pause all (soft drain) / Stop all (hard kill); durum pill: Live · Paused · Stopped
 - `?focus=` ile proje odaklama + expand
 
 ### `/workspaces/[id]/inbox` — Inbox

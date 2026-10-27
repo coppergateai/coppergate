@@ -89,7 +89,7 @@ Date: 2026-10-24
 - **Release already_exists**: 422 tag collision treated as success
 
 ## Cycle 14
-- **Pause quiet**: VALIDATING/WAITING_CI while arena paused/stopped no longer Needs attention
+- **Pause quiet**: VALIDATING/WAITING_CI/REVIEW_REQUIRED while arena paused/stopped no longer Needs attention (P-102); workspace status reports **PAUSED** distinct from **Stopped**
 - **Grammar**: “1 agent needs attention”
 - **Replan attention**: collapse per project; surface error + project name
 - **Evidence attention**: title includes project so duplicate P-00N rows are distinguishable

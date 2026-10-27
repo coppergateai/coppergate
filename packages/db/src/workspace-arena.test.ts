@@ -102,7 +102,7 @@ describe("classifyContenderRuntime", () => {
         1_000_000,
         { arenaLive: false },
       ),
-      "awaitingCi",
+      "idle",
     );
   });
 
@@ -356,7 +356,7 @@ describe("workspace arena fan-out", { skip: !url }, () => {
     const paused = await stopWorkspaceArena(db, { workspaceId, actor });
     assert.equal(paused.paused, 2);
     assert.equal(paused.errors.length, 0);
-    assert.equal(paused.status, "STOPPED");
+    assert.equal(paused.status, "PAUSED");
 
     const afterPauseA = await getArenaForProject(db, {
       workspaceId,
