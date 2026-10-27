@@ -118,6 +118,7 @@ Header: repo, stack, autonomy, budget, pending approvals, last run status.
 ### `/workspaces/[id]/arena` — Workspace Arena (Mission Control)
 - Canlı operasyon özeti: Running / Awaiting CI / Needs attention / Idle
 - Proje satırları özet; expand ile agent grid + execution phase
+- Efficiency payoff tablosu: f, spend, e = f/spend^α; CI fail ⇒ e=0; winner promote reason
 - Semantic agent state (role / mode / runtime ayrı); yalnızca Running’de pulse
 - Sağ panel Agent Inspector: Overview / Logs / Artifacts (run events + inline evidence)
 - Owner kontrolleri: Resume all (paused) veya Start all (stopped) / Pause all (soft drain) / Stop all (hard kill); durum pill: Live · Paused · Stopped
