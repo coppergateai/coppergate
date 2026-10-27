@@ -8,6 +8,7 @@ import {
 import { startProjectArena, stopProjectArena } from "./maintainer.js";
 import { listAgentProfiles } from "./profiles.js";
 import { listProjectsForWorkspace } from "./projects.js";
+import { latestRunProgressHints, mergeRunActivityLine } from "./run-event-hints.js";
 import {
   agentRuns,
   tasks,
@@ -29,6 +30,8 @@ export type WorkspaceArenaContenderRun = {
   /** WINNER | LOSER | CANCELLED — losers are expected, not ops fires. */
   tournamentResult: string | null;
   updatedAt: string;
+  /** Latest coding-path / failover honesty from run progress events (AG-013). */
+  activityHint: string | null;
 };
 
 /** Failures older than this do not inflate Needs attention while the arena is live. */
@@ -258,8 +261,19 @@ async function latestRunsByContender(
       errorCode: row.errorCode,
       tournamentResult: row.tournamentResult ?? null,
       updatedAt: row.updatedAt.toISOString(),
+      activityHint: null,
     });
   }
+
+  const runIds = [...new Set([...map.values()].map((r) => r.id))];
+  const hints = await latestRunProgressHints(db, runIds);
+  for (const entry of map.values()) {
+    const hint = hints.get(entry.id);
+    if (!hint) continue;
+    const line = mergeRunActivityLine("", hint, "running");
+    entry.activityHint = line || hint.codingPathLine || hint.failoverLine;
+  }
+
   return map;
 }
 
