@@ -73,9 +73,23 @@ async function loadDefaultBridge(): Promise<CursorSdkBridge> {
           options: CursorSdkCreateOptions,
         ) => Promise<CursorSdkAgentHandle>;
       };
+      /** Present on some SDK builds — wires ignore/search to a real rg binary. */
+      configureRipgrepPath?: (path: string) => void;
     };
     if (!mod.Agent?.create) {
       throw new Error("@cursor/sdk Agent.create missing");
+    }
+    // Prefer system rg (Dockerfile installs ripgrep) so ignore mapping works.
+    if (typeof mod.configureRipgrepPath === "function") {
+      try {
+        const { execFileSync } = await import("node:child_process");
+        const rg = execFileSync("which", ["rg"], {
+          encoding: "utf8",
+        }).trim();
+        if (rg) mod.configureRipgrepPath(rg);
+      } catch {
+        /* optional — SDK may still find rg on PATH */
+      }
     }
     return {
       create: (options) => mod.Agent!.create(options),

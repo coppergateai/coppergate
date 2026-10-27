@@ -68,6 +68,33 @@ import {
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
 
+/**
+ * Archive / non-product projects must never invent architecture Open IDs
+ * (primary-only writes until coordinatedMultiRepo is on).
+ */
+export const ARCHIVE_OR_NON_PRODUCT_PROJECT_NAMES = new Set([
+  ".github",
+  "homebrew-tap",
+  "kprompt-examples",
+  "kprompt-architecture",
+  "coppergate-examples",
+  "coppergate-staging-smoke",
+  "coppergate-architecture",
+]);
+
+/** Default task allowedPaths when inventing against a TS monorepo / product path policy. */
+export const DEFAULT_PRODUCT_ALLOWED_PATHS = [
+  "apps/**",
+  "packages/**",
+  "docs/**",
+  "scripts/**",
+  "*.md",
+  ".github/**",
+];
+
+/** How long a DONE/FAILED architecture ID stays excluded from re-invent (thrash guard). */
+export const ARCHITECTURE_ID_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+
 /** Below this available project budget, spawn engineer+reviewer only (not FULL_ARENA). */
 export const LEAN_ROSTER_AVAILABLE_MICROS = 2_000_000;
 
@@ -2072,6 +2099,29 @@ export async function runVisionReplan(
   const maxAutoQueue =
     input.maxAutoQueue ?? policy.maxAutoQueuePerReplan;
 
+  // Primary-only invent: archive / secondary product shells stay quiet.
+  if (
+    !policy.coordinatedMultiRepo &&
+    project?.name &&
+    ARCHIVE_OR_NON_PRODUCT_PROJECT_NAMES.has(project.name)
+  ) {
+    await recordMaintainerEvent(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      kind: "replan",
+      payload: {
+        briefId: brief.id,
+        taskCount: 0,
+        queued: 0,
+        autoQueue,
+        skipped: true,
+        reason: "non_primary_project",
+        projectName: project.name,
+      },
+    });
+    return { taskCount: 0, queued: 0 };
+  }
+
   const stamp = new Date().toISOString().slice(0, 10);
   const roadmapMd =
     input.roadmapMarkdown?.trim() ||
@@ -2140,8 +2190,19 @@ export async function runVisionReplan(
   } as const;
   const complexity = archTask.estimateComplexity;
   const shipTitle = archTask.title.slice(0, 200);
-  const shipGoal = archTask.goal.slice(0, 2000);
+  const shipGoal = [
+    archTask.goal.slice(0, 1600),
+    "",
+    "Constraints: edit the primary product tree only (apps/, packages/, docs/, scripts/).",
+    "Do not invent parallel Go trees (arena/, internal/, roster/) or write to archive/secondary repos.",
+  ]
+    .join("\n")
+    .slice(0, 2000);
   const shipAcceptance = archTask.acceptanceCriteria;
+  const inventPaths =
+    policy.pathAllowlist.length > 0
+      ? policy.pathAllowlist
+      : DEFAULT_PRODUCT_ALLOWED_PATHS;
 
   const plan = await generateProjectPlan(db, {
     workspaceId: input.workspaceId,
@@ -2159,7 +2220,7 @@ export async function runVisionReplan(
             scope:
               brief.scope.slice(0, 800) ||
               "Primary-repo product increment with tests and docs as needed",
-            allowedPaths: ["**/*"],
+            allowedPaths: inventPaths,
             acceptanceCriteria: shipAcceptance.slice(0, 8),
             estimateMicros: estimateBand[complexity],
             estimateComplexity: complexity,
@@ -2653,8 +2714,9 @@ export const DEFAULT_ARCHITECTURE_PATHS =
   "PROVIDER-TASKS.md,RUNTIME-TASKS.md,AGENT-TASKS.md,APP-TASKS.md,WEBSITE-TASKS.md,CONTENT-PLAN.md";
 
 /**
- * Architecture IDs already represented by open board work or open Coppergate PRs.
- * Used to stop every project from re-arming the same Open roadmap ID.
+ * Architecture IDs already represented by open board work (workspace-wide),
+ * recently completed/failed work (cooldown), or open Coppergate PRs.
+ * Workspace scope stops every secondary project from re-arming the same Open ID.
  */
 export async function listInFlightArchitectureIds(
   db: Database,
@@ -2664,19 +2726,38 @@ export async function listInFlightArchitectureIds(
     architectureToken?: string | null;
   },
 ): Promise<string[]> {
+  // Workspace-wide open/in-flight — not just this project.
   const openTasks = await db
     .select({ title: tasks.title })
     .from(tasks)
     .where(
       and(
         eq(tasks.workspaceId, input.workspaceId),
-        eq(tasks.projectId, input.projectId),
         inArray(tasks.status, [...IN_FLIGHT_ARCH_TASK_STATUSES]),
       ),
     )
-    .limit(100);
+    .limit(300);
 
   const ids = new Set(architectureIdsFromTitles(openTasks.map((t) => t.title)));
+
+  // Cooldown: same Open ID must not thrash after DONE/FAILED/ACCEPTED.
+  const since = new Date(Date.now() - ARCHITECTURE_ID_COOLDOWN_MS);
+  const recentTerminal = await db
+    .select({ title: tasks.title })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.workspaceId, input.workspaceId),
+        inArray(tasks.status, ["DONE", "FAILED", "ACCEPTED"]),
+        gte(tasks.updatedAt, since),
+      ),
+    )
+    .limit(300);
+  for (const id of architectureIdsFromTitles(
+    recentTerminal.map((t) => t.title),
+  )) {
+    ids.add(id);
+  }
 
   const token = input.architectureToken?.trim();
   if (token) {

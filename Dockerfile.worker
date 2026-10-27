@@ -22,13 +22,15 @@ ENV GOTOOLCHAIN=local
 ENV GOMAXPROCS=1
 ENV PATH=/usr/local/go/bin:$PATH
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git ca-certificates curl \
+  && apt-get install -y --no-install-recommends git ca-certificates curl ripgrep \
   && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
     | tar -C /usr/local -xz \
   && rm -rf /var/lib/apt/lists/* \
   && corepack enable \
   && corepack prepare pnpm@9.15.9 --activate \
-  && go version
+  && go version \
+  && command -v rg \
+  && rg --version
 COPY --from=build /app /app
 # Non-root runtime — sandbox workdirs use /tmp (world-writable).
 RUN groupadd --system --gid 1001 coppergate \

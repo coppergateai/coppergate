@@ -66,7 +66,10 @@ import {
   type SandboxManager,
 } from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
-import { buildDeliveryFiles } from "./delivery-files.js";
+import {
+  assertProductDeliveryPaths,
+  buildDeliveryFiles,
+} from "./delivery-files.js";
 import {
   mergeArchitectureContext,
   resolveMultiRepoRunContext,
@@ -708,26 +711,60 @@ export async function executeClaimedRun(
           !(agent instanceof FakeCodingAgent) &&
           (deliveryBundle.fromSandbox === 0 ||
             deliveryBundle.files.length === 0);
+        // Prefer maintainer pathAllowlist; fall back to task allowedPaths.
+        let deliveryAllowlist: string[] = [];
+        try {
+          const boundProject = await getProjectForWorkspace(
+            db,
+            run.workspaceId,
+            run.projectId,
+          );
+          const policyJson = boundProject?.project.maintainerPolicyJson;
+          if (typeof policyJson === "string" && policyJson.trim()) {
+            const parsed = JSON.parse(policyJson) as {
+              pathAllowlist?: unknown;
+            };
+            if (Array.isArray(parsed.pathAllowlist)) {
+              deliveryAllowlist = parsed.pathAllowlist.filter(
+                (p): p is string => typeof p === "string",
+              );
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+        if (deliveryAllowlist.length === 0) {
+          deliveryAllowlist = parseJsonArray(task.allowedPaths).filter(
+            (p) => p !== "**/*" && p !== "**",
+          );
+        }
+        const pathGate = assertProductDeliveryPaths({
+          paths: deliveryBundle.files.map((f) => f.path),
+          pathAllowlist: deliveryAllowlist,
+        });
         // CI / FakeCodingAgent paths still use fixture diffs — only enforce on live http.
         if (
-          (toy.toy || noRealFiles) &&
+          (toy.toy || noRealFiles || !pathGate.ok) &&
           deliveryModeHint === "http" &&
           !(agent instanceof FakeCodingAgent)
         ) {
-          const reason = toy.reason ?? "no_sandbox_files";
+          const reason = !pathGate.ok
+            ? pathGate.reason
+            : (toy.reason ?? "no_sandbox_files");
+          const code = !pathGate.ok ? pathGate.code : "stub_delivery";
           await appendRunEvent(db, {
             runId: run.id,
             workspaceId: run.workspaceId,
             kind: "error",
             payload: {
               message: `Stub/toy delivery refused: ${reason}`,
-              code: "stub_delivery",
+              code,
             },
           });
           await markRunFailed(db, {
             runId: run.id,
             workerId,
-            errorCode: "stub_delivery",
+            errorCode: code,
             errorMessage: reason.slice(0, 500),
           });
           await safeTaskTransition(db, task, "FAILED", workerId, log);
