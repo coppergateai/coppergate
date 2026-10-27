@@ -7,9 +7,8 @@ import {
   isLlmProviderQuotaFailure,
 } from "./fake.js";
 import {
+  evaluateAgentWritePath,
   isEditToolAllowed,
-  isPathAllowed,
-  isSafeRelativePath,
   resolveSafeWorkdirPath,
 } from "./path-policy.js";
 import {
@@ -224,22 +223,21 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
     }
 
     for (const f of files) {
-      if (!isSafeRelativePath(f.path)) {
+      const pathGate = evaluateAgentWritePath({
+        path: f.path,
+        allowedPaths: input.allowedPaths,
+        content: f.content,
+      });
+      if (!pathGate.ok) {
         yield {
           kind: "error",
-          message: `Path escape rejected: ${f.path}`,
-          payload: { code: "path_escape", path: f.path },
-        };
-        return;
-      }
-      if (!isPathAllowed(f.path, input.allowedPaths)) {
-        yield {
-          kind: "error",
-          message: `Path not allowed: ${f.path}`,
+          message: pathGate.message,
           payload: {
-            code: "path_not_allowed",
-            path: f.path,
-            allowedPaths: input.allowedPaths,
+            code: pathGate.code,
+            path: pathGate.path,
+            ...(pathGate.code === "path_not_allowed"
+              ? { allowedPaths: input.allowedPaths }
+              : {}),
           },
         };
         return;

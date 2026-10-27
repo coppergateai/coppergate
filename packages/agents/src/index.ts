@@ -92,9 +92,14 @@ export {
 } from "./stub-detect.js";
 export { findDuplicateFilePath, parseFileBlocks } from "./openai-compatible.js";
 export {
+  containsForbiddenWriteSecret,
+  evaluateAgentWritePath,
+  isAgentWritePathAllowed,
+  isForbiddenAgentPath,
   isPathAllowed,
   isEditToolAllowed,
   isProfileEditAllowed,
   isSafeRelativePath,
   resolveSafeWorkdirPath,
+  type AgentWritePathViolation,
 } from "./path-policy.js";

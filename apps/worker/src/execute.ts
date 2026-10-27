@@ -67,6 +67,7 @@ import {
 } from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
 import {
+  assertDeliverySecretsRefused,
   assertProductDeliveryPaths,
   buildDeliveryFiles,
 } from "./delivery-files.js";
@@ -742,16 +743,19 @@ export async function executeClaimedRun(
           paths: deliveryBundle.files.map((f) => f.path),
           pathAllowlist: deliveryAllowlist,
         });
+        const secretGate = assertDeliverySecretsRefused(deliveryBundle.files);
+        const deliveryBlocked = !pathGate.ok || !secretGate.ok;
         // CI / FakeCodingAgent paths still use fixture diffs — only enforce on live http.
         if (
-          (toy.toy || noRealFiles || !pathGate.ok) &&
+          (toy.toy || noRealFiles || deliveryBlocked) &&
           deliveryModeHint === "http" &&
           !(agent instanceof FakeCodingAgent)
         ) {
-          const reason = !pathGate.ok
-            ? pathGate.reason
+          const blocked = !pathGate.ok ? pathGate : secretGate;
+          const reason = deliveryBlocked
+            ? blocked.reason
             : (toy.reason ?? "no_sandbox_files");
-          const code = !pathGate.ok ? pathGate.code : "stub_delivery";
+          const code = deliveryBlocked ? blocked.code : "stub_delivery";
           await appendRunEvent(db, {
             runId: run.id,
             workspaceId: run.workspaceId,

@@ -293,6 +293,22 @@ function authenticatedCloneUrl(
   return trimmed;
 }
 
+function killProcessTree(child: { pid?: number; kill: (sig?: NodeJS.Signals) => boolean }): void {
+  try {
+    if (child.pid && child.pid > 0) {
+      process.kill(-child.pid, "SIGKILL");
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    /* already dead */
+  }
+}
+
 function runHostCommand(
   command: string[],
   timeoutMs: number,
@@ -308,11 +324,12 @@ function runHostCommand(
         GIT_TERMINAL_PROMPT: "0",
       },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
     });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
+      killProcessTree(child);
     }, timeoutMs);
 
     child.stdout?.on("data", (chunk: Buffer) => {

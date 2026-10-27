@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { isPathAllowed, isSafeRelativePath } from "./path-policy.js";
+import {
+  isForbiddenAgentPath,
+  isPathAllowed,
+  isSafeRelativePath,
+} from "./path-policy.js";
 
 const SKIP_DIR_NAMES = new Set([
   ".git",
@@ -59,6 +63,7 @@ async function walk(
     const abs = join(dir, entry.name);
     const rel = relative(root, abs).replace(/\\/g, "/");
     if (!isSafeRelativePath(rel)) continue;
+    if (isForbiddenAgentPath(rel)) continue;
     if (!isPathAllowed(rel, allowedPaths)) continue;
     try {
       const st = await stat(abs);
