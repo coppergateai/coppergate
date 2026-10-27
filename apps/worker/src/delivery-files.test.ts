@@ -3,7 +3,35 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { buildDeliveryFiles } from "./delivery-files.js";
+import {
+  assertProductDeliveryPaths,
+  buildDeliveryFiles,
+  pathMatchesAllowlist,
+} from "./delivery-files.js";
+
+describe("product delivery path gates", () => {
+  it("matches apps/** allowlist", () => {
+    assert.equal(pathMatchesAllowlist("apps/web/src/x.ts", ["apps/**"]), true);
+    assert.equal(pathMatchesAllowlist("arena/roster.go", ["apps/**"]), false);
+  });
+
+  it("rejects phantom Go trees under product allowlist", () => {
+    const hit = assertProductDeliveryPaths({
+      paths: ["arena/roster.go", "internal/programruntime/runtime.go"],
+      pathAllowlist: ["apps/**", "packages/**"],
+    });
+    assert.equal(hit.ok, false);
+    if (!hit.ok) assert.equal(hit.code, "phantom_tree");
+  });
+
+  it("allows TS product paths", () => {
+    const ok = assertProductDeliveryPaths({
+      paths: ["packages/db/src/maintainer.ts", "docs/HARNESS.md"],
+      pathAllowlist: ["apps/**", "packages/**", "docs/**"],
+    });
+    assert.equal(ok.ok, true);
+  });
+});
 
 describe("buildDeliveryFiles path containment", () => {
   it("reads files inside workdir", async () => {

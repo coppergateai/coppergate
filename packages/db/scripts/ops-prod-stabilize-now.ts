@@ -140,16 +140,17 @@ try {
   };
 
   // --- coppergate ---
+  // Self-pilot: N=1 fan-out (not duel) so one machine can finish real TS validation.
   const cgArenas = await db.select().from(arenas).where(eq(arenas.workspaceId, CG));
   for (const a of cgArenas) {
-    if (a.defaultContenderN !== 2) {
+    if (a.defaultContenderN !== 1) {
       await db
         .update(arenas)
-        .set({ defaultContenderN: 2, updatedAt: new Date() })
+        .set({ defaultContenderN: 1, updatedAt: new Date() })
         .where(eq(arenas.id, a.id));
     }
   }
-  // Pin architecture + duel maintainer on primary; resume for self-pilot
+  // Pin architecture + lean maintainer on primary; resume for self-pilot
   await updateMaintainerPolicy(db, {
     workspaceId: CG,
     projectId: CG_PRIMARY,
@@ -158,10 +159,12 @@ try {
       enabled: true,
       continuousBacklog: true,
       autoQueueReplanTasks: true,
-      maxTournamentN: 2,
+      maxTournamentN: 1,
       architectureRepo: "coppergateai/coppergate-architecture",
       architecturePaths: "docs/OPEN_PROGRAM.md",
       monthlyBudgetMicros: 8_000_000,
+      // Prefer TypeScript product paths; reject phantom Go thrash.
+      pathAllowlist: ["apps/**", "packages/**", "docs/**", "scripts/**", "*.md"],
     },
   });
   const [primaryArena] = cgArenas.filter((a) => a.projectId === CG_PRIMARY);

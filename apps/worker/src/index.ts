@@ -2,6 +2,7 @@ import { loadEnv } from "@coppergate/config";
 import { checkDb } from "@coppergate/db";
 import { createLogger, initTelemetry } from "@coppergate/telemetry";
 import { runWorkerLoop } from "./loop.js";
+import { gcOrphanSandboxes } from "./sandbox-gc.js";
 
 const env = loadEnv();
 
@@ -20,6 +21,12 @@ if (!ok) {
   log.error("Database unavailable — worker cannot start");
   process.exit(1);
 }
+
+// Free /tmp before claiming runs (ENOSPC was blocking cursor_local sandboxes).
+await gcOrphanSandboxes({ log, minAgeMs: 5 * 60_000 });
+setInterval(() => {
+  void gcOrphanSandboxes({ log, minAgeMs: 30 * 60_000 });
+}, 15 * 60_000).unref();
 
 const workerId =
   process.env.WORKER_ID?.trim() ||

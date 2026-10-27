@@ -5,6 +5,89 @@ export type DeliveryFile = { path: string; content: string };
 
 const README_NAMES = new Set(["readme.md", "readme.txt", "readme"]);
 
+/** Go phantom trees agents invent beside a TypeScript monorepo. */
+const PHANTOM_GO_PREFIXES = [
+  "arena/",
+  "internal/",
+  "roster/",
+  "spend/",
+  "runtime/",
+  "pkg/",
+];
+
+/**
+ * Glob-ish allowlist match (`apps/**`, `*.md`, exact path).
+ * Empty allowlist = allow all.
+ */
+export function pathMatchesAllowlist(
+  path: string,
+  allowlist: string[],
+): boolean {
+  if (!allowlist.length) return true;
+  const p = path.replace(/^\.\//, "");
+  for (const raw of allowlist) {
+    const allow = raw.trim();
+    if (!allow || allow === "**" || allow === "**/*") return true;
+    if (allow.endsWith("/**")) {
+      const prefix = allow.slice(0, -3);
+      if (p === prefix || p.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`)) {
+        return true;
+      }
+      continue;
+    }
+    if (allow.startsWith("*.")) {
+      if (p.toLowerCase().endsWith(allow.slice(1).toLowerCase())) return true;
+      continue;
+    }
+    if (p === allow || p.startsWith(`${allow}/`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Refuse deliveries that only touch phantom Go trees when the task/policy
+ * allowlist is product-oriented (apps/packages/docs), or when every path is
+ * outside the allowlist.
+ */
+export function assertProductDeliveryPaths(input: {
+  paths: string[];
+  pathAllowlist: string[];
+}): { ok: true } | { ok: false; reason: string; code: string } {
+  const paths = input.paths
+    .map((p) => p.replace(/^\.\//, "").trim())
+    .filter(Boolean);
+  if (paths.length === 0) {
+    return { ok: false, reason: "no_delivery_paths", code: "no_sandbox_files" };
+  }
+
+  const allPhantomGo = paths.every(
+    (p) =>
+      p.endsWith(".go") &&
+      PHANTOM_GO_PREFIXES.some((pre) => p.startsWith(pre)),
+  );
+  if (allPhantomGo) {
+    return {
+      ok: false,
+      reason: "phantom_go_tree",
+      code: "phantom_tree",
+    };
+  }
+
+  const allow = input.pathAllowlist.filter((p) => p.trim());
+  if (allow.length > 0) {
+    const allowed = paths.filter((p) => pathMatchesAllowlist(p, allow));
+    if (allowed.length === 0) {
+      return {
+        ok: false,
+        reason: `paths outside allowlist: ${paths.slice(0, 8).join(", ")}`,
+        code: "path_not_allowed",
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
 /**
  * Prefer sandbox workdir contents for paths the agent reported.
  * Never invent README stubs or smoke pages — empty means no delivery.
