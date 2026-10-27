@@ -1,27 +1,12 @@
-import {
-  createCodingAgent,
-  createContenderHarness,
-  FakeCodingAgent,
-  harnessAsCodingAgent,
-  type ContenderHarnessKind,
-  type CodingAgent,
-  type CodingAgentKind,
-} from "@coppergate/agents";
+import { type ContenderHarnessKind } from "@coppergate/agents";
 import {
   applyTaskTransition,
   claimNextRun,
   createDb,
-  getDefaultLlmByok,
-  getEffectiveAgentProfile,
-  getLlmByokById,
-  listLlmByok,
   purgeExpiredSoftDeletedWorkspaces,
   reapStaleRuns,
-  touchLlmByokUsed,
   type Database,
-  type IntegrationCredential,
 } from "@coppergate/db";
-import { openSecret, parseEncryptionKey } from "@coppergate/github";
 import {
   SIGNAL_SLOS,
   dispatchSloBurnAlert,
@@ -30,9 +15,10 @@ import {
 import { executeClaimedRun } from "./execute.js";
 import { runMaintainerSchedulerTick } from "./maintainer-tick.js";
 import { resolveWorkerInstallationToken } from "./github-delivery.js";
+import { resolveWorkerAgent } from "./resolve-worker-agent.js";
 
 function resolveDeliveryModeHint(): "http" | "fake" {
-  const raw = (process.env.GITHUB_DELIVERY_MODE ?? "fake").trim().toLowerCase();
+  const raw = (process.env.GITHUB_DELIVERY_MODE ?? "").trim().toLowerCase();
   return raw === "http" ? "http" : "fake";
 }
 
@@ -52,344 +38,10 @@ function parseHarnessEnv(): ContenderHarnessKind | null {
     : null;
 }
 
-function vendorToAgentKind(vendor: string | null | undefined): CodingAgentKind {
-  return vendor?.trim().toLowerCase() === "cursor" ? "cursor" : "openai";
-}
-
-async function resolveCursorFallbackCredential(
-  db: Database,
-  workspaceId: string,
-  primaryCredentialId: string | null,
-): Promise<{ byok: IntegrationCredential; model: string | undefined } | null> {
-  const listed = await listLlmByok(db, workspaceId);
-  const cursorMeta = listed.find(
-    (c) =>
-      c.vendor.trim().toLowerCase() === "cursor" &&
-      c.id !== primaryCredentialId,
-  );
-  if (!cursorMeta) return null;
-  const byok = await getLlmByokById(db, workspaceId, cursorMeta.id);
-  if (!byok?.encryptedPayload) return null;
-  return {
-    byok,
-    model: byok.model?.trim() || undefined,
-  };
-}
-
-/**
- * Live http prefers BYOK / env OpenAI. OpenHands stub is not a default.
- * Fake only for GITHUB_DELIVERY_MODE=fake / CI / explicit native_fake.
- */
 function resolveHarnessKind(): ContenderHarnessKind | null {
   const explicit = parseHarnessEnv();
   if (explicit) return explicit;
   return null;
-}
-
-async function resolveByokForProfile(
-  db: Database,
-  workspaceId: string,
-  agentProfileKey: string | null | undefined,
-): Promise<{
-  byok: IntegrationCredential;
-  model: string | undefined;
-  profileKey: string | null;
-} | null> {
-  let preferredModel: string | null = null;
-  let credentialId: string | null = null;
-  let profileKey: string | null = null;
-
-  if (agentProfileKey) {
-    const profile = await getEffectiveAgentProfile(
-      db,
-      workspaceId,
-      agentProfileKey,
-    );
-    if (profile) {
-      profileKey = profile.key;
-      preferredModel = profile.preferredModel;
-      credentialId = profile.llmCredentialId;
-    }
-  }
-
-  let byok: IntegrationCredential | null = null;
-  if (credentialId) {
-    byok = await getLlmByokById(db, workspaceId, credentialId);
-  }
-  if (!byok) {
-    byok = await getDefaultLlmByok(db, workspaceId);
-  }
-  if (!byok) return null;
-
-  return {
-    byok,
-    model: preferredModel?.trim() || byok.model || undefined,
-    profileKey,
-  };
-}
-
-function resolveWorkerAgent(
-  db: Database,
-  workspaceId: string,
-  log: Logger,
-  agentProfileKey?: string | null,
-) {
-  return (async (): Promise<CodingAgent> => {
-    const explicit = parseHarnessEnv();
-    const delivery = resolveDeliveryModeHint();
-    const forceFakePath =
-      explicit === "native_fake" ||
-      delivery === "fake" ||
-      process.env.NODE_ENV === "test" ||
-      process.env.CI === "true";
-
-    if (explicit === "openhands" || explicit === "aider") {
-      log.info("using ContenderHarness", {
-        harnessKind: explicit,
-        workspaceId,
-        stubAllowed: process.env.ALLOW_HARNESS_STUB === "1",
-      });
-      return harnessAsCodingAgent(
-        createContenderHarness({ kind: explicit }),
-      );
-    }
-
-    if (explicit === "cursor_local") {
-      log.info("using ContenderHarness", {
-        harnessKind: explicit,
-        workspaceId,
-      });
-      return harnessAsCodingAgent(
-        createContenderHarness({ kind: "cursor_local" }),
-      );
-    }
-
-    // Prefer Cursor-class coding (cursor_local / SDK) when available; OpenAI is
-    // chat→file-write and stays secondary unless CONTENDER_HARNESS=native_openai.
-    if (!forceFakePath || explicit === "native_openai") {
-      try {
-        const resolved = await resolveByokForProfile(
-          db,
-          workspaceId,
-          agentProfileKey,
-        );
-        const keyHex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
-        if (resolved?.byok.encryptedPayload && keyHex) {
-          const { byok, model, profileKey } = resolved;
-          const apiKey = openSecret(
-            byok.encryptedPayload,
-            parseEncryptionKey(keyHex),
-          );
-          await touchLlmByokUsed(db, workspaceId, byok.id);
-          let kind = vendorToAgentKind(byok.vendor);
-          let primaryKey = apiKey;
-          let primaryModel = model;
-          let primaryBase = byok.baseUrl ?? undefined;
-          let primaryCredentialId = byok.id;
-          let primaryLabel = byok.label;
-          let primaryVendor = byok.vendor;
-          let openaiFailover:
-            | { apiKey: string; baseUrl?: string; model?: string }
-            | undefined;
-
-          // Prefer workspace Cursor BYOK as primary for live product coding.
-          if (kind === "openai" && explicit !== "native_openai") {
-            const cursorPrimary = await resolveCursorFallbackCredential(
-              db,
-              workspaceId,
-              byok.id,
-            );
-            if (cursorPrimary?.byok.encryptedPayload) {
-              openaiFailover = {
-                apiKey,
-                baseUrl: byok.baseUrl ?? undefined,
-                model,
-              };
-              primaryKey = openSecret(
-                cursorPrimary.byok.encryptedPayload,
-                parseEncryptionKey(keyHex),
-              );
-              await touchLlmByokUsed(db, workspaceId, cursorPrimary.byok.id);
-              kind = "cursor";
-              primaryModel = cursorPrimary.model ?? model;
-              primaryBase = undefined;
-              primaryCredentialId = cursorPrimary.byok.id;
-              primaryLabel = cursorPrimary.byok.label;
-              primaryVendor = cursorPrimary.byok.vendor;
-              log.info("preferring Cursor BYOK as primary coding agent", {
-                workspaceId,
-                cursorCredentialId: cursorPrimary.byok.id,
-                openaiFailoverId: byok.id,
-              });
-            }
-          }
-
-          log.info("using workspace BYOK for coding agent", {
-            workspaceId,
-            credentialId: primaryCredentialId,
-            label: primaryLabel,
-            vendor: primaryVendor,
-            kind,
-            model: primaryModel,
-            profileKey,
-          });
-          if (explicit === "native_openai") {
-            return harnessAsCodingAgent(
-              createContenderHarness({
-                kind: "native_openai",
-                openai: {
-                  apiKey,
-                  baseUrl: byok.baseUrl ?? undefined,
-                  model,
-                },
-              }),
-            );
-          }
-
-          if (kind === "cursor") {
-            // cursor_local primary; keep OpenAI as FailoverCodingAgent when demoted.
-            if (openaiFailover) {
-              log.info("using ContenderHarness with OpenAI failover", {
-                harnessKind: "cursor_local",
-                workspaceId,
-              });
-              return createCodingAgent({
-                kind: "cursor",
-                apiKey: primaryKey,
-                model: primaryModel,
-                fallback: {
-                  kind: "openai",
-                  apiKey: openaiFailover.apiKey,
-                  baseUrl: openaiFailover.baseUrl,
-                  model: openaiFailover.model,
-                },
-              });
-            }
-            log.info("using ContenderHarness", {
-              harnessKind: "cursor_local",
-              workspaceId,
-            });
-            return harnessAsCodingAgent(
-              createContenderHarness({
-                kind: "cursor_local",
-                cursor: {
-                  apiKey: primaryKey,
-                  model: primaryModel,
-                },
-              }),
-            );
-          }
-
-          let fallback:
-            | {
-                kind: CodingAgentKind;
-                apiKey?: string;
-                model?: string;
-              }
-            | undefined;
-          const cursorFb = await resolveCursorFallbackCredential(
-            db,
-            workspaceId,
-            primaryCredentialId,
-          );
-          if (cursorFb?.byok.encryptedPayload) {
-            const cursorKey = openSecret(
-              cursorFb.byok.encryptedPayload,
-              parseEncryptionKey(keyHex),
-            );
-            await touchLlmByokUsed(db, workspaceId, cursorFb.byok.id);
-            fallback = {
-              kind: "cursor",
-              apiKey: cursorKey,
-              model: cursorFb.model,
-            };
-            log.info("wiring Cursor BYOK as OpenAI quota failover", {
-              workspaceId,
-              cursorCredentialId: cursorFb.byok.id,
-              model: cursorFb.model,
-            });
-          }
-
-          return createCodingAgent({
-            kind,
-            apiKey: primaryKey,
-            baseUrl: primaryBase,
-            model: primaryModel,
-            fallback,
-          });
-        }
-      } catch (err) {
-        log.warn("BYOK resolve failed; falling back", {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-
-      // Env: prefer Cursor SDK when CURSOR_API_KEY is allowed (self-host).
-      const allowEnv =
-        process.env.ALLOW_ENV_LLM_KEYS === "1" ||
-        process.env.NODE_ENV !== "production";
-      const envCursorKey = allowEnv
-        ? process.env.CURSOR_API_KEY?.trim() || ""
-        : "";
-      if (envCursorKey && explicit !== "native_openai") {
-        log.info("using ContenderHarness from env CURSOR_API_KEY", {
-          harnessKind: "cursor_local",
-          workspaceId,
-        });
-        return harnessAsCodingAgent(
-          createContenderHarness({
-            kind: "cursor_local",
-            cursor: {
-              apiKey: envCursorKey,
-              model: process.env.CURSOR_MODEL?.trim() || undefined,
-            },
-          }),
-        );
-      }
-
-      // Env LLM/CURSOR keys: local/self-host only (gated inside createCodingAgent).
-      const envAgent = createCodingAgent();
-      if (!(envAgent instanceof FakeCodingAgent)) {
-        log.info("using coding agent from env (OpenAI and/or Cursor)", {
-          workspaceId,
-        });
-        return envAgent;
-      }
-    }
-
-    if (explicit === "native_fake") {
-      return harnessAsCodingAgent(
-        createContenderHarness({ kind: "native_fake" }),
-      );
-    }
-
-    if (forceFakePath) {
-      log.info("using FakeCodingAgent (fake delivery / CI)", { workspaceId });
-      return createCodingAgent({ forceFake: true });
-    }
-
-    // Live http without BYOK: fail closed (no scaffold stub).
-    const kind = resolveHarnessKind();
-    if (kind) {
-      log.info("using ContenderHarness", { harnessKind: kind, workspaceId });
-      return harnessAsCodingAgent(createContenderHarness({ kind }));
-    }
-
-    log.error("no BYOK/OpenAI coding agent for live delivery", {
-      workspaceId,
-      hint: "Configure workspace LLM BYOK or OPENAI_API_KEY",
-    });
-    return {
-      async *run() {
-        yield {
-          kind: "error" as const,
-          message:
-            "BYOK required for live coding. OpenHands scaffold stub is disabled.",
-          payload: { code: "byok_required" },
-        };
-      },
-    };
-  })();
 }
 
 export type WorkerLoopOptions = {
@@ -505,7 +157,6 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           }
         }
 
-        // Retention purge (TASK028) — at most once per 5 minutes per worker.
         if (Date.now() - lastPurgeAt > 5 * 60_000) {
           lastPurgeAt = Date.now();
           const purged = await purgeExpiredSoftDeletedWorkspaces(db);
@@ -516,7 +167,6 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           }
         }
 
-        // Autonomous maintainer scheduler — every 60s.
         if (Date.now() - lastMaintainerTickAt > 60_000) {
           lastMaintainerTickAt = Date.now();
           try {
@@ -530,7 +180,6 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           }
         }
 
-        // SLO burn → Slack/webhook (Phase D) — every 2 minutes when samples exist.
         if (Date.now() - lastSloCheckAt > 2 * 60_000 && lagSamplesMs.length > 0) {
           lastSloCheckAt = Date.now();
           const sorted = [...lagSamplesMs].sort((a, b) => a - b);
@@ -542,7 +191,6 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
           await dispatchSloBurnAlert({
             metrics: {
               workerLagP95Ms: p95,
-              // Map terminal failure rate into ingestSuccessRate slot for burn.
               ingestSuccessRate: failRate,
             },
             log,
@@ -572,7 +220,7 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
         });
 
         const started = Date.now();
-        const agent = await resolveWorkerAgent(
+        const { agent } = await resolveWorkerAgent(
           db,
           run.workspaceId,
           log,
@@ -592,7 +240,6 @@ export async function runWorkerLoop(options: WorkerLoopOptions): Promise<void> {
         consecutiveErrors = 0;
         log.info("run processed", { runId: run.id, outcome });
 
-        // Poison visibility: terminal failures surface for ops dashboards.
         if (outcome === "failed" || outcome === "validation_failed") {
           terminalFailWindow += 1;
           log.warn("run terminal failure (dead-letter visibility)", {
