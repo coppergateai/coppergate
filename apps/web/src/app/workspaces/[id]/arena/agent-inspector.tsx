@@ -11,6 +11,8 @@ export type InspectorRun = {
   taskId: string;
   taskTitle: string;
   actualCostMicros: number;
+  fitnessScore?: number | null;
+  efficiencyScore?: number | null;
   prUrl: string | null;
   prNumber: number | null;
   errorCode: string | null;
@@ -304,6 +306,22 @@ export function AgentInspector({
               Status {run.status.replace(/_/g, " ")}
               {" · "}
               Cost {formatUsd(run.actualCostMicros)}
+              {run.fitnessScore != null ? (
+                <>
+                  {" · "}
+                  f {run.fitnessScore.toFixed(2)}
+                </>
+              ) : null}
+              {run.efficiencyScore != null ? (
+                <>
+                  {" · "}
+                  e {run.efficiencyScore.toFixed(3)}
+                  {run.efficiencyScore === 0 &&
+                  run.errorCode === "ci_failed" ? (
+                    <> (CI fail)</>
+                  ) : null}
+                </>
+              ) : null}
             </p>
             <div className={styles.inspectorLinks}>
               {reviewHref ? (
