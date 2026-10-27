@@ -121,7 +121,7 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
       </div>
       <p className={styles.sectionLede}>
         Contenders compete under budget; fitness and CI pick the survivor.
-        Start and Stop are workspace-level —{" "}
+        Pause all drains the queue; Resume or Stop all are workspace-level —{" "}
         <Link href={arenaHref} className={styles.inlineLink}>
           {isOwner ? "open Arena to arm projects" : "watch agents live"}
         </Link>
