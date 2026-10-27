@@ -570,9 +570,13 @@ export {
   type RetentionSnapshot,
 } from "./analytics.js";
 export {
-  getWorkspaceMissionControl,
+  missionControlAttentionKindRank,
+  sortMissionControlAttention,
   type MissionControlAttentionItem,
   type MissionControlAttentionKind,
+} from "./mission-control-attention.js";
+export {
+  getWorkspaceMissionControl,
   type MissionControlExecution,
   type WorkspaceMissionControl,
 } from "./mission-control.js";

@@ -2,6 +2,11 @@ import Link from "next/link";
 import type { WorkspaceMissionControl } from "@coppergate/db";
 import { humanizeOpsDetail } from "@/lib/humanize-ops";
 import {
+  missionControlAttentionEmptyBody,
+  missionControlAttentionTotal,
+  missionControlExecutionsEmptyBody,
+} from "@/lib/mission-control-view";
+import {
   type ActivityEvent,
   type ActivityGroup,
   actorLabel,
@@ -105,8 +110,13 @@ function tagsFor(group: ActivityGroup): string[] {
 }
 
 export function MissionControl({ data, recentEvents }: Props) {
-  const { metrics, attention, executions } = data;
+  const { metrics, attention, executions, capacityCrisis } = data;
   const hasBudget = metrics.budgetCapMicros > 0;
+  const emptyCtx = {
+    capacityCrisis,
+    budgetPaused: metrics.budgetStatus === "paused",
+    hasBudget,
+  };
   const needsAttention = attention.length > 0;
   const budgetPaused = metrics.budgetStatus === "paused";
   const arenaHot = metrics.arenaNeedsAttention > 0;
@@ -124,16 +134,20 @@ export function MissionControl({ data, recentEvents }: Props) {
   const evidenceItem = attention.find((a) => a.kind === "review_required");
   const humanGates = metrics.needsApproval;
   const evidenceGates = metrics.needsEvidenceAccept;
-  const attentionTotal =
-    humanGates + evidenceGates + metrics.arenaNeedsAttention;
+  const attentionTotal = missionControlAttentionTotal(metrics, capacityCrisis);
+  const arenaInAttentionTotal = capacityCrisis
+    ? 0
+    : metrics.arenaNeedsAttention;
   const attentionHref =
     humanGates > 0
       ? `/workspaces/${data.workspaceId}/inbox`
       : evidenceItem
         ? evidenceItem.href
-        : crisisItem || arenaHot
-          ? `/workspaces/${data.workspaceId}/arena`
-          : `/workspaces/${data.workspaceId}/inbox`;
+        : crisisItem
+          ? crisisItem.href
+          : arenaHot
+            ? `/workspaces/${data.workspaceId}/arena`
+            : `/workspaces/${data.workspaceId}/inbox`;
 
   const statusLine = (() => {
     if (budgetPaused) {
@@ -267,12 +281,25 @@ export function MissionControl({ data, recentEvents }: Props) {
         </div>
         <div className={styles.headRight}>
           <p className={styles.stamp}>{formatStamp()}</p>
-          <Link
-            href={`/workspaces/${data.workspaceId}/arena`}
-            className={styles.arenaCta}
-          >
-            Open Arena →
-          </Link>
+          {crisisItem ? (
+            <Link
+              href={crisisItem.href}
+              className={styles.arenaCta}
+            >
+              {providerQuotaItem
+                ? "Fix provider quota →"
+                : mergeBlockedItem
+                  ? "Fix merge rights →"
+                  : "Pause Arena →"}
+            </Link>
+          ) : (
+            <Link
+              href={`/workspaces/${data.workspaceId}/arena`}
+              className={styles.arenaCta}
+            >
+              Open Arena →
+            </Link>
+          )}
         </div>
       </header>
 
@@ -299,7 +326,8 @@ export function MissionControl({ data, recentEvents }: Props) {
           </Link>
           <span className={styles.summaryMute}>
             {humanGates} inbox · {evidenceGates} evidence ·{" "}
-            {metrics.arenaNeedsAttention} arena
+            {arenaInAttentionTotal} arena
+            {capacityCrisis ? " · crisis" : ""}
           </span>
         </p>
         <p className={styles.summaryItem}>
@@ -364,12 +392,7 @@ export function MissionControl({ data, recentEvents }: Props) {
                 </span>
                 <p className={styles.emptyTitle}>You&apos;re all caught up</p>
                 <p className={styles.emptyBody}>
-                  No approvals, failed arena runs, or blockers. Next spend needs
-                  an Open Program ID —{" "}
-                  <Link href={`/workspaces/${data.workspaceId}/arena`}>
-                    Arena
-                  </Link>{" "}
-                  cannot reserve without one when the program is bound.
+                  {missionControlAttentionEmptyBody(emptyCtx)}
                 </p>
               </div>
             ) : (
@@ -502,11 +525,7 @@ export function MissionControl({ data, recentEvents }: Props) {
               <div className={styles.emptyCatch}>
                 <p className={styles.emptyTitle}>No active executions</p>
                 <p className={styles.emptyBody}>
-                  No Open ID, no spend. Bind an Open Program line, then open{" "}
-                  <Link href={`/workspaces/${data.workspaceId}/arena`}>
-                    Arena
-                  </Link>{" "}
-                  to license the next reserve.
+                  {missionControlExecutionsEmptyBody(emptyCtx)}
                 </p>
               </div>
             ) : (

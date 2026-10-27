@@ -126,9 +126,19 @@ describe("AG-010 provider quota fail-closed", { skip: !url }, () => {
     assert.ok(evt);
 
     const snap = await getWorkspaceMissionControl(db, workspaceId);
+    assert.equal(snap.capacityCrisis, true);
     const quota = snap.attention.find((a) => a.kind === "provider_quota");
     assert.ok(quota, "Mission Control must surface provider_quota attention");
     assert.match(quota.title, /quota/i);
+    assert.equal(
+      snap.attention[0]?.kind,
+      "provider_quota",
+      "provider_quota must lead attention during crisis",
+    );
+    assert.ok(
+      !snap.attention.some((a) => a.kind === "arena_failed"),
+      "arena_failed noise suppressed during provider quota crisis",
+    );
 
     // Idempotent: second call stays paused, still reports paused.
     const again = await pauseArenaForProviderQuota(db, {

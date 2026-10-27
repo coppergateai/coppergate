@@ -13,6 +13,19 @@ import {
   type WorkspaceArenaProjectLane,
 } from "./workspace-arena.js";
 import { agentRuns, projects, tasks } from "./schema.js";
+import {
+  sortMissionControlAttention,
+  type MissionControlAttentionItem,
+} from "./mission-control-attention.js";
+
+export type {
+  MissionControlAttentionItem,
+  MissionControlAttentionKind,
+} from "./mission-control-attention.js";
+export {
+  missionControlAttentionKindRank,
+  sortMissionControlAttention,
+} from "./mission-control-attention.js";
 
 const ACTIVE_RUN_STATUSES = [
   "QUEUED",
@@ -29,28 +42,6 @@ const ACTIVE_TASK_STATUSES = [
   "IN_REVIEW",
 ] as const;
 
-export type MissionControlAttentionKind =
-  | "approval"
-  | "budget_paused"
-  | "budget_reserved"
-  | "provider_quota"
-  | "review_required"
-  | "arena_failed"
-  | "replan_failed"
-  | "merge_blocked"
-  | "concurrency";
-
-export type MissionControlAttentionItem = {
-  id: string;
-  kind: MissionControlAttentionKind;
-  title: string;
-  detail: string;
-  href: string;
-  priority: "high" | "normal";
-  /** Optional primary CTA label for the attention row. */
-  ctaLabel?: string;
-};
-
 export type MissionControlExecution = {
   projectId: string;
   projectName: string;
@@ -64,6 +55,8 @@ export type MissionControlExecution = {
 export type WorkspaceMissionControl = {
   workspaceId: string;
   workspaceName: string;
+  /** Concurrency or provider quota — suppress arena/replan noise until resolved. */
+  capacityCrisis: boolean;
   metrics: {
     activeRuns: number;
     activeRunProjects: number;
@@ -265,6 +258,8 @@ export async function getWorkspaceMissionControl(
     });
   }
 
+  const capacityCrisis = overConcurrency || !!quotaPause;
+
   if (spend?.budgetStatus === "paused") {
     attention.push({
       id: "budget-paused",
@@ -311,9 +306,9 @@ export async function getWorkspaceMissionControl(
     });
   }
 
-  // When over concurrency, arena/replan/merge noise is mostly a symptom —
-  // keep Mission Control focused on Pause + real human gates.
-  if (!overConcurrency) {
+  // During capacity crisis, arena/replan/merge noise is mostly a symptom —
+  // keep Mission Control focused on Pause/quota + real human gates.
+  if (!capacityCrisis) {
     const failedLanes = arena.projects.filter(laneNeedsAttention).slice(0, 4);
     for (const lane of failedLanes) {
       const arenaLive = isLiveArenaStatus(lane.arenaStatus);
@@ -449,20 +444,7 @@ export async function getWorkspaceMissionControl(
     }
   }
 
-  attention.sort((a, b) => {
-    // Concurrency / provider quota crisis leads — stop burn before triage.
-    const rank = (k: MissionControlAttentionKind) =>
-      k === "concurrency" ||
-      k === "provider_quota" ||
-      k === "merge_blocked"
-        ? 0
-        : 1;
-    const ra = rank(a.kind);
-    const rb = rank(b.kind);
-    if (ra !== rb) return ra - rb;
-    if (a.priority === b.priority) return 0;
-    return a.priority === "high" ? -1 : 1;
-  });
+  sortMissionControlAttention(attention);
 
   // Dedupe identical in-flight titles for the executions strip
   const seenExecTitles = new Set<string>();
@@ -509,6 +491,7 @@ export async function getWorkspaceMissionControl(
   return {
     workspaceId,
     workspaceName,
+    capacityCrisis,
     metrics: {
       activeRuns,
       activeRunProjects,
