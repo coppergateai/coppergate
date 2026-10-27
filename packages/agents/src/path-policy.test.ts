@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  containsForbiddenWriteSecret,
+  evaluateAgentWritePath,
+  isAgentWritePathAllowed,
+  isForbiddenAgentPath,
   isPathAllowed,
   isEditToolAllowed,
   isProfileEditAllowed,
@@ -14,6 +18,39 @@ describe("path-policy", () => {
     assert.equal(isSafeRelativePath("/etc/passwd"), false);
     assert.equal(isSafeRelativePath("app/../../secret"), false);
     assert.equal(isSafeRelativePath("app/page.tsx"), true);
+    assert.equal(isSafeRelativePath("app/%2e%2e/secret"), false);
+  });
+
+  it("SEC-022 forbids env, secret files, and .git paths even under **/*", () => {
+    assert.equal(isForbiddenAgentPath("apps/web/.env"), true);
+    assert.equal(isForbiddenAgentPath("apps/web/.env.local"), true);
+    assert.equal(isForbiddenAgentPath("apps/web/.env.example"), false);
+    assert.equal(isForbiddenAgentPath("packages/db/credentials.json"), true);
+    assert.equal(isForbiddenAgentPath(".git/config"), true);
+    assert.equal(isForbiddenAgentPath(".fly/config.yml"), true);
+    assert.equal(
+      isAgentWritePathAllowed("apps/web/.env", ["**/*", "apps/**"]),
+      false,
+    );
+    assert.equal(isAgentWritePathAllowed("apps/web/page.tsx", ["apps/**"]), true);
+  });
+
+  it("SEC-022 detects embedded secrets and Fly tokens in file content", () => {
+    assert.equal(
+      containsForbiddenWriteSecret("FLY_API_TOKEN=fo1_deadbeef0123456789"),
+      true,
+    );
+    assert.equal(
+      containsForbiddenWriteSecret("export const x = 1;\n"),
+      false,
+    );
+    const gate = evaluateAgentWritePath({
+      path: "apps/web/src/config.ts",
+      allowedPaths: ["apps/**"],
+      content: "const t = 'ghp_abcdefghijklmnopqrstuvwxyz1234567890';",
+    });
+    assert.equal(gate.ok, false);
+    if (!gate.ok) assert.equal(gate.code, "forbidden_secret");
   });
 
   it("enforces allowedPaths when non-empty", () => {

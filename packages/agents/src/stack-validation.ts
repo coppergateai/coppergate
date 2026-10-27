@@ -131,8 +131,17 @@ export async function runStackValidation(
   }
 
   if (stack === "nextjs_ts" || stack === "unknown" || stack.startsWith("node")) {
-    // Local/git sandboxes clone without install. Full monorepo `pnpm install`
-    // OOMs small workers; GitHub CI is the real gate after http PR delivery.
+    // Local/git sandboxes: full monorepo `turbo run test` hangs past SIGKILL of the
+    // npm parent (orphan turbo children) and OOMs small workers. GitHub CI is the
+    // real merge gate after http PR delivery.
+    let hasTurboJson = false;
+    try {
+      await access(join(input.workdir, "turbo.json"));
+      hasTurboJson = true;
+    } catch {
+      hasTurboJson = false;
+    }
+
     let hasNodeModules = false;
     try {
       await access(join(input.workdir, "node_modules"));
@@ -141,12 +150,13 @@ export async function runStackValidation(
       hasNodeModules = false;
     }
 
-    if (!hasNodeModules) {
+    if (hasTurboJson || !hasNodeModules) {
       checks.push({
         name: "npm_deps",
         passed: true,
-        detail:
-          "node_modules missing in sandbox — skipped lint/test; GitHub CI remains the merge gate",
+        detail: hasTurboJson
+          ? "turbo monorepo — skipped sandbox lint/test; GitHub CI remains the merge gate"
+          : "node_modules missing in sandbox — skipped lint/test; GitHub CI remains the merge gate",
       });
     } else {
       const lint = await runNpmScript(

@@ -237,6 +237,24 @@ function authenticatedCloneUrl(
   return trimmed;
 }
 
+function killProcessTree(child: { pid?: number; kill: (sig?: NodeJS.Signals) => boolean }): void {
+  // Kill the whole process group — turbo/npm children otherwise orphan and keep
+  // the sandbox busy long after wall-clock timeout.
+  try {
+    if (child.pid && child.pid > 0) {
+      process.kill(-child.pid, "SIGKILL");
+      return;
+    }
+  } catch {
+    /* fall through to direct kill */
+  }
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    /* already dead */
+  }
+}
+
 function runCommand(
   command: string[],
   cwd: string,
@@ -252,11 +270,12 @@ function runCommand(
         GIT_TERMINAL_PROMPT: "0",
       },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
     });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
+      killProcessTree(child);
     }, timeoutMs);
 
     child.stdout?.on("data", (chunk: Buffer) => {

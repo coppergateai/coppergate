@@ -1,3 +1,7 @@
+import {
+  evaluateAgentWritePath,
+  isForbiddenAgentPath,
+} from "@coppergate/agents";
 import { readFile } from "node:fs/promises";
 import { resolveContainedPath } from "@coppergate/sandbox";
 
@@ -85,6 +89,36 @@ export function assertProductDeliveryPaths(input: {
     }
   }
 
+  const forbidden = paths.filter((p) => isForbiddenAgentPath(p));
+  if (forbidden.length > 0) {
+    return {
+      ok: false,
+      reason: `forbidden agent paths: ${forbidden.slice(0, 8).join(", ")}`,
+      code: "forbidden_path",
+    };
+  }
+
+  return { ok: true };
+}
+
+/** SEC-022 — refuse delivery file bodies that embed tokens or private keys. */
+export function assertDeliverySecretsRefused(
+  files: DeliveryFile[],
+): { ok: true } | { ok: false; reason: string; code: string } {
+  for (const file of files) {
+    const gate = evaluateAgentWritePath({
+      path: file.path,
+      allowedPaths: ["**/*"],
+      content: file.content,
+    });
+    if (!gate.ok && gate.code === "forbidden_secret") {
+      return {
+        ok: false,
+        reason: gate.message,
+        code: "forbidden_secret",
+      };
+    }
+  }
   return { ok: true };
 }
 

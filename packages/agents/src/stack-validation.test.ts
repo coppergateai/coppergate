@@ -105,6 +105,41 @@ describe("runStackValidation", () => {
     assert.ok(calls.some((c) => c[0] === "npm" && c[2] === "lint"));
   });
 
+  it("skips npm lint/test for turbo monorepos even with node_modules", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "cg-stack-turbo-"));
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(join(workdir, "node_modules"), { recursive: true });
+    await writeFile(
+      join(workdir, "package.json"),
+      JSON.stringify({ scripts: { lint: "echo ok", test: "echo ok" } }),
+      "utf8",
+    );
+    await writeFile(join(workdir, "turbo.json"), JSON.stringify({ pipeline: {} }), "utf8");
+    const calls: string[][] = [];
+    const report = await runStackValidation({
+      goal: "ship it",
+      acceptanceCriteria: ["ok"],
+      completion,
+      workdir,
+      stack: "nextjs_ts",
+      forceFake: false,
+      exec: async (command) => {
+        calls.push(command);
+        return { exitCode: 1, stdout: "", stderr: "should not run", durationMs: 1 };
+      },
+    });
+    assert.equal(report.passed, true);
+    assert.equal(calls.length, 0);
+    assert.ok(
+      report.checks.some(
+        (c) =>
+          c.name === "npm_deps" &&
+          c.passed &&
+          (c.detail ?? "").includes("turbo monorepo"),
+      ),
+    );
+  });
+
   it("runs go test when go.mod present", async () => {
     const workdir = await mkdtemp(join(tmpdir(), "cg-stack-go-"));
     await writeFile(join(workdir, "go.mod"), "module example.com/x\n", "utf8");
