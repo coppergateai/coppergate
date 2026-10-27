@@ -120,7 +120,8 @@ export function ArenaPanel({ workspaceId, projectId, isOwner }: Props) {
         ) : null}
       </div>
       <p className={styles.sectionLede}>
-        Contenders compete under budget; fitness and CI pick the survivor.
+        Contenders compete under budget; efficiency payoff (f / spend^α) ranks
+        CI-green paths.
         Pause all drains the queue; Resume or Stop all are workspace-level —{" "}
         <Link href={arenaHref} className={styles.inlineLink}>
           {isOwner ? "open Arena to arm projects" : "watch agents live"}
