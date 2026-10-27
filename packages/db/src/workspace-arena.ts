@@ -1,7 +1,13 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "./client.js";
 import {
+  buildEfficiencyBoard,
+  type EfficiencyBoard,
+} from "./arena-efficiency-board.js";
+import {
+  DEFAULT_PAYOFF_ALPHA,
   getArenaForProject,
+  getLatestTournamentForTask,
   killArena,
   listContendersForArena,
 } from "./arena.js";
@@ -23,6 +29,8 @@ export type WorkspaceArenaContenderRun = {
   taskId: string;
   taskTitle: string;
   actualCostMicros: number;
+  fitnessScore: number | null;
+  efficiencyScore: number | null;
   prUrl: string | null;
   prNumber: number | null;
   errorCode: string | null;
@@ -76,6 +84,9 @@ export type WorkspaceArenaProjectLane = {
   repoFullName: string;
   arenaId: string | null;
   arenaStatus: string | null;
+  payoffAlpha: number | null;
+  /** Efficiency payoff f / spend^α for the active task contest. */
+  efficiencyBoard: EfficiencyBoard | null;
   contenders: WorkspaceArenaContenderView[];
   lastRun: WorkspaceArenaLastRun | null;
 };
@@ -228,6 +239,8 @@ async function latestRunsByContender(
       taskId: agentRuns.taskId,
       taskTitle: tasks.title,
       actualCostMicros: agentRuns.actualCostMicros,
+      fitnessScore: agentRuns.fitnessScore,
+      efficiencyScore: agentRuns.efficiencyScore,
       prUrl: agentRuns.prUrl,
       prNumber: agentRuns.prNumber,
       errorCode: agentRuns.errorCode,
@@ -253,6 +266,10 @@ async function latestRunsByContender(
       taskId: row.taskId,
       taskTitle: row.taskTitle,
       actualCostMicros: row.actualCostMicros,
+      fitnessScore:
+        row.fitnessScore == null ? null : Number(row.fitnessScore),
+      efficiencyScore:
+        row.efficiencyScore == null ? null : Number(row.efficiencyScore),
       prUrl: row.prUrl,
       prNumber: row.prNumber,
       errorCode: row.errorCode,
@@ -402,6 +419,32 @@ export async function listWorkspaceArenaSnapshot(
       pool.map((c) => c.id),
     );
     const lastRun = await lastRunForProject(db, workspaceId, project.id);
+    const contenders = contenderViews(pool, temperamentByKey, runsByContender);
+    const payoffAlpha = arena?.payoffAlpha ?? null;
+    let efficiencyBoard: EfficiencyBoard | null = null;
+    if (arena && contenders.length > 0) {
+      const draft = buildEfficiencyBoard({
+        payoffAlpha: payoffAlpha ?? DEFAULT_PAYOFF_ALPHA,
+        contenders,
+      });
+      if (draft) {
+        const tournament = await getLatestTournamentForTask(db, {
+          workspaceId,
+          taskId: draft.taskId,
+        });
+        efficiencyBoard = buildEfficiencyBoard({
+          payoffAlpha: payoffAlpha ?? DEFAULT_PAYOFF_ALPHA,
+          contenders,
+          tournament: tournament
+            ? {
+                taskId: tournament.taskId,
+                status: tournament.status,
+                winnerRunId: tournament.winnerRunId,
+              }
+            : null,
+        });
+      }
+    }
     projects.push({
       projectId: project.id,
       projectName: project.name,
@@ -410,7 +453,9 @@ export async function listWorkspaceArenaSnapshot(
         `${repository.owner}/${repository.name}`,
       arenaId: arena?.id ?? null,
       arenaStatus: arena?.status ?? null,
-      contenders: contenderViews(pool, temperamentByKey, runsByContender),
+      payoffAlpha,
+      efficiencyBoard,
+      contenders,
       lastRun,
     });
   }
