@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { EmptyState } from "@/components/app/ui";
+import { EmptyState, SkeletonStack } from "@/components/app/ui";
 import {
   DonutChart,
   HorizontalBars,
@@ -66,7 +66,9 @@ export function InsightsShell({
     setLoading(true);
     setError(null);
     try {
-      const costRes = await fetch(`/api/workspaces/${workspaceId}/cost?days=7`);
+      const costRes = await fetch(
+        `/api/workspaces/${workspaceId}/cost?days=30`,
+      );
       const costBody = (await costRes.json()) as {
         cost?: CostData;
         error?: { message?: string };
@@ -120,82 +122,117 @@ export function InsightsShell({
       ? Math.round((analytics.failedRunCount / analytics.runCount) * 100)
       : 0;
 
+  const spendLabel =
+    isOwner && analytics
+      ? usd(analytics.totalSpendMicros)
+      : isOwner
+        ? "—"
+        : "Owner only";
+
   return (
     <main className={styles.main}>
       <header className={styles.head}>
-        <div className={styles.headLeft}>
-          <p className={styles.eyebrow}>Workspace / {workspaceName}</p>
+        <p className={styles.eyebrow}>Workspace / {workspaceName}</p>
+        <div className={styles.titleRow}>
           <h1 className={styles.title}>Insights</h1>
-          <p className={styles.lede}>
-            Period economics and verified delivery — what shipped and what it
-            cost, not what needs intervention now.
-          </p>
+          <div className={styles.headActions}>
+            <nav className={styles.headLinks} aria-label="Related">
+              <Link
+                href={`/workspaces/${workspaceId}/arena`}
+                className={styles.headLink}
+              >
+                Arena
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/activity`}
+                className={styles.headLink}
+              >
+                Activity
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/settings?tab=billing`}
+                className={styles.headLink}
+              >
+                Billing
+              </Link>
+            </nav>
+          </div>
         </div>
-        <div className={styles.headRight}>
-          <Link href={`/workspaces/${workspaceId}`} className={styles.headLink}>
-            ← Mission Control
-          </Link>
-          <Link
-            href={`/workspaces/${workspaceId}/settings?tab=billing`}
-            className={styles.headLink}
-          >
-            Manage budget →
-          </Link>
+        <p className={styles.lede}>
+          Period economics and verified delivery — what shipped and what it
+          cost, not what needs intervention now.
+        </p>
+        <div className={styles.summaryStrip} aria-label="Insights summary">
+          {loading ? (
+            <span className={styles.summaryItem}>
+              <strong>—</strong> loading
+            </span>
+          ) : (
+            <>
+              <span className={styles.summaryItem}>
+                <strong>{spendLabel}</strong> spend · 30d
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>
+                  {isOwner && analytics ? analytics.acceptedPrCount : "—"}
+                </strong>{" "}
+                accepted PRs
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>{verifiedPrsThisMonth}</strong> verified
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span
+                className={`${styles.summaryItem} ${
+                  isOwner && analytics && failRate >= 50
+                    ? styles.summaryWarn
+                    : ""
+                }`}
+              >
+                <strong>
+                  {isOwner && analytics ? `${failRate}%` : "—"}
+                </strong>{" "}
+                fail rate
+              </span>
+            </>
+          )}
         </div>
       </header>
 
       {error ? <p className={styles.error}>{error}</p> : null}
-      {loading ? <p className={styles.note}>Loading insights…</p> : null}
 
-      {!loading ? (
+      {loading ? (
+        <div className={styles.loading}>
+          <SkeletonStack rows={6} />
+        </div>
+      ) : (
         <>
-          <section
-            className={styles.kpiGrid}
-            aria-label="Period key metrics"
-          >
-            <article className={styles.kpi}>
-              <p className={styles.kpiLabel}>Spend (30d)</p>
-              <p className={styles.kpiValue}>
-                {isOwner && analytics
-                  ? usd(analytics.totalSpendMicros)
-                  : isOwner
-                    ? "—"
-                    : "Owner only"}
-              </p>
-              <p className={styles.kpiHint}>
-                {isOwner && analytics
-                  ? `${usd(analytics.failedRunSpendMicros)} on failed runs`
-                  : "Coppergate budget units"}
-              </p>
-            </article>
-            <article className={styles.kpi}>
-              <p className={styles.kpiLabel}>Accepted PRs</p>
-              <p className={styles.kpiValue}>
-                {isOwner && analytics ? analytics.acceptedPrCount : "—"}
-              </p>
-              <p className={styles.kpiHint}>
-                {isOwner && analytics
-                  ? `median ${usd(analytics.medianAcceptedPrCostMicros)} / PR`
-                  : "30-day acceptances"}
-              </p>
-            </article>
-            <article className={styles.kpi}>
-              <p className={styles.kpiLabel}>Verified PRs</p>
-              <p className={styles.kpiValue}>{verifiedPrsThisMonth}</p>
-              <p className={styles.kpiHint}>this month · north star</p>
-            </article>
-            <article className={`${styles.kpi} ${styles.kpiAccent}`}>
-              <p className={styles.kpiLabel}>Run fail rate</p>
-              <p className={styles.kpiValue}>
-                {isOwner && analytics ? `${failRate}%` : "—"}
-              </p>
-              <p className={styles.kpiHint}>
-                {isOwner && analytics
-                  ? `${analytics.failedRunCount} of ${analytics.runCount} runs`
-                  : "Owner-only analytics"}
-              </p>
-            </article>
-          </section>
+          {isOwner && analytics ? (
+            <p className={styles.summaryHint}>
+              {usd(analytics.failedRunSpendMicros)} on failed runs · median{" "}
+              {usd(analytics.medianAcceptedPrCostMicros)} / accepted PR ·{" "}
+              {analytics.failedRunCount} of {analytics.runCount} runs failed
+            </p>
+          ) : !isOwner ? (
+            <p className={styles.summaryHint}>
+              Spend and run charts are owner-only. Verified PRs stay visible for
+              the whole workspace.
+            </p>
+          ) : null}
 
           <div className={styles.board}>
             <section
@@ -206,7 +243,7 @@ export function InsightsShell({
                 <h2 id="project-spend-heading" className={styles.sectionLabel}>
                   Spend by project
                 </h2>
-                <p className={styles.panelWindow}>7d</p>
+                <p className={styles.panelWindow}>30d</p>
               </div>
               <p className={styles.sectionLede}>
                 Coppergate budget units by project — not your provider invoice.
@@ -230,7 +267,7 @@ export function InsightsShell({
               ) : (
                 <EmptyState
                   title="No usage in this window"
-                  body="No project spend in the last 7 days."
+                  body="No project spend in the last 30 days."
                 />
               )}
             </section>
@@ -342,45 +379,6 @@ export function InsightsShell({
             )}
           </section>
 
-          <section
-            className={`${styles.panel} ${styles.verifiedPanel}`}
-            aria-labelledby="verified-delivery-heading"
-          >
-            <div className={styles.verifiedLayout}>
-              <div>
-                <h2
-                  id="verified-delivery-heading"
-                  className={styles.sectionLabel}
-                >
-                  Verified delivery
-                </h2>
-                <p className={styles.sectionLede}>
-                  North-star count for this month. Ship receipts live on Activity
-                  and Delivery Review.
-                </p>
-                <p className={styles.note}>
-                  <Link
-                    href={`/workspaces/${workspaceId}/projects`}
-                    className={styles.footerLink}
-                  >
-                    View projects
-                  </Link>
-                  <span className={styles.footerMute}> · </span>
-                  <Link
-                    href={`/workspaces/${workspaceId}/activity`}
-                    className={styles.footerLink}
-                  >
-                    View activity
-                  </Link>
-                </p>
-              </div>
-              <div className={styles.verifiedHero} aria-label="Verified PRs">
-                <strong>{verifiedPrsThisMonth}</strong>
-                <span>verified PRs</span>
-              </div>
-            </div>
-          </section>
-
           <div className={styles.footerActions}>
             <a
               href={`/api/workspaces/${workspaceId}/cost?days=31&format=csv`}
@@ -389,15 +387,36 @@ export function InsightsShell({
             >
               Export CSV (31d)
             </a>
+            <span className={styles.footerMute} aria-hidden>
+              ·
+            </span>
+            <Link
+              href={`/workspaces/${workspaceId}/projects`}
+              className={styles.footerLink}
+            >
+              Projects
+            </Link>
+            <span className={styles.footerMute} aria-hidden>
+              ·
+            </span>
+            <Link
+              href={`/workspaces/${workspaceId}/activity`}
+              className={styles.footerLink}
+            >
+              Activity
+            </Link>
+            <span className={styles.footerMute} aria-hidden>
+              ·
+            </span>
             <Link
               href={`/workspaces/${workspaceId}/settings?tab=billing`}
               className={styles.footerLink}
             >
-              Manage budget → Settings · Billing
+              Manage budget
             </Link>
           </div>
         </>
-      ) : null}
+      )}
     </main>
   );
 }
