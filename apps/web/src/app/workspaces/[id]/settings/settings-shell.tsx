@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -53,6 +54,7 @@ function isTabId(value: string | null): value is SettingsTabId {
 }
 
 type Props = {
+  workspaceId: string;
   workspaceName: string;
   workspaceSlug: string;
   role: string;
@@ -61,6 +63,7 @@ type Props = {
 };
 
 export function SettingsShell({
+  workspaceId,
   workspaceName,
   workspaceSlug,
   role,
@@ -98,16 +101,59 @@ export function SettingsShell({
   return (
     <div className={styles.shell}>
       <header className={styles.shellHead}>
-        <div className={styles.shellHeadMain}>
-          <h1 className={styles.title}>Workspace settings</h1>
-          <p className={styles.meta}>
-            {workspaceName} · /{workspaceSlug} · {role}
-            <span className={styles.metaSep} aria-hidden>
-              ·
-            </span>
-            <span className={styles.metaActive}>{activeMeta.label}</span>
-            <span className={styles.metaBlurb}> — {activeMeta.blurb}</span>
-          </p>
+        <p className={styles.eyebrow}>Workspace / {workspaceName}</p>
+        <div className={styles.titleRow}>
+          <h1 className={styles.title}>Settings</h1>
+          <div className={styles.headActions}>
+            <nav className={styles.headLinks} aria-label="Related">
+              <Link
+                href={`/workspaces/${workspaceId}/agents`}
+                className={styles.headLink}
+              >
+                Agents
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/tools`}
+                className={styles.headLink}
+              >
+                Tools
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/insights`}
+                className={styles.headLink}
+              >
+                Insights
+              </Link>
+            </nav>
+          </div>
+        </div>
+        <p className={styles.lede}>
+          Connections, spend, signals, and model routing for this workspace —
+          owners change settings; everyone can review them.
+        </p>
+        <div className={styles.summaryStrip} aria-label="Settings context">
+          <span className={styles.summaryItem}>
+            <strong>/{workspaceSlug}</strong>
+          </span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{role}</strong>
+          </span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{activeMeta.label}</strong>
+            <span className={styles.summaryMute}> — {activeMeta.blurb}</span>
+          </span>
         </div>
       </header>
 
@@ -118,14 +164,16 @@ export function SettingsShell({
           return (
             <div key={group} className={styles.tabGroup}>
               <p className={styles.tabGroupLabel}>{group}</p>
-              <div className={styles.tabGroupRow}>
+              <div className={styles.tabGroupRow} role="tablist">
                 {tabs.map((t) => (
                   <button
                     key={t.id}
                     type="button"
+                    role="tab"
                     className={`${styles.tabBtn} ${
                       active === t.id ? styles.tabBtnActive : ""
                     } ${t.id === "danger" ? styles.tabBtnDanger : ""}`}
+                    aria-selected={active === t.id}
                     aria-current={active === t.id ? "page" : undefined}
                     onClick={() => select(t.id)}
                     title={t.blurb}

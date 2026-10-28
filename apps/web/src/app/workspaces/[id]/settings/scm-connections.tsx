@@ -109,8 +109,14 @@ export function ScmConnectionsPanel({
 
   if (loading) {
     return (
-      <section className={styles.section} aria-busy="true">
-        <p className={styles.sectionLede}>Loading source control…</p>
+      <section className={styles.section} aria-busy="true" aria-live="polite">
+        <h2 className={styles.sectionLabel}>Source control</h2>
+        <p className={styles.sectionLede}>Checking GitHub and GitLab…</p>
+        <div className={styles.scmLoading}>
+          <span className={styles.scmLoadingBar} />
+          <span className={styles.scmLoadingBar} />
+          <span className={styles.scmLoadingBar} data-short />
+        </div>
       </section>
     );
   }

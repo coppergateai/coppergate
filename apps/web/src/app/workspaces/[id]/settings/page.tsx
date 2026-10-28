@@ -206,6 +206,7 @@ export default async function WorkspaceSettingsPage({
         }
       >
         <SettingsShell
+          workspaceId={workspace.id}
           workspaceName={workspace.name}
           workspaceSlug={workspace.slug}
           role={role}

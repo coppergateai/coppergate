@@ -14,46 +14,111 @@
 }
 
 .shellHead {
+  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 0;
+}
+
+.eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute-soft);
+}
+
+.titleRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem 1.5rem;
-  padding: var(--app-pad-y) var(--app-pad-x-lg) 1rem;
+  gap: 0.75rem 1.25rem;
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+}
+
+.headLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.headLink {
+  font-size: 0.82rem;
+  font-weight: 550;
+  color: var(--mute);
+  text-decoration: none;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-sm, 8px);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.headLink:hover {
+  color: var(--copper);
+  background: var(--copper-fill-soft);
+}
+
+.headSep {
+  color: var(--line);
+  font-size: 0.75rem;
+  user-select: none;
+}
+
+.lede {
+  margin: 0.45rem 0 0;
+  max-width: 40rem;
+  font-size: 0.92rem;
+  color: var(--mute);
+  line-height: 1.45;
+}
+
+.summaryStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0;
+  margin: 0.85rem 0 0;
+  padding: 0 0 0.95rem;
   border-bottom: 1px solid var(--line);
-  background:
-    radial-gradient(
-      70% 120% at 0% 0%,
-      var(--copper-fill-soft),
-      transparent 55%
-    ),
-    var(--page-bar-bg);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
-  z-index: 5;
-}
-
-.shellHeadMain {
-  min-width: 0;
-}
-
-.shellHeadAside {
-  text-align: right;
-}
-
-.shellActiveLabel {
-  margin: 0;
-  color: var(--paper);
-  font-size: 0.95rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
-
-.shellActiveBlurb {
-  margin: 0.15rem 0 0;
   color: var(--mute-soft);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+}
+
+.summaryItem {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.summaryItem strong {
+  color: var(--paper);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+}
+
+.summaryDot {
+  margin: 0 0.55rem;
+  color: var(--line);
+  user-select: none;
+}
+
+.summaryMute {
+  color: var(--mute-soft);
+  font-weight: 500;
+}
+
+@media (max-width: 560px) {
+  .headLinks {
+    display: none;
+  }
 }
 
 .tabNav {
@@ -62,16 +127,15 @@
   align-items: flex-end;
   gap: 0.85rem 1.15rem;
   overflow-x: auto;
-  padding: 0.55rem var(--app-pad-x-lg) 0.65rem;
+  padding: 0.45rem var(--app-pad-x-lg) 0;
   border-bottom: 1px solid var(--line);
-  background: var(--overlay-muted);
   scrollbar-width: thin;
 }
 
 .tabGroup {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.2rem;
   flex: 0 0 auto;
 }
 
@@ -88,43 +152,42 @@
 .tabGroupRow {
   display: flex;
   flex-wrap: nowrap;
-  gap: 0.25rem;
+  gap: 0.1rem;
 }
 
 .tabBtn {
+  display: inline-flex;
+  align-items: center;
   flex: 0 0 auto;
-  padding: 0.5rem 0.9rem;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  min-height: 2.1rem;
+  padding: 0.3rem 0.65rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
   background: transparent;
   color: var(--mute);
   font: inherit;
-  font-size: 0.84rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 550;
   letter-spacing: -0.01em;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    color 0.15s ease;
+  transition: color 0.12s ease, border-color 0.12s ease;
 }
 
 .tabBtn:hover {
   color: var(--paper);
-  background: var(--overlay);
 }
 
 .tabBtnActive {
-  border-color: var(--copper-border);
-  background: var(--copper-fill);
   color: var(--paper);
+  border-bottom-color: var(--copper-border-strong);
 }
 
 .tabBtnDanger.tabBtnActive {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
+  border-bottom-color: color-mix(in srgb, var(--danger) 65%, transparent);
 }
 
 .tabPanel {
@@ -145,6 +208,46 @@
 .splitGrid {
   display: grid;
   gap: 1rem;
+}
+
+.scmLoading {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+  max-width: 28rem;
+}
+
+.scmLoadingBar {
+  display: block;
+  height: 0.7rem;
+  border-radius: var(--radius-sm, 8px);
+  background: linear-gradient(
+    90deg,
+    var(--line-soft),
+    var(--surface-hover),
+    var(--line-soft)
+  );
+  background-size: 200% 100%;
+  animation: scmShimmer 1.2s ease-in-out infinite;
+}
+
+.scmLoadingBar[data-short] {
+  width: 55%;
+}
+
+@keyframes scmShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scmLoadingBar {
+    animation: none;
+  }
 }
 
 .scmPicker {
@@ -428,11 +531,13 @@
 
 .title {
   margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 2.8vw, 1.9rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
   color: var(--paper);
+  line-height: 1.15;
+  text-transform: none;
 }
 
 .meta {
