@@ -47,7 +47,12 @@ async function main() {
     .first()
     .waitFor({ timeout: 20_000 })
     .catch(() => undefined);
-  await page.waitForTimeout(1200);
+  await page
+    .getByText(/hard gates|Retry \(new attempt\)|Ship Receipt/i)
+    .first()
+    .waitFor({ timeout: 15_000 })
+    .catch(() => undefined);
+  await page.waitForTimeout(800);
   console.log("url", page.url());
   if (!page.url().includes("/tasks/")) {
     throw new Error("did not reach task detail");
