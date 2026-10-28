@@ -1,34 +1,41 @@
-.main {
+.stage {
   position: relative;
   z-index: 1;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  min-height: min(70vh, 40rem);
-  padding: clamp(3rem, 8vw, 5.5rem) var(--gutter) clamp(4rem, 10vw, 6.5rem);
-  background:
-    radial-gradient(
-      ellipse 55% 40% at 50% 0%,
-      var(--copper-fill-soft),
-      transparent 65%
-    ),
-    linear-gradient(180deg, var(--ink-soft), var(--ink) 45%);
+  min-height: min(72vh, 42rem);
+  padding: clamp(2.75rem, 7vw, 5rem) var(--gutter) clamp(3.5rem, 9vw, 6rem);
 }
 
-.card {
-  width: min(26rem, 100%);
-  padding: 2.15rem 1.85rem 1.85rem;
-  border: 1px solid var(--line);
-  border-radius: calc(var(--radius) + 4px);
-  background: var(--surface-elevated);
-  box-shadow: var(--shadow-elevated);
+.panel {
+  width: min(28rem, 100%);
+  padding: 0.25rem 0 0.5rem;
   text-align: center;
+  animation: loginRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes loginRise {
+  from {
+    opacity: 0;
+    transform: translateY(0.65rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
 }
 
 .mark {
   display: block;
-  width: 3.25rem;
-  margin: 0 auto 1.35rem;
+  width: 3rem;
+  margin: 0 auto 0.85rem;
 }
 
 .mark img {
@@ -37,65 +44,87 @@
   height: auto;
 }
 
-.title {
+.brand {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.45rem, 3vw, 1.7rem);
+  font-size: clamp(1.85rem, 4vw, 2.35rem);
   font-weight: 650;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
   color: var(--paper);
 }
 
+.title {
+  margin: 0.55rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 2.4vw, 1.35rem);
+  font-weight: 550;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--mute);
+}
+
 .lede {
-  margin: 0.75rem 0 0;
+  margin: 0.75rem auto 0;
+  max-width: 26rem;
   color: var(--mute);
   font-size: 0.94rem;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .ctaStack {
   display: grid;
-  gap: 0.65rem;
-  margin-top: 1.65rem;
+  gap: 0.55rem;
+  margin: 1.75rem auto 0;
+  max-width: 22rem;
 }
 
-.cta {
+.ctaPrimary,
+.ctaSecondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   min-height: 2.75rem;
   padding: 0.55rem 1rem;
-  border: none;
-  border-radius: 12px;
-  background: var(--copper);
-  color: var(--on-copper);
-  font-size: 0.9375rem;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 0.94rem;
   font-weight: 650;
   letter-spacing: -0.015em;
   text-decoration: none;
-  box-shadow: 0 10px 24px var(--copper-ring);
   transition:
     filter 0.15s ease,
-    transform 0.15s ease;
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
-.cta:hover {
+.ctaPrimary {
+  border: 1px solid var(--copper-border-strong);
+  background: var(--copper);
+  color: var(--on-copper);
+  box-shadow: 0 10px 24px var(--copper-ring);
+}
+
+.ctaPrimary:hover {
   filter: brightness(1.05);
-  transform: translateY(-1px);
 }
 
-.cta:active {
-  transform: translateY(1px);
+.ctaSecondary {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--paper);
 }
 
-.secondary {
+.ctaSecondary:hover {
+  border-color: var(--copper-border);
+  background: var(--copper-fill-soft);
+  color: var(--copper-hot);
+}
+
+.selfHost {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  margin-top: 1rem;
+  margin-top: 1.15rem;
   color: var(--mute);
   font-size: 0.875rem;
   font-weight: 550;
@@ -103,29 +132,42 @@
   transition: color 0.12s ease;
 }
 
-.secondary:hover {
-  color: var(--copper-hot);
+.selfHost:hover {
+  color: var(--copper);
 }
 
 .note {
-  margin: 1rem 0 0;
+  margin: 1rem auto 0;
+  max-width: 24rem;
   color: var(--mute-soft);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   line-height: 1.5;
 }
 
-.note a {
+.fine {
+  margin: 1.65rem 0 0;
+  color: var(--mute-soft);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.footerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem 0.45rem;
+  margin: 0.65rem 0 0;
+  color: var(--line);
+  font-size: 0.78rem;
+}
+
+.footerLinks a {
   color: var(--mute);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
+  padding: 0.1rem 0.2rem;
 }
 
-.note a:hover {
-  color: var(--copper-hot);
-}
-
-.divider {
-  margin: 1.25rem 0 0;
-  border: none;
-  border-top: 1px solid var(--line-soft);
+.footerLinks a:hover {
+  color: var(--copper);
 }

@@ -28,56 +28,61 @@ export default async function LoginPage() {
 
   return (
     <SiteChrome>
-      <div className={styles.main}>
-        <div className={styles.card}>
-          <BrandMark className={styles.mark} size={52} />
+      <div className={styles.stage}>
+        <section className={styles.panel} aria-labelledby="login-brand">
+          <BrandMark className={styles.mark} size={48} />
+          <p id="login-brand" className={styles.brand}>
+            Coppergate
+          </p>
           <h1 className={styles.title}>Try the hosted arena</h1>
           <p className={styles.lede}>
-            Free to explore — no paid plan required. Sign in with GitHub or
-            GitLab to open workspaces, bind Open Programs, and review Ship
-            Receipts. Identity scopes only — repository access comes later
-            under your control.
+            Free to explore — Community $0, no paid plan required. Sign in to
+            open workspaces, bind Open Programs, and review Ship Receipts.
+            Identity only; repository access stays under your control.
           </p>
+
           <div className={styles.ctaStack}>
             {githubReady ? (
-              <a className={styles.cta} href="/api/auth/github">
+              <a className={styles.ctaPrimary} href="/api/auth/github">
                 Continue with GitHub
               </a>
             ) : null}
             {gitlabReady ? (
-              <a className={styles.cta} href="/api/auth/gitlab">
+              <a className={styles.ctaSecondary} href="/api/auth/gitlab">
                 Continue with GitLab
               </a>
             ) : null}
           </div>
+
           {!githubReady && !gitlabReady ? (
-            <p className={styles.note}>
+            <p className={styles.note} role="status">
               OAuth is not configured. Set GitHub and/or GitLab client
               credentials.
             </p>
           ) : null}
+
           <a
-            className={styles.secondary}
+            className={styles.selfHost}
             href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
             target="_blank"
             rel="noreferrer"
           >
             Prefer self-host? Read the guide →
           </a>
-          <hr className={styles.divider} />
-          <p className={styles.note}>
+
+          <p className={styles.fine}>
             MIT · Community $0 · Open Program spend licenses · Kill-switch
           </p>
-          <p className={styles.note}>
+          <nav className={styles.footerLinks} aria-label="Related docs">
             <Link href="/docs/open-program-runtime">Open Program Runtime</Link>
-            {" · "}
+            <span aria-hidden>·</span>
             <Link href="/docs/pricing">Pricing</Link>
-            {" · "}
+            <span aria-hidden>·</span>
             <Link href="/docs/limitations">Limitations</Link>
-            {" · "}
+            <span aria-hidden>·</span>
             <Link href="/">Home</Link>
-          </p>
-        </div>
+          </nav>
+        </section>
       </div>
     </SiteChrome>
   );
