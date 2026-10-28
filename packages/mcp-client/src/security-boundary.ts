@@ -118,7 +118,7 @@ export function scrubToolSummary(raw: string, maxLen = 2_000): string {
       /(authorization|api[_-]?key|token|secret|password)\s*[:=]\s*\S+/gi,
       "$1=[redacted]",
     )
-    .replace(/Bearer\s+[A-Za-z0-9._\-]+/gi, "Bearer [redacted]");
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "Bearer [redacted]");
   return scrubbed.length > maxLen
     ? `${scrubbed.slice(0, maxLen)}…`
     : scrubbed;
