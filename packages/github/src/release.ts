@@ -102,6 +102,21 @@ function bucketHighlight(title: string): "features" | "fixes" | "other" {
   return "other";
 }
 
+/** Maintainer tick — tag, title, and notes body before GitHub API call. */
+export function buildMaintainerReleaseRequest(input: {
+  tagName: string;
+  highlights: string[];
+}): { tagName: string; name: string; body: string } {
+  return {
+    tagName: input.tagName,
+    name: `Maintainer ${input.tagName}`,
+    body: formatReleaseNotes({
+      version: input.tagName,
+      highlights: input.highlights.slice(0, 20),
+    }),
+  };
+}
+
 /** Build a user-facing changelog body from merged PR / task titles. */
 export function formatReleaseNotes(input: {
   version: string;
