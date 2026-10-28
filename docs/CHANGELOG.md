@@ -6,6 +6,7 @@
 
 - P-101: Mission Control crisis clarity (concurrency + provider quota lead attention, muted arena noise, honest empty states). See `docs/mission-control-crisis.md`.
 - P-102: Arena Pause drain copy, Live/Paused/Stopped labeling, Resume vs Start controls, and quiet idle/CI/review counts while paused (not ops fires). See `docs/arena-pause-drain.md`.
+- P-141: Contender elimination ledger (audit-backed debits), Arena **Eliminated** roster + pool honesty, and Activity fan-out starvation summaries. See `docs/contender-elimination-ledger.md`.
 - AG-012: Implement lean roster spawning under $2 monthly budget for Engineer and Reviewer roles only.
   - Prevent FULL_ARENA spawn under tight budget.
   - Enforce $8 monthly budget envelope.
