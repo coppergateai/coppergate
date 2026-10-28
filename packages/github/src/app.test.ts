@@ -1,7 +1,38 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createAppJwt, githubAppInstallUrl, toPkcs8Pem } from "./app.js";
+import {
+  createAppJwt,
+  createInstallationAccessToken,
+  githubAppInstallUrl,
+  isGithubNumericInstallationId,
+  toPkcs8Pem,
+} from "./app.js";
+
+describe("isGithubNumericInstallationId", () => {
+  it("accepts numeric GitHub installation ids only", () => {
+    assert.equal(isGithubNumericInstallationId("172191459"), true);
+    assert.equal(isGithubNumericInstallationId(" 42 "), true);
+    assert.equal(isGithubNumericInstallationId("inst-maint-auto-1"), false);
+    assert.equal(isGithubNumericInstallationId("gitlab-user:1"), false);
+    assert.equal(isGithubNumericInstallationId(""), false);
+  });
+});
+
+describe("createInstallationAccessToken", () => {
+  it("rejects non-numeric installation ids without calling GitHub", async () => {
+    let called = false;
+    await assert.rejects(
+      () =>
+        createInstallationAccessToken("jwt", "inst-fixture-1", async () => {
+          called = true;
+          return new Response(null, { status: 500 });
+        }),
+      /invalid_id/,
+    );
+    assert.equal(called, false);
+  });
+});
 
 describe("githubAppInstallUrl", () => {
   it("points at the app install page with state", () => {

@@ -3,6 +3,7 @@ export {
   createInstallationAccessToken,
   fetchInstallation,
   githubAppInstallUrl,
+  isGithubNumericInstallationId,
   listInstallationRepos,
   type GithubAppConfig,
   type GithubInstallationAccount,
