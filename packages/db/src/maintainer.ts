@@ -9,6 +9,7 @@ import {
 } from "./briefs.js";
 import {
   getProjectSpendSummary,
+  getWorkspaceSpendSummary,
   rollMonthlyBudgetIfDue,
   setWorkspaceBudget,
 } from "./budgets.js";
@@ -214,7 +215,8 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   monthlyBudgetMicros: DEFAULT_MONTHLY_BUDGET_MICROS,
   softAlertRatio: 0.8,
   autoMerge: true,
-  autoRelease: true,
+  /** P-144: GitHub tag + Release only when explicitly enabled — not prod deploy. */
+  autoRelease: false,
   selfImprove: true,
   communityReplies: true,
   communityScout: true,
@@ -310,6 +312,14 @@ export function parseMaintainerPolicy(
         v.softAlertRatio <= 1
           ? v.softAlertRatio
           : DEFAULT_MAINTAINER_POLICY.softAlertRatio,
+      autoMerge:
+        typeof v.autoMerge === "boolean"
+          ? v.autoMerge
+          : DEFAULT_MAINTAINER_POLICY.autoMerge,
+      autoRelease:
+        typeof v.autoRelease === "boolean"
+          ? v.autoRelease
+          : DEFAULT_MAINTAINER_POLICY.autoRelease,
       allowedSignalProviders: Array.isArray(v.allowedSignalProviders)
         ? v.allowedSignalProviders.filter((x) => typeof x === "string")
         : DEFAULT_MAINTAINER_POLICY.allowedSignalProviders,
@@ -480,6 +490,14 @@ export function taskMatchesPathAllowlist(
   );
 }
 
+/** True when maintainer tick should open a GitHub Release after merges this cycle. */
+export function shouldRunMaintainerRelease(input: {
+  autoRelease: boolean;
+  mergedTitles: string[];
+}): boolean {
+  return input.autoRelease && input.mergedTitles.length > 0;
+}
+
 export function buildMaintainerReleaseTag(
   style: MaintainerPolicy["releaseTagStyle"],
   when = new Date(),
@@ -521,6 +539,44 @@ async function recordMaintainerEvent(
     .returning();
   if (!row) throw new Error("Failed to record maintainer event");
   return row;
+}
+
+/** P-144 — audit + maintainer event after a GitHub Release is created (or idempotent hit). */
+export async function recordMaintainerReleaseOutcome(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+    tagName: string;
+    htmlUrl: string;
+    releaseTagStyle: MaintainerPolicy["releaseTagStyle"];
+    mergeCount: number;
+    highlights: string[];
+  },
+): Promise<void> {
+  const meta = {
+    tagName: input.tagName,
+    htmlUrl: input.htmlUrl,
+    releaseTagStyle: input.releaseTagStyle,
+    mergeCount: input.mergeCount,
+    highlights: input.highlights.slice(0, 20),
+    prodDeploy: false,
+  };
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "maintainer.release",
+    targetType: "project",
+    targetId: input.projectId,
+    meta,
+  });
+  await recordMaintainerEvent(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    kind: "release",
+    payload: meta,
+  });
 }
 
 /**
@@ -654,7 +710,11 @@ export async function enableMaintainerMode(
     action: "maintainer.enable",
     targetType: "project",
     targetId: input.projectId,
-    meta: { policy },
+    meta: {
+      policy,
+      prodWritesEnabled: arena.prodWritesEnabled === true,
+      autoRelease: policy.autoRelease,
+    },
   });
   await recordMaintainerEvent(db, {
     workspaceId: input.workspaceId,
@@ -2432,8 +2492,12 @@ export type MaintainerMetrics = {
   workspaceId: string;
   windowDays: number;
   merges: number;
+  /** GitHub merges recorded by maintainer auto_merge (merged: true). */
+  verifiedMerges: number;
   spendMicros: number;
   capMicros: number;
+  /** Project spend / workspace cap when pooled (null when cap is zero). */
+  budgetBurnRatio: number | null;
   spendWithinCap: boolean;
   humanTouches: number;
   policyViolations: number;
@@ -2448,6 +2512,88 @@ export type MaintainerMetrics = {
   ticks: number;
   maintainerEnabled: boolean;
 };
+
+export type MaintainerProjectRollup = MaintainerMetrics & {
+  projectName: string;
+};
+
+export type MaintainerRollupTotals = {
+  merges: number;
+  verifiedMerges: number;
+  spendMicros: number;
+  capMicros: number;
+  budgetBurnRatio: number | null;
+  humanTouches: number;
+  maintainerProjectCount: number;
+  /** Verified merges with zero human PR touches in the rollup window. */
+  zeroTouchDelivery: boolean;
+};
+
+export type WorkspaceMaintainerRollup = {
+  windowDays: number;
+  workspace: {
+    spentMicros: number;
+    capMicros: number;
+    budgetBurnRatio: number | null;
+    pooled: boolean;
+  };
+  projects: MaintainerProjectRollup[];
+  totals: MaintainerRollupTotals;
+};
+
+/** Envelope burn for maintainer dashboards (0–1, capped). */
+export function computeBudgetBurnRatio(
+  spentMicros: number,
+  capMicros: number,
+): number | null {
+  if (!Number.isFinite(capMicros) || capMicros <= 0) return null;
+  if (!Number.isFinite(spentMicros) || spentMicros <= 0) return 0;
+  return Math.min(1, spentMicros / capMicros);
+}
+
+export function isVerifiedAutoMergePayload(payload: string): boolean {
+  try {
+    const v = JSON.parse(payload) as { merged?: boolean };
+    return v.merged === true;
+  } catch {
+    return false;
+  }
+}
+
+export function countVerifiedMergesFromMaintainerEvents(
+  events: Array<{ kind: string; payload: string }>,
+): number {
+  return events.filter(
+    (e) => e.kind === "auto_merge" && isVerifiedAutoMergePayload(e.payload),
+  ).length;
+}
+
+/** Aggregate multi-project maintainer KPIs without double-counting pooled spend. */
+export function summarizeMaintainerRollupTotals(input: {
+  projects: Array<
+    Pick<MaintainerMetrics, "merges" | "verifiedMerges" | "humanTouches">
+  >;
+  workspaceSpend: { spentMicros: number; capMicros: number } | null;
+}): MaintainerRollupTotals {
+  const merges = input.projects.reduce((s, m) => s + m.merges, 0);
+  const verifiedMerges = input.projects.reduce(
+    (s, m) => s + m.verifiedMerges,
+    0,
+  );
+  const humanTouches = input.projects.reduce((s, m) => s + m.humanTouches, 0);
+  const spendMicros = input.workspaceSpend?.spentMicros ?? 0;
+  const capMicros = input.workspaceSpend?.capMicros ?? 0;
+  return {
+    merges,
+    verifiedMerges,
+    spendMicros,
+    capMicros,
+    budgetBurnRatio: computeBudgetBurnRatio(spendMicros, capMicros),
+    humanTouches,
+    maintainerProjectCount: input.projects.length,
+    zeroTouchDelivery: humanTouches === 0 && verifiedMerges > 0,
+  };
+}
 
 export async function getMaintainerMetrics(
   db: Database,
@@ -2520,6 +2666,7 @@ export async function getMaintainerMetrics(
       ),
     );
 
+  const verifiedMerges = countVerifiedMergesFromMaintainerEvents(events);
   const autoAccepts = events.filter((e) => e.kind === "auto_accept").length;
   const selfImproves = events.filter((e) => e.kind === "self_improve").length;
   const metaTournaments = events.filter(
@@ -2547,13 +2694,23 @@ export async function getMaintainerMetrics(
   ].sort();
 
   const merges = doneTasks.length;
+  // projectSpentMicros is optional on pooled summaries — fall back to spentMicros.
+  const projectSpendMicros =
+    spend.pooled && spend.projectSpentMicros != null
+      ? spend.projectSpentMicros
+      : spend.spentMicros;
   return {
     projectId: input.projectId,
     workspaceId: input.workspaceId,
     windowDays: days,
     merges,
-    spendMicros: spend.spentMicros,
+    verifiedMerges,
+    spendMicros: projectSpendMicros,
     capMicros: spend.capMicros,
+    budgetBurnRatio: computeBudgetBurnRatio(
+      projectSpendMicros,
+      spend.capMicros,
+    ),
     spendWithinCap: spend.spentMicros <= spend.capMicros,
     humanTouches: humanAudits.length,
     policyViolations,
@@ -2562,7 +2719,7 @@ export async function getMaintainerMetrics(
     metaTournaments,
     replans,
     costPerAcceptedMergeMicros:
-      merges > 0 ? Math.round(spend.spentMicros / merges) : 0,
+      merges > 0 ? Math.round(projectSpendMicros / merges) : 0,
     winningProfileKeys,
     ticks,
     maintainerEnabled: project.maintainerEnabled,
@@ -2572,15 +2729,8 @@ export async function getMaintainerMetrics(
 export async function getWorkspaceMaintainerRollup(
   db: Database,
   input: { workspaceId: string; days?: number },
-): Promise<{
-  projects: MaintainerMetrics[];
-  totals: {
-    merges: number;
-    spendMicros: number;
-    humanTouches: number;
-    maintainerProjectCount: number;
-  };
-}> {
+): Promise<WorkspaceMaintainerRollup> {
+  const days = input.days ?? 30;
   const rows = await db
     .select()
     .from(projects)
@@ -2590,24 +2740,33 @@ export async function getWorkspaceMaintainerRollup(
         eq(projects.maintainerEnabled, true),
       ),
     );
-  const projectsMetrics: MaintainerMetrics[] = [];
+  const wsSpend = await getWorkspaceSpendSummary(db, input.workspaceId);
+  const projectsMetrics: MaintainerProjectRollup[] = [];
   for (const p of rows) {
-    projectsMetrics.push(
-      await getMaintainerMetrics(db, {
-        workspaceId: input.workspaceId,
-        projectId: p.id,
-        days: input.days,
-      }),
-    );
+    const metrics = await getMaintainerMetrics(db, {
+      workspaceId: input.workspaceId,
+      projectId: p.id,
+      days,
+    });
+    projectsMetrics.push({ ...metrics, projectName: p.name });
   }
+  const workspaceSpent = wsSpend?.spentMicros ?? 0;
+  const workspaceCap = wsSpend?.capMicros ?? 0;
   return {
-    projects: projectsMetrics,
-    totals: {
-      merges: projectsMetrics.reduce((s, m) => s + m.merges, 0),
-      spendMicros: projectsMetrics.reduce((s, m) => s + m.spendMicros, 0),
-      humanTouches: projectsMetrics.reduce((s, m) => s + m.humanTouches, 0),
-      maintainerProjectCount: projectsMetrics.length,
+    windowDays: days,
+    workspace: {
+      spentMicros: workspaceSpent,
+      capMicros: workspaceCap,
+      budgetBurnRatio: computeBudgetBurnRatio(workspaceSpent, workspaceCap),
+      pooled: wsSpend != null,
     },
+    projects: projectsMetrics,
+    totals: summarizeMaintainerRollupTotals({
+      projects: projectsMetrics,
+      workspaceSpend: wsSpend
+        ? { spentMicros: workspaceSpent, capMicros: workspaceCap }
+        : null,
+    }),
   };
 }
 

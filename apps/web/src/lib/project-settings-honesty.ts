@@ -102,6 +102,49 @@ export type MaintainerSettingsHonesty = {
   failClosedLines: string[];
 };
 
+export type ReleaseAssistantHonesty = {
+  releasePathActive: boolean;
+  blockers: string[];
+  summary: string;
+  notProdDeployLine: string;
+  auditLine: string;
+};
+
+export function describeReleaseAssistantHonesty(input: {
+  maintainerEnabled: boolean;
+  autoRelease?: boolean;
+  prodWritesEnabled?: boolean;
+}): ReleaseAssistantHonesty {
+  const autoRelease = input.autoRelease === true;
+  const blockers: string[] = [];
+  if (!input.maintainerEnabled) {
+    blockers.push("Maintainer mode is off");
+  }
+  if (!autoRelease) {
+    blockers.push("Maintainer policy has auto-release off");
+  }
+  const releasePathActive =
+    input.maintainerEnabled && autoRelease && blockers.length === 0;
+
+  const summary = releasePathActive
+    ? "Active on maintainer ticks — after unattended merges, opens a GitHub tag + Release with notes from merged work."
+    : input.maintainerEnabled && !autoRelease
+      ? "Inactive — turn on auto-release in maintainer policy to ship GitHub Releases after merge cycles."
+      : "Inactive — requires maintainer on and policy auto-release.";
+
+  const prodWrites = input.prodWritesEnabled === true;
+  return {
+    releasePathActive,
+    blockers,
+    summary,
+    notProdDeployLine: prodWrites
+      ? "Arena prod writes may be on — releases still do not deploy to production."
+      : "Does not deploy to production or enable prod environment writes — GitHub Release only.",
+    auditLine:
+      "Each release writes maintainer.release to Activity (tag, URL, merge highlights; prodDeploy: false).",
+  };
+}
+
 export function describeMaintainerSettingsHonesty(input: {
   maintainerEnabled: boolean;
   prodWritesEnabled?: boolean;

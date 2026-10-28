@@ -8,6 +8,9 @@ import {
   LEAN_ROSTER_AVAILABLE_MICROS,
   MIN_REPLAN_AVAILABLE_MICROS,
   buildMaintainerReleaseTag,
+  computeBudgetBurnRatio,
+  countVerifiedMergesFromMaintainerEvents,
+  shouldRunMaintainerRelease,
   isMergeProtectionBlock,
   isTerminalMergeSkip,
   isTransientNotMergeable,
@@ -18,11 +21,55 @@ import {
   selectAutoAcceptRun,
   selectCiRefreshRun,
   serializeMaintainerPolicy,
+  summarizeMaintainerRollupTotals,
   shouldReplanVision,
   shouldRollbackProfileForFitness,
   taskMatchesPathAllowlist,
 } from "./maintainer.js";
 import { shouldRollMonthlyPeriod } from "./budgets.js";
+
+describe("maintainer rollup (P-145)", () => {
+  it("counts verified merges from auto_merge events", () => {
+    const n = countVerifiedMergesFromMaintainerEvents([
+      { kind: "auto_merge", payload: JSON.stringify({ merged: true }) },
+      { kind: "auto_merge", payload: JSON.stringify({ merged: false }) },
+      { kind: "auto_accept", payload: "{}" },
+    ]);
+    assert.equal(n, 1);
+  });
+
+  it("computes budget burn ratio with cap", () => {
+    assert.equal(computeBudgetBurnRatio(4_000_000, 8_000_000), 0.5);
+    assert.equal(computeBudgetBurnRatio(0, 8_000_000), 0);
+    assert.equal(computeBudgetBurnRatio(10_000_000, 8_000_000), 1);
+    assert.equal(computeBudgetBurnRatio(1, 0), null);
+  });
+
+  it("summarizes workspace totals without double-counting pooled spend", () => {
+    const totals = summarizeMaintainerRollupTotals({
+      projects: [
+        { merges: 2, verifiedMerges: 1, humanTouches: 0 },
+        { merges: 1, verifiedMerges: 1, humanTouches: 0 },
+      ],
+      workspaceSpend: { spentMicros: 6_000_000, capMicros: 8_000_000 },
+    });
+    assert.equal(totals.merges, 3);
+    assert.equal(totals.verifiedMerges, 2);
+    assert.equal(totals.spendMicros, 6_000_000);
+    assert.equal(totals.budgetBurnRatio, 0.75);
+    assert.equal(totals.humanTouches, 0);
+    assert.equal(totals.zeroTouchDelivery, true);
+    assert.equal(totals.maintainerProjectCount, 2);
+  });
+
+  it("zeroTouchDelivery is false when human touches exist", () => {
+    const totals = summarizeMaintainerRollupTotals({
+      projects: [{ merges: 1, verifiedMerges: 1, humanTouches: 2 }],
+      workspaceSpend: { spentMicros: 1_000_000, capMicros: 8_000_000 },
+    });
+    assert.equal(totals.zeroTouchDelivery, false);
+  });
+});
 
 describe("maintainer policy", () => {
   it("parses defaults when raw is null", () => {
@@ -32,6 +79,8 @@ describe("maintainer policy", () => {
     assert.equal(DEFAULT_MONTHLY_BUDGET_MICROS, 8_000_000);
     assert.equal(p.maxTournamentN, 2);
     assert.equal(p.autoMerge, true);
+    assert.equal(p.autoRelease, false);
+    assert.equal(DEFAULT_MAINTAINER_POLICY.autoRelease, false);
     assert.equal(p.autoQueueReplanTasks, true);
     assert.equal(p.maxAutoQueuePerReplan, 2);
     assert.equal(p.continuousBacklog, true);
@@ -268,6 +317,24 @@ describe("path allowlist + release tags", () => {
     assert.equal(
       taskMatchesPathAllowlist('["docs/**"]', ["cmd/", "internal/"]),
       false,
+    );
+  });
+
+  it("shouldRunMaintainerRelease requires policy opt-in and merges", () => {
+    assert.equal(
+      shouldRunMaintainerRelease({ autoRelease: false, mergedTitles: ["a"] }),
+      false,
+    );
+    assert.equal(
+      shouldRunMaintainerRelease({ autoRelease: true, mergedTitles: [] }),
+      false,
+    );
+    assert.equal(
+      shouldRunMaintainerRelease({
+        autoRelease: true,
+        mergedTitles: ["P-144: ship"],
+      }),
+      true,
     );
   });
 

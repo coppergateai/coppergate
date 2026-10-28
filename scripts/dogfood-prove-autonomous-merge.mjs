@@ -125,6 +125,7 @@ try {
     repo: primary.repository.baseRepoFullName,
     metrics: {
       merges: metrics.merges,
+      verifiedMerges: metrics.verifiedMerges,
       autoAccepts: metrics.autoAccepts,
       humanTouches: metrics.humanTouches,
       spendMicros: metrics.spendMicros,
