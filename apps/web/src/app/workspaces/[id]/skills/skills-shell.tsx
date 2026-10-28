@@ -16,11 +16,18 @@ export type SkillRow = {
   agents: Array<{ key: string; displayName: string }>;
 };
 
+type AgentGrant = {
+  key: string;
+  displayName: string;
+  skillKeys: string[];
+};
+
 type Props = {
   workspaceId: string;
   workspaceName: string;
   isOwner: boolean;
   skills: SkillRow[];
+  allAgents?: AgentGrant[];
   initialKey?: string | null;
 };
 
@@ -43,10 +50,12 @@ export function SkillsShell({
   workspaceName,
   isOwner,
   skills: initialSkills,
+  allAgents: initialAgents = [],
   initialKey,
 }: Props) {
   const router = useRouter();
   const [skills, setSkills] = useState(initialSkills);
+  const [allAgents, setAllAgents] = useState(initialAgents);
   const [selectedKey, setSelectedKey] = useState<string | null>(
     initialKey && initialSkills.some((s) => s.key === initialKey)
       ? initialKey
@@ -68,6 +77,49 @@ export function SkillsShell({
   useEffect(() => {
     setSkills(initialSkills);
   }, [initialSkills]);
+  useEffect(() => {
+    setAllAgents(initialAgents);
+  }, [initialAgents]);
+
+  async function setSkillOnAgent(
+    agentKey: string,
+    skillKey: string,
+    attach: boolean,
+  ) {
+    if (!isOwner) return;
+    const agent = allAgents.find((a) => a.key === agentKey);
+    if (!agent) return;
+    const next = attach
+      ? [...new Set([...agent.skillKeys, skillKey])]
+      : agent.skillKeys.filter((k) => k !== skillKey);
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/profiles`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: agentKey, skillKeys: next }),
+      });
+      const body = (await res.json()) as { error?: { message: string } };
+      if (!res.ok) throw new Error(body.error?.message ?? "Update failed");
+      setAllAgents((rows) =>
+        rows.map((a) =>
+          a.key === agentKey ? { ...a, skillKeys: next } : a,
+        ),
+      );
+      setOk(
+        attach
+          ? `Granted ${skillKey} → ${agentKey}`
+          : `Removed ${skillKey} from ${agentKey}`,
+      );
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setPending(false);
+    }
+  }
 
   useEffect(() => {
     if (!selectedKey || creating) return;
@@ -493,27 +545,36 @@ export function SkillsShell({
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionLabel}>Used by agents</h3>
-                {selected.agents.length === 0 ? (
-                  <p className={styles.note}>
-                    Not attached to any profile — attach from Agents → Edit.
-                  </p>
+                <h3 className={styles.sectionLabel}>Grant to agents</h3>
+                <p className={styles.note}>
+                  Runtime injects at most 4 skills (~6k chars) into the prompt.
+                </p>
+                {allAgents.length === 0 ? (
+                  <p className={styles.note}>No agents in this workspace.</p>
                 ) : (
-                  <ul className={styles.relatedList}>
-                    {selected.agents.map((a) => (
-                      <li key={a.key}>
-                        <Link
-                          href={`/workspaces/${workspaceId}/agents?agent=${encodeURIComponent(a.key)}`}
-                          className={styles.relatedItem}
-                        >
-                          <span className={styles.relatedTitle}>
-                            {a.displayName}
-                          </span>
-                          <span className={styles.relatedMeta}>{a.key}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className={styles.checkGrid}>
+                    {allAgents.map((a) => {
+                      const on = a.skillKeys.includes(selected.key);
+                      return (
+                        <label key={a.key} className={styles.checkItem}>
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            disabled={!isOwner || pending}
+                            onChange={(e) =>
+                              void setSkillOnAgent(
+                                a.key,
+                                selected.key,
+                                e.target.checked,
+                              )
+                            }
+                          />
+                          {a.displayName}
+                          <span className={styles.relatedMeta}> {a.key}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 )}
               </section>
 

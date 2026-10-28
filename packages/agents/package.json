@@ -17,6 +17,8 @@
     "prepare": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+    "@coppergate/mcp-client": "workspace:^",
     "@coppergate/sandbox": "workspace:*",
     "@cursor/sdk": "^1.0.40"
   },

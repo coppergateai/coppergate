@@ -536,6 +536,7 @@ export {
   resolveWaitingCiTimeoutMs,
   attachSandboxToRun,
   setTaskPrUrl,
+  updateRunSkillSnapshot,
   type ReapedFailedRun,
   type ReapStaleRunsResult,
 } from "./runs.js";
@@ -755,6 +756,8 @@ export {
 } from "./temperament.js";
 export {
   DEFAULT_PROFILE_SKILL_KEYS,
+  MAX_SKILL_CHARS,
+  MAX_SKILLS_IN_PROMPT,
   SYSTEM_SKILL_SEEDS,
   deleteWorkspaceSkill,
   ensureSystemAgentSkills,
@@ -762,12 +765,16 @@ export {
   getEffectiveAgentSkill,
   listAgentSkills,
   loadSkillsForPrompt,
+  loadSkillsForPromptDetailed,
   parseSkillKeysJson,
   upsertWorkspaceSkill,
+  type SkillPromptSnapshotEntry,
+  type SkillsForPromptResult,
 } from "./skills.js";
 export {
   MCP_PROVIDERS,
   SONARQUBE_TOOLS,
+  defaultToolsForProvider,
   deleteMcpConnection,
   filterMcpToolsForProfile,
   getMcpConnection,
@@ -776,6 +783,7 @@ export {
   parseToolAllowlistJson,
   serializeMcpConnectionPublic,
   setMcpConnectionEnabled,
+  updateMcpConnectionTools,
   upsertMcpConnection,
   type McpProvider,
 } from "./mcp.js";
@@ -793,6 +801,11 @@ export {
   normalizeToolDefKey,
   upsertWorkspaceToolDef,
 } from "./tool-defs.js";
+export {
+  SYSTEM_TOOL_CATALOG,
+  systemToolMeta,
+  type SystemToolCatalogEntry,
+} from "./tool-catalog.js";
 export {
   exportWorkspaceAuditBundle,
   getSpendBySignalSource,

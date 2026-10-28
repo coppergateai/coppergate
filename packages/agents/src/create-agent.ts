@@ -1,4 +1,8 @@
 import {
+  ClaudeCodeCodingAgent,
+  type ClaudeCodeBridge,
+} from "./claude-code.js";
+import {
   CursorSdkCodingAgent,
   type CursorSdkBridge,
 } from "./cursor-sdk.js";
@@ -7,7 +11,7 @@ import { FailoverCodingAgent } from "./failover.js";
 import { OpenAiCompatibleCodingAgent } from "./openai-compatible.js";
 import type { CodingAgent } from "./types.js";
 
-export type CodingAgentKind = "openai" | "cursor";
+export type CodingAgentKind = "openai" | "cursor" | "claude_code";
 
 export type CreateCodingAgentFallback = {
   kind?: CodingAgentKind;
@@ -16,12 +20,14 @@ export type CreateCodingAgentFallback = {
   model?: string;
   /** Test inject for Cursor secondary. */
   cursorBridge?: CursorSdkBridge;
+  /** Test inject for Claude Code secondary. */
+  claudeCodeBridge?: ClaudeCodeBridge;
 };
 
 export type CreateCodingAgentOptions = {
-  /** openai (default) or cursor local SDK. */
+  /** openai (default), cursor local SDK, or Claude Agent SDK. */
   kind?: CodingAgentKind;
-  /** When set (or via LLM_API_KEY / CURSOR_API_KEY), use a real provider. */
+  /** When set (or via LLM_API_KEY / CURSOR_API_KEY / ANTHROPIC_API_KEY), use a real provider. */
   apiKey?: string;
   baseUrl?: string;
   model?: string;
@@ -30,12 +36,14 @@ export type CreateCodingAgentOptions = {
   forceFake?: boolean;
   /**
    * Optional secondary provider. Env: LLM_FALLBACK_API_KEY /
-   * LLM_FALLBACK_BASE_URL / LLM_FALLBACK_MODEL, or CURSOR_API_KEY when
-   * primary is OpenAI and no explicit fallback object is passed.
+   * LLM_FALLBACK_BASE_URL / LLM_FALLBACK_MODEL, or CURSOR_API_KEY /
+   * ANTHROPIC_API_KEY when primary is OpenAI and no explicit fallback object is passed.
    */
   fallback?: CreateCodingAgentFallback;
   /** Test inject for Cursor primary. */
   cursorBridge?: CursorSdkBridge;
+  /** Test inject for Claude Code primary. */
+  claudeCodeBridge?: ClaudeCodeBridge;
 };
 
 function normalizeBase(url: string | undefined, fallback: string): string {
@@ -43,7 +51,7 @@ function normalizeBase(url: string | undefined, fallback: string): string {
 }
 
 /**
- * Host-level LLM/CURSOR env keys are for single-tenant self-host / local only.
+ * Host-level LLM/CURSOR/Anthropic env keys are for single-tenant self-host / local only.
  * Hosted production must use workspace BYOK so one tenant cannot spend
  * another tenant's (or the operator's) provider quota.
  * Opt in with ALLOW_ENV_LLM_KEYS=1 when intentionally running single-tenant.
@@ -56,6 +64,15 @@ export function envLlmKeysAllowed(): boolean {
 function envCursorApiKey(): string {
   if (!envLlmKeysAllowed()) return "";
   return process.env.CURSOR_API_KEY?.trim() || "";
+}
+
+function envClaudeCodeApiKey(): string {
+  if (!envLlmKeysAllowed()) return "";
+  return (
+    process.env.ANTHROPIC_API_KEY?.trim() ||
+    process.env.CLAUDE_CODE_API_KEY?.trim() ||
+    ""
+  );
 }
 
 function envOpenAiApiKey(): string {
@@ -73,10 +90,41 @@ function envFallbackApiKey(): string {
 }
 
 function resolveKind(options: CreateCodingAgentOptions): CodingAgentKind {
-  if (options.kind === "cursor" || options.kind === "openai") {
+  if (
+    options.kind === "cursor" ||
+    options.kind === "openai" ||
+    options.kind === "claude_code"
+  ) {
     return options.kind;
   }
   return "openai";
+}
+
+function envPrimaryApiKey(kind: CodingAgentKind): string {
+  if (kind === "cursor") return envCursorApiKey();
+  if (kind === "claude_code") return envClaudeCodeApiKey();
+  return envOpenAiApiKey();
+}
+
+function defaultModelForKind(kind: CodingAgentKind): string {
+  if (kind === "cursor") {
+    return (
+      (envLlmKeysAllowed() ? process.env.CURSOR_MODEL?.trim() : undefined) ||
+      "composer-2.5"
+    );
+  }
+  if (kind === "claude_code") {
+    return (
+      (envLlmKeysAllowed()
+        ? process.env.CLAUDE_CODE_MODEL?.trim() ||
+          process.env.ANTHROPIC_MODEL?.trim()
+        : undefined) || "claude-sonnet-4-5"
+    );
+  }
+  return (
+    (envLlmKeysAllowed() ? process.env.LLM_MODEL?.trim() : undefined) ||
+    "gpt-4o-mini"
+  );
 }
 
 function buildPrimary(options: CreateCodingAgentOptions): CodingAgent | null {
@@ -88,6 +136,15 @@ function buildPrimary(options: CreateCodingAgentOptions): CodingAgent | null {
       apiKey,
       model: options.model,
       bridge: options.cursorBridge,
+    });
+  }
+  if (kind === "claude_code") {
+    const apiKey = options.apiKey?.trim() || envClaudeCodeApiKey();
+    if (!apiKey) return null;
+    return new ClaudeCodeCodingAgent({
+      apiKey,
+      model: options.model,
+      bridge: options.claudeCodeBridge,
     });
   }
 
@@ -120,14 +177,19 @@ function buildSecondary(
   primaryModel: string,
 ): { agent: CodingAgent; label: string } | null {
   const fb = options.fallback;
-  // Infer Cursor only when no explicit fallback object was passed (env auto-wire).
+  // Infer Cursor / Claude Code only when no explicit fallback object was passed (env auto-wire).
   // Explicit LLM_FALLBACK_* / options.fallback without kind stays OpenAI-compatible.
+  // Prefer Cursor over Claude Code when both env keys exist.
   const fbKind: CodingAgentKind =
-    fb?.kind === "cursor" || fb?.kind === "openai"
+    fb?.kind === "cursor" ||
+    fb?.kind === "openai" ||
+    fb?.kind === "claude_code"
       ? fb.kind
       : !fb && envCursorApiKey() && primaryKind === "openai"
         ? "cursor"
-        : "openai";
+        : !fb && envClaudeCodeApiKey() && primaryKind === "openai"
+          ? "claude_code"
+          : "openai";
 
   if (fbKind === "cursor") {
     const key = fb?.apiKey?.trim() || envCursorApiKey();
@@ -144,6 +206,27 @@ function buildSecondary(
         bridge: fb?.cursorBridge ?? options.cursorBridge,
       }),
       label: `cursor:${model}`,
+    };
+  }
+
+  if (fbKind === "claude_code") {
+    const key = fb?.apiKey?.trim() || envClaudeCodeApiKey();
+    if (!key) return null;
+    if (primaryKind === "claude_code" && key === primaryKey) return null;
+    const model =
+      fb?.model?.trim() ||
+      (envLlmKeysAllowed()
+        ? process.env.CLAUDE_CODE_MODEL?.trim() ||
+          process.env.ANTHROPIC_MODEL?.trim()
+        : undefined) ||
+      "claude-sonnet-4-5";
+    return {
+      agent: new ClaudeCodeCodingAgent({
+        apiKey: key,
+        model,
+        bridge: fb?.claudeCodeBridge ?? options.claudeCodeBridge,
+      }),
+      label: `claude_code:${model}`,
     };
   }
 
@@ -181,7 +264,7 @@ function buildSecondary(
 }
 
 /**
- * D6 factory: FakeCodingAgent by default; OpenAI-compatible or Cursor when keyed.
+ * D6 factory: FakeCodingAgent by default; OpenAI-compatible, Cursor, or Claude Code when keyed.
  * Wraps FailoverCodingAgent when a distinct fallback is configured.
  */
 export function createCodingAgent(
@@ -198,33 +281,28 @@ export function createCodingAgent(
   }
 
   const primaryKey =
-    options.apiKey?.trim() ||
-    (primaryKind === "cursor" ? envCursorApiKey() : envOpenAiApiKey()) ||
-    "";
+    options.apiKey?.trim() || envPrimaryApiKey(primaryKind) || "";
   const primaryBase = normalizeBase(
     options.baseUrl ??
       (envLlmKeysAllowed() ? process.env.LLM_BASE_URL : undefined),
     "https://api.openai.com/v1",
   );
   const primaryModel =
-    options.model?.trim() ||
-    (primaryKind === "cursor"
-      ? (envLlmKeysAllowed() ? process.env.CURSOR_MODEL?.trim() : undefined) ||
-        "composer-2.5"
-      : (envLlmKeysAllowed() ? process.env.LLM_MODEL?.trim() : undefined) ||
-        "gpt-4o-mini");
+    options.model?.trim() || defaultModelForKind(primaryKind);
 
-  const withAutoCursorFallback: CreateCodingAgentOptions = {
+  const withAutoLocalAgentFallback: CreateCodingAgentOptions = {
     ...options,
     fallback:
       options.fallback ??
       (primaryKind === "openai" && envCursorApiKey()
         ? { kind: "cursor" as const }
-        : undefined),
+        : primaryKind === "openai" && envClaudeCodeApiKey()
+          ? { kind: "claude_code" as const }
+          : undefined),
   };
 
   const secondary = buildSecondary(
-    withAutoCursorFallback,
+    withAutoLocalAgentFallback,
     primaryKind,
     primaryKey,
     primaryBase,

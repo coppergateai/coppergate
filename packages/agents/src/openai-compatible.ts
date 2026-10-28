@@ -98,7 +98,75 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       return;
     }
 
-    const { prompt, injectionFlagged } = buildPrompt(input);
+    // Bounded MCP/Sonar tool loop before planning (worker also preflights).
+    let architectureContext = input.architectureContext;
+    if (input.invokeTool && input.mode !== "pr_review") {
+      const max = Math.max(1, input.maxToolInvokes ?? 4);
+      const candidates = [
+        ...new Set([
+          ...(input.profileTools ?? []),
+          ...input.toolAllowlist,
+        ]),
+      ].filter(
+        (t) =>
+          t.startsWith("sonar_") ||
+          (t !== "mcp:*" &&
+            t !== "mcp:sonarqube" &&
+            t !== "mcp:mcp" &&
+            !["read", "edit", "test", "git", "write", "write_file", "put_file"].includes(
+              t,
+            )),
+      );
+      let invokes = 0;
+      for (const tool of candidates) {
+        if (invokes >= max) break;
+        if (await input.isCancelRequested?.() || input.abortSignal?.aborted) {
+          break;
+        }
+        invokes += 1;
+        try {
+          const result = await input.invokeTool({ tool });
+          yield {
+            kind: "tool",
+            message: result.ok
+              ? `tool ${tool} ok (${result.ms}ms)`
+              : `tool ${tool} failed`,
+            payload: {
+              tool,
+              ok: result.ok,
+              ms: result.ms,
+              summary: result.summary,
+              phase: "harness_tool_loop",
+              ...(result.error ? { error: result.error } : {}),
+            },
+          };
+          if (result.ok && result.summary) {
+            architectureContext = [
+              architectureContext,
+              `### Tool result: ${tool}\n${result.summary}`,
+            ]
+              .filter(Boolean)
+              .join("\n\n");
+          }
+        } catch (err) {
+          yield {
+            kind: "tool",
+            message: `tool ${tool} error`,
+            payload: {
+              tool,
+              ok: false,
+              phase: "harness_tool_loop",
+              error: err instanceof Error ? err.message : String(err),
+            },
+          };
+        }
+      }
+    }
+
+    const { prompt, injectionFlagged } = buildPrompt({
+      ...input,
+      architectureContext,
+    });
     if (injectionFlagged) {
       yield {
         kind: "progress",

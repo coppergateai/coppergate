@@ -5,6 +5,7 @@ export const CODING_PATH_HONESTY_CODE = "coding_path_honesty" as const;
 
 export type CodingPathPrimary =
   | "cursor_local"
+  | "claude_code"
   | "native_openai"
   | "openai"
   | "cursor"

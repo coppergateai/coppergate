@@ -1,6 +1,10 @@
 import type { AgentEvent, AgentRunInput, CodingAgent } from "./types.js";
 import { createCodingAgent } from "./create-agent.js";
 import {
+  ClaudeCodeCodingAgent,
+  type ClaudeCodeBridge,
+} from "./claude-code.js";
+import {
   CursorSdkCodingAgent,
   type CursorSdkBridge,
 } from "./cursor-sdk.js";
@@ -17,6 +21,7 @@ export type ContenderHarnessKind =
   | "openhands"
   | "aider"
   | "cursor_local"
+  | "claude_code"
   | "cursor_cloud"
   | "codex";
 
@@ -82,6 +87,17 @@ export class CursorLocalHarness implements ContenderHarness {
   }
 }
 
+/** Live Claude Agent SDK harness (BYOK / ANTHROPIC_API_KEY). */
+export class ClaudeCodeHarness implements ContenderHarness {
+  readonly kind = "claude_code" as const;
+  readonly capability =
+    "Claude Agent SDK (@anthropic-ai/claude-agent-sdk) — mutates sandbox workdir; BYOK vendor=claude_code";
+  constructor(private readonly agent: CodingAgent) {}
+  run(input: AgentRunInput) {
+    return this.agent.run(input);
+  }
+}
+
 /** Cursor Cloud / Codex — API wait-state; no FakeCodingAgent fallback. */
 export class CursorCloudHarnessStub implements ContenderHarness {
   readonly kind = "cursor_cloud" as const;
@@ -92,7 +108,7 @@ export class CursorCloudHarnessStub implements ContenderHarness {
     yield {
       kind: "error",
       message:
-        "Cursor Cloud harness not available. Use BYOK vendor=cursor (cursor_local) or OpenAI-compatible agent.",
+        "Cursor Cloud harness not available. Use BYOK vendor=cursor (cursor_local), claude_code, or OpenAI-compatible agent.",
       payload: { code: "harness_stub_disabled", harness: this.kind },
     };
   }
@@ -105,6 +121,11 @@ export type CreateHarnessOptions = {
     apiKey: string;
     model?: string;
     bridge?: CursorSdkBridge;
+  };
+  claudeCode?: {
+    apiKey: string;
+    model?: string;
+    bridge?: ClaudeCodeBridge;
   };
 };
 
@@ -143,6 +164,30 @@ export function createContenderHarness(
           apiKey,
           model: opts.cursor?.model,
           bridge: opts.cursor?.bridge,
+        }),
+      );
+    }
+    case "claude_code": {
+      const allowEnv =
+        process.env.ALLOW_ENV_LLM_KEYS === "1" ||
+        process.env.NODE_ENV !== "production";
+      const apiKey =
+        opts.claudeCode?.apiKey?.trim() ||
+        (allowEnv
+          ? process.env.ANTHROPIC_API_KEY?.trim() ||
+            process.env.CLAUDE_CODE_API_KEY?.trim()
+          : "") ||
+        "";
+      if (!apiKey) {
+        throw new Error(
+          "claude_code harness requires claudeCode.apiKey (or ANTHROPIC_API_KEY when ALLOW_ENV_LLM_KEYS=1 / non-production)",
+        );
+      }
+      return new ClaudeCodeHarness(
+        new ClaudeCodeCodingAgent({
+          apiKey,
+          model: opts.claudeCode?.model,
+          bridge: opts.claudeCode?.bridge,
         }),
       );
     }

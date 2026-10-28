@@ -56,4 +56,18 @@ describe("loadEnv", () => {
       /SESSION_SECRET/,
     );
   });
+
+  it("accepts optional ACPP_GATEWAY_URL", () => {
+    const env = loadEnv({
+      throwOnError: true,
+      env: {
+        DATABASE_URL: "postgresql://coppergate:coppergate@localhost:5433/coppergate",
+        NODE_ENV: "test",
+        ACPP_GATEWAY_URL: "http://127.0.0.1:8787",
+        ACPP_GATEWAY_TOKEN: "dev-token",
+      },
+    });
+    assert.equal(env.ACPP_GATEWAY_URL, "http://127.0.0.1:8787");
+    assert.equal(env.ACPP_GATEWAY_TOKEN, "dev-token");
+  });
 });

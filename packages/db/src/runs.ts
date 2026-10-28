@@ -6,8 +6,14 @@ import {
   releaseEstimateForRun,
   reserveEstimateForTask,
 } from "./budgets.js";
+import { getEffectiveAgentProfile } from "./profiles.js";
 import { agentRuns, tasks, type AgentRun } from "./schema.js";
+import {
+  getEffectiveAgentSkill,
+  parseSkillKeysJson,
+} from "./skills.js";
 import { assertSpendLicenseForTask, SpendLicenseError } from "./spend-license.js";
+import { parseToolAllowlistJson } from "./mcp.js";
 
 export class RunError extends Error {
   readonly code: "not_found" | "conflict" | "not_owner" | "policy" | "cancelled";
@@ -88,6 +94,7 @@ function mapRow(row: Record<string, unknown>): AgentRun {
     prNumber: row.pr_number == null ? null : Number(row.pr_number),
     prUrl: row.pr_url == null ? null : String(row.pr_url),
     toolAllowlist: String(row.tool_allowlist ?? "[]"),
+    skillSnapshotJson: String(row.skill_snapshot_json ?? "[]"),
     spendCapMicros: Number(row.spend_cap_micros ?? 0),
     estimatedCostMicros: Number(row.estimated_cost_micros ?? 0),
     actualCostMicros: Number(row.actual_cost_micros ?? 0),
@@ -141,6 +148,10 @@ export async function enqueueAgentRun(
     tournamentId?: string | null;
     contenderId?: string | null;
     branchName?: string | null;
+    /** Override profile-derived tool allowlist snapshot. */
+    toolAllowlist?: string[];
+    /** Override profile-derived skill snapshot JSON. */
+    skillSnapshotJson?: string;
   },
 ): Promise<{ run: AgentRun; created: boolean }> {
   const [task] = await db
@@ -174,6 +185,53 @@ export async function enqueueAgentRun(
     return { run: existing, created: false };
   }
 
+  const profileKey = input.agentProfileKey ?? "engineer";
+  let toolAllowlistJson = "[]";
+  let skillSnapshotJson = "[]";
+  if (input.toolAllowlist) {
+    toolAllowlistJson = JSON.stringify(input.toolAllowlist);
+  }
+  if (input.skillSnapshotJson) {
+    skillSnapshotJson = input.skillSnapshotJson;
+  } else {
+    try {
+      const profile = await getEffectiveAgentProfile(
+        db,
+        input.workspaceId,
+        profileKey,
+      );
+      if (profile) {
+        if (!input.toolAllowlist) {
+          const tools = parseToolAllowlistJson(profile.toolAllowlistJson);
+          toolAllowlistJson = JSON.stringify(tools);
+        }
+        const skillKeys = parseSkillKeysJson(profile.skillKeysJson);
+        const snapshot: Array<{
+          key: string;
+          title: string;
+          version: number;
+          included: boolean;
+        }> = [];
+        for (const key of skillKeys) {
+          const skill = await getEffectiveAgentSkill(
+            db,
+            input.workspaceId,
+            key,
+          );
+          snapshot.push({
+            key,
+            title: skill?.title ?? key,
+            version: skill?.version ?? 0,
+            included: false,
+          });
+        }
+        skillSnapshotJson = JSON.stringify(snapshot);
+      }
+    } catch {
+      /* profile snapshot best-effort */
+    }
+  }
+
   const now = new Date();
   const [run] = await db
     .insert(agentRuns)
@@ -184,11 +242,12 @@ export async function enqueueAgentRun(
       taskId: input.taskId,
       status: "QUEUED",
       attempt: input.attempt ?? task.attemptCount + 1,
-      agentProfileKey: input.agentProfileKey ?? "engineer",
+      agentProfileKey: profileKey,
       baseSha: input.baseSha ?? task.baseSha ?? "unknown",
       branchName: input.branchName ?? null,
       // Tool names (edit/read/…), not path globs — allowedPaths is enforced separately.
-      toolAllowlist: "[]",
+      toolAllowlist: toolAllowlistJson,
+      skillSnapshotJson,
       spendCapMicros: input.spendCapMicros ?? task.estimateMicros ?? 0,
       estimatedCostMicros:
         input.estimatedCostMicros ?? task.estimateMicros ?? 0,
@@ -203,6 +262,26 @@ export async function enqueueAgentRun(
 
   if (!run) throw new Error("Failed to enqueue run");
   return { run, created: true };
+}
+
+/** Persist skill prompt snapshot after load (included vs dropped). */
+export async function updateRunSkillSnapshot(
+  db: Database,
+  runId: string,
+  snapshot: Array<{
+    key: string;
+    title: string;
+    version: number;
+    included: boolean;
+  }>,
+): Promise<void> {
+  await db
+    .update(agentRuns)
+    .set({
+      skillSnapshotJson: JSON.stringify(snapshot),
+      updatedAt: new Date(),
+    })
+    .where(eq(agentRuns.id, runId));
 }
 
 /**

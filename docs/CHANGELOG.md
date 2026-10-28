@@ -9,6 +9,8 @@
 
 ### Features
 
+- Claude Code (Agent SDK) coding harness — `ClaudeCodeCodingAgent` via `@anthropic-ai/claude-agent-sdk`, BYOK vendor `claude_code`, harness kind `claude_code`, env `ANTHROPIC_API_KEY` / `CLAUDE_CODE_MODEL`. Prefer Cursor when both exist; Claude Code is OpenAI failover when Cursor is absent. See `docs/HARNESS.md`.
+- P-150–P-154: Agents → Skills → Tools (MCP) runtime + UX — `ToolRuntime` + Sonar/generic MCP invoke (worker preflight; optional `ACPP_GATEWAY_URL`), `skill_snapshot_json` on runs, Tools page as MCP home (SonarQube + HTTPS MCP), bidirectional skill/tool grants, `SYSTEM_TOOL_CATALOG` single source of truth. Custom tool tokens remain catalog/policy only; Sonar/`mcp:*` are invokable.
 - AG-030: Maintainer enable no silent escalation — existing workspace spend cap is never raised on enable; multi-repo, auto-release, and extra signal providers are stripped with audit `escalationClamps`. See `docs/maintainer-enable-no-escalation.md`.
 - Catalog CRUD: workspace owners can create/update/delete custom Agents and Skills, reset system overrides, manage Tools (workspace defs + allowlist) and MCP connections from Agents / Skills / Tools pages. Fail-closed allowlists; custom tool tokens are catalog/policy only (harness stays core + MCP).
 - AG-013: Cursor harness as default coding path honesty — worker prefers workspace Cursor BYOK over env LLM, emits `coding_path_honesty` run progress (including `native_openai` demotion reason), and Arena contender rows surface the hint while runs are live. See `docs/HARNESS.md`.

@@ -4,6 +4,31 @@
 
 export type AgentRunMode = "implement" | "pr_review";
 
+export type SkillSnapshotEntry = {
+  key: string;
+  title: string;
+  version: number;
+  /** True when the skill body was injected into the prompt. */
+  included: boolean;
+};
+
+export type ToolInvokeRequest = {
+  tool: string;
+  args?: Record<string, unknown>;
+};
+
+export type ToolInvokeResult = {
+  ok: boolean;
+  summary: string;
+  result?: Record<string, unknown>;
+  error?: string;
+  ms: number;
+};
+
+export type ToolInvoker = (
+  req: ToolInvokeRequest,
+) => Promise<ToolInvokeResult>;
+
 export type AgentRunInput = {
   runId: string;
   taskId: string;
@@ -42,6 +67,15 @@ export type AgentRunInput = {
   mode?: AgentRunMode;
   /** Extra PR context for pr_review mode (title, files, etc.). */
   reviewContext?: string;
+  /** Skills resolved at enqueue / execute (audit + prompt honesty). */
+  skillSnapshot?: SkillSnapshotEntry[];
+  /**
+   * Optional MCP/Sonar tool invoker for a bounded tool-call loop (OpenAI path).
+   * Cursor path uses worker preflight instead.
+   */
+  invokeTool?: ToolInvoker;
+  /** Max tool rounds in harness loop. Default 4. */
+  maxToolInvokes?: number;
 };
 
 export type AgentEventKind =

@@ -92,20 +92,20 @@ Varsayılan app teması: **light** (toggle ile dark).
 ### `/workspaces/[id]/agents` — Agents
 - Master–detail: profil listesi + seçili agent detayı
 - Guidance, temperament, strategy, spend cap, model/BYOK, tool allowlist
-- Skill catalog (expandable markdown body)
+- Skill catalog (expandable markdown body); >4 skill uyarısı (runtime max 4 / ~6k)
 - 30d stats: runs, wins/losses, failed, spend, last run
 - Live Arena seats (ACTIVE contenders) per profile
 - `?agent=engineer` deep-link; Configure → Settings · LLM
 
 ### `/workspaces/[id]/skills` — Skills
 - Master–detail skill catalog (system + workspace overrides)
-- Full procedure markdown; agents that attach the skill
+- Full procedure markdown; **Grant to agents** (ters binding)
 - `?skill=pr-hygiene` deep-link
 
 ### `/workspaces/[id]/tools` — Tools
-- Allowlist tool catalog (core / MCP / aliases) + profile grants
-- Which agents may use each tool; links back to Agents
-- `?tool=edit` deep-link
+- Allowlist tool catalog (core / MCP / aliases / custom) + **MCP home** (SonarQube + generic HTTPS MCP connect)
+- **Grant to agents**; custom = catalog/policy only badge
+- `?tool=edit` deep-link; Settings · LLM MCP paneli buraya yönlendirir
 
 ### `/workspaces/[id]/insights` — Insights
 - Period economics & verified delivery (Mission Control’dan ayrı)

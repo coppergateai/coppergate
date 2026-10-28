@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./settings.module.css";
 
@@ -87,8 +88,9 @@ export function AgentsPanel({ workspaceId, isOwner }: Props) {
         Agents
       </h2>
       <p className={styles.sectionLede}>
-        Temperament shapes pacing (steady / swift / balanced). Skills are
-        procedures injected into runs and can evolve via self-improve.
+        Temperament shapes pacing (steady / swift / balanced). Full skill/tool
+        binding lives on the{" "}
+        <Link href={`/workspaces/${workspaceId}/agents`}>Agents</Link> catalog.
       </p>
 
       <ul className={styles.list}>
@@ -96,7 +98,11 @@ export function AgentsPanel({ workspaceId, isOwner }: Props) {
           <li key={p.key} className={styles.row}>
             <div>
               <p className={styles.rowTitle}>
-                {p.displayName}{" "}
+                <Link
+                  href={`/workspaces/${workspaceId}/agents?agent=${encodeURIComponent(p.key)}`}
+                >
+                  {p.displayName}
+                </Link>{" "}
                 <span className={styles.rowMeta}>({p.key})</span>
               </p>
               <p className={styles.rowMeta}>
@@ -129,11 +135,20 @@ export function AgentsPanel({ workspaceId, isOwner }: Props) {
       <h3 className={styles.sectionLabel} style={{ marginTop: "1.25rem" }}>
         Skill catalog
       </h3>
+      <p className={styles.note}>
+        <Link href={`/workspaces/${workspaceId}/skills`}>Open Skills →</Link>
+      </p>
       <ul className={styles.list}>
         {skills.map((s) => (
           <li key={s.key} className={styles.row}>
             <div>
-              <p className={styles.rowTitle}>{s.title}</p>
+              <p className={styles.rowTitle}>
+                <Link
+                  href={`/workspaces/${workspaceId}/skills?skill=${encodeURIComponent(s.key)}`}
+                >
+                  {s.title}
+                </Link>
+              </p>
               <p className={styles.rowMeta}>
                 {s.key} · v{s.version}
               </p>

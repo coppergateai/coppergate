@@ -112,6 +112,11 @@ export default async function WorkspaceSkillsPage({
       workspaceName={access.workspace.name}
       isOwner={access.role === "owner"}
       skills={skills}
+      allAgents={profiles.map((p) => ({
+        key: p.key,
+        displayName: p.displayName,
+        skillKeys: p.skillKeys,
+      }))}
       initialKey={initialKey}
     />
   );

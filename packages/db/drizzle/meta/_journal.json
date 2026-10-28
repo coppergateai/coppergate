@@ -225,6 +225,13 @@
       "when": 1729700000000,
       "tag": "0031_workspace_tools",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1729800000000,
+      "tag": "0032_agent_run_skills",
+      "breakpoints": true
     }
   ]
 }

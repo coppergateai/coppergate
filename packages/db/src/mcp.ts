@@ -7,7 +7,7 @@ import {
   type WorkspaceMcpConnection,
 } from "./schema.js";
 
-export const MCP_PROVIDERS = ["sonarqube"] as const;
+export const MCP_PROVIDERS = ["sonarqube", "mcp"] as const;
 export type McpProvider = (typeof MCP_PROVIDERS)[number];
 
 export const SONARQUBE_TOOLS = [
@@ -18,6 +18,12 @@ export const SONARQUBE_TOOLS = [
 
 export function isMcpProvider(v: string): v is McpProvider {
   return (MCP_PROVIDERS as readonly string[]).includes(v);
+}
+
+/** Default connection tool allowlist when caller omits one. */
+export function defaultToolsForProvider(provider: McpProvider): string[] {
+  if (provider === "sonarqube") return [...SONARQUBE_TOOLS];
+  return [];
 }
 
 export function parseToolAllowlistJson(raw: string | null | undefined): string[] {
@@ -100,17 +106,23 @@ export async function upsertMcpConnection(
   }
   const endpoint = input.endpointUrl.trim().replace(/\/+$/, "");
   try {
-    // Self-hosted Sonar on private nets is allowed; metadata/link-local is not.
-    // DNS-resolved addresses are re-checked (rebinding defense).
-    await assertSafeServerFetchUrlResolved(endpoint, { allowPrivate: true });
+    // Sonar self-host may live on private nets; generic MCP follows ACPP §10.6
+    // (HTTPS + no private) via DNS-resolved check with allowPrivate=false.
+    await assertSafeServerFetchUrlResolved(endpoint, {
+      allowPrivate: input.provider === "sonarqube",
+    });
   } catch {
     throw new Error(
-      "endpointUrl must be a safe http(s) URL (metadata/link-local blocked)",
+      input.provider === "mcp"
+        ? "endpointUrl must be a public https URL (SSRF-safe; no private/metadata)"
+        : "endpointUrl must be a safe http(s) URL (metadata/link-local blocked)",
     );
   }
   const tools =
-    input.toolAllowlist ??
-    (input.provider === "sonarqube" ? [...SONARQUBE_TOOLS] : []);
+    input.toolAllowlist ?? defaultToolsForProvider(input.provider);
+  if (input.provider === "mcp" && tools.length === 0) {
+    throw new Error("generic MCP connections require a non-empty toolAllowlist");
+  }
   const now = new Date();
   const existing = await getMcpConnection(
     db,
@@ -124,9 +136,15 @@ export async function upsertMcpConnection(
       .set({
         displayName: input.displayName.trim().slice(0, 80) || existing.displayName,
         endpointUrl: endpoint,
-        encryptedPayload: input.encryptedPayload || existing.encryptedPayload,
+        // Empty string keeps the prior vault blob (token omitted on update).
+        encryptedPayload: input.encryptedPayload.trim()
+          ? input.encryptedPayload
+          : existing.encryptedPayload,
         enabled: input.enabled ?? existing.enabled,
-        toolAllowlistJson: JSON.stringify(tools),
+        toolAllowlistJson:
+          input.toolAllowlist !== undefined
+            ? JSON.stringify(tools)
+            : existing.toolAllowlistJson,
         metaJson:
           input.meta === undefined
             ? existing.metaJson
@@ -200,6 +218,48 @@ export async function setMcpConnectionEnabled(
     targetType: "mcp_connection",
     targetId: existing.id,
     meta: { provider: input.provider },
+  });
+  return updated ?? null;
+}
+
+/** Patch connection tool allowlist (and optional display name). */
+export async function updateMcpConnectionTools(
+  db: Database,
+  input: {
+    workspaceId: string;
+    provider: string;
+    toolAllowlist: string[];
+    actor: string;
+  },
+): Promise<WorkspaceMcpConnection | null> {
+  const existing = await getMcpConnection(
+    db,
+    input.workspaceId,
+    input.provider,
+  );
+  if (!existing) return null;
+  const tools = input.toolAllowlist
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 64);
+  if (tools.length === 0) {
+    throw new Error("toolAllowlist must be non-empty");
+  }
+  const [updated] = await db
+    .update(workspaceMcpConnections)
+    .set({
+      toolAllowlistJson: JSON.stringify(tools),
+      updatedAt: new Date(),
+    })
+    .where(eq(workspaceMcpConnections.id, existing.id))
+    .returning();
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "mcp.tools_update",
+    targetType: "mcp_connection",
+    targetId: existing.id,
+    meta: { provider: input.provider, tools },
   });
   return updated ?? null;
 }

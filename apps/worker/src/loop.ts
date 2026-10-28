@@ -30,6 +30,7 @@ function parseHarnessEnv(): ContenderHarnessKind | null {
     "openhands",
     "aider",
     "cursor_local",
+    "claude_code",
     "cursor_cloud",
     "codex",
   ];

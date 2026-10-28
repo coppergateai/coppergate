@@ -40,9 +40,11 @@ Issue → Execution → Verification → Human Approval → Delivery
 Surfaces:
 
 - **Mission Control** (`/workspaces/[id]`) — what needs intervention now
-- **Agents** (`/workspaces/[id]/agents`) — profile catalog, skills, 30d outcomes
-- **Skills** (`/workspaces/[id]/skills`) — procedure playbooks attached to agents
-- **Tools** (`/workspaces/[id]/tools`) — allowlist capabilities per profile
+- **Agents** (`/workspaces/[id]/agents`) — profile catalog, skills, tools, 30d outcomes
+- **Skills** (`/workspaces/[id]/skills`) — procedure playbooks; grantable to agents; prompt-capped (max 4 / ~6k chars)
+- **Tools** (`/workspaces/[id]/tools`) — capability tokens + MCP home (SonarQube / generic HTTPS MCP); invokable vs custom(policy-only)
+
+Runtime hierarchy: **Agent → Skills (prompt procedures) → Tools (allowlist + ToolRuntime)**. MCP connections are workspace-scoped; optional `ACPP_GATEWAY_URL` bridges invoke through ACPP identity/policy.
 - **Insights** (`/workspaces/[id]/insights`) — period economics & verified delivery
 - **Evidence** — why a delivery is acceptable
 - **Arena** — which contender won and why (hard gates, then rank)

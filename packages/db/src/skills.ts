@@ -359,8 +359,81 @@ export async function getEffectiveAgentSkill(
   return sys ?? null;
 }
 
-const MAX_SKILLS_IN_PROMPT = 4;
-const MAX_SKILL_CHARS = 6_000;
+export const MAX_SKILLS_IN_PROMPT = 4;
+export const MAX_SKILL_CHARS = 6_000;
+
+export type SkillPromptSnapshotEntry = {
+  key: string;
+  title: string;
+  version: number;
+  included: boolean;
+};
+
+export type SkillsForPromptResult = {
+  markdown: string;
+  snapshot: SkillPromptSnapshotEntry[];
+  droppedKeys: string[];
+};
+
+/**
+ * Load skill bodies for a profile; capped for prompt budget.
+ * Returns markdown plus an audit snapshot of included vs dropped skills.
+ */
+export async function loadSkillsForPromptDetailed(
+  db: Database,
+  workspaceId: string,
+  skillKeys: string[],
+): Promise<SkillsForPromptResult> {
+  const snapshot: SkillPromptSnapshotEntry[] = [];
+  const droppedKeys: string[] = [];
+  const chunks: string[] = [];
+  let used = 0;
+  let slots = 0;
+
+  for (const key of skillKeys) {
+    const skill = await getEffectiveAgentSkill(db, workspaceId, key);
+    if (!skill?.bodyMarkdown?.trim()) {
+      droppedKeys.push(key);
+      snapshot.push({
+        key,
+        title: key,
+        version: 0,
+        included: false,
+      });
+      continue;
+    }
+    const block = `### Skill: ${skill.title} (${skill.key} v${skill.version})\n${skill.bodyMarkdown.trim()}`;
+    const overSlots = slots >= MAX_SKILLS_IN_PROMPT;
+    const overChars = used + block.length > MAX_SKILL_CHARS;
+    if (overSlots || overChars) {
+      droppedKeys.push(key);
+      snapshot.push({
+        key: skill.key,
+        title: skill.title,
+        version: skill.version,
+        included: false,
+      });
+      continue;
+    }
+    chunks.push(block);
+    used += block.length;
+    slots += 1;
+    snapshot.push({
+      key: skill.key,
+      title: skill.title,
+      version: skill.version,
+      included: true,
+    });
+  }
+
+  return {
+    markdown: chunks.length
+      ? `## Assigned skills\n\n${chunks.join("\n\n")}`
+      : "",
+    snapshot,
+    droppedKeys,
+  };
+}
 
 /**
  * Load skill bodies for a profile; capped for prompt budget.
@@ -370,19 +443,12 @@ export async function loadSkillsForPrompt(
   workspaceId: string,
   skillKeys: string[],
 ): Promise<string> {
-  const keys = skillKeys.slice(0, MAX_SKILLS_IN_PROMPT);
-  const chunks: string[] = [];
-  let used = 0;
-  for (const key of keys) {
-    const skill = await getEffectiveAgentSkill(db, workspaceId, key);
-    if (!skill?.bodyMarkdown?.trim()) continue;
-    const block = `### Skill: ${skill.title} (${skill.key} v${skill.version})\n${skill.bodyMarkdown.trim()}`;
-    if (used + block.length > MAX_SKILL_CHARS) break;
-    chunks.push(block);
-    used += block.length;
-  }
-  if (!chunks.length) return "";
-  return `## Assigned skills\n\n${chunks.join("\n\n")}`;
+  const { markdown } = await loadSkillsForPromptDetailed(
+    db,
+    workspaceId,
+    skillKeys,
+  );
+  return markdown;
 }
 
 export async function upsertWorkspaceSkill(

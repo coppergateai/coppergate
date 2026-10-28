@@ -68,6 +68,22 @@ const envSchema = z.object({
   CURSOR_API_KEY: z.string().min(1).optional(),
   CURSOR_MODEL: z.string().min(1).optional(),
   /**
+   * Optional Claude Agent SDK key. When set with OpenAI primary (and no Cursor),
+   * worker wraps FailoverCodingAgent (quota → Claude Code). Prefer BYOK vendor=claude_code.
+   */
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  CLAUDE_CODE_API_KEY: z.string().min(1).optional(),
+  CLAUDE_CODE_MODEL: z.string().min(1).optional(),
+  ANTHROPIC_MODEL: z.string().min(1).optional(),
+  /**
+   * Optional ACPP hosted MCP gateway base URL (no trailing path).
+   * When set, worker proxies generic MCP invoke to
+   * POST {ACPP_GATEWAY_URL}/v1/mcp/tools/invoke. Unset → local MCP client.
+   */
+  ACPP_GATEWAY_URL: z.string().url().optional(),
+  /** Optional bearer for ACPP gateway (local dogfood usually empty). */
+  ACPP_GATEWAY_TOKEN: z.string().min(1).optional(),
+  /**
    * Worker PR delivery: `fake` (default) or `http` (real GitHub App installation).
    * Staging / TASK033 sets `http` with App credentials.
    */

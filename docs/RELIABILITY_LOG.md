@@ -34,9 +34,10 @@ Date: 2026-10-24
 
 ## Cycle 14
 - **Cursor local SDK adapter**: `CursorSdkCodingAgent` (`@cursor/sdk`, `local.cwd` = sandbox workdir); BYOK vendor `cursor` + per-profile routing
-- **Quota failover**: `FailoverCodingAgent` also switches on primary `provider_quota` error events (not only throws); OpenAI primary + Cursor BYOK/`CURSOR_API_KEY` secondary
-- Arena `pauseArenaForProviderQuota` only when the run ends without completion (both providers failed); successful Cursor fallback keeps the arena running
-- Capability matrix: `cursor_local` live; `cursor_cloud` remains wait-state
+- **Claude Agent SDK adapter**: `ClaudeCodeCodingAgent` (`@anthropic-ai/claude-agent-sdk`, `cwd` = sandbox workdir, `acceptEdits`); BYOK vendor `claude_code` + `ANTHROPIC_API_KEY` self-host
+- **Quota failover**: `FailoverCodingAgent` also switches on primary `provider_quota` error events (not only throws); OpenAI primary + Cursor (preferred) or Claude Code BYOK/env secondary
+- Arena `pauseArenaForProviderQuota` only when the run ends without completion (both providers failed); successful Cursor/Claude fallback keeps the arena running
+- Capability matrix: `cursor_local` + `claude_code` live; `cursor_cloud` remains wait-state
 
 ## Cycle 6
 - **Restored poison reclaim** (was missing on disk): RUNNING → `QUEUED` with `reclaim:N`; after max 3 or 45m wall-clock → `FAILED` (`lease_expired_poison`)

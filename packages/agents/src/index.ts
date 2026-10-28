@@ -5,7 +5,17 @@ export type {
   AgentRunMode,
   CodingAgent,
   FakeCompletionPayload,
+  SkillSnapshotEntry,
+  ToolInvoker,
+  ToolInvokeRequest,
+  ToolInvokeResult,
 } from "./types.js";
+export {
+  ToolRuntime,
+  ToolRuntimeError,
+  runToolPreflight,
+  type ToolRuntimeOptions,
+} from "./tool-runtime.js";
 export {
   AgentPolicyError,
   FakeCodingAgent,
@@ -59,6 +69,13 @@ export {
   type CursorSdkRunHandle,
 } from "./cursor-sdk.js";
 export {
+  ClaudeCodeCodingAgent,
+  type ClaudeCodeBridge,
+  type ClaudeCodeCodingAgentConfig,
+  type ClaudeCodeQueryOptions,
+  type ClaudeCodeStreamMessage,
+} from "./claude-code.js";
+export {
   diffWorkdirSnapshots,
   snapshotWorkdir,
   type ChangedWorkdirFile,
@@ -81,6 +98,7 @@ export {
   type ContenderStrategy,
 } from "./strategy.js";
 export {
+  ClaudeCodeHarness,
   CursorCloudHarnessStub,
   CursorLocalHarness,
   NativeFakeHarness,

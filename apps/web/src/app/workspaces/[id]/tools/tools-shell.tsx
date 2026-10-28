@@ -21,6 +21,13 @@ type McpRow = {
   displayName: string;
   enabled: boolean;
   endpointUrl: string;
+  tools?: string[];
+};
+
+type AgentGrant = {
+  key: string;
+  displayName: string;
+  tools: string[];
 };
 
 type Props = {
@@ -29,6 +36,7 @@ type Props = {
   isOwner: boolean;
   tools: ToolRow[];
   mcpConnections: McpRow[];
+  allAgents?: AgentGrant[];
   initialKey?: string | null;
 };
 
@@ -53,11 +61,22 @@ export function ToolsShell({
   isOwner,
   tools: initialTools,
   mcpConnections: initialMcp,
+  allAgents: initialAgents = [],
   initialKey,
 }: Props) {
   const router = useRouter();
   const [tools, setTools] = useState(initialTools);
   const [mcpConnections, setMcp] = useState(initialMcp);
+  const [allAgents, setAllAgents] = useState(initialAgents);
+  const [mcpProvider, setMcpProvider] = useState<"sonarqube" | "mcp">(
+    "sonarqube",
+  );
+  const [mcpEndpoint, setMcpEndpoint] = useState("");
+  const [mcpToken, setMcpToken] = useState("");
+  const [mcpProjectKey, setMcpProjectKey] = useState("");
+  const [mcpToolAllowlist, setMcpToolAllowlist] = useState(
+    "search_docs, list_resources",
+  );
   const [selectedKey, setSelectedKey] = useState<string | null>(
     initialKey && initialTools.some((t) => t.key === initialKey)
       ? initialKey
@@ -84,6 +103,86 @@ export function ToolsShell({
   useEffect(() => {
     setMcp(initialMcp);
   }, [initialMcp]);
+  useEffect(() => {
+    setAllAgents(initialAgents);
+  }, [initialAgents]);
+
+  async function connectMcp() {
+    if (!isOwner) return;
+    setPending(true);
+    setError(null);
+    setOk(null);
+    try {
+      const toolAllowlist =
+        mcpProvider === "mcp"
+          ? mcpToolAllowlist
+              .split(/[,\s]+/)
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : undefined;
+      const res = await fetch(`/api/workspaces/${workspaceId}/mcp`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: mcpProvider,
+          displayName: mcpProvider === "sonarqube" ? "SonarQube" : "MCP server",
+          endpointUrl: mcpEndpoint,
+          token: mcpToken || undefined,
+          projectKey: mcpProjectKey || undefined,
+          toolAllowlist,
+          enabled: true,
+        }),
+      });
+      const body = (await res.json()) as { error?: { message: string } };
+      if (!res.ok) throw new Error(body.error?.message ?? "Connect failed");
+      setOk(`${mcpProvider} connected`);
+      setMcpToken("");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Connect failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function setToolOnAgent(
+    agentKey: string,
+    toolKey: string,
+    attach: boolean,
+  ) {
+    if (!isOwner) return;
+    const agent = allAgents.find((a) => a.key === agentKey);
+    if (!agent) return;
+    const next = attach
+      ? [...new Set([...agent.tools, toolKey])]
+      : agent.tools.filter((k) => k !== toolKey);
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/profiles`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: agentKey, toolAllowlist: next }),
+      });
+      const body = (await res.json()) as { error?: { message: string } };
+      if (!res.ok) throw new Error(body.error?.message ?? "Update failed");
+      setAllAgents((rows) =>
+        rows.map((a) => (a.key === agentKey ? { ...a, tools: next } : a)),
+      );
+      setOk(
+        attach
+          ? `Granted ${toolKey} → ${agentKey}`
+          : `Removed ${toolKey} from ${agentKey}`,
+      );
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setPending(false);
+    }
+  }
 
   useEffect(() => {
     if (!selectedKey || creating) return;
@@ -428,15 +527,7 @@ export function ToolsShell({
             </div>
             {mcpConnections.length === 0 ? (
               <p className={styles.note}>
-                None connected.{" "}
-                {isOwner ? (
-                  <Link
-                    href={`/workspaces/${workspaceId}/settings?tab=llm`}
-                    className={styles.footerLink}
-                  >
-                    Configure in Settings
-                  </Link>
-                ) : null}
+                None connected — use the form below (Tools is the MCP home).
               </p>
             ) : (
               <ul className={styles.relatedList}>
@@ -453,6 +544,9 @@ export function ToolsShell({
                         >
                           {c.enabled ? "on" : "off"}
                         </span>
+                        {c.tools?.length
+                          ? ` · ${c.tools.join(", ")}`
+                          : null}
                       </span>
                     </div>
                     {isOwner ? (
@@ -481,6 +575,82 @@ export function ToolsShell({
                 ))}
               </ul>
             )}
+            {isOwner ? (
+              <div className={styles.field} style={{ marginTop: "0.75rem" }}>
+                <label className={styles.fieldLabel} htmlFor="mcp-provider">
+                  Connect MCP
+                </label>
+                <select
+                  id="mcp-provider"
+                  className={styles.select}
+                  value={mcpProvider}
+                  onChange={(e) =>
+                    setMcpProvider(e.target.value as "sonarqube" | "mcp")
+                  }
+                  disabled={pending}
+                >
+                  <option value="sonarqube">SonarQube</option>
+                  <option value="mcp">Generic HTTPS MCP</option>
+                </select>
+                <input
+                  className={styles.input}
+                  style={{ marginTop: "0.4rem" }}
+                  value={mcpEndpoint}
+                  onChange={(e) => setMcpEndpoint(e.target.value)}
+                  placeholder={
+                    mcpProvider === "sonarqube"
+                      ? "https://sonar.example.com"
+                      : "https://mcp.example.com/rpc"
+                  }
+                  disabled={pending}
+                />
+                <input
+                  className={styles.input}
+                  style={{ marginTop: "0.4rem" }}
+                  type="password"
+                  value={mcpToken}
+                  onChange={(e) => setMcpToken(e.target.value)}
+                  placeholder={
+                    mcpProvider === "sonarqube"
+                      ? "Token (required)"
+                      : "Bearer token (optional)"
+                  }
+                  disabled={pending}
+                />
+                {mcpProvider === "sonarqube" ? (
+                  <input
+                    className={styles.input}
+                    style={{ marginTop: "0.4rem" }}
+                    value={mcpProjectKey}
+                    onChange={(e) => setMcpProjectKey(e.target.value)}
+                    placeholder="Project key (optional)"
+                    disabled={pending}
+                  />
+                ) : (
+                  <input
+                    className={styles.input}
+                    style={{ marginTop: "0.4rem" }}
+                    value={mcpToolAllowlist}
+                    onChange={(e) => setMcpToolAllowlist(e.target.value)}
+                    placeholder="tool_a, tool_b"
+                    disabled={pending}
+                  />
+                )}
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  style={{ marginTop: "0.5rem" }}
+                  disabled={
+                    pending ||
+                    !mcpEndpoint ||
+                    (mcpProvider === "sonarqube" && !mcpToken)
+                  }
+                  onClick={() => void connectMcp()}
+                >
+                  Connect
+                </button>
+              </div>
+            ) : null}
           </section>
         </aside>
 
@@ -679,32 +849,44 @@ export function ToolsShell({
 
               <section className={styles.section}>
                 <div className={styles.sectionHead}>
-                  <h3 className={styles.sectionLabel}>Granted to agents</h3>
+                  <h3 className={styles.sectionLabel}>Grant to agents</h3>
                   <span className={styles.sectionCount}>
-                    {selected.agents.length}
+                    {allAgents.filter((a) => a.tools.includes(selected.key))
+                      .length}
                   </span>
                 </div>
-                {selected.agents.length === 0 ? (
-                  <p className={styles.note}>
-                    No profile currently grants this tool — attach from Agents →
-                    Edit.
+                {selected.kind === "custom" ? (
+                  <p className={styles.honesty}>
+                    Custom tokens are catalog / policy only — granting them does
+                    not unlock new harness capabilities.
                   </p>
+                ) : null}
+                {allAgents.length === 0 ? (
+                  <p className={styles.note}>No agents in this workspace.</p>
                 ) : (
-                  <ul className={styles.relatedList}>
-                    {selected.agents.map((a) => (
-                      <li key={a.key}>
-                        <Link
-                          href={`/workspaces/${workspaceId}/agents?agent=${encodeURIComponent(a.key)}`}
-                          className={styles.relatedItem}
-                        >
-                          <span className={styles.relatedTitle}>
-                            {a.displayName}
-                          </span>
-                          <span className={styles.relatedMeta}>{a.key}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className={styles.checkGrid}>
+                    {allAgents.map((a) => {
+                      const on = a.tools.includes(selected.key);
+                      return (
+                        <label key={a.key} className={styles.checkItem}>
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            disabled={!isOwner || pending}
+                            onChange={(e) =>
+                              void setToolOnAgent(
+                                a.key,
+                                selected.key,
+                                e.target.checked,
+                              )
+                            }
+                          />
+                          {a.displayName}
+                          <span className={styles.relatedMeta}> {a.key}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 )}
               </section>
 

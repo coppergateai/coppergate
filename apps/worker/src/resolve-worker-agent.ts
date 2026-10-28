@@ -37,6 +37,7 @@ function parseHarnessEnv(): ContenderHarnessKind | null {
     "openhands",
     "aider",
     "cursor_local",
+    "claude_code",
     "cursor_cloud",
     "codex",
   ];
@@ -51,7 +52,31 @@ function resolveDeliveryModeHint(): "http" | "fake" {
 }
 
 function vendorToAgentKind(vendor: string | null | undefined): CodingAgentKind {
-  return vendor?.trim().toLowerCase() === "cursor" ? "cursor" : "openai";
+  const v = vendor?.trim().toLowerCase();
+  if (v === "cursor") return "cursor";
+  if (v === "claude_code") return "claude_code";
+  return "openai";
+}
+
+async function resolveVendorFallbackCredential(
+  db: Database,
+  workspaceId: string,
+  primaryCredentialId: string | null,
+  vendor: "cursor" | "claude_code",
+): Promise<{ byok: IntegrationCredential; model: string | undefined } | null> {
+  const listed = await listLlmByok(db, workspaceId);
+  const meta = listed.find(
+    (c) =>
+      c.vendor.trim().toLowerCase() === vendor &&
+      c.id !== primaryCredentialId,
+  );
+  if (!meta) return null;
+  const byok = await getLlmByokById(db, workspaceId, meta.id);
+  if (!byok?.encryptedPayload) return null;
+  return {
+    byok,
+    model: byok.model?.trim() || undefined,
+  };
 }
 
 async function resolveCursorFallbackCredential(
@@ -59,19 +84,39 @@ async function resolveCursorFallbackCredential(
   workspaceId: string,
   primaryCredentialId: string | null,
 ): Promise<{ byok: IntegrationCredential; model: string | undefined } | null> {
-  const listed = await listLlmByok(db, workspaceId);
-  const cursorMeta = listed.find(
-    (c) =>
-      c.vendor.trim().toLowerCase() === "cursor" &&
-      c.id !== primaryCredentialId,
+  return resolveVendorFallbackCredential(
+    db,
+    workspaceId,
+    primaryCredentialId,
+    "cursor",
   );
-  if (!cursorMeta) return null;
-  const byok = await getLlmByokById(db, workspaceId, cursorMeta.id);
-  if (!byok?.encryptedPayload) return null;
-  return {
-    byok,
-    model: byok.model?.trim() || undefined,
-  };
+}
+
+async function resolveClaudeCodeFallbackCredential(
+  db: Database,
+  workspaceId: string,
+  primaryCredentialId: string | null,
+): Promise<{ byok: IntegrationCredential; model: string | undefined } | null> {
+  return resolveVendorFallbackCredential(
+    db,
+    workspaceId,
+    primaryCredentialId,
+    "claude_code",
+  );
+}
+
+function honestyPrimaryForKind(
+  kind: CodingAgentKind,
+): CodingPathHonestyMeta["primary"] {
+  if (kind === "cursor") return "cursor_local";
+  if (kind === "claude_code") return "claude_code";
+  return "openai";
+}
+
+function harnessKindForAgent(kind: CodingAgentKind): ContenderHarnessKind {
+  if (kind === "cursor") return "cursor_local";
+  if (kind === "claude_code") return "claude_code";
+  return "native_openai";
 }
 
 async function resolveByokForProfile(
@@ -202,6 +247,19 @@ export async function resolveWorkerAgent(
     );
   }
 
+  if (explicit === "claude_code") {
+    log.info("using ContenderHarness", {
+      harnessKind: explicit,
+      workspaceId,
+    });
+    return wrap(
+      harnessAsCodingAgent(
+        createContenderHarness({ kind: "claude_code" }),
+      ),
+      honestyForHarness("claude_code", "explicit_harness"),
+    );
+  }
+
   let byokResolved = false;
 
   if (!forceFakePath || explicit === "native_openai") {
@@ -261,6 +319,38 @@ export async function resolveWorkerAgent(
               cursorCredentialId: cursorPrimary.byok.id,
               openaiFailoverId: byok.id,
             });
+          } else {
+            const claudePrimary = await resolveClaudeCodeFallbackCredential(
+              db,
+              workspaceId,
+              byok.id,
+            );
+            if (claudePrimary?.byok.encryptedPayload) {
+              openaiFailover = {
+                apiKey,
+                baseUrl: byok.baseUrl ?? undefined,
+                model,
+              };
+              primaryKey = openSecret(
+                claudePrimary.byok.encryptedPayload,
+                parseEncryptionKey(keyHex),
+              );
+              await touchLlmByokUsed(db, workspaceId, claudePrimary.byok.id);
+              kind = "claude_code";
+              primaryModel = claudePrimary.model ?? model;
+              primaryBase = undefined;
+              primaryCredentialId = claudePrimary.byok.id;
+              primaryLabel = claudePrimary.byok.label;
+              primaryVendor = claudePrimary.byok.vendor;
+              demoted = buildNativeOpenAiDemotion(
+                "Workspace Claude Code BYOK is the primary coding harness; native_openai (OpenAI chat→file-write) is demoted to quota failover.",
+              );
+              log.info("preferring Claude Code BYOK as primary coding agent", {
+                workspaceId,
+                claudeCredentialId: claudePrimary.byok.id,
+                openaiFailoverId: byok.id,
+              });
+            }
           }
         }
 
@@ -275,7 +365,7 @@ export async function resolveWorkerAgent(
         });
 
         const byokHonestyBase: CodingPathHonestyMeta = {
-          primary: "cursor_local",
+          primary: honestyPrimaryForKind(kind),
           source: "workspace_byok",
           credentialLabel: primaryLabel,
           credentialId: primaryCredentialId,
@@ -304,15 +394,16 @@ export async function resolveWorkerAgent(
           );
         }
 
-        if (kind === "cursor") {
+        if (kind === "cursor" || kind === "claude_code") {
+          const harnessKind = harnessKindForAgent(kind);
           if (openaiFailover) {
             log.info("using ContenderHarness with OpenAI failover", {
-              harnessKind: "cursor_local",
+              harnessKind,
               workspaceId,
             });
             return wrap(
               createCodingAgent({
-                kind: "cursor",
+                kind,
                 apiKey: primaryKey,
                 model: primaryModel,
                 fallback: {
@@ -324,31 +415,41 @@ export async function resolveWorkerAgent(
               }),
               {
                 ...byokHonestyBase,
-                primary: "cursor_local",
-                harness: "cursor_local",
-                provider: "cursor",
+                primary: honestyPrimaryForKind(kind),
+                harness: harnessKind,
+                provider: kind,
               },
             );
           }
           log.info("using ContenderHarness", {
-            harnessKind: "cursor_local",
+            harnessKind,
             workspaceId,
           });
           return wrap(
             harnessAsCodingAgent(
-              createContenderHarness({
-                kind: "cursor_local",
-                cursor: {
-                  apiKey: primaryKey,
-                  model: primaryModel,
-                },
-              }),
+              createContenderHarness(
+                kind === "cursor"
+                  ? {
+                      kind: "cursor_local",
+                      cursor: {
+                        apiKey: primaryKey,
+                        model: primaryModel,
+                      },
+                    }
+                  : {
+                      kind: "claude_code",
+                      claudeCode: {
+                        apiKey: primaryKey,
+                        model: primaryModel,
+                      },
+                    },
+              ),
             ),
             {
               ...byokHonestyBase,
-              primary: "cursor_local",
-              harness: "cursor_local",
-              provider: "cursor",
+              primary: honestyPrimaryForKind(kind),
+              harness: harnessKind,
+              provider: kind,
             },
           );
         }
@@ -381,6 +482,29 @@ export async function resolveWorkerAgent(
             cursorCredentialId: cursorFb.byok.id,
             model: cursorFb.model,
           });
+        } else {
+          const claudeFb = await resolveClaudeCodeFallbackCredential(
+            db,
+            workspaceId,
+            primaryCredentialId,
+          );
+          if (claudeFb?.byok.encryptedPayload) {
+            const claudeKey = openSecret(
+              claudeFb.byok.encryptedPayload,
+              parseEncryptionKey(keyHex),
+            );
+            await touchLlmByokUsed(db, workspaceId, claudeFb.byok.id);
+            fallback = {
+              kind: "claude_code",
+              apiKey: claudeKey,
+              model: claudeFb.model,
+            };
+            log.info("wiring Claude Code BYOK as OpenAI quota failover", {
+              workspaceId,
+              claudeCredentialId: claudeFb.byok.id,
+              model: claudeFb.model,
+            });
+          }
         }
 
         return wrap(
@@ -392,7 +516,7 @@ export async function resolveWorkerAgent(
             fallback,
           }),
           {
-            primary: kind === "openai" ? "openai" : "cursor",
+            primary: honestyPrimaryForKind(kind),
             source: "workspace_byok",
             provider: kind,
             credentialLabel: primaryLabel,
@@ -444,9 +568,38 @@ export async function resolveWorkerAgent(
       );
     }
 
+    const envClaudeKey = allowEnv
+      ? process.env.ANTHROPIC_API_KEY?.trim() ||
+        process.env.CLAUDE_CODE_API_KEY?.trim() ||
+        ""
+      : "";
+    if (envClaudeKey && explicit !== "native_openai") {
+      log.info("using ContenderHarness from env ANTHROPIC_API_KEY", {
+        harnessKind: "claude_code",
+        workspaceId,
+      });
+      return wrap(
+        harnessAsCodingAgent(
+          createContenderHarness({
+            kind: "claude_code",
+            claudeCode: {
+              apiKey: envClaudeKey,
+              model:
+                process.env.CLAUDE_CODE_MODEL?.trim() ||
+                process.env.ANTHROPIC_MODEL?.trim() ||
+                undefined,
+            },
+          }),
+        ),
+        honestyForHarness("claude_code", "env_llm", {
+          provider: "claude_code",
+        }),
+      );
+    }
+
     const envAgent = createCodingAgent();
     if (!(envAgent instanceof FakeCodingAgent)) {
-      log.info("using coding agent from env (OpenAI and/or Cursor)", {
+      log.info("using coding agent from env (OpenAI / Cursor / Claude Code)", {
         workspaceId,
       });
       return wrap(envAgent, {

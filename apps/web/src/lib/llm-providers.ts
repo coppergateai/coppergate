@@ -3,6 +3,7 @@
 export type LlmVendorId =
   | "openai"
   | "cursor"
+  | "claude_code"
   | "groq"
   | "openrouter"
   | "ollama"
@@ -66,6 +67,22 @@ export const LLM_PROVIDERS: readonly LlmProviderPreset[] = [
     supportsDiscover: false,
     hint:
       "Dashboard → Integrations API key. Worker runs @cursor/sdk locally against the sandbox. When OpenAI hits quota, a Cursor connection is used as automatic failover.",
+  },
+  {
+    id: "claude_code",
+    name: "Claude Code (Agent SDK)",
+    baseUrl: null,
+    requiresKey: true,
+    keyPlaceholder: "sk-ant-…",
+    hideBaseUrl: true,
+    curatedModels: [
+      "claude-sonnet-4-5",
+      "claude-opus-4-5",
+      "claude-haiku-4-5",
+    ],
+    supportsDiscover: false,
+    hint:
+      "Anthropic API key. Worker runs @anthropic-ai/claude-agent-sdk locally against the sandbox (acceptEdits). Prefer Settings BYOK over host ANTHROPIC_API_KEY. Used as OpenAI quota failover when Cursor is not configured.",
   },
   {
     id: "groq",
@@ -188,8 +205,8 @@ export function normalizeLlmBaseUrl(
   baseUrl: string | null | undefined,
 ): string | null {
   const preset = getLlmProvider(vendorId);
-  // Cursor is not OpenAI-compatible — never store a fake chat base URL.
-  if (vendorId === "cursor") return null;
+  // Cursor / Claude Code are not OpenAI-compatible — never store a fake chat base URL.
+  if (vendorId === "cursor" || vendorId === "claude_code") return null;
   if (preset?.hideBaseUrl && preset.baseUrl) return preset.baseUrl;
   const trimmed = typeof baseUrl === "string" ? baseUrl.trim() : "";
   if (trimmed) return trimmed.replace(/\/+$/, "");

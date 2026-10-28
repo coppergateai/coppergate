@@ -127,6 +127,7 @@ export default async function WorkspaceToolsPage({
       displayName: pub.displayName,
       enabled: pub.enabled,
       endpointUrl: pub.endpointUrl,
+      tools: pub.tools,
     };
   });
 
@@ -137,6 +138,11 @@ export default async function WorkspaceToolsPage({
       isOwner={access.role === "owner"}
       tools={tools}
       mcpConnections={mcpConnections}
+      allAgents={profiles.map((p) => ({
+        key: p.key,
+        displayName: p.displayName,
+        tools: p.tools,
+      }))}
       initialKey={initialKey}
     />
   );

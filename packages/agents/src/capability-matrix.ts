@@ -37,11 +37,18 @@ export const HARNESS_CAPABILITY_MATRIX: HarnessCapability[] = [
       "Requires CURSOR_API_KEY / BYOK vendor=cursor and @cursor/sdk; mutates sandbox workdir.",
   },
   {
+    id: "claude_code",
+    displayName: "Claude Code (Agent SDK)",
+    status: "live",
+    notes:
+      "Requires ANTHROPIC_API_KEY / BYOK vendor=claude_code and @anthropic-ai/claude-agent-sdk; mutates sandbox workdir.",
+  },
+  {
     id: "cursor_cloud",
     displayName: "Cursor Cloud",
     status: "wait",
     notes:
-      "Cloud Background Agents still wait-state; use cursor_local / BYOK Cursor for live runs.",
+      "Cloud Background Agents still wait-state; use cursor_local / claude_code / BYOK for live runs.",
   },
   {
     id: "codex",

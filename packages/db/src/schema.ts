@@ -481,6 +481,11 @@ export const agentRuns = pgTable(
     prNumber: integer("pr_number"),
     prUrl: text("pr_url"),
     toolAllowlist: text("tool_allowlist").notNull().default("[]"),
+    /**
+     * Snapshot of skill keys/versions at enqueue (JSON array of
+     * { key, title, version, included? }).
+     */
+    skillSnapshotJson: text("skill_snapshot_json").notNull().default("[]"),
     spendCapMicros: bigint("spend_cap_micros", { mode: "number" })
       .notNull()
       .default(0),

@@ -38,6 +38,7 @@ assert.match(
 for (const rel of [
   "packages/agents/src/openai-compatible.ts",
   "packages/agents/src/cursor-sdk.ts",
+  "packages/agents/src/claude-code.ts",
 ]) {
   const src = read(rel);
   assert.match(

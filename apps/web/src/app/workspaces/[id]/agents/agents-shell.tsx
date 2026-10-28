@@ -610,6 +610,12 @@ export function AgentsShell({
               </div>
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>Skills</span>
+                {form.skillKeys.length > 4 ? (
+                  <p className={styles.honesty}>
+                    Runtime injects at most 4 skills (~6k chars). Extra
+                    selections are truncated at run time.
+                  </p>
+                ) : null}
                 <div className={styles.checkGrid}>
                   {skills.map((s) => (
                     <label key={s.key} className={styles.checkItem}>

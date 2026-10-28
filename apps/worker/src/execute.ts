@@ -5,9 +5,12 @@ import {
   isLlmProviderQuotaError,
   isStubOrToyDelivery,
   runStackValidation,
+  runToolPreflight,
   strategyGuidance,
   type CodingAgent,
   type FakeCompletionPayload,
+  type SkillSnapshotEntry,
+  type ToolInvoker,
 } from "@coppergate/agents";
 import {
   appendRunEvent,
@@ -31,7 +34,7 @@ import {
   ingestCiEvidence,
   ingestSonarFitness,
   isRunCancelRequested,
-  loadSkillsForPrompt,
+  loadSkillsForPromptDetailed,
   markRunAwaitingReview,
   markRunCancelled,
   markRunFailed,
@@ -48,6 +51,7 @@ import {
   renewRunLease,
   RunError,
   setTaskPrUrl,
+  updateRunSkillSnapshot,
   withTemperamentGuidance,
   type AgentRun,
   type Database,
@@ -266,6 +270,8 @@ export async function executeClaimedRun(
   let strategyContext: string | undefined;
   let promptGuidance: string | undefined;
   let profileTools: string[] | undefined;
+  let skillSnapshot: SkillSnapshotEntry[] | undefined;
+  let toolInvoker: ToolInvoker | undefined;
   const resolveProfile = async (profileKey: string | null | undefined) => {
     const key = profileKey?.trim();
     if (!key) return;
@@ -290,13 +296,34 @@ export async function executeClaimedRun(
       }
       try {
         const keys = parseSkillKeysJson(profile.skillKeysJson);
-        const skillsBlock = await loadSkillsForPrompt(
+        const loaded = await loadSkillsForPromptDetailed(
           db,
           run.workspaceId,
           keys,
         );
-        if (skillsBlock) {
-          strategyContext = [strategyContext, skillsBlock]
+        skillSnapshot = loaded.snapshot;
+        try {
+          await updateRunSkillSnapshot(db, run.id, loaded.snapshot);
+        } catch {
+          /* snapshot persist best-effort */
+        }
+        if (loaded.droppedKeys.length > 0) {
+          await appendRunEvent(db, {
+            runId: run.id,
+            workspaceId: run.workspaceId,
+            kind: "progress",
+            payload: {
+              message: "Some skills truncated for prompt budget",
+              code: "skills_truncated",
+              droppedKeys: loaded.droppedKeys,
+              included: loaded.snapshot
+                .filter((s) => s.included)
+                .map((s) => s.key),
+            },
+          });
+        }
+        if (loaded.markdown) {
+          strategyContext = [strategyContext, loaded.markdown]
             .filter(Boolean)
             .join("\n\n");
         }
@@ -573,6 +600,56 @@ export async function executeClaimedRun(
     }
 
     try {
+      const allowlistForTools =
+        profileTools && profileTools.length > 0
+          ? profileTools
+          : parseJsonArray(run.toolAllowlist);
+      if (!isPrReview && allowlistForTools.length > 0) {
+        try {
+          const { buildWorkspaceToolInvoker } = await import(
+            "./tool-preflight.js"
+          );
+          const built = await buildWorkspaceToolInvoker({
+            db,
+            workspaceId: run.workspaceId,
+            profileAllowlist: allowlistForTools,
+          });
+          toolInvoker = built.invoker;
+          if (built.invokableTools.length > 0) {
+            const preflight = await runToolPreflight({
+              runtime: built.runtime,
+              tools: built.invokableTools.slice(0, 4),
+              phase: "tool_preflight",
+            });
+            for (const ev of preflight.events) {
+              await appendRunEvent(db, {
+                runId: run.id,
+                workspaceId: run.workspaceId,
+                kind: ev.kind,
+                payload: {
+                  message: ev.message,
+                  ...(ev.payload ?? {}),
+                },
+              });
+            }
+            if (preflight.contextBlocks.length > 0) {
+              strategyContext = [
+                strategyContext,
+                "## Tool preflight",
+                ...preflight.contextBlocks,
+              ]
+                .filter(Boolean)
+                .join("\n\n");
+            }
+          }
+        } catch (err) {
+          log.warn("tool preflight skipped", {
+            runId: run.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
       for await (const event of agent.run({
         runId: run.id,
         taskId: task.id,
@@ -595,6 +672,15 @@ export async function executeClaimedRun(
         abortSignal: abortController.signal,
         mode: isPrReview ? "pr_review" : "implement",
         reviewContext,
+        skillSnapshot,
+        // Preflight already ran above (Cursor + OpenAI). Pass invoker only when
+        // preflight found nothing invokable so the OpenAI harness can still try.
+        invokeTool:
+          toolInvoker &&
+          !(strategyContext ?? "").includes("## Tool preflight")
+            ? toolInvoker
+            : undefined,
+        maxToolInvokes: 4,
       })) {
         if (lostOwnership || abortController.signal.aborted) {
           break;

@@ -1,9 +1,11 @@
 import {
   deleteMcpConnection,
+  getMcpConnection,
   isMcpProvider,
   listMcpConnections,
   serializeMcpConnectionPublic,
   setMcpConnectionEnabled,
+  updateMcpConnectionTools,
   upsertMcpConnection,
 } from "@coppergate/db";
 import { sealSecret } from "@coppergate/github";
@@ -52,24 +54,54 @@ export async function PUT(request: Request, context: RouteContext) {
       token?: string;
       enabled?: boolean;
       projectKey?: string;
+      toolAllowlist?: string[];
     };
     if (!body.provider || !isMcpProvider(body.provider)) {
-      throw new ApiError("bad_request", "provider must be sonarqube");
+      throw new ApiError(
+        "bad_request",
+        "provider must be sonarqube or mcp",
+      );
     }
     if (!body.endpointUrl || typeof body.endpointUrl !== "string") {
       throw new ApiError("bad_request", "endpointUrl required");
     }
-    if (!body.token || typeof body.token !== "string") {
-      throw new ApiError("bad_request", "token required");
+    // Sonar always needs a token; generic MCP may be unauthenticated.
+    if (
+      body.provider === "sonarqube" &&
+      (!body.token || typeof body.token !== "string")
+    ) {
+      throw new ApiError("bad_request", "token required for sonarqube");
     }
-    const encryptedPayload = sealSecret(body.token.trim(), credentialsKey());
+    if (
+      body.provider === "mcp" &&
+      (!Array.isArray(body.toolAllowlist) || body.toolAllowlist.length === 0)
+    ) {
+      throw new ApiError(
+        "bad_request",
+        "toolAllowlist required for generic mcp provider",
+      );
+    }
+    const token =
+      typeof body.token === "string" ? body.token.trim() : "";
+    const existing = await getMcpConnection(db, workspaceId, body.provider);
+    // Sonar always has a token. Generic MCP: omit token on update → keep vault;
+    // create without bearer → sealed placeholder (column NOT NULL).
+    let encryptedPayload = "";
+    if (token) {
+      encryptedPayload = sealSecret(token, credentialsKey());
+    } else if (!existing) {
+      encryptedPayload = sealSecret("mcp:no-token", credentialsKey());
+    }
     const row = await upsertMcpConnection(db, {
       workspaceId,
       provider: body.provider,
-      displayName: body.displayName?.trim() || "SonarQube",
+      displayName:
+        body.displayName?.trim() ||
+        (body.provider === "sonarqube" ? "SonarQube" : "MCP server"),
       endpointUrl: body.endpointUrl,
       encryptedPayload,
       enabled: body.enabled ?? true,
+      toolAllowlist: body.toolAllowlist,
       actor: `user:${user.id}`,
       meta: body.projectKey
         ? { projectKey: body.projectKey.trim() }
@@ -94,9 +126,29 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = (await request.json()) as {
       provider?: string;
       enabled?: boolean;
+      toolAllowlist?: string[];
     };
-    if (!body.provider || typeof body.enabled !== "boolean") {
-      throw new ApiError("bad_request", "provider and enabled required");
+    if (!body.provider) {
+      throw new ApiError("bad_request", "provider required");
+    }
+    if (Array.isArray(body.toolAllowlist)) {
+      const row = await updateMcpConnectionTools(db, {
+        workspaceId,
+        provider: body.provider,
+        toolAllowlist: body.toolAllowlist,
+        actor: `user:${user.id}`,
+      });
+      if (!row) throw new ApiError("not_found", "connection not found");
+      return jsonOk(
+        { connection: serializeMcpConnectionPublic(row) },
+        { correlationId },
+      );
+    }
+    if (typeof body.enabled !== "boolean") {
+      throw new ApiError(
+        "bad_request",
+        "enabled or toolAllowlist required",
+      );
     }
     const row = await setMcpConnectionEnabled(db, {
       workspaceId,
