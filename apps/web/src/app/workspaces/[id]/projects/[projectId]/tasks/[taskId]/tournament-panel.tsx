@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { formatPromoteReason } from "../../../../arena/payoff-display";
 import { TournamentFlowGraph } from "../../../../arena/tournament-flow-graph";
 import styles from "./task-detail.module.css";
 
@@ -169,24 +170,7 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
       ) : null}
 
       {winner && tournament.status === "RESOLVED" ? (
-        <p className={styles.tournamentWhy}>
-          Decision: efficiency{" "}
-          <strong>
-            {winner.efficiencyScore == null
-              ? "—"
-              : winner.efficiencyScore.toFixed(3)}
-          </strong>
-          {" · "}fitness{" "}
-          {winner.fitnessScore == null ? "—" : winner.fitnessScore.toFixed(2)}
-          {" · "}spend{" "}
-          {formatUsd(winner.actualCostMicros || winner.estimatedCostMicros)}
-          {winner.fitnessReasons && winner.fitnessReasons.length > 0 ? (
-            <>
-              {" · "}
-              {winner.fitnessReasons.slice(0, 4).map(reasonLabel).join(", ")}
-            </>
-          ) : null}
-        </p>
+        <p className={styles.tournamentWhy}>{formatPromoteReason(winner)}</p>
       ) : null}
 
       {!allQuiet ? (
@@ -247,6 +231,9 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
                         : null}
                       {run.fitnessReasons?.includes("ci_failed")
                         ? " · CI failed (e=0)"
+                        : null}
+                      {run.fitnessReasons?.includes("vibes_only_blocked")
+                        ? " · vibes-only blocked (need CI/tests refs)"
                         : null}
                     </p>
                   ) : run.fitnessReasons && run.fitnessReasons.length > 0 ? (

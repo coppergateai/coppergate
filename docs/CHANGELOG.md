@@ -9,6 +9,8 @@
 
 ### Features
 
+- P-142: Critic fitness cites evidence refs — non-zero fitness requires cited CI/validation + tests(/coverage/e2e) artifact ids; vibes-only promote blocked (`vibes_only_blocked`). See `docs/critic-fitness-evidence-refs.md`.
+- P-140: Arena efficiency payoff UX — board strip + agent cards + inspector show `e · f · spend` (`e=f/spend^α`), CI fail ⇒ e=0 copy, and winner promote reason. See `docs/arena-efficiency-payoff.md`.
 - Claude Code (Agent SDK) coding harness — `ClaudeCodeCodingAgent` via `@anthropic-ai/claude-agent-sdk`, BYOK vendor `claude_code`, harness kind `claude_code`, env `ANTHROPIC_API_KEY` / `CLAUDE_CODE_MODEL`. Prefer Cursor when both exist; Claude Code is OpenAI failover when Cursor is absent. See `docs/HARNESS.md`.
 - P-150–P-154: Agents → Skills → Tools (MCP) runtime + UX — `ToolRuntime` + Sonar/generic MCP invoke (worker preflight; optional `ACPP_GATEWAY_URL`), `skill_snapshot_json` on runs, Tools page as MCP home (SonarQube + HTTPS MCP), bidirectional skill/tool grants, `SYSTEM_TOOL_CATALOG` single source of truth. Custom tool tokens remain catalog/policy only; Sonar/`mcp:*` are invokable.
 - AG-030: Maintainer enable no silent escalation — existing workspace spend cap is never raised on enable; multi-repo, auto-release, and extra signal providers are stripped with audit `escalationClamps`. See `docs/maintainer-enable-no-escalation.md`.

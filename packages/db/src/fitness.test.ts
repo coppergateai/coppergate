@@ -11,9 +11,17 @@ import { approveBrief, createBriefDraft } from "./briefs.js";
 import { upsertWorkspaceSubscription } from "./billing.js";
 import { setProjectBudget } from "./budgets.js";
 import {
+  missingFitnessEvidence,
   scoreAndResolveTournament,
   scoreWithRulesCritic,
 } from "./fitness.js";
+
+const cited = [
+  { kind: "ci" as const, artifactId: "a-ci" },
+  { kind: "validation" as const, artifactId: "a-val" },
+  { kind: "tests" as const, artifactId: "a-diff" },
+  { kind: "diff" as const, artifactId: "a-diff" },
+];
 import { connectRepository, upsertGithubInstallation } from "./github.js";
 import { generateProjectPlan } from "./plans.js";
 import { createProjectWithRepo } from "./projects.js";
@@ -23,7 +31,7 @@ import { createWorkspaceWithOwner, insertTestUser } from "./workspaces.js";
 import { eq } from "drizzle-orm";
 
 describe("rules critic (pure)", () => {
-  it("ranks CI+validation+PR above failure", () => {
+  it("ranks CI+validation+PR above failure when evidence is cited", () => {
     const good = scoreWithRulesCritic({
       ciPassed: true,
       validationPassed: true,
@@ -33,6 +41,7 @@ describe("rules critic (pure)", () => {
       sonarPassed: true,
       meaningfulDiff: true,
       testsTouched: true,
+      evidenceRefs: cited,
     });
     const bad = scoreWithRulesCritic({
       ciPassed: false,
@@ -41,6 +50,7 @@ describe("rules critic (pure)", () => {
       hasDiffEvidence: false,
       blockingFailure: true,
       sonarPassed: false,
+      evidenceRefs: cited,
     });
     assert.ok(good.score > bad.score);
     assert.ok(good.score <= 1);
@@ -50,6 +60,7 @@ describe("rules critic (pure)", () => {
     assert.ok("coverage" in good.breakdown);
     assert.ok("e2e" in good.breakdown);
     assert.ok("meaningful" in good.breakdown);
+    assert.deepEqual(good.evidenceRefs, cited);
   });
 
   it("disqualifies stub/toy deliveries", () => {
@@ -60,9 +71,46 @@ describe("rules critic (pure)", () => {
       hasDiffEvidence: true,
       blockingFailure: false,
       stubOrToy: true,
+      evidenceRefs: cited,
     });
     assert.equal(toy.score, 0);
     assert.ok(toy.reasons.includes("stub_or_toy_disqualified"));
+  });
+
+  it("blocks vibes-only promote without CI/tests evidence refs (P-142)", () => {
+    const vibes = scoreWithRulesCritic({
+      ciPassed: null,
+      validationPassed: null,
+      hasPr: true,
+      hasDiffEvidence: false,
+      blockingFailure: false,
+    });
+    assert.equal(vibes.score, 0);
+    assert.ok(vibes.reasons.includes("vibes_only_blocked"));
+    assert.ok(
+      missingFitnessEvidence({
+        ciPassed: null,
+        validationPassed: null,
+        hasPr: true,
+        hasDiffEvidence: false,
+        blockingFailure: false,
+      }).includes("critic_evidence_refs"),
+    );
+
+    const noTests = scoreWithRulesCritic({
+      ciPassed: true,
+      validationPassed: true,
+      hasPr: true,
+      hasDiffEvidence: true,
+      blockingFailure: false,
+      evidenceRefs: [
+        { kind: "ci", artifactId: "a-ci" },
+        { kind: "validation", artifactId: "a-val" },
+        { kind: "diff", artifactId: "a-diff" },
+      ],
+    });
+    assert.equal(noTests.score, 0);
+    assert.ok(noTests.reasons.includes("missing_tests"));
   });
 });
 
@@ -241,7 +289,10 @@ describe("scoreAndResolveTournament", { skip: !url }, () => {
       taskId,
       runId: strong!.id,
       kind: "diff_summary",
-      body: { files: 3 },
+      body: {
+        filesChanged: ["src/app.ts", "src/app.test.ts", "src/lib/util.ts"],
+        additions: 80,
+      },
       meta: { summary: "diff" },
     });
 

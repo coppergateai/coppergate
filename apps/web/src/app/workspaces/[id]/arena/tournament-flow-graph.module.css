@@ -24,6 +24,18 @@
   flex: 1 1 14rem;
 }
 
+.promote {
+  flex: 1 0 100%;
+  margin: 0.05rem 0 0;
+  max-width: 42rem;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--strip-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .right {
   display: flex;
   flex-wrap: wrap;

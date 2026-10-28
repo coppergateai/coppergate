@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  formatPayoffMetrics,
+  formatPromoteReason,
+} from "./payoff-display";
 import styles from "./tournament-flow-graph.module.css";
 
 export type TournamentFlowTournament = {
@@ -19,6 +23,9 @@ export type TournamentFlowRun = {
   efficiencyScore: number | null;
   tournamentResult: string | null;
   prUrl: string | null;
+  estimatedCostMicros?: number;
+  actualCostMicros?: number;
+  fitnessReasons?: string[];
 };
 
 type Props = {
@@ -75,14 +82,12 @@ export function TournamentFlowGraph({
   const outcome = tournament.provisional
     ? "Scoring when CI is ready"
     : winner
-      ? `Winner · ${titleCase(winner.agentProfileKey)}${
-          winner.efficiencyScore == null
-            ? ""
-            : ` · e=${winner.efficiencyScore.toFixed(3)}`
-        }`
+      ? `Winner · ${titleCase(winner.agentProfileKey)} · ${formatPayoffMetrics(winner)}`
       : open
-        ? `${tournament.n} contenders · efficiency contest`
+        ? `${tournament.n} contenders · e = f / spend^α`
         : tournament.status.replace(/_/g, " ");
+  const promote =
+    resolved && winner ? formatPromoteReason(winner) : null;
 
   return (
     <div className={styles.strip} aria-label="Tournament status">
@@ -94,7 +99,13 @@ export function TournamentFlowGraph({
           N={tournament.n}
           {" · "}
           {tournament.status.replace(/_/g, " ")}
+          {" · "}e=f/spend^α
         </p>
+        {promote ? (
+          <p className={styles.promote} title={promote}>
+            {promote}
+          </p>
+        ) : null}
         {tag ? (
           <span className={tag.className}>
             <span
@@ -122,11 +133,7 @@ export function TournamentFlowGraph({
             ]
               .filter(Boolean)
               .join(" ");
-            const label = `${titleCase(run.agentProfileKey)}${
-              run.efficiencyScore == null
-                ? ""
-                : ` · e=${run.efficiencyScore.toFixed(2)}`
-            }`;
+            const label = `${titleCase(run.agentProfileKey)} · ${formatPayoffMetrics(run)}`;
             if (!clickable) {
               return (
                 <span key={run.id} role="listitem" className={className}>

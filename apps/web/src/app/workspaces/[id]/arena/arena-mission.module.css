@@ -621,6 +621,17 @@ html[data-theme="light"] .chip_needsAttention {
   font-variant-numeric: tabular-nums;
 }
 
+.payoffPromote {
+  margin: 0.35rem 0 0.15rem;
+  max-width: 48rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--mc-text-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .agentPr {
   color: var(--mc-copper);
   text-decoration: none;

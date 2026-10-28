@@ -33,6 +33,9 @@ export type LaneTournamentScore = {
   tournamentResult: string | null;
   prUrl: string | null;
   runStatus: string;
+  actualCostMicros: number;
+  estimatedCostMicros: number;
+  fitnessReasons: string[];
 };
 
 type Props = {
@@ -93,6 +96,9 @@ export function LaneTournamentFlow({
           tournamentResult: r.tournamentResult,
           prUrl: r.prUrl,
           runStatus: r.status,
+          actualCostMicros: r.actualCostMicros ?? 0,
+          estimatedCostMicros: r.estimatedCostMicros ?? 0,
+          fitnessReasons: r.fitnessReasons ?? [],
         })),
     );
   }, [taskId, workspaceId]);

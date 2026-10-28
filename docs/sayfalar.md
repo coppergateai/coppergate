@@ -143,6 +143,7 @@ Header: repo, stack, autonomy, budget, pending approvals, last run status.
 - Arena decision panel (efficiency contest + rationale)
 
 ### `/workspaces/[id]/arena` — Workspace Arena (Mission Control)
+- Efficiency payoff on board: `e · f · spend` (`e=f/spend^α`), CI fail ⇒ e=0, winner promote reason (P-140)
 - Canlı operasyon özeti: Running / Awaiting CI / Needs attention / Idle
 - Proje satırları özet; expand ile agent grid + execution phase
 - Semantic agent state (role / mode / runtime ayrı); yalnızca Running’de pulse

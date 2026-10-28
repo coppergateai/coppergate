@@ -21,6 +21,22 @@ import {
   type Tournament,
 } from "./schema.js";
 
+export type CriticEvidenceKind =
+  | "ci"
+  | "validation"
+  | "tests"
+  | "diff"
+  | "review"
+  | "coverage"
+  | "e2e"
+  | "sonar";
+
+/** Artifact citation produced by the critic (P-142 — no vibes-only promote). */
+export type CriticEvidenceRef = {
+  kind: CriticEvidenceKind;
+  artifactId: string;
+};
+
 export type CriticSignals = {
   ciPassed: boolean | null;
   validationPassed: boolean | null;
@@ -39,6 +55,8 @@ export type CriticSignals = {
   testsTouched?: boolean | null;
   /** Scaffold / coppergateSignalFix / toy title patterns. */
   stubOrToy?: boolean | null;
+  /** Cited evidence artifacts — required for non-zero fitness (P-142). */
+  evidenceRefs?: CriticEvidenceRef[];
 };
 
 export type CriticScore = {
@@ -54,11 +72,55 @@ export type CriticScore = {
     meaningful: number;
   };
   reasons: string[];
+  evidenceRefs?: CriticEvidenceRef[];
 };
 
-/** Rules-based critic (TASK050 + quality/e2e + meaningfulness gates). */
+function evidenceKinds(signals: CriticSignals): Set<CriticEvidenceKind> {
+  return new Set((signals.evidenceRefs ?? []).map((r) => r.kind));
+}
+
+function hasEvidenceKind(
+  signals: CriticSignals,
+  kind: CriticEvidenceKind,
+): boolean {
+  return evidenceKinds(signals).has(kind);
+}
+
+/**
+ * P-142 — fitness promote requires cited CI/validation + tests(+coverage/e2e) refs.
+ * Returns missing requirement keys (empty = gate open).
+ */
+export function missingFitnessEvidence(signals: CriticSignals): string[] {
+  const refs = signals.evidenceRefs ?? [];
+  const kinds = evidenceKinds(signals);
+  const missing: string[] = [];
+  if (refs.length === 0) {
+    missing.push("critic_evidence_refs");
+  }
+  if (!kinds.has("ci") && !kinds.has("validation")) {
+    missing.push("ci_or_validation");
+  }
+  if (!kinds.has("tests") && !kinds.has("coverage") && !kinds.has("e2e")) {
+    missing.push("tests");
+  }
+  return missing;
+}
+
+const EMPTY_BREAKDOWN: CriticScore["breakdown"] = {
+  ci: 0,
+  validation: 0,
+  delivery: 0,
+  criticPenalty: 0,
+  sonar: 0,
+  coverage: 0,
+  e2e: 0,
+  meaningful: 0,
+};
+
+/** Rules-based critic (TASK050 + quality/e2e + meaningfulness + P-142 evidence refs). */
 export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   const reasons: string[] = [];
+  const cited = signals.evidenceRefs ?? [];
   let ci = 0;
   let validation = 0;
   let delivery = 0;
@@ -72,17 +134,23 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
     reasons.push("stub_or_toy_disqualified");
     return {
       score: 0,
-      breakdown: {
-        ci: 0,
-        validation: 0,
-        delivery: 0,
-        criticPenalty: -1,
-        sonar: 0,
-        coverage: 0,
-        e2e: 0,
-        meaningful: 0,
-      },
+      breakdown: { ...EMPTY_BREAKDOWN, criticPenalty: -1 },
       reasons,
+      evidenceRefs: cited,
+    };
+  }
+
+  const missing = missingFitnessEvidence(signals);
+  if (missing.length > 0) {
+    reasons.push("vibes_only_blocked");
+    for (const key of missing) {
+      reasons.push(`missing_${key}`);
+    }
+    return {
+      score: 0,
+      breakdown: { ...EMPTY_BREAKDOWN, criticPenalty: -1 },
+      reasons,
+      evidenceRefs: cited,
     };
   }
 
@@ -97,9 +165,11 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   } else if (signals.ciPassed === false) {
     ci = 0;
     reasons.push("ci_failed");
-  } else {
+  } else if (hasEvidenceKind(signals, "ci")) {
     ci = 0.08;
     reasons.push("ci_unknown");
+  } else {
+    reasons.push("ci_absent");
   }
 
   if (signals.validationPassed === true) {
@@ -108,9 +178,11 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   } else if (signals.validationPassed === false) {
     validation = 0;
     reasons.push("validation_failed");
-  } else {
+  } else if (hasEvidenceKind(signals, "validation")) {
     validation = 0.04;
     reasons.push("validation_unknown");
+  } else {
+    reasons.push("validation_absent");
   }
 
   if (signals.sonarPassed === true) {
@@ -119,7 +191,7 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   } else if (signals.sonarPassed === false) {
     sonar = 0;
     reasons.push("sonar_failed");
-  } else {
+  } else if (hasEvidenceKind(signals, "sonar")) {
     sonar = 0.03;
     reasons.push("sonar_unknown");
   }
@@ -130,7 +202,7 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   } else if (signals.coveragePassed === false) {
     coverage = 0;
     reasons.push("coverage_failed");
-  } else {
+  } else if (hasEvidenceKind(signals, "coverage")) {
     coverage = 0.02;
     reasons.push("coverage_unknown");
   }
@@ -141,7 +213,7 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
   } else if (signals.e2ePassed === false) {
     e2e = 0;
     reasons.push("e2e_failed");
-  } else {
+  } else if (hasEvidenceKind(signals, "e2e")) {
     e2e = 0.03;
     reasons.push("e2e_unknown");
   }
@@ -194,7 +266,17 @@ export function scoreWithRulesCritic(signals: CriticSignals): CriticScore {
       meaningful,
     },
     reasons,
+    evidenceRefs: cited,
   };
+}
+
+function pushEvidenceRef(
+  refs: CriticEvidenceRef[],
+  kind: CriticEvidenceKind,
+  artifactId: string,
+): void {
+  if (refs.some((r) => r.kind === kind && r.artifactId === artifactId)) return;
+  refs.push({ kind, artifactId });
 }
 
 export async function collectCriticSignals(
@@ -214,31 +296,53 @@ export async function collectCriticSignals(
   let meaningfulDiff: boolean | null = null;
   let testsTouched: boolean | null = null;
   let stubOrToy: boolean | null = null;
+  const evidenceRefs: CriticEvidenceRef[] = [];
 
   for (const art of artifacts) {
+    if (art.kind === "ci_evidence") {
+      pushEvidenceRef(evidenceRefs, "ci", art.id);
+    }
+    if (art.kind === "review_findings") {
+      pushEvidenceRef(evidenceRefs, "review", art.id);
+    }
     if (art.kind === "validation_report" || art.kind === "ci_evidence") {
       try {
         const meta = art.meta ? JSON.parse(art.meta) : {};
         if (typeof meta.passed === "boolean") {
-          if (art.kind === "validation_report") validationPassed = meta.passed;
+          if (art.kind === "validation_report") {
+            validationPassed = meta.passed;
+            pushEvidenceRef(evidenceRefs, "validation", art.id);
+          }
           if (meta.passed) ciPassed = meta.passed;
+          if (art.kind === "ci_evidence" && typeof meta.passed === "boolean") {
+            ciPassed = meta.passed;
+          }
           if (meta.passed === false && meta.blocksAccept) blockingFailure = true;
         }
         if (meta.inlineBody) {
           const body = JSON.parse(String(meta.inlineBody));
           if (typeof body.passed === "boolean") {
-            validationPassed = body.passed;
-            if (body.source === "github_check") ciPassed = body.passed;
+            if (art.kind === "validation_report") {
+              validationPassed = body.passed;
+              pushEvidenceRef(evidenceRefs, "validation", art.id);
+            }
+            if (body.source === "github_check") {
+              ciPassed = body.passed;
+              pushEvidenceRef(evidenceRefs, "ci", art.id);
+            }
             if (body.source === "sonar_quality_gate") {
               sonarPassed = body.passed;
+              pushEvidenceRef(evidenceRefs, "sonar", art.id);
               if (body.passed === false) blockingFailure = true;
             }
             if (body.source === "coverage_delta") {
               coveragePassed = body.passed;
+              pushEvidenceRef(evidenceRefs, "coverage", art.id);
               if (body.passed === false) blockingFailure = true;
             }
             if (body.source === "e2e") {
               e2ePassed = body.passed;
+              pushEvidenceRef(evidenceRefs, "e2e", art.id);
               if (body.passed === false) blockingFailure = true;
             }
             if (body.blocksAccept && body.passed === false) {
@@ -248,6 +352,7 @@ export async function collectCriticSignals(
         }
         if (meta.validator === "sonar-quality-gate-v1" && typeof meta.passed === "boolean") {
           sonarPassed = meta.passed;
+          pushEvidenceRef(evidenceRefs, "sonar", art.id);
           if (!meta.passed) blockingFailure = true;
         }
         if (
@@ -256,6 +361,7 @@ export async function collectCriticSignals(
           typeof meta.passed === "boolean"
         ) {
           coveragePassed = meta.passed;
+          pushEvidenceRef(evidenceRefs, "coverage", art.id);
           if (!meta.passed) blockingFailure = true;
         }
         if (
@@ -264,7 +370,17 @@ export async function collectCriticSignals(
           typeof meta.passed === "boolean"
         ) {
           e2ePassed = meta.passed;
+          pushEvidenceRef(evidenceRefs, "e2e", art.id);
           if (!meta.passed) blockingFailure = true;
+        }
+        // Fixture / sandbox validation without github_check still counts as CI proxy when passed.
+        if (
+          art.kind === "validation_report" &&
+          validationPassed === true &&
+          !evidenceRefs.some((r) => r.kind === "ci")
+        ) {
+          pushEvidenceRef(evidenceRefs, "ci", art.id);
+          if (ciPassed == null) ciPassed = true;
         }
       } catch {
         /* ignore malformed meta */
@@ -272,6 +388,7 @@ export async function collectCriticSignals(
     }
     if (art.kind === "diff_summary" || art.kind === "delivery_report") {
       hasDiffEvidence = true;
+      pushEvidenceRef(evidenceRefs, "diff", art.id);
       try {
         const meta = art.meta ? JSON.parse(art.meta) : {};
         const body =
@@ -281,7 +398,11 @@ export async function collectCriticSignals(
         const files: string[] = Array.isArray(body?.filesChanged)
           ? body.filesChanged
           : Array.isArray(body?.files)
-            ? body.files.map((f: { path?: string }) => f.path).filter(Boolean)
+            ? body.files
+                .map((f: { path?: string } | string) =>
+                  typeof f === "string" ? f : f.path,
+                )
+                .filter((p: string | undefined): p is string => Boolean(p))
             : [];
         const additions =
           typeof body?.additions === "number"
@@ -306,7 +427,10 @@ export async function collectCriticSignals(
         const testFiles = files.filter((p) =>
           /\.(test|spec)\.|_test\.|\/tests?\//i.test(p),
         );
-        if (testFiles.length > 0) testsTouched = true;
+        if (testFiles.length > 0) {
+          testsTouched = true;
+          pushEvidenceRef(evidenceRefs, "tests", art.id);
+        }
         if (nonDoc.length >= 2 || (additions != null && additions >= 40)) {
           meaningfulDiff = true;
         } else if (
@@ -363,6 +487,7 @@ export async function collectCriticSignals(
     meaningfulDiff,
     testsTouched,
     stubOrToy,
+    evidenceRefs,
   };
 }
 
@@ -398,6 +523,7 @@ export async function persistContenderFitness(
     ciPassed: signals.ciPassed,
   });
 
+  const cited = score.evidenceRefs ?? signals.evidenceRefs ?? [];
   const artifact = await createArtifact(db, {
     workspaceId: input.run.workspaceId,
     projectId: input.run.projectId,
@@ -408,6 +534,7 @@ export async function persistContenderFitness(
       scorer: "rules-critic-v1",
       signals,
       ...score,
+      evidenceRefs: cited,
       efficiency,
       spendMicros,
       alpha,
@@ -419,6 +546,8 @@ export async function persistContenderFitness(
       efficiency,
       alpha,
       summary: score.reasons.join(","),
+      evidenceRefs: cited,
+      evidenceRefCount: cited.length,
     },
   });
 
@@ -455,6 +584,7 @@ export async function persistContenderFitness(
       alpha,
       artifactId: artifact.id,
       reasons: score.reasons,
+      evidenceRefs: cited,
     }),
   });
 

@@ -9,6 +9,7 @@ import {
   LaneTournamentFlow,
   type LaneTournamentScore,
 } from "./lane-tournament-flow";
+import { formatPayoffMetrics, formatPromoteReason } from "./payoff-display";
 import styles from "./arena-mission.module.css";
 
 type ContenderRun = {
@@ -784,7 +785,13 @@ export function ArenaSpectacle({
                                     scores[i]?.efficiencyScore &&
                                   s.fitnessScore === scores[i]?.fitnessScore &&
                                   s.tournamentResult ===
-                                    scores[i]?.tournamentResult,
+                                    scores[i]?.tournamentResult &&
+                                  s.actualCostMicros ===
+                                    scores[i]?.actualCostMicros &&
+                                  s.estimatedCostMicros ===
+                                    scores[i]?.estimatedCostMicros &&
+                                  (s.fitnessReasons ?? []).join() ===
+                                    (scores[i]?.fitnessReasons ?? []).join(),
                               )
                             ) {
                               return prev;
@@ -812,12 +819,14 @@ export function ArenaSpectacle({
                         ))}
                       </div>
                       {(() => {
+                        const laneScoreList = laneScores[lane.projectId] ?? [];
                         const scoresByContender = new Map(
-                          (laneScores[lane.projectId] ?? []).map((s) => [
-                            s.contenderId,
-                            s,
-                          ]),
+                          laneScoreList.map((s) => [s.contenderId, s]),
                         );
+                        const winnerScore =
+                          laneScoreList.find(
+                            (s) => s.tournamentResult === "WINNER",
+                          ) ?? null;
                         const ranked = [...lane.contenders]
                           .map((c) => ({
                             c,
@@ -842,6 +851,15 @@ export function ArenaSpectacle({
                           const score = scoresByContender.get(c.id);
                           const result = score?.tournamentResult;
                           const prUrl = score?.prUrl ?? c.latestRun?.prUrl;
+                          const metrics = score
+                            ? formatPayoffMetrics({
+                                ...score,
+                                actualCostMicros:
+                                  score.actualCostMicros ||
+                                  c.latestRun?.actualCostMicros ||
+                                  0,
+                              })
+                            : null;
                           return (
                             <button
                               key={c.id}
@@ -881,19 +899,10 @@ export function ArenaSpectacle({
                                   {temperLabel(c.temperament)} · {c.strategy}
                                 </p>
                               )}
-                              {!compact && (score || prUrl) ? (
+                              {!compact && (metrics || prUrl) ? (
                                 <div className={styles.agentMetrics}>
-                                  {score ? (
-                                    <span>
-                                      e=
-                                      {score.efficiencyScore == null
-                                        ? "—"
-                                        : score.efficiencyScore.toFixed(3)}
-                                      {" · "}f=
-                                      {score.fitnessScore == null
-                                        ? "—"
-                                        : score.fitnessScore.toFixed(2)}
-                                    </span>
+                                  {metrics ? (
+                                    <span title="e = f / spend^α">{metrics}</span>
                                   ) : null}
                                   {prUrl ? (
                                     <a
@@ -933,6 +942,14 @@ export function ArenaSpectacle({
                                 )
                               )}
                             </div>
+                            {winnerScore ? (
+                              <p
+                                className={styles.payoffPromote}
+                                title={formatPromoteReason(winnerScore)}
+                              >
+                                {formatPromoteReason(winnerScore)}
+                              </p>
+                            ) : null}
                             {idle.length > 0 ? (
                               <div className={styles.idleRoster}>
                                 <button
@@ -1055,6 +1072,11 @@ export function ArenaSpectacle({
           )}
           statusBadgeClass={TONE[selectedAgent.state].badge ?? ""}
           eliminated={selectedAgent.eliminated}
+          payoff={
+            (laneScores[selectedAgent.lane.projectId] ?? []).find(
+              (s) => s.contenderId === selectedAgent.contender.id,
+            ) ?? null
+          }
           onClose={() => setSelected(null)}
         />
       ) : null}

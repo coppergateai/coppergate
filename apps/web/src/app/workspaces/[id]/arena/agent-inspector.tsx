@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { displayTaskTitle } from "@/lib/display-title";
+import {
+  formatPayoffMetrics,
+  formatPromoteReason,
+  type PayoffFields,
+} from "./payoff-display";
 import styles from "./arena-mission.module.css";
 
 export type InspectorRun = {
@@ -64,6 +69,7 @@ type Props = {
   statusLabel: string;
   statusBadgeClass: string;
   eliminated?: boolean;
+  payoff?: PayoffFields | null;
   onClose: () => void;
 };
 
@@ -167,6 +173,7 @@ export function AgentInspector({
   contender,
   statusLabel,
   statusBadgeClass,
+  payoff,
   eliminated = false,
   onClose,
 }: Props) {
@@ -366,6 +373,14 @@ export function AgentInspector({
               {" · "}
               Cost {formatUsd(run.actualCostMicros)}
             </p>
+            {payoff ? (
+              <p
+                className={styles.inspectorMeta}
+                title={formatPromoteReason(payoff)}
+              >
+                Payoff {formatPayoffMetrics(payoff)}
+              </p>
+            ) : null}
             <div className={styles.inspectorLinks}>
               {reviewHref ? (
                 <Link href={reviewHref} className={styles.inspectorLink}>

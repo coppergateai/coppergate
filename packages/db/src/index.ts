@@ -170,9 +170,12 @@ export {
 export {
   collectCriticSignals,
   maybeScoreAndResolveTournament,
+  missingFitnessEvidence,
   persistContenderFitness,
   scoreAndResolveTournament,
   scoreWithRulesCritic,
+  type CriticEvidenceKind,
+  type CriticEvidenceRef,
   type CriticScore,
   type CriticSignals,
 } from "./fitness.js";
