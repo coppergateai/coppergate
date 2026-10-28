@@ -37,7 +37,7 @@ export function BriefPanel({
   isOwner,
   showArenaCta = true,
 }: Props) {
-  const arenaHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
+  const arenaHref = `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`;
   const brief = initialBrief;
 
   return (

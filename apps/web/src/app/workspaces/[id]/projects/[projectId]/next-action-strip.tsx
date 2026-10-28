@@ -71,7 +71,7 @@ export function NextActionStrip({
     title = "Start execution in Arena";
     detail =
       "Contenders compete under budget. Survivor opens a PR — CI is the promotion gate.";
-    href = `${base}?tab=arena`;
+    href = `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`;
     cta = "Open Arena";
   } else if (step === "ci") {
     title = "Wait for CI to finish";

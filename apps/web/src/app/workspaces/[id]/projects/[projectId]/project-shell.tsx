@@ -31,7 +31,6 @@ type Props = {
   initialTab: ProjectTab;
   overview: ReactNode;
   delivery: ReactNode;
-  arena: ReactNode;
   evidence: ReactNode;
   configuration: ReactNode;
 };
@@ -40,7 +39,6 @@ function tabFromHash(hash: string): ProjectTab | null {
   const id = hash.replace(/^#/, "");
   if (id === "budget" || id === "brief" || id === "issues") return "overview";
   if (id === "plan" || id === "board") return "delivery";
-  if (id === "arena") return "arena";
   if (id === "evidence") return "evidence";
   if (id === "merge" || id === "policy" || id === "repos" || id === "more") {
     return "configuration";
@@ -82,7 +80,6 @@ const TABS: Array<{
 }> = [
   { id: "overview", label: "Overview" },
   { id: "delivery", label: "Delivery", countKey: "delivery" },
-  { id: "arena", label: "Arena" },
   { id: "evidence", label: "Evidence", countKey: "evidence" },
   { id: "configuration", label: "Configuration" },
 ];
@@ -108,7 +105,6 @@ export function ProjectShell({
   initialTab,
   overview,
   delivery,
-  arena,
   evidence,
   configuration,
 }: Props) {
@@ -141,13 +137,11 @@ export function ProjectShell({
   const pane =
     tab === "delivery"
       ? delivery
-      : tab === "arena"
-        ? arena
-        : tab === "evidence"
-          ? evidence
-          : tab === "configuration"
-            ? configuration
-            : overview;
+      : tab === "evidence"
+        ? evidence
+        : tab === "configuration"
+          ? configuration
+          : overview;
 
   const availableLabel = pooled
     ? formatCap(availableMicros ?? 0, currency)

@@ -19,7 +19,6 @@ import {
 import { SkeletonStack } from "@/components/app/ui";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { ArenaPanel } from "./arena-panel";
 import { CostExplorerStrip } from "./cost-explorer";
 import { EvidencePanel } from "./evidence-panel";
 import { IssuesPanel } from "./issues-panel";
@@ -70,6 +69,11 @@ export default async function ProjectDetailPage({
 
   const { id: workspaceId, projectId } = await params;
   const sp = await searchParams;
+  if (sp.tab === "arena") {
+    redirect(
+      `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`,
+    );
+  }
   const access = await getWorkspaceForMember(db, workspaceId, user.id);
   if (!access) {
     notFound();
@@ -330,13 +334,6 @@ export default async function ProjectDetailPage({
               tasks={boardTasks}
             />
           </>
-        }
-        arena={
-          <ArenaPanel
-            workspaceId={workspaceId}
-            projectId={projectId}
-            isOwner={isOwner}
-          />
         }
         evidence={
           <EvidencePanel workspaceId={workspaceId} projectId={projectId} />

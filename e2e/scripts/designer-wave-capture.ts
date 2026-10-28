@@ -124,7 +124,6 @@ async function main() {
       ["03-projects", `${ws}/projects`, /Projects/i],
       ["04-overview", `${target.projectUrl}?tab=overview`, /Overview|Brief|Plan|Budget/i],
       ["05-delivery", `${target.projectUrl}?tab=delivery`, /Delivery|Backlog|Accepted/i],
-      ["06-project-arena", `${target.projectUrl}?tab=arena`, /Arena/i],
       ["07-evidence", `${target.projectUrl}?tab=evidence`, /Evidence|Accept/i],
       ["08-configuration", `${target.projectUrl}?tab=configuration`, /Configuration|Policy|Maintainer|Settings/i],
       ["09-arena", `${ws}/arena`, /Arena/i],

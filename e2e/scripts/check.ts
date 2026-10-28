@@ -64,7 +64,6 @@ async function main(): Promise<void> {
   const tabs = {
     overview: clip(overview, 4000),
     delivery: await openTab(page, "delivery"),
-    arena: await openTab(page, "arena"),
     more: await openTab(page, "more"),
   };
 
@@ -72,13 +71,6 @@ async function main(): Promise<void> {
     name: "Delivery tab renders",
     ok: tabs.delivery.length > 40,
     detail: `${tabs.delivery.length} chars`,
-  });
-  assertions.push({
-    name: "Agents tab renders",
-    ok: /Agents|Arena|Start|Stop|LIVE|IDLE|PAUSED|Contender|war|Workspace Start/i.test(
-      tabs.arena,
-    ),
-    detail: clip(tabs.arena, 200),
   });
 
   page.setDefaultTimeout(45_000);
@@ -220,10 +212,9 @@ async function main(): Promise<void> {
 
 async function openTab(
   page: Page,
-  tab: "delivery" | "arena" | "more",
+  tab: "delivery" | "more",
 ): Promise<string> {
-  const label =
-    tab === "delivery" ? "Delivery" : tab === "arena" ? "Agents" : "More";
+  const label = tab === "delivery" ? "Delivery" : "More";
   const tabBtn = page.getByRole("tab", { name: new RegExp(`^${label}`) });
   if ((await tabBtn.count()) > 0) {
     await tabBtn.first().click({ timeout: 5_000 }).catch(() => undefined);

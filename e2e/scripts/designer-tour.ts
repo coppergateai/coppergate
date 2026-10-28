@@ -117,11 +117,6 @@ async function main() {
     /Delivery|Backlog|Accepted/i,
   );
   await capture(
-    "06-project-arena",
-    `${target.projectUrl}?tab=arena`,
-    /Arena/i,
-  );
-  await capture(
     "07-evidence",
     `${target.projectUrl}?tab=evidence`,
     /Evidence|Accept/i,

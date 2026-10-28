@@ -127,7 +127,7 @@ export function PlanPanel({
     }
   }
 
-  const arenaHref = `/workspaces/${workspaceId}/projects/${projectId}?tab=arena`;
+  const arenaHref = `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`;
   const [showOlderMilestones, setShowOlderMilestones] = useState(false);
   const MILESTONE_PREVIEW = 3;
 

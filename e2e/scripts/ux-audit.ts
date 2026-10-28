@@ -92,10 +92,6 @@ async function main(): Promise<void> {
       path: `/workspaces/${ws}/projects/${project}?tab=delivery`,
     },
     {
-      id: "18-project-arena",
-      path: `/workspaces/${ws}/projects/${project}?tab=arena`,
-    },
-    {
       id: "19-project-evidence",
       path: `/workspaces/${ws}/projects/${project}?tab=evidence`,
     },
