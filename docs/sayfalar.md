@@ -78,7 +78,7 @@ Web uygulamasındaki (`apps/web`) route’ların sayfa sayfa özeti. Auth gerekt
 
 ## Workspace (`/workspaces/[id]/…`)
 
-Layout: AppChrome sidebar — **Overview**, Projects, Arena, Agents, Inbox, Insights, Activity, Settings.
+Layout: AppChrome sidebar — **Overview**, Projects, Arena, Agents, Skills, Tools, Inbox, Insights, Activity, Settings.
 Varsayılan app teması: **light** (toggle ile dark).
 
 ### `/workspaces/[id]` — Mission Control (Overview)
@@ -96,6 +96,16 @@ Varsayılan app teması: **light** (toggle ile dark).
 - 30d stats: runs, wins/losses, failed, spend, last run
 - Live Arena seats (ACTIVE contenders) per profile
 - `?agent=engineer` deep-link; Configure → Settings · LLM
+
+### `/workspaces/[id]/skills` — Skills
+- Master–detail skill catalog (system + workspace overrides)
+- Full procedure markdown; agents that attach the skill
+- `?skill=pr-hygiene` deep-link
+
+### `/workspaces/[id]/tools` — Tools
+- Allowlist tool catalog (core / MCP / aliases) + profile grants
+- Which agents may use each tool; links back to Agents
+- `?tool=edit` deep-link
 
 ### `/workspaces/[id]/insights` — Insights
 - Period economics & verified delivery (Mission Control’dan ayrı)
@@ -198,6 +208,8 @@ Cost / period analytics → [`/insights`](#workspacesidinsights--insights) (`?ta
 /workspaces/[id]/projects/[projectId]/tasks/[taskId]  Task + Accept
 /workspaces/[id]/arena     Arena spectacle
 /workspaces/[id]/agents    Agent catalog & details
+/workspaces/[id]/skills    Skill procedures
+/workspaces/[id]/tools     Tool allowlist catalog
 /workspaces/[id]/inbox     Approvals
 /workspaces/[id]/insights  Period economics & verified delivery
 /workspaces/[id]/activity  Agent Operations Timeline

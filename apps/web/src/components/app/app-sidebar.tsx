@@ -178,6 +178,28 @@ export function AppSidebar({
               <span className={styles.navItemLabel}>Agents</span>
             </Link>
             <Link
+              href={`/workspaces/${workspaceId}/skills`}
+              className={`${styles.navItem} ${
+                isActive(pathname, `/workspaces/${workspaceId}/skills`)
+                  ? styles.navItemActive
+                  : ""
+              }`}
+              onClick={onClose}
+            >
+              <span className={styles.navItemLabel}>Skills</span>
+            </Link>
+            <Link
+              href={`/workspaces/${workspaceId}/tools`}
+              className={`${styles.navItem} ${
+                isActive(pathname, `/workspaces/${workspaceId}/tools`)
+                  ? styles.navItemActive
+                  : ""
+              }`}
+              onClick={onClose}
+            >
+              <span className={styles.navItemLabel}>Tools</span>
+            </Link>
+            <Link
               href={`/workspaces/${workspaceId}/inbox`}
               className={`${styles.navItem} ${
                 isActive(pathname, `/workspaces/${workspaceId}/inbox`)

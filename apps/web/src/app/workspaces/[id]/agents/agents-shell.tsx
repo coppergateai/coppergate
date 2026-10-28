@@ -142,6 +142,18 @@ export function AgentsShell({
           <h1 className={styles.title}>Agents</h1>
           <div className={styles.headLinks}>
             <Link
+              href={`/workspaces/${workspaceId}/skills`}
+              className={styles.headLink}
+            >
+              Skills →
+            </Link>
+            <Link
+              href={`/workspaces/${workspaceId}/tools`}
+              className={styles.headLink}
+            >
+              Tools →
+            </Link>
+            <Link
               href={`/workspaces/${workspaceId}/arena`}
               className={styles.headLink}
             >
@@ -377,6 +389,18 @@ export function AgentsShell({
               </section>
 
               <div className={styles.footerActions}>
+                <Link
+                  href={`/workspaces/${workspaceId}/skills`}
+                  className={styles.footerLink}
+                >
+                  All skills →
+                </Link>
+                <Link
+                  href={`/workspaces/${workspaceId}/tools`}
+                  className={styles.footerLink}
+                >
+                  All tools →
+                </Link>
                 <Link
                   href={`/workspaces/${workspaceId}/arena`}
                   className={styles.footerLink}

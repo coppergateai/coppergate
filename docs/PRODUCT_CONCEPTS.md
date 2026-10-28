@@ -41,6 +41,8 @@ Surfaces:
 
 - **Mission Control** (`/workspaces/[id]`) — what needs intervention now
 - **Agents** (`/workspaces/[id]/agents`) — profile catalog, skills, 30d outcomes
+- **Skills** (`/workspaces/[id]/skills`) — procedure playbooks attached to agents
+- **Tools** (`/workspaces/[id]/tools`) — allowlist capabilities per profile
 - **Insights** (`/workspaces/[id]/insights`) — period economics & verified delivery
 - **Evidence** — why a delivery is acceptable
 - **Arena** — which contender won and why (hard gates, then rank)
