@@ -121,7 +121,7 @@ export function BacklogShell({
   return (
     <main className={styles.main}>
       <header className={styles.head}>
-        <p className={styles.eyebrow}>{workspaceName}</p>
+        <p className={styles.eyebrow}>Open Program · {workspaceName}</p>
         <div className={styles.titleRow}>
           <h1 className={styles.title}>Backlog</h1>
           <nav className={styles.headLinks} aria-label="Related">
