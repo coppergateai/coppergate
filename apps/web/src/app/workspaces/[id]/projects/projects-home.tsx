@@ -9,7 +9,6 @@ import { RedetectStacksButton } from "./redetect-stacks-button";
 import { UnboundReposPanel } from "./unbound-repos-panel";
 import {
   burnPercent,
-  dollars,
   useMaintainerRollup,
 } from "./use-maintainer-rollup";
 import styles from "./projects.module.css";
