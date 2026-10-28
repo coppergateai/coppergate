@@ -265,8 +265,18 @@ export function BacklogShell({
           <div className={styles.body}>
             {visible.length === 0 ? (
               <EmptyState
-                title="Nothing in this filter"
-                body="Try All, or another project chip."
+                title={
+                  counts.all === 0
+                    ? "Open Program rows unavailable"
+                    : "Nothing in this filter"
+                }
+                body={
+                  counts.all === 0
+                    ? fetchErrors.length > 0
+                      ? "GitHub could not return the bound markdown. Confirm the App can read those repos, or that the paths are public."
+                      : "The bound files have no Open/Done program IDs yet."
+                    : "Try All, or another project chip."
+                }
               />
             ) : (
               grouped.map(([section, rows]) => (

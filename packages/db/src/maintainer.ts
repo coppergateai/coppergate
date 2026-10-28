@@ -3140,8 +3140,8 @@ export async function fetchArchitectureBacklogMarkdown(
     opts.token?.trim() ||
     process.env.ARCHITECTURE_GITHUB_TOKEN?.trim() ||
     process.env.GITHUB_TOKEN?.trim() ||
-    process.env.GH_TOKEN?.trim();
-  if (!token) return "";
+    process.env.GH_TOKEN?.trim() ||
+    null;
 
   const repo =
     opts.repo?.trim() ||
@@ -3163,16 +3163,16 @@ export async function fetchArchitectureBacklogMarkdown(
   const chunks: string[] = [];
   for (const path of paths) {
     try {
+      const headers: Record<string, string> = {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "coppergate-maintainer",
+        "X-GitHub-Api-Version": "2022-11-28",
+      };
+      // Public Open Program repos work without a token; private need install/PAT.
+      if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${name}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${token}`,
-            "User-Agent": "coppergate-maintainer",
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        },
+        { headers },
       );
       if (!res.ok) continue;
       const body = (await res.json()) as {

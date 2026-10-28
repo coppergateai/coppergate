@@ -1,4 +1,5 @@
 import { getWorkspaceOpenProgramBacklog } from "@coppergate/db";
+import { resolveArchitectureToken } from "@/lib/architecture-token";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { correlationIdFrom, jsonError, jsonOk } from "@/lib/http";
@@ -16,7 +17,10 @@ export async function GET(request: Request, context: RouteContext) {
     const { id: workspaceId } = await context.params;
     await requireWorkspaceMember(db, workspaceId, user.id);
 
-    const backlog = await getWorkspaceOpenProgramBacklog(db, workspaceId);
+    const architectureToken = await resolveArchitectureToken(db, workspaceId);
+    const backlog = await getWorkspaceOpenProgramBacklog(db, workspaceId, {
+      architectureToken,
+    });
 
     return jsonOk({ backlog }, { correlationId });
   } catch (err) {

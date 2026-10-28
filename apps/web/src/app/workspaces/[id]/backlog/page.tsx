@@ -4,6 +4,7 @@ import {
   getWorkspaceForMember,
   getWorkspaceOpenProgramBacklog,
 } from "@coppergate/db";
+import { resolveArchitectureToken } from "@/lib/architecture-token";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { BacklogShell } from "./backlog-shell";
@@ -31,9 +32,14 @@ export default async function WorkspaceBacklogPage({ params }: PageProps) {
   const access = await getWorkspaceForMember(db, id, user.id);
   if (!access) notFound();
 
+  const architectureToken = await resolveArchitectureToken(
+    db,
+    access.workspace.id,
+  );
   const backlog = await getWorkspaceOpenProgramBacklog(
     db,
     access.workspace.id,
+    { architectureToken },
   );
 
   return (
