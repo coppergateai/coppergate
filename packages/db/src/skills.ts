@@ -15,6 +15,7 @@ export const SYSTEM_SKILL_SEEDS = [
       "- Title describes a user-visible capability, not scaffold/typo.",
       "- Keep blast radius small; include a test or validation note.",
       "- Update CHANGELOG/docs when user-visible.",
+      "- If you change any `package.json` dependencies/devDependencies, run the package manager and commit the lockfile (`pnpm-lock.yaml` / `package-lock.json` / `yarn.lock`). CI uses frozen lockfiles; missing lockfile updates fail delivery.",
     ].join("\n"),
   },
   {
@@ -247,7 +248,24 @@ export async function ensureSystemAgentSkills(
   for (const seed of SYSTEM_SKILL_SEEDS) {
     const hit = byKey.get(seed.key);
     if (hit) {
-      out.push(hit);
+      if (
+        hit.title !== seed.title ||
+        hit.bodyMarkdown !== seed.bodyMarkdown
+      ) {
+        const [updated] = await db
+          .update(agentSkills)
+          .set({
+            title: seed.title,
+            bodyMarkdown: seed.bodyMarkdown,
+            version: (hit.version ?? 1) + 1,
+            updatedAt: now,
+          })
+          .where(eq(agentSkills.id, hit.id))
+          .returning();
+        out.push(updated ?? hit);
+      } else {
+        out.push(hit);
+      }
       continue;
     }
     const [created] = await db
