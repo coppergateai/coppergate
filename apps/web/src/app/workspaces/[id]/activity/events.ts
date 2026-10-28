@@ -105,9 +105,30 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     outcome: "running",
     summary: (m) => {
       const n = num(m, "n");
+      const requested = num(m, "requestedFanout");
+      const eligible = num(m, "eligibleCount");
+      const eliminated = num(m, "eliminatedInPool");
+      const starved = m?.poolStarved === true;
+      const reason = str(m, "poolStarvedReason");
       const runs = Array.isArray(m?.runIds) ? m.runIds.length : null;
-      if (n != null) return `${n} contender runs spawned.`;
-      if (runs != null) return `${runs} contender runs spawned.`;
+      const width = n ?? runs;
+      if (starved && requested != null && width != null) {
+        const elimNote =
+          eliminated != null && eliminated > 0
+            ? ` · ${eliminated} eliminated in pool`
+            : "";
+        if (reason === "contenders" && eligible != null) {
+          return `Fan-out N=${width} (requested ${requested}) — only ${eligible} contender(s) with budget${elimNote}.`;
+        }
+        if (reason === "concurrency") {
+          return `Fan-out N=${width} (requested ${requested}) — concurrency slots capped width${elimNote}.`;
+        }
+        if (reason === "budget") {
+          return `Fan-out N=${width} (requested ${requested}) — workspace budget capped width${elimNote}.`;
+        }
+        return `Fan-out N=${width} (requested ${requested}) — pool could not fill duel width${elimNote}.`;
+      }
+      if (width != null) return `${width} contender runs spawned.`;
       return "Contender runs spawned for evaluation.";
     },
   },
@@ -129,15 +150,44 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     title: "Contenders eliminated",
     category: "decision",
     outcome: "decision",
-    summary: (_m, count) =>
-      count > 1
-        ? `${count} candidates removed during evaluation.`
-        : "Candidate removed during evaluation.",
+    summary: (m, count) => {
+      const profile = str(m, "profileKey");
+      const debit = num(m, "debitMicros");
+      const debitUsd =
+        debit != null ? `$${(debit / 1_000_000).toFixed(2)}` : null;
+      if (count > 1) {
+        return `${count} contenders out of the pool after tournament losses.`;
+      }
+      if (profile && debitUsd) {
+        return `${profile} eliminated — ${debitUsd} loss debited from contender budget.`;
+      }
+      if (profile) return `${profile} eliminated — budget exhausted.`;
+      return "Contender eliminated — budget exhausted.";
+    },
   },
   "contender.debit": {
     title: "Contender budget debited",
     category: "agent",
     outcome: "neutral",
+    summary: (m, count) => {
+      const profile = str(m, "profileKey");
+      const debit = num(m, "debitMicros");
+      const remaining = num(m, "remainingMicros");
+      if (count > 1) {
+        return `${count} loser debits recorded on contender purses.`;
+      }
+      const debitUsd =
+        debit != null ? `$${(debit / 1_000_000).toFixed(2)}` : null;
+      const remainUsd =
+        remaining != null ? `$${(remaining / 1_000_000).toFixed(2)}` : null;
+      if (profile && debitUsd && remainUsd) {
+        return `${profile} lost ${debitUsd} — ${remainUsd} remaining on contender budget.`;
+      }
+      if (debitUsd && remainUsd) {
+        return `Loser debit ${debitUsd} — ${remainUsd} remaining.`;
+      }
+      return "Tournament loss debited from contender budget.";
+    },
   },
   "maintainer.meta_tournament": {
     title: "Tournament completed",
