@@ -179,21 +179,24 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
       return { ...existing, created: false, idempotencyKey: input.idempotencyKey };
     }
 
+    if (!input.files.length) {
+      throw new GithubDeliveryError("invalid", "files required");
+    }
+
     // Ensure branch ref from baseSha
     await this.createRef(owner, repo, input.branchName, input.baseSha);
 
-    let headSha = input.baseSha;
-    for (const file of input.files) {
-      headSha = await this.putFile(
-        owner,
-        repo,
-        input.branchName,
-        input.repo.defaultBranch,
-        file,
-        input.commitMessage,
-        headSha,
-      );
-    }
+    // One Git Data commit for all files — Contents API PUT-per-file was
+    // creating N near-identical commits (thrash) with the same message.
+    const headSha = await this.commitFilesOnBranch(
+      owner,
+      repo,
+      input.branchName,
+      input.repo.defaultBranch,
+      input.files,
+      input.commitMessage,
+      input.baseSha,
+    );
 
     const pr = await this.createPr(owner, repo, {
       title: input.prTitle,
@@ -300,73 +303,168 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
     return body.object?.sha ?? null;
   }
 
-  private async putFile(
+  /**
+   * Batch all file changes into a single commit via the Git Data API.
+   * Compare-and-swap: refuses to update the ref if the tip moved.
+   */
+  private async commitFilesOnBranch(
     owner: string,
     repo: string,
     branch: string,
     defaultBranch: string,
-    file: FileChange,
+    files: FileChange[],
     message: string,
     expectedHead: string,
   ): Promise<string> {
     assertSafeBranch(branch, defaultBranch);
 
-    // Compare-and-swap: refuse to write if another worker moved the branch tip.
-    if (expectedHead && expectedHead !== "unknown") {
-      const tip = await this.getBranchHeadSha(owner, repo, branch);
-      if (tip && tip !== expectedHead) {
-        throw new GithubDeliveryError(
-          "conflict",
-          `branch head moved: expected ${expectedHead.slice(0, 12)} got ${tip.slice(0, 12)}`,
-        );
-      }
+    const tip = await this.getBranchHeadSha(owner, repo, branch);
+    const parentSha = tip ?? expectedHead;
+    if (
+      expectedHead &&
+      expectedHead !== "unknown" &&
+      tip &&
+      tip !== expectedHead
+    ) {
+      throw new GithubDeliveryError(
+        "conflict",
+        `branch head moved: expected ${expectedHead.slice(0, 12)} got ${tip.slice(0, 12)}`,
+      );
     }
 
-    const content =
-      file.encoding === "base64"
-        ? file.content
-        : Buffer.from(file.content, "utf8").toString("base64");
-
-    const getRes = await this.fetchImpl(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(file.path).replace(/%2F/g, "/")}?ref=${encodeURIComponent(branch)}`,
+    const parentRes = await this.fetchImpl(
+      `https://api.github.com/repos/${owner}/${repo}/git/commits/${parentSha}`,
       { headers: this.headers() },
     );
-    let sha: string | undefined;
-    if (getRes.ok) {
-      const body = (await getRes.json()) as { sha?: string };
-      sha = body.sha;
+    if (!parentRes.ok) {
+      throw new GithubDeliveryError(
+        "http",
+        `getCommit failed (${parentRes.status})`,
+      );
+    }
+    const parent = (await parentRes.json()) as {
+      tree?: { sha?: string };
+    };
+    const baseTree = parent.tree?.sha;
+    if (!baseTree) {
+      throw new GithubDeliveryError("http", "parent commit missing tree sha");
     }
 
-    const res = await this.fetchImpl(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${file.path
-        .split("/")
-        .map(encodeURIComponent)
-        .join("/")}`,
+    const treeItems: Array<{
+      path: string;
+      mode: "100644";
+      type: "blob";
+      sha: string;
+    }> = [];
+    for (const file of files) {
+      const encoding = file.encoding === "base64" ? "base64" : "utf-8";
+      const blobRes = await this.fetchImpl(
+        `https://api.github.com/repos/${owner}/${repo}/git/blobs`,
+        {
+          method: "POST",
+          headers: this.headers(),
+          body: JSON.stringify({
+            content: file.content,
+            encoding,
+          }),
+        },
+      );
+      if (!blobRes.ok) {
+        throw new GithubDeliveryError(
+          "http",
+          `createBlob failed (${blobRes.status}) for ${file.path}`,
+        );
+      }
+      const blob = (await blobRes.json()) as { sha?: string };
+      if (!blob.sha) {
+        throw new GithubDeliveryError(
+          "http",
+          `createBlob missing sha for ${file.path}`,
+        );
+      }
+      treeItems.push({
+        path: file.path,
+        mode: "100644",
+        type: "blob",
+        sha: blob.sha,
+      });
+    }
+
+    const treeRes = await this.fetchImpl(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees`,
       {
-        method: "PUT",
+        method: "POST",
         headers: this.headers(),
         body: JSON.stringify({
-          message,
-          content,
-          branch,
-          ...(sha ? { sha } : {}),
+          base_tree: baseTree,
+          tree: treeItems,
         }),
       },
     );
-    if (res.status === 409) {
-      throw new GithubDeliveryError(
-        "conflict",
-        `putFile conflict (409) for ${file.path} — branch or blob changed`,
-      );
-    }
-    if (!res.ok) {
+    if (!treeRes.ok) {
       throw new GithubDeliveryError(
         "http",
-        `putFile failed (${res.status}) for ${file.path}`,
+        `createTree failed (${treeRes.status})`,
       );
     }
-    const body = (await res.json()) as { commit?: { sha?: string } };
-    return body.commit?.sha ?? expectedHead;
+    const tree = (await treeRes.json()) as { sha?: string };
+    if (!tree.sha) {
+      throw new GithubDeliveryError("http", "createTree missing sha");
+    }
+
+    const commitRes = await this.fetchImpl(
+      `https://api.github.com/repos/${owner}/${repo}/git/commits`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({
+          message,
+          tree: tree.sha,
+          parents: [parentSha],
+        }),
+      },
+    );
+    if (!commitRes.ok) {
+      throw new GithubDeliveryError(
+        "http",
+        `createCommit failed (${commitRes.status})`,
+      );
+    }
+    const commit = (await commitRes.json()) as { sha?: string };
+    if (!commit.sha) {
+      throw new GithubDeliveryError("http", "createCommit missing sha");
+    }
+
+    // Final CAS before moving the tip.
+    const tipAgain = await this.getBranchHeadSha(owner, repo, branch);
+    if (tipAgain && tipAgain !== parentSha) {
+      throw new GithubDeliveryError(
+        "conflict",
+        `branch head moved: expected ${parentSha.slice(0, 12)} got ${tipAgain.slice(0, 12)}`,
+      );
+    }
+
+    const refRes = await this.fetchImpl(
+      `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`,
+      {
+        method: "PATCH",
+        headers: this.headers(),
+        body: JSON.stringify({ sha: commit.sha, force: false }),
+      },
+    );
+    if (refRes.status === 422) {
+      throw new GithubDeliveryError(
+        "conflict",
+        `updateRef conflict (422) for ${branch}`,
+      );
+    }
+    if (!refRes.ok) {
+      throw new GithubDeliveryError(
+        "http",
+        `updateRef failed (${refRes.status})`,
+      );
+    }
+    return commit.sha;
   }
 
   private async createPr(
