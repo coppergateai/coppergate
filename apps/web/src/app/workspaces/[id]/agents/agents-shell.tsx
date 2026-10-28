@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./agents.module.css";
 
 export type AgentProfileStatsView = {
@@ -27,6 +28,8 @@ export type AgentProfileView = {
   locked: boolean;
   preferredModel: string | null;
   llmCredentialId: string | null;
+  /** null = effective system seed with no workspace row */
+  workspaceId: string | null;
 };
 
 export type AgentSkillView = {
@@ -34,6 +37,11 @@ export type AgentSkillView = {
   title: string;
   bodyMarkdown: string;
   version: number;
+};
+
+export type ToolOption = {
+  key: string;
+  title: string;
 };
 
 type LiveSeat = {
@@ -49,10 +57,25 @@ type Props = {
   isOwner: boolean;
   profiles: AgentProfileView[];
   skills: AgentSkillView[];
+  toolOptions: ToolOption[];
   stats: AgentProfileStatsView[];
   liveSeats: LiveSeat[];
   initialKey?: string | null;
 };
+
+const SYSTEM_KEYS = new Set([
+  "fixer",
+  "engineer",
+  "proposer",
+  "reviewer",
+  "security",
+  "perf",
+  "docs",
+  "qa",
+  "triager",
+  "community",
+  "release",
+]);
 
 function usd(micros: number): string {
   const dollars = micros / 1_000_000;
@@ -88,22 +111,76 @@ function relativeTime(iso: string | null): string {
   return `${days}d ago`;
 }
 
+function sourceLabel(p: AgentProfileView): string {
+  if (!p.workspaceId) return "system";
+  if (SYSTEM_KEYS.has(p.key)) return "workspace override";
+  return "custom";
+}
+
+type FormState = {
+  key: string;
+  displayName: string;
+  promptGuidance: string;
+  temperament: string;
+  strategyDefault: string;
+  maxSpendMicros: string;
+  skillKeys: string[];
+  toolAllowlist: string[];
+};
+
+function formFromProfile(p: AgentProfileView): FormState {
+  return {
+    key: p.key,
+    displayName: p.displayName,
+    promptGuidance: p.promptGuidance,
+    temperament: p.temperament,
+    strategyDefault: p.strategyDefault,
+    maxSpendMicros: String(p.maxSpendMicros),
+    skillKeys: [...p.skillKeys],
+    toolAllowlist: parseTools(p.toolAllowlistJson),
+  };
+}
+
+const emptyCreateForm = (): FormState => ({
+  key: "",
+  displayName: "",
+  promptGuidance: "",
+  temperament: "balanced",
+  strategyDefault: "balanced",
+  maxSpendMicros: "100000",
+  skillKeys: [],
+  toolAllowlist: ["read", "edit", "test", "git"],
+});
+
 export function AgentsShell({
   workspaceId,
   workspaceName,
   isOwner,
-  profiles,
+  profiles: initialProfiles,
   skills,
+  toolOptions,
   stats,
   liveSeats,
   initialKey,
 }: Props) {
+  const router = useRouter();
+  const [profiles, setProfiles] = useState(initialProfiles);
   const [selectedKey, setSelectedKey] = useState<string | null>(
-    initialKey && profiles.some((p) => p.key === initialKey)
+    initialKey && initialProfiles.some((p) => p.key === initialKey)
       ? initialKey
-      : (profiles[0]?.key ?? null),
+      : (initialProfiles[0]?.key ?? null),
   );
   const [openSkill, setOpenSkill] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<FormState>(emptyCreateForm);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+
+  useEffect(() => {
+    setProfiles(initialProfiles);
+  }, [initialProfiles]);
 
   const statsByKey = useMemo(() => {
     const map = new Map<string, AgentProfileStatsView>();
@@ -134,6 +211,139 @@ export function AgentsShell({
   const totalRuns = stats.reduce((s, r) => s + r.runCount, 0);
   const liveCount = liveSeats.length;
 
+  function startCreate() {
+    setCreating(true);
+    setEditing(false);
+    setForm(emptyCreateForm());
+    setError(null);
+    setOk(null);
+  }
+
+  function startEdit(p: AgentProfileView) {
+    setCreating(false);
+    setEditing(true);
+    setForm(formFromProfile(p));
+    setError(null);
+    setOk(null);
+  }
+
+  function cancelEditor() {
+    setCreating(false);
+    setEditing(false);
+    setError(null);
+  }
+
+  function toggleList(
+    field: "skillKeys" | "toolAllowlist",
+    key: string,
+    on: boolean,
+  ) {
+    setForm((prev) => {
+      const set = new Set(prev[field]);
+      if (on) set.add(key);
+      else set.delete(key);
+      return { ...prev, [field]: [...set] };
+    });
+  }
+
+  async function saveCreate() {
+    if (!isOwner) return;
+    setPending(true);
+    setError(null);
+    setOk(null);
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/profiles`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: form.key,
+          displayName: form.displayName,
+          promptGuidance: form.promptGuidance,
+          temperament: form.temperament,
+          strategyDefault: form.strategyDefault,
+          maxSpendMicros: Number(form.maxSpendMicros),
+          skillKeys: form.skillKeys,
+          toolAllowlist: form.toolAllowlist,
+        }),
+      });
+      const body = (await res.json()) as {
+        error?: { message: string };
+        profile?: AgentProfileView;
+      };
+      if (!res.ok) throw new Error(body.error?.message ?? "Create failed");
+      setOk(`Created ${body.profile?.key ?? form.key}`);
+      setCreating(false);
+      setSelectedKey(body.profile?.key ?? form.key);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Create failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function saveEdit() {
+    if (!isOwner || !selected) return;
+    setPending(true);
+    setError(null);
+    setOk(null);
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/profiles`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: selected.key,
+          displayName: form.displayName,
+          promptGuidance: form.promptGuidance,
+          temperament: form.temperament,
+          strategyDefault: form.strategyDefault,
+          maxSpendMicros: Number(form.maxSpendMicros),
+          skillKeys: form.skillKeys,
+          toolAllowlist: form.toolAllowlist,
+        }),
+      });
+      const body = (await res.json()) as { error?: { message: string } };
+      if (!res.ok) throw new Error(body.error?.message ?? "Save failed");
+      setOk(`Saved ${selected.key}`);
+      setEditing(false);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function deleteSelected() {
+    if (!isOwner || !selected?.workspaceId) return;
+    const reset = SYSTEM_KEYS.has(selected.key);
+    const label = reset ? "Reset to system?" : `Delete ${selected.key}?`;
+    if (!window.confirm(label)) return;
+    setPending(true);
+    setError(null);
+    setOk(null);
+    try {
+      const res = await fetch(
+        `/api/workspaces/${workspaceId}/profiles?key=${encodeURIComponent(selected.key)}`,
+        { method: "DELETE", credentials: "same-origin" },
+      );
+      const body = (await res.json()) as { error?: { message: string } };
+      if (!res.ok) throw new Error(body.error?.message ?? "Delete failed");
+      setOk(reset ? `Reset ${selected.key}` : `Deleted ${selected.key}`);
+      setEditing(false);
+      if (!reset) setSelectedKey(null);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const showEditor = isOwner && (creating || editing);
+
   return (
     <main className={styles.main}>
       <header className={styles.head}>
@@ -141,6 +351,16 @@ export function AgentsShell({
         <div className={styles.titleRow}>
           <h1 className={styles.title}>Agents</h1>
           <div className={styles.headLinks}>
+            {isOwner ? (
+              <button
+                type="button"
+                className={styles.newBtn}
+                onClick={startCreate}
+                disabled={pending}
+              >
+                New agent
+              </button>
+            ) : null}
             <Link
               href={`/workspaces/${workspaceId}/skills`}
               className={styles.headLink}
@@ -164,7 +384,7 @@ export function AgentsShell({
                 href={`/workspaces/${workspaceId}/settings?tab=llm`}
                 className={styles.headLink}
               >
-                Configure →
+                BYOK →
               </Link>
             ) : null}
           </div>
@@ -189,15 +409,22 @@ export function AgentsShell({
         </div>
       </header>
 
+      {error ? <p className={styles.error}>{error}</p> : null}
+      {ok ? (
+        <p className={styles.ok} style={{ margin: "0.5rem var(--app-pad-x-lg)" }}>
+          {ok}
+        </p>
+      ) : null}
+
       <div
-        className={`${styles.layout} ${selected ? styles.layoutDetailOpen : ""}`}
+        className={`${styles.layout} ${selected || creating ? styles.layoutDetailOpen : ""}`}
       >
         <aside className={styles.listPane} aria-label="Agent profiles">
           <ul className={styles.agentList}>
             {profiles.map((p) => {
               const st = statsByKey.get(p.key);
               const live = liveByKey.get(p.key)?.length ?? 0;
-              const active = p.key === selectedKey;
+              const active = !creating && p.key === selectedKey;
               return (
                 <li key={p.key}>
                   <button
@@ -207,6 +434,8 @@ export function AgentsShell({
                     onClick={() => {
                       setSelectedKey(p.key);
                       setOpenSkill(null);
+                      setCreating(false);
+                      setEditing(false);
                     }}
                   >
                     <p className={styles.agentName}>{p.displayName}</p>
@@ -220,6 +449,7 @@ export function AgentsShell({
                       ) : null}
                       <span>{p.temperament}</span>
                       <span>{st ? `${st.runCount} runs` : "no runs"}</span>
+                      {!SYSTEM_KEYS.has(p.key) ? <span>custom</span> : null}
                     </p>
                   </button>
                 </li>
@@ -229,7 +459,176 @@ export function AgentsShell({
         </aside>
 
         <section className={styles.detailPane} aria-live="polite">
-          {!selected ? (
+          {showEditor ? (
+            <div className={styles.editor}>
+              <h2 className={styles.detailTitle}>
+                {creating ? "New agent" : `Edit ${selected?.displayName}`}
+              </h2>
+              {creating ? (
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel} htmlFor="agent-key">
+                    Key
+                  </label>
+                  <input
+                    id="agent-key"
+                    className={styles.input}
+                    value={form.key}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, key: e.target.value }))
+                    }
+                    placeholder="my-agent"
+                    disabled={pending}
+                  />
+                </div>
+              ) : null}
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="agent-name">
+                  Display name
+                </label>
+                <input
+                  id="agent-name"
+                  className={styles.input}
+                  value={form.displayName}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, displayName: e.target.value }))
+                  }
+                  disabled={pending}
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="agent-guidance">
+                  Prompt guidance
+                </label>
+                <textarea
+                  id="agent-guidance"
+                  className={styles.textarea}
+                  value={form.promptGuidance}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, promptGuidance: e.target.value }))
+                  }
+                  disabled={pending}
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="agent-temp">
+                  Temperament
+                </label>
+                <select
+                  id="agent-temp"
+                  className={styles.select}
+                  value={form.temperament}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, temperament: e.target.value }))
+                  }
+                  disabled={pending}
+                >
+                  <option value="balanced">balanced</option>
+                  <option value="steady">steady</option>
+                  <option value="swift">swift</option>
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="agent-strategy">
+                  Strategy
+                </label>
+                <select
+                  id="agent-strategy"
+                  className={styles.select}
+                  value={form.strategyDefault}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, strategyDefault: e.target.value }))
+                  }
+                  disabled={pending}
+                >
+                  <option value="balanced">balanced</option>
+                  <option value="blitz">blitz</option>
+                  <option value="fortress">fortress</option>
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="agent-cap">
+                  Max spend (micros)
+                </label>
+                <input
+                  id="agent-cap"
+                  className={styles.input}
+                  value={form.maxSpendMicros}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, maxSpendMicros: e.target.value }))
+                  }
+                  disabled={pending}
+                />
+              </div>
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Skills</span>
+                <div className={styles.checkGrid}>
+                  {skills.map((s) => (
+                    <label key={s.key} className={styles.checkItem}>
+                      <input
+                        type="checkbox"
+                        checked={form.skillKeys.includes(s.key)}
+                        onChange={(e) =>
+                          toggleList("skillKeys", s.key, e.target.checked)
+                        }
+                        disabled={pending}
+                      />
+                      {s.title}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Tools</span>
+                <div className={styles.checkGrid}>
+                  {toolOptions.map((t) => (
+                    <label key={t.key} className={styles.checkItem}>
+                      <input
+                        type="checkbox"
+                        checked={form.toolAllowlist.includes(t.key)}
+                        onChange={(e) =>
+                          toggleList("toolAllowlist", t.key, e.target.checked)
+                        }
+                        disabled={pending}
+                      />
+                      {t.title}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.btnRow}>
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  disabled={pending}
+                  onClick={() => void (creating ? saveCreate() : saveEdit())}
+                >
+                  {creating ? "Create" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  disabled={pending}
+                  onClick={cancelEditor}
+                >
+                  Cancel
+                </button>
+                {!creating && selected?.workspaceId ? (
+                  <button
+                    type="button"
+                    className={styles.btnDanger}
+                    disabled={pending}
+                    onClick={() => void deleteSelected()}
+                  >
+                    {SYSTEM_KEYS.has(selected.key)
+                      ? "Reset to system"
+                      : "Delete"}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {!creating && !selected ? (
             <div className={styles.emptyDetail}>
               <strong>Select an agent</strong>
               <p className={styles.note}>
@@ -237,7 +636,9 @@ export function AgentsShell({
                 outcomes.
               </p>
             </div>
-          ) : (
+          ) : null}
+
+          {!creating && selected && !editing ? (
             <>
               <button
                 type="button"
@@ -250,8 +651,7 @@ export function AgentsShell({
                 <div>
                   <h2 className={styles.detailTitle}>{selected.displayName}</h2>
                   <p className={styles.detailKey}>
-                    {selected.key}
-                    {selected.locked ? " · system" : " · workspace override"}
+                    {selected.key} · {sourceLabel(selected)}
                   </p>
                   <div className={styles.chipRow}>
                     <span className={styles.chip}>{selected.temperament}</span>
@@ -274,6 +674,31 @@ export function AgentsShell({
                   </div>
                 </div>
               </div>
+
+              {isOwner ? (
+                <div className={styles.btnRow} style={{ marginBottom: "1rem" }}>
+                  <button
+                    type="button"
+                    className={styles.btnPrimary}
+                    onClick={() => startEdit(selected)}
+                    disabled={pending}
+                  >
+                    Edit
+                  </button>
+                  {selected.workspaceId ? (
+                    <button
+                      type="button"
+                      className={styles.btnDanger}
+                      disabled={pending}
+                      onClick={() => void deleteSelected()}
+                    >
+                      {SYSTEM_KEYS.has(selected.key)
+                        ? "Reset to system"
+                        : "Delete"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className={styles.statGrid} aria-label="30-day outcomes">
                 <div className={styles.stat}>
@@ -351,9 +776,7 @@ export function AgentsShell({
                             type="button"
                             className={styles.skillHead}
                             aria-expanded={open}
-                            onClick={() =>
-                              setOpenSkill(open ? null : key)
-                            }
+                            onClick={() => setOpenSkill(open ? null : key)}
                           >
                             <p className={styles.skillTitle}>
                               {skill?.title ?? key}
@@ -407,17 +830,9 @@ export function AgentsShell({
                 >
                   Watch in Arena →
                 </Link>
-                {isOwner ? (
-                  <Link
-                    href={`/workspaces/${workspaceId}/settings?tab=llm`}
-                    className={styles.footerLink}
-                  >
-                    Edit temperament / BYOK →
-                  </Link>
-                ) : null}
               </div>
             </>
-          )}
+          ) : null}
         </section>
       </div>
     </main>

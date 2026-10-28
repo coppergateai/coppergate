@@ -204,6 +204,34 @@ export async function setMcpConnectionEnabled(
   return updated ?? null;
 }
 
+export async function deleteMcpConnection(
+  db: Database,
+  input: {
+    workspaceId: string;
+    provider: string;
+    actor: string;
+  },
+): Promise<{ deleted: boolean }> {
+  const existing = await getMcpConnection(
+    db,
+    input.workspaceId,
+    input.provider,
+  );
+  if (!existing) return { deleted: false };
+  await db
+    .delete(workspaceMcpConnections)
+    .where(eq(workspaceMcpConnections.id, existing.id));
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "mcp.delete",
+    targetType: "mcp_connection",
+    targetId: existing.id,
+    meta: { provider: input.provider },
+  });
+  return { deleted: true };
+}
+
 /** Public view without secrets. */
 export function serializeMcpConnectionPublic(row: WorkspaceMcpConnection) {
   return {

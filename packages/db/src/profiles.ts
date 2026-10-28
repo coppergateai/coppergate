@@ -26,6 +26,15 @@ import {
   isAgentTemperament,
   strategyForTemperament,
 } from "./temperament.js";
+import { assertProfileToolAllowlist, ToolDefError } from "./tool-defs.js";
+
+export function normalizeProfileKey(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+export function isValidProfileKey(key: string): boolean {
+  return /^[a-z0-9][a-z0-9-]{1,62}$/.test(key);
+}
 
 export class ProfileError extends Error {
   readonly code: "not_found" | "invalid" | "forbidden";
@@ -188,12 +197,47 @@ export const DEFAULT_SPAWN_MATRIX: Record<string, string[]> = {
 export function resolveSpawnProfileKeys(
   provider: string,
   override?: string[] | null,
+  /** Extra workspace-custom profile keys allowed in explicit overrides. */
+  allowedExtraKeys?: Iterable<string> | null,
 ): string[] {
+  const allowed = new Set(BOUNDED_KEYS);
+  if (allowedExtraKeys) {
+    for (const k of allowedExtraKeys) allowed.add(k);
+  }
   if (override && override.length > 0) {
-    const filtered = override.filter((k) => BOUNDED_KEYS.has(k));
+    const filtered = override.filter((k) => allowed.has(k));
     if (filtered.length > 0) return filtered;
   }
   return DEFAULT_SPAWN_MATRIX[provider] ?? DEFAULT_SPAWN_MATRIX["*"]!;
+}
+
+/** Merged effective catalog: system seeds + workspace overrides/customs. */
+export async function listEffectiveAgentProfiles(
+  db: Database,
+  workspaceId: string,
+): Promise<AgentProfile[]> {
+  const rows = await listAgentProfiles(db, workspaceId);
+  const byKey = new Map<string, AgentProfile>();
+  for (const p of rows) {
+    if (!p.workspaceId) {
+      if (!byKey.has(p.key)) byKey.set(p.key, p);
+    } else {
+      byKey.set(p.key, p);
+    }
+  }
+  return [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/** Workspace-only custom keys (not in the system bounded roster). */
+export async function listCustomWorkspaceProfileKeys(
+  db: Database,
+  workspaceId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select()
+    .from(agentProfiles)
+    .where(eq(agentProfiles.workspaceId, workspaceId));
+  return rows.map((r) => r.key).filter((k) => !BOUNDED_KEYS.has(k));
 }
 
 /** Seed system profiles (idempotent). */
@@ -273,13 +317,12 @@ export async function listAgentProfiles(
     .orderBy(asc(agentProfiles.key));
 }
 
-/** Workspace override wins over system seed for a profile key. */
+/** Workspace override / custom wins over system seed for a profile key. */
 export async function getEffectiveAgentProfile(
   db: Database,
   workspaceId: string,
   key: string,
 ): Promise<AgentProfile | null> {
-  if (!BOUNDED_KEYS.has(key)) return null;
   await ensureSystemAgentProfiles(db);
   const [override] = await db
     .select()
@@ -292,6 +335,7 @@ export async function getEffectiveAgentProfile(
     )
     .limit(1);
   if (override) return override;
+  if (!BOUNDED_KEYS.has(key)) return null;
   const [system] = await db
     .select()
     .from(agentProfiles)
@@ -302,14 +346,46 @@ export async function getEffectiveAgentProfile(
   return system ?? null;
 }
 
+async function assertProfileExistsForUpdate(
+  db: Database,
+  workspaceId: string,
+  key: string,
+): Promise<{
+  existing: AgentProfile | null;
+  system: AgentProfile | null;
+}> {
+  await ensureSystemAgentProfiles(db);
+  const [existing] = await db
+    .select()
+    .from(agentProfiles)
+    .where(
+      and(
+        eq(agentProfiles.workspaceId, workspaceId),
+        eq(agentProfiles.key, key),
+      ),
+    )
+    .limit(1);
+  if (existing) return { existing, system: null };
+  if (BOUNDED_KEYS.has(key)) {
+    const system =
+      (await listAgentProfiles(db)).find((p) => p.key === key) ?? null;
+    return { existing: null, system };
+  }
+  throw new ProfileError(
+    "not_found",
+    "custom profile not found — create it first",
+  );
+}
+
 /**
- * Constrained profile editor — cannot add unbounded tools or raise autonomy (TASK103).
+ * Create a workspace-custom agent (new key) or seed an override for a system key.
  */
-export async function updateWorkspaceAgentProfile(
+export async function createWorkspaceAgentProfile(
   db: Database,
   input: {
     workspaceId: string;
     key: string;
+    displayName: string;
     actor: string;
     promptGuidance?: string;
     strategyDefault?: string;
@@ -317,29 +393,28 @@ export async function updateWorkspaceAgentProfile(
     skillKeys?: string[];
     maxSpendMicros?: number;
     toolAllowlist?: string[];
-    llmCredentialId?: string | null;
-    preferredModel?: string | null;
   },
 ): Promise<AgentProfile> {
-  if (!BOUNDED_KEYS.has(input.key)) {
-    throw new ProfileError("invalid", `profile key not in bounded catalog`);
+  const key = normalizeProfileKey(input.key);
+  if (!isValidProfileKey(key)) {
+    throw new ProfileError("invalid", "invalid profile key");
   }
-  const allowedTools = new Set([
-    "read",
-    "edit",
-    "test",
-    "git",
-    "mcp:sonarqube",
-    "mcp:*",
-  ]);
+  const displayName = input.displayName.trim().slice(0, 80);
+  if (!displayName) {
+    throw new ProfileError("invalid", "displayName required");
+  }
   if (input.toolAllowlist) {
-    for (const t of input.toolAllowlist) {
-      if (!allowedTools.has(t) && !t.startsWith("sonar_")) {
-        throw new ProfileError(
-          "forbidden",
-          `tool ${t} not allowed — cannot escalate tools`,
-        );
+    try {
+      await assertProfileToolAllowlist(
+        db,
+        input.workspaceId,
+        input.toolAllowlist,
+      );
+    } catch (err) {
+      if (err instanceof ToolDefError) {
+        throw new ProfileError(err.code, err.message);
       }
+      throw err;
     }
   }
   if (
@@ -358,6 +433,169 @@ export async function updateWorkspaceAgentProfile(
     throw new ProfileError("invalid", "maxSpendMicros must be positive");
   }
 
+  await ensureSystemAgentProfiles(db);
+  const [existing] = await db
+    .select()
+    .from(agentProfiles)
+    .where(
+      and(
+        eq(agentProfiles.workspaceId, input.workspaceId),
+        eq(agentProfiles.key, key),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    throw new ProfileError("invalid", "profile already exists in workspace");
+  }
+
+  const system = BOUNDED_KEYS.has(key)
+    ? ((await listAgentProfiles(db)).find((p) => p.key === key) ?? null)
+    : null;
+
+  const temperament: AgentTemperament =
+    input.temperament ??
+    (system && isAgentTemperament(system.temperament)
+      ? system.temperament
+      : "balanced");
+  const strategyDefault =
+    input.strategyDefault ??
+    strategyForTemperament(temperament) ??
+    system?.strategyDefault ??
+    "balanced";
+  const now = new Date();
+  const [created] = await db
+    .insert(agentProfiles)
+    .values({
+      id: crypto.randomUUID(),
+      workspaceId: input.workspaceId,
+      key,
+      displayName,
+      promptGuidance:
+        input.promptGuidance ?? system?.promptGuidance ?? "",
+      toolAllowlistJson:
+        input.toolAllowlist !== undefined
+          ? JSON.stringify(input.toolAllowlist)
+          : (system?.toolAllowlistJson ??
+            JSON.stringify(["read", "edit", "test", "git"])),
+      strategyDefault,
+      temperament,
+      skillKeysJson:
+        input.skillKeys !== undefined
+          ? JSON.stringify(input.skillKeys)
+          : (system?.skillKeysJson ||
+            JSON.stringify(DEFAULT_PROFILE_SKILL_KEYS[key] ?? [])),
+      maxSpendMicros:
+        input.maxSpendMicros ?? system?.maxSpendMicros ?? 100_000,
+      locked: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: BOUNDED_KEYS.has(key) ? "profile.override" : "profile.create",
+    targetType: "agent_profile",
+    targetId: created!.id,
+    meta: { key },
+  });
+  return created!;
+}
+
+/**
+ * Delete workspace profile row — resets system override or removes custom agent.
+ */
+export async function deleteWorkspaceAgentProfile(
+  db: Database,
+  input: { workspaceId: string; key: string; actor: string },
+): Promise<{ deleted: boolean; resetToSystem: boolean }> {
+  const key = normalizeProfileKey(input.key);
+  const [existing] = await db
+    .select()
+    .from(agentProfiles)
+    .where(
+      and(
+        eq(agentProfiles.workspaceId, input.workspaceId),
+        eq(agentProfiles.key, key),
+      ),
+    )
+    .limit(1);
+  if (!existing) {
+    throw new ProfileError("not_found", "workspace profile not found");
+  }
+  if (existing.locked) {
+    throw new ProfileError("forbidden", "profile is locked");
+  }
+  await db.delete(agentProfiles).where(eq(agentProfiles.id, existing.id));
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: BOUNDED_KEYS.has(key) ? "profile.reset" : "profile.delete",
+    targetType: "agent_profile",
+    targetId: existing.id,
+    meta: { key },
+  });
+  return { deleted: true, resetToSystem: BOUNDED_KEYS.has(key) };
+}
+
+/**
+ * Constrained profile editor — cannot add unbounded tools or raise autonomy (TASK103).
+ */
+export async function updateWorkspaceAgentProfile(
+  db: Database,
+  input: {
+    workspaceId: string;
+    key: string;
+    actor: string;
+    displayName?: string;
+    promptGuidance?: string;
+    strategyDefault?: string;
+    temperament?: AgentTemperament;
+    skillKeys?: string[];
+    maxSpendMicros?: number;
+    toolAllowlist?: string[];
+    llmCredentialId?: string | null;
+    preferredModel?: string | null;
+  },
+): Promise<AgentProfile> {
+  const key = normalizeProfileKey(input.key);
+  if (!isValidProfileKey(key)) {
+    throw new ProfileError("invalid", "invalid profile key");
+  }
+  if (input.toolAllowlist) {
+    try {
+      await assertProfileToolAllowlist(
+        db,
+        input.workspaceId,
+        input.toolAllowlist,
+      );
+    } catch (err) {
+      if (err instanceof ToolDefError) {
+        throw new ProfileError(err.code, err.message);
+      }
+      throw err;
+    }
+  }
+  if (
+    input.strategyDefault &&
+    !["balanced", "blitz", "fortress"].includes(input.strategyDefault)
+  ) {
+    throw new ProfileError("invalid", "invalid strategyDefault");
+  }
+  if (input.temperament && !isAgentTemperament(input.temperament)) {
+    throw new ProfileError("invalid", "invalid temperament");
+  }
+  if (
+    input.maxSpendMicros != null &&
+    (!Number.isFinite(input.maxSpendMicros) || input.maxSpendMicros < 1)
+  ) {
+    throw new ProfileError("invalid", "maxSpendMicros must be positive");
+  }
+  if (input.displayName !== undefined && !input.displayName.trim()) {
+    throw new ProfileError("invalid", "displayName required");
+  }
+
   if (input.llmCredentialId) {
     const cred = await getLlmByokById(
       db,
@@ -369,18 +607,12 @@ export async function updateWorkspaceAgentProfile(
     }
   }
 
-  await ensureSystemAgentProfiles(db);
+  const { existing, system } = await assertProfileExistsForUpdate(
+    db,
+    input.workspaceId,
+    key,
+  );
   const now = new Date();
-  const [existing] = await db
-    .select()
-    .from(agentProfiles)
-    .where(
-      and(
-        eq(agentProfiles.workspaceId, input.workspaceId),
-        eq(agentProfiles.key, input.key),
-      ),
-    )
-    .limit(1);
 
   const preferredModel =
     input.preferredModel === undefined
@@ -399,6 +631,10 @@ export async function updateWorkspaceAgentProfile(
     const [updated] = await db
       .update(agentProfiles)
       .set({
+        displayName:
+          input.displayName !== undefined
+            ? input.displayName.trim().slice(0, 80)
+            : existing.displayName,
         promptGuidance: input.promptGuidance ?? existing.promptGuidance,
         strategyDefault: nextStrategy ?? existing.strategyDefault,
         temperament: nextTemperament ?? existing.temperament,
@@ -429,12 +665,11 @@ export async function updateWorkspaceAgentProfile(
       action: "profile.update",
       targetType: "agent_profile",
       targetId: updated!.id,
-      meta: { key: input.key },
+      meta: { key },
     });
     return updated!;
   }
 
-  const system = (await listAgentProfiles(db)).find((p) => p.key === input.key);
   if (!system) throw new ProfileError("not_found", "system profile missing");
 
   const [created] = await db
@@ -442,8 +677,11 @@ export async function updateWorkspaceAgentProfile(
     .values({
       id: crypto.randomUUID(),
       workspaceId: input.workspaceId,
-      key: input.key,
-      displayName: system.displayName,
+      key,
+      displayName:
+        input.displayName !== undefined
+          ? input.displayName.trim().slice(0, 80)
+          : system.displayName,
       promptGuidance: input.promptGuidance ?? system.promptGuidance,
       toolAllowlistJson:
         input.toolAllowlist !== undefined
@@ -455,12 +693,12 @@ export async function updateWorkspaceAgentProfile(
         nextTemperament ??
         (isAgentTemperament(system.temperament)
           ? system.temperament
-          : defaultTemperamentForProfileKey(input.key)),
+          : defaultTemperamentForProfileKey(key)),
       skillKeysJson:
         input.skillKeys !== undefined
           ? JSON.stringify(input.skillKeys)
           : system.skillKeysJson ||
-            JSON.stringify(DEFAULT_PROFILE_SKILL_KEYS[input.key] ?? []),
+            JSON.stringify(DEFAULT_PROFILE_SKILL_KEYS[key] ?? []),
       maxSpendMicros: input.maxSpendMicros ?? system.maxSpendMicros,
       llmCredentialId: input.llmCredentialId ?? null,
       preferredModel: preferredModel ?? null,
@@ -476,7 +714,7 @@ export async function updateWorkspaceAgentProfile(
     action: "profile.override",
     targetType: "agent_profile",
     targetId: created!.id,
-    meta: { key: input.key },
+    meta: { key },
   });
   return created!;
 }
@@ -504,12 +742,13 @@ export async function applySpawnProfilesToArena(
     strategyByKey?: Record<string, ContenderStrategy>;
   },
 ): Promise<void> {
-  const primary = primaryRoleForSpawn(input.profileKeys, BOUNDED_KEYS);
-  if (!BOUNDED_KEYS.has(primary)) return;
-
   await ensureSystemAgentProfiles(db);
-  const profiles = await listAgentProfiles(db, input.workspaceId);
-  const profile = profiles.find((p) => p.key === primary);
+  const effective = await listEffectiveAgentProfiles(db, input.workspaceId);
+  const knownKeys = new Set(effective.map((p) => p.key));
+  const primary = primaryRoleForSpawn(input.profileKeys, knownKeys);
+  if (!knownKeys.has(primary)) return;
+
+  const profile = effective.find((p) => p.key === primary);
   const preferredRaw =
     input.strategies?.[0] ??
     input.strategyByKey?.[primary] ??

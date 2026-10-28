@@ -1,4 +1,5 @@
 import {
+  deleteWorkspaceSkill,
   listAgentSkills,
   upsertWorkspaceSkill,
 } from "@coppergate/db";
@@ -15,6 +16,24 @@ import {
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+function serializeSkill(s: {
+  id: string;
+  key: string;
+  title: string;
+  bodyMarkdown: string;
+  version: number;
+  workspaceId: string | null;
+}) {
+  return {
+    id: s.id,
+    key: s.key,
+    title: s.title,
+    bodyMarkdown: s.bodyMarkdown,
+    version: s.version,
+    workspaceId: s.workspaceId,
+  };
+}
 
 export async function GET(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
@@ -33,14 +52,7 @@ export async function GET(request: Request, context: RouteContext) {
     }
     const skills = [...byKey.values()]
       .sort((a, b) => a.key.localeCompare(b.key))
-      .map((s) => ({
-        id: s.id,
-        key: s.key,
-        title: s.title,
-        bodyMarkdown: s.bodyMarkdown,
-        version: s.version,
-        workspaceId: s.workspaceId,
-      }));
+      .map(serializeSkill);
     return jsonOk({ skills }, { correlationId });
   } catch (err) {
     return jsonError(err, correlationId);
@@ -69,19 +81,36 @@ export async function PUT(request: Request, context: RouteContext) {
       bodyMarkdown: body.bodyMarkdown,
       actor: `user:${user.id}`,
     });
-    return jsonOk(
-      {
-        skill: {
-          id: skill.id,
-          key: skill.key,
-          title: skill.title,
-          bodyMarkdown: skill.bodyMarkdown,
-          version: skill.version,
-          workspaceId: skill.workspaceId,
-        },
-      },
-      { correlationId },
-    );
+    return jsonOk({ skill: serializeSkill(skill) }, { correlationId });
+  } catch (err) {
+    return jsonError(err, correlationId);
+  }
+}
+
+/** Delete workspace skill override (reset) or custom skill. Query: ?key= */
+export async function DELETE(request: Request, context: RouteContext) {
+  const correlationId = correlationIdFrom(request);
+  try {
+    requireCsrf(request);
+    const user = await requireUser(request);
+    const { id: workspaceId } = await context.params;
+    await requireWorkspaceOwner(db, workspaceId, user.id);
+    const url = new URL(request.url);
+    const key = url.searchParams.get("key");
+    if (!key) throw new ApiError("bad_request", "key is required");
+    try {
+      const result = await deleteWorkspaceSkill(db, {
+        workspaceId,
+        key,
+        actor: `user:${user.id}`,
+      });
+      return jsonOk(result, { correlationId });
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("not found")) {
+        throw new ApiError("not_found", err.message);
+      }
+      throw err;
+    }
   } catch (err) {
     return jsonError(err, correlationId);
   }

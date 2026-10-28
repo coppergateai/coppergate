@@ -3,6 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import {
   getWorkspaceForMember,
   listAgentProfiles,
+  listMcpConnections,
+  listWorkspaceToolDefs,
+  serializeMcpConnectionPublic,
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -53,7 +56,12 @@ export default async function WorkspaceToolsPage({
   const query = await searchParams;
   const initialKey = typeof query.tool === "string" ? query.tool : null;
 
-  const profileRows = await listAgentProfiles(db, access.workspace.id);
+  const [profileRows, toolDefs, mcpRows] = await Promise.all([
+    listAgentProfiles(db, access.workspace.id),
+    listWorkspaceToolDefs(db, access.workspace.id),
+    listMcpConnections(db, access.workspace.id),
+  ]);
+
   const profilesByKey = new Map<
     string,
     { key: string; displayName: string; tools: string[] }
@@ -72,27 +80,55 @@ export default async function WorkspaceToolsPage({
   }
   const profiles = [...profilesByKey.values()];
 
+  const defByKey = new Map(toolDefs.map((t) => [t.key, t]));
   const keys = new Set<string>(TOOL_CATALOG.map((t) => t.key));
   for (const p of profiles) {
     for (const t of p.tools) keys.add(t);
   }
+  for (const t of toolDefs) keys.add(t.key);
 
   const tools: ToolRow[] = [...keys]
     .sort((a, b) => a.localeCompare(b))
     .map((key) => {
-      const meta = toolMeta(key);
+      const def = defByKey.get(key);
       const agents = profiles
         .filter((p) => p.tools.includes(key))
         .map((p) => ({ key: p.key, displayName: p.displayName }))
         .sort((a, b) => a.key.localeCompare(b.key));
+      if (def) {
+        const kind =
+          def.kind === "mcp" || def.kind === "alias" ? def.kind : "custom";
+        return {
+          key: def.key,
+          title: def.title,
+          kind,
+          description: def.description,
+          workspaceOwned: true,
+          targetToken: def.targetToken,
+          agents,
+        };
+      }
+      const meta = toolMeta(key);
       return {
         key: meta.key,
         title: meta.title,
         kind: meta.kind,
         description: meta.description,
+        workspaceOwned: false,
+        targetToken: null,
         agents,
       };
     });
+
+  const mcpConnections = mcpRows.map((r) => {
+    const pub = serializeMcpConnectionPublic(r);
+    return {
+      provider: pub.provider,
+      displayName: pub.displayName,
+      enabled: pub.enabled,
+      endpointUrl: pub.endpointUrl,
+    };
+  });
 
   return (
     <ToolsShell
@@ -100,6 +136,7 @@ export default async function WorkspaceToolsPage({
       workspaceName={access.workspace.name}
       isOwner={access.role === "owner"}
       tools={tools}
+      mcpConnections={mcpConnections}
       initialKey={initialKey}
     />
   );

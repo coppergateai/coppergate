@@ -1002,6 +1002,37 @@ export const workspaceMcpConnections = pgTable(
   ],
 );
 
+/**
+ * Workspace tool catalog entries (metadata + allowlist membership).
+ * Fail-closed: does not grant new harness capabilities beyond core/MCP targets.
+ */
+export const workspaceToolDefs = pgTable(
+  "workspace_tool_defs",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    /** mcp | alias | custom */
+    kind: text("kind").notNull().default("custom"),
+    /** Optional underlying token (core or mcp:…) for alias/mcp kinds. */
+    targetToken: text("target_token"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("workspace_tool_defs_ws_idx").on(t.workspaceId),
+    uniqueIndex("workspace_tool_defs_ws_key_uidx").on(t.workspaceId, t.key),
+  ],
+);
+
 /** Maintainer scheduler / self-improve / release audit trail. */
 export const maintainerEvents = pgTable(
   "maintainer_events",
@@ -1226,6 +1257,8 @@ export type AutoArmRule = typeof autoArmRules.$inferSelect;
 export type AgentProfile = typeof agentProfiles.$inferSelect;
 export type AgentSkill = typeof agentSkills.$inferSelect;
 export type WorkspaceMcpConnection = typeof workspaceMcpConnections.$inferSelect;
+export type WorkspaceToolDef = typeof workspaceToolDefs.$inferSelect;
+export type WorkspaceToolDefKind = "mcp" | "alias" | "custom";
 export type AgentTemperament = "steady" | "swift" | "balanced";
 export type MaintainerEvent = typeof maintainerEvents.$inferSelect;
 export type SignalEventStatus =
