@@ -91,9 +91,9 @@ Varsayılan app teması: **light** (toggle ile dark).
 
 ### `/workspaces/[id]/insights` — Insights
 - Period economics & verified delivery (Mission Control’dan ayrı)
-- 30d cost analytics strip (owner): spend, accepted PRs, median/PR, runs, failed-run spend
-- Cost by project (7d) + signal spend by provider (owner)
-- Verified PRs this month + Activity / Projects deep-links
+- KPI grid: spend, accepted PRs, verified PRs, run fail rate
+- Charts (SVG, no chart lib): spend-by-project bars, run-outcome donut + spend split
+- Signal spend bars (owner); verified delivery hero
 - Export CSV (31d); Manage budget → Settings · Billing
 - Eski `settings?tab=analytics` buraya redirect
 
