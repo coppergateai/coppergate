@@ -250,6 +250,42 @@ describe("activity events", () => {
     assert.ok(groups.some((g) => g.action === "task.enqueue"));
   });
 
+  it("summarizes backlog replan from stored meta", () => {
+    assert.match(
+      summaryFor(
+        "maintainer.replan",
+        {
+          taskCount: 1,
+          queued: 1,
+          architectureId: "P-010",
+          architectureTitle: "Ship receipts",
+        },
+        1,
+      ) ?? "",
+      /Queued 1 of 1 from P-010 · Ship receipts/,
+    );
+    assert.match(
+      summaryFor(
+        "maintainer.replan",
+        {
+          skipped: true,
+          reason: "architecture_ids_in_flight",
+          excludeIds: ["P-010", "P-011"],
+        },
+        1,
+      ) ?? "",
+      /2 architecture ID/,
+    );
+    assert.match(
+      summaryFor(
+        "maintainer.replan",
+        { skipped: true, reason: "no_architecture_open_id" },
+        1,
+      ) ?? "",
+      /no open architecture ID/i,
+    );
+  });
+
   it("softens concurrency replan queue failures to waiting-on-capacity", () => {
     const groups = groupActivityEvents([
       evt({

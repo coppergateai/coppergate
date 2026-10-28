@@ -252,6 +252,46 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     title: "Backlog replan",
     category: "execution",
     outcome: "completed",
+    summary: (m) => {
+      if (m?.skipped === true) {
+        const reason = str(m, "reason");
+        if (reason === "architecture_ids_in_flight") {
+          const n = Array.isArray(m.excludeIds) ? m.excludeIds.length : null;
+          return n != null && n > 0
+            ? `Skipped — ${n} architecture ID(s) already in flight.`
+            : "Skipped — architecture IDs already in flight.";
+        }
+        if (reason === "no_architecture_open_id") {
+          return "Skipped — no open architecture ID to invent from.";
+        }
+        if (reason === "non_primary_project") {
+          return "Skipped — non-primary project stays quiet.";
+        }
+        return reason ? `Skipped — ${reason.replace(/_/g, " ")}.` : "Skipped.";
+      }
+      const tasks = num(m, "taskCount");
+      const queued = num(m, "queued");
+      const openId = str(m, "architectureId");
+      const title = str(m, "architectureTitle");
+      const from =
+        openId && title
+          ? `${openId} · ${title}`
+          : openId
+            ? openId
+            : title;
+      if (tasks != null && queued != null) {
+        if (from) {
+          return queued > 0
+            ? `Queued ${queued} of ${tasks} from ${from}.`
+            : `Created ${tasks} draft task(s) from ${from} (not auto-queued).`;
+        }
+        return queued > 0
+          ? `Queued ${queued} of ${tasks} task(s).`
+          : `Created ${tasks} draft task(s) (not auto-queued).`;
+      }
+      if (from) return `Replanned from ${from}.`;
+      return null;
+    },
   },
   "maintainer.replan_queue_failed": {
     title: "Replan queue failed",

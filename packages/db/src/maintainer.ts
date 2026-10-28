@@ -2339,6 +2339,8 @@ export async function runVisionReplan(
       targetType: "project",
       targetId: input.projectId,
       meta: {
+        projectId: input.projectId,
+        projectName: project?.name ?? null,
         briefId: brief.id,
         taskCount: 0,
         queued: 0,
@@ -2501,7 +2503,14 @@ export async function runVisionReplan(
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     kind: "replan",
-    payload: { briefId: brief.id, taskCount, queued, autoQueue },
+    payload: {
+      briefId: brief.id,
+      taskCount,
+      queued,
+      autoQueue,
+      architectureId: archTask.id,
+      architectureTitle: archTask.title.slice(0, 160),
+    },
   });
   await recordAuditEvent(db, {
     workspaceId: input.workspaceId,
@@ -2511,9 +2520,12 @@ export async function runVisionReplan(
     targetId: input.projectId,
     meta: {
       projectId: input.projectId,
+      projectName: project?.name ?? null,
       briefId: brief.id,
       taskCount,
       queued,
+      architectureId: archTask.id,
+      architectureTitle: archTask.title.slice(0, 160),
     },
   });
 
