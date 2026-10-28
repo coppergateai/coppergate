@@ -24,6 +24,9 @@ describe("tool-defs helpers", () => {
     assert.equal(isWorkspaceToolDefKind("mcp"), true);
     assert.equal(isWorkspaceToolDefKind("shell"), false);
     assert.ok(RESERVED_TOOL_KEYS.has("edit"));
+    assert.ok(RESERVED_TOOL_KEYS.has("sonar_quality_gate"));
     assert.ok(CORE_ALLOWLIST_TOOLS.has("git"));
+    assert.ok(CORE_ALLOWLIST_TOOLS.has("mcp:*"));
+    assert.equal(isValidToolDefKey("sonar_list_issues"), false);
   });
 });

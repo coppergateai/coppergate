@@ -16,7 +16,7 @@ export class ToolDefError extends Error {
   }
 }
 
-/** Core / alias tokens that cannot be redefined as workspace tool defs. */
+/** Core / alias / system MCP tokens that cannot be redefined as workspace tool defs. */
 export const RESERVED_TOOL_KEYS = new Set([
   "read",
   "edit",
@@ -27,6 +27,9 @@ export const RESERVED_TOOL_KEYS = new Set([
   "put_file",
   "mcp:sonarqube",
   "mcp:*",
+  "sonar_list_issues",
+  "sonar_quality_gate",
+  "sonar_hotspots",
 ]);
 
 export const CORE_ALLOWLIST_TOOLS = new Set([
@@ -36,6 +39,9 @@ export const CORE_ALLOWLIST_TOOLS = new Set([
   "git",
   "mcp:sonarqube",
   "mcp:*",
+  "sonar_list_issues",
+  "sonar_quality_gate",
+  "sonar_hotspots",
 ]);
 
 export const TOOL_DEF_KINDS = ["mcp", "alias", "custom"] as const;

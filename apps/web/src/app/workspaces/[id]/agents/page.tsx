@@ -134,10 +134,13 @@ export default async function WorkspaceAgentsPage({
   );
 
   const toolOptions: ToolOption[] = [
-    ...TOOL_CATALOG.filter((t) => t.kind === "core" || t.key.startsWith("mcp:")).map(
-      (t) => ({ key: t.key, title: t.title }),
-    ),
-    { key: "mcp:*", title: "MCP · all" },
+    ...TOOL_CATALOG.filter(
+      (t) =>
+        t.kind === "core" ||
+        t.kind === "mcp" ||
+        t.key.startsWith("mcp:") ||
+        t.key.startsWith("sonar_"),
+    ).map((t) => ({ key: t.key, title: t.title })),
     ...toolDefs.map((t) => ({ key: t.key, title: t.title })),
   ];
   // Dedupe by key
