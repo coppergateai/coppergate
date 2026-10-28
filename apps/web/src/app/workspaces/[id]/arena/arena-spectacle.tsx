@@ -170,19 +170,29 @@ function runtimeLabel(state: RuntimeState, eliminated?: boolean): string {
   }
 }
 
+/** Keep collapsed lane meta scannable (2748 → 2.7k). */
+function formatCompactCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10_000) {
+    const tenths = Math.round(n / 100) / 10;
+    return `${tenths % 1 === 0 ? tenths.toFixed(0) : tenths.toFixed(1)}k`;
+  }
+  if (n < 1_000_000) return `${Math.round(n / 1000)}k`;
+  const millions = Math.round(n / 100_000) / 10;
+  return `${millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1)}m`;
+}
+
 function poolCaption(pool: PoolSummary | undefined): string {
   if (!pool) return "";
   const parts: string[] = [];
   if (pool.activeWithBudget > 0) {
-    parts.push(
-      `${pool.activeWithBudget} with budget`,
-    );
+    parts.push(`${formatCompactCount(pool.activeWithBudget)} with budget`);
   }
   if (pool.eliminated > 0) {
-    parts.push(`${pool.eliminated} eliminated`);
+    parts.push(`${formatCompactCount(pool.eliminated)} eliminated`);
   }
   if (pool.activeBroke > 0) {
-    parts.push(`${pool.activeBroke} broke`);
+    parts.push(`${formatCompactCount(pool.activeBroke)} broke`);
   }
   return parts.length ? parts.join(" · ") : "No active contenders";
 }
@@ -376,9 +386,16 @@ export function ArenaSpectacle({
     void load();
   }, [load]);
 
+  const syncing = loading && !snapshot;
   const live = snapshot?.status === "LIVE";
   const paused = snapshot?.status === "PAUSED";
-  const workspaceStatusLabel = live ? "Live" : paused ? "Paused" : "Stopped";
+  const workspaceStatusLabel = syncing
+    ? "Syncing"
+    : live
+      ? "Live"
+      : paused
+        ? "Paused"
+        : "Stopped";
 
   useEffect(() => {
     if (!live && !paused) return;
@@ -540,7 +557,15 @@ export function ArenaSpectacle({
           <div className={styles.heroTop}>
             <p className={styles.eyebrow}>Arena / {workspaceName}</p>
             <span
-              className={`${styles.pill} ${live ? styles.pillLive : paused ? styles.pillPaused : ""}`}
+              className={`${styles.pill} ${
+                syncing
+                  ? styles.pillSyncing
+                  : live
+                    ? styles.pillLive
+                    : paused
+                      ? styles.pillPaused
+                      : ""
+              }`}
               aria-live="polite"
             >
               <span className={styles.pillDot} aria-hidden />

@@ -110,6 +110,16 @@
   background: var(--mc-idle);
 }
 
+.pillSyncing {
+  color: var(--mc-text-mute);
+  border-color: var(--mc-line);
+}
+
+.pillSyncing .pillDot {
+  background: var(--mc-text-mute);
+  animation: syncPulse 1.2s ease-in-out infinite;
+}
+
 .pillLive {
   color: var(--mc-active);
   border-color: color-mix(in srgb, var(--mc-active) 40%, transparent);
@@ -128,6 +138,16 @@
   background: var(--mc-active);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--mc-active) 50%, transparent);
   animation: livePulse 1.8s ease-out infinite;
+}
+
+@keyframes syncPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @keyframes livePulse {
