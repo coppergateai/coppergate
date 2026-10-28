@@ -78,7 +78,7 @@ Web uygulamasındaki (`apps/web`) route’ların sayfa sayfa özeti. Auth gerekt
 
 ## Workspace (`/workspaces/[id]/…`)
 
-Layout: AppChrome sidebar — **Overview**, Projects, Arena, Inbox, Insights, Activity, Settings.
+Layout: AppChrome sidebar — **Overview**, Projects, Arena, Agents, Inbox, Insights, Activity, Settings.
 Varsayılan app teması: **light** (toggle ile dark).
 
 ### `/workspaces/[id]` — Mission Control (Overview)
@@ -88,6 +88,14 @@ Varsayılan app teması: **light** (toggle ile dark).
 - Sağ: Active executions (pipeline steps) + Quick actions
 - İlk 10 sn’de müdahale gereken iş görünür
 - Period köprüsü: **30d insights →** `/insights` (operasyon paneli değil)
+
+### `/workspaces/[id]/agents` — Agents
+- Master–detail: profil listesi + seçili agent detayı
+- Guidance, temperament, strategy, spend cap, model/BYOK, tool allowlist
+- Skill catalog (expandable markdown body)
+- 30d stats: runs, wins/losses, failed, spend, last run
+- Live Arena seats (ACTIVE contenders) per profile
+- `?agent=engineer` deep-link; Configure → Settings · LLM
 
 ### `/workspaces/[id]/insights` — Insights
 - Period economics & verified delivery (Mission Control’dan ayrı)
@@ -189,6 +197,7 @@ Cost / period analytics → [`/insights`](#workspacesidinsights--insights) (`?ta
 /workspaces/[id]/projects/[projectId]           Project (tabs)
 /workspaces/[id]/projects/[projectId]/tasks/[taskId]  Task + Accept
 /workspaces/[id]/arena     Arena spectacle
+/workspaces/[id]/agents    Agent catalog & details
 /workspaces/[id]/inbox     Approvals
 /workspaces/[id]/insights  Period economics & verified delivery
 /workspaces/[id]/activity  Agent Operations Timeline

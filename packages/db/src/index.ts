@@ -670,6 +670,10 @@ export {
   updateWorkspaceAgentProfile,
 } from "./profiles.js";
 export {
+  getWorkspaceAgentProfileStats,
+  type AgentProfileStats,
+} from "./agent-stats.js";
+export {
   TEMPERAMENT_VALUES,
   defaultTemperamentForProfileKey,
   isAgentTemperament,

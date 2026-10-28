@@ -40,6 +40,7 @@ Issue → Execution → Verification → Human Approval → Delivery
 Surfaces:
 
 - **Mission Control** (`/workspaces/[id]`) — what needs intervention now
+- **Agents** (`/workspaces/[id]/agents`) — profile catalog, skills, 30d outcomes
 - **Insights** (`/workspaces/[id]/insights`) — period economics & verified delivery
 - **Evidence** — why a delivery is acceptable
 - **Arena** — which contender won and why (hard gates, then rank)

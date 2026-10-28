@@ -167,6 +167,17 @@ export function AppSidebar({
               <span className={styles.navItemLabel}>Arena</span>
             </Link>
             <Link
+              href={`/workspaces/${workspaceId}/agents`}
+              className={`${styles.navItem} ${
+                isActive(pathname, `/workspaces/${workspaceId}/agents`)
+                  ? styles.navItemActive
+                  : ""
+              }`}
+              onClick={onClose}
+            >
+              <span className={styles.navItemLabel}>Agents</span>
+            </Link>
+            <Link
               href={`/workspaces/${workspaceId}/inbox`}
               className={`${styles.navItem} ${
                 isActive(pathname, `/workspaces/${workspaceId}/inbox`)
