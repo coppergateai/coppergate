@@ -84,7 +84,11 @@ export async function captureDesignScoutShots(input: {
   try {
     const browser = await chromium.launch({
       headless: true,
-      channel: process.env.PW_USE_BUNDLED === "1" ? undefined : "chrome",
+      // Prefer Playwright-bundled Chromium in worker images.
+      // Set PW_USE_SYSTEM_CHROME=1 to use installed Google Chrome instead.
+      ...(process.env.PW_USE_SYSTEM_CHROME === "1"
+        ? { channel: "chrome" as const }
+        : {}),
     });
     try {
       const context = await browser.newContext({

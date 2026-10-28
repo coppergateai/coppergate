@@ -17,6 +17,8 @@ primary_region = "iad"
   # Prefer workspace BYOK / OPENAI_API_KEY. OpenHands scaffold stub is disabled.
   # CONTENDER_HARNESS = "native_openai"
   APP_URL = "https://www.coppergate.ai"
+  # Design scout: use Playwright-bundled Chromium (see Dockerfile.worker).
+  PW_USE_BUNDLED = "1"
 
 [processes]
   worker = "pnpm start"

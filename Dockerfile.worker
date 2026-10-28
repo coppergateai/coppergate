@@ -32,6 +32,10 @@ RUN apt-get update \
   && command -v rg \
   && rg --version
 COPY --from=build /app /app
+# Playwright Chromium for design scout (bundled browser + OS deps).
+RUN cd /app/apps/worker \
+  && pnpm exec playwright install-deps chromium \
+  && pnpm exec playwright install chromium
 # Non-root runtime — sandbox workdirs use /tmp (world-writable).
 RUN groupadd --system --gid 1001 coppergate \
   && useradd --system --uid 1001 --gid coppergate --home-dir /app --shell /usr/sbin/nologin coppergate \
