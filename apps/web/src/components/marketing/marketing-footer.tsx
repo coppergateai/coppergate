@@ -33,7 +33,7 @@ export function MarketingFooter() {
             </p>
             <p className={styles.footerNote}>
               Coppergate is built by Coppergate — and ships adjacent open-source
-              pilots like kprompt.
+              pilots like ACPP and kprompt.
             </p>
             <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
               hello@coppergate.ai
@@ -146,7 +146,7 @@ export function MarketingFooter() {
 
         <div className={styles.footerBottom}>
           <p>© {year} Coppergate</p>
-          <p>MIT · Open source · Dogfood + kprompt</p>
+          <p>MIT · Open source · Dogfood + ACPP + kprompt</p>
         </div>
       </div>
     </footer>

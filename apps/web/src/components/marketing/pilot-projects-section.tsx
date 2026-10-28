@@ -17,7 +17,7 @@ export function PilotProjectsSection() {
         <p className={styles.sectionLede}>
           We dogfood Contracted Autonomy on our own repos — Open Program → spend
           license → Accept + Ship Receipt under a real cap — and ship adjacent
-          open-source pilots like kprompt from the same shop.
+          open-source pilots like ACPP and kprompt from the same shop.
         </p>
 
         <ul className={styles.pilotGrid}>

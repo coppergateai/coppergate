@@ -28,6 +28,17 @@ export const PILOT_PROJECTS: readonly PilotProject[] = [
     badge: "Dogfood",
   },
   {
+    id: "acpp",
+    name: "ACPP",
+    href: "https://acpp.coppergate.ai",
+    github: "https://github.com/coppergateai/acpp",
+    blurb:
+      "Agent Credential & Proof Protocol — verifiable agent identity, explicit permissions, and execution receipts. Dogfooded under Open Program on coppergateai/acpp.",
+    logoSrc: "/pilots/acpp-mark.svg",
+    logoAlt: "ACPP",
+    badge: "Dogfood",
+  },
+  {
     id: "kprompt",
     name: "kprompt",
     href: "https://kprompt.ai",

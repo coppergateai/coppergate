@@ -14,6 +14,14 @@ export const metadata: Metadata = publicPageMetadata({
 
 const entries = [
   {
+    date: "2026-10-28",
+    title: "ACPP open pilot",
+    items: [
+      "Pilot projects: ACPP (Agent Credential & Proof Protocol) listed with Dogfood badge",
+      "Links to acpp.coppergate.ai and github.com/coppergateai/acpp",
+    ],
+  },
+  {
     date: "2026-10-26",
     title: "Marketing Open Program consistency",
     items: [
