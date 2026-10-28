@@ -135,9 +135,6 @@ export function MissionControl({ data, recentEvents }: Props) {
   const humanGates = metrics.needsApproval;
   const evidenceGates = metrics.needsEvidenceAccept;
   const attentionTotal = missionControlAttentionTotal(metrics, capacityCrisis);
-  const arenaInAttentionTotal = capacityCrisis
-    ? 0
-    : metrics.arenaNeedsAttention;
   const attentionHref =
     humanGates > 0
       ? `/workspaces/${data.workspaceId}/inbox`
