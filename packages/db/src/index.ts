@@ -382,9 +382,11 @@ export {
   type ArchitectureOpenTask,
 } from "./architecture-backlog.js";
 export {
+  architectureRepoFromMaintainerPolicyJson,
   assertSpendLicenseForTask,
   licenseTitleForProgram,
   openIdFromTaskTitle,
+  programBoundFromMaintainerPolicyJson,
   SpendLicenseError,
   type SpendLicense,
 } from "./spend-license.js";
@@ -643,6 +645,15 @@ export {
   IssueImportError,
   importGithubIssueAsTask,
 } from "./issue-import.js";
+export {
+  computeIssueWedgeNextStep,
+  D14_LOCKED_KPI_PATH,
+  describeIssueWedgeHonesty,
+  issueWedgeHonestyForProject,
+  type IssueWedgeHonesty,
+  type IssueWedgeNextStep,
+  type IssueWedgeNextStepInput,
+} from "./issue-wedge-honesty.js";
 export {
   PrImportError,
   importGithubPrAsTask,

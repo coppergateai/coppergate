@@ -69,7 +69,7 @@ export function licenseTitleForProgram(input: {
 }
 
 /** Lightweight parse — avoid importing maintainer.ts (circular with arena). */
-function architectureRepoFromPolicyJson(
+export function architectureRepoFromMaintainerPolicyJson(
   raw: string | null | undefined,
 ): string | null {
   if (!raw?.trim()) return null;
@@ -85,6 +85,13 @@ function architectureRepoFromPolicyJson(
     return null;
   }
   return null;
+}
+
+/** True when maintainer policy binds an Open Program architecture repo. */
+export function programBoundFromMaintainerPolicyJson(
+  raw: string | null | undefined,
+): boolean {
+  return Boolean(architectureRepoFromMaintainerPolicyJson(raw));
 }
 
 /**
@@ -112,8 +119,8 @@ export async function assertSpendLicenseForTask(
     )
     .limit(1);
 
-  const programBound = Boolean(
-    architectureRepoFromPolicyJson(project?.maintainerPolicyJson ?? null),
+  const programBound = programBoundFromMaintainerPolicyJson(
+    project?.maintainerPolicyJson ?? null,
   );
   const openId = openIdFromTaskTitle(input.taskTitle);
 
