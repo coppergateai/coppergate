@@ -4,15 +4,19 @@ import { recordAuditEvent } from "./briefs.js";
 import {
   DEFAULT_CONTENDER_BUDGET_MICROS,
   ensureArenaForProject,
+  ensurePeerContenderSeats,
   isContenderStrategy,
-  MAX_TOURNAMENT_FANOUT,
+  MIN_DUEL_CONTENDERS,
   type ContenderStrategy,
 } from "./arena.js";
+import {
+  primaryRoleForSpawn,
+  strategiesForDuel,
+  type PeerContenderStrategy,
+} from "./contender-peers.js";
 import { getLlmByokById } from "./credentials.js";
 import {
   agentProfiles,
-  arenas,
-  contenders,
   type AgentProfile,
   type AgentTemperament,
 } from "./schema.js";
@@ -478,9 +482,9 @@ export async function updateWorkspaceAgentProfile(
 }
 
 /**
- * Align arena contenders with spawn matrix profile keys before fan-out (TASK104).
- * Inserts missing ACTIVE contenders per key; eliminates ACTIVE slots whose
- * profileKey is not in the requested set (e.g. engineer_2 clones).
+ * Arm peer-only contender seats for the primary spawn role.
+ * Spawn matrix keys are role assignment (first key wins) — not duel partners.
+ * Cross-role ACTIVE seats (and engineer_N clones) are eliminated.
  */
 export async function applySpawnProfilesToArena(
   db: Database,
@@ -489,97 +493,64 @@ export async function applySpawnProfilesToArena(
     projectId: string;
     actor: string;
     profileKeys: string[];
-    /** Optional per-profile strategy overrides (meta-tournament challenger flip). */
+    /** Peer seat count; defaults to max(arena.defaultContenderN, MIN_DUEL). */
+    seatCount?: number;
+    /** Explicit strategies for peer seats (meta duel). */
+    strategies?: ContenderStrategy[];
+    /**
+     * Legacy: per-key strategy hint. Only the primary key is honored as seat-0
+     * preferred strategy; remaining seats flip via strategiesForDuel.
+     */
     strategyByKey?: Record<string, ContenderStrategy>;
   },
 ): Promise<void> {
-  const seen = new Set<string>();
-  const keys: string[] = [];
-  for (const k of input.profileKeys) {
-    if (!BOUNDED_KEYS.has(k) || seen.has(k)) continue;
-    seen.add(k);
-    keys.push(k);
-  }
-  if (keys.length === 0) return;
+  const primary = primaryRoleForSpawn(input.profileKeys, BOUNDED_KEYS);
+  if (!BOUNDED_KEYS.has(primary)) return;
 
   await ensureSystemAgentProfiles(db);
   const profiles = await listAgentProfiles(db, input.workspaceId);
-  const byKey = new Map(profiles.map((p) => [p.key, p]));
+  const profile = profiles.find((p) => p.key === primary);
+  const preferredRaw =
+    input.strategies?.[0] ??
+    input.strategyByKey?.[primary] ??
+    profile?.strategyDefault ??
+    "balanced";
+  const preferred: PeerContenderStrategy = isContenderStrategy(preferredRaw)
+    ? preferredRaw
+    : "balanced";
 
-  const n = Math.min(MAX_TOURNAMENT_FANOUT, Math.max(keys.length, 1));
-  const { arena, contenders: pool } = await ensureArenaForProject(db, {
+  const requestedSeats = Math.max(
+    MIN_DUEL_CONTENDERS,
+    arenaDefaultN(input.seatCount),
+  );
+  const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
-    defaultContenderN: n,
-    contenderCount: n,
+    defaultContenderN: requestedSeats,
+    contenderCount: requestedSeats,
   });
 
-  const now = new Date();
-  const active = pool.filter((c) => c.status === "ACTIVE");
-  const byProfile = new Map<string, (typeof active)[number]>();
-  const wanted = new Set(keys);
+  const seatCount = Math.max(
+    MIN_DUEL_CONTENDERS,
+    input.seatCount ??
+      Math.max(arena.defaultContenderN, MIN_DUEL_CONTENDERS),
+  );
+  const strategies: ContenderStrategy[] =
+    input.strategies && input.strategies.length > 0
+      ? input.strategies.map((s) =>
+          isContenderStrategy(s) ? s : preferred,
+        )
+      : (strategiesForDuel(seatCount, preferred) as ContenderStrategy[]);
 
-  for (const c of active) {
-    const keep =
-      wanted.has(c.profileKey) && !byProfile.has(c.profileKey);
-    if (keep) {
-      byProfile.set(c.profileKey, c);
-      continue;
-    }
-    // Orphan clones (engineer_2), duplicate keys, or keys dropped from roster
-    await db
-      .update(contenders)
-      .set({
-        status: "ELIMINATED",
-        eliminatedAt: now,
-        updatedAt: now,
-      })
-      .where(
-        and(eq(contenders.id, c.id), eq(contenders.arenaId, arena.id)),
-      );
-  }
-
-  for (const key of keys) {
-    const profile = byKey.get(key);
-    const override = input.strategyByKey?.[key];
-    const rawStrategy =
-      override ?? profile?.strategyDefault ?? "balanced";
-    const strategy = isContenderStrategy(rawStrategy) ? rawStrategy : "balanced";
-    const existing = byProfile.get(key);
-    if (existing) {
-      await db
-        .update(contenders)
-        .set({
-          profileKey: key,
-          strategy,
-          updatedAt: now,
-        })
-        .where(
-          and(eq(contenders.id, existing.id), eq(contenders.arenaId, arena.id)),
-        );
-      continue;
-    }
-    await db.insert(contenders).values({
-      id: crypto.randomUUID(),
-      arenaId: arena.id,
-      workspaceId: input.workspaceId,
-      profileKey: key,
-      strategy,
-      budgetMicrosRemaining: DEFAULT_CONTENDER_BUDGET_MICROS,
-      status: "ACTIVE",
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-
-  // Keep arena defaultContenderN aligned with the live roster width.
-  await db
-    .update(arenas)
-    .set({ defaultContenderN: n, updatedAt: now })
-    .where(
-      and(eq(arenas.id, arena.id), eq(arenas.workspaceId, input.workspaceId)),
-    );
+  await ensurePeerContenderSeats(db, {
+    workspaceId: input.workspaceId,
+    arenaId: arena.id,
+    profileKey: primary,
+    strategies,
+    budgetMicros: DEFAULT_CONTENDER_BUDGET_MICROS,
+    pinDefaultContenderN: seatCount,
+  });
 
   await recordAuditEvent(db, {
     workspaceId: input.workspaceId,
@@ -587,6 +558,19 @@ export async function applySpawnProfilesToArena(
     action: "signal.spawn_profiles",
     targetType: "arena",
     targetId: arena.id,
-    meta: { profileKeys: keys, projectId: input.projectId },
+    meta: {
+      profileKeys: [primary],
+      spawnHintKeys: input.profileKeys,
+      primaryProfileKey: primary,
+      strategies,
+      projectId: input.projectId,
+    },
   });
+}
+
+function arenaDefaultN(seatCount: number | undefined): number {
+  if (seatCount != null && Number.isFinite(seatCount) && seatCount >= 1) {
+    return Math.floor(seatCount);
+  }
+  return MIN_DUEL_CONTENDERS;
 }

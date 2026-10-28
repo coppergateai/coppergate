@@ -14,6 +14,7 @@ import {
   type SignalEvent,
   type Task,
 } from "./schema.js";
+import { primaryRoleForSpawn } from "./contender-peers.js";
 import { notifyWorkspace } from "./notify.js";
 import {
   applySpawnProfilesToArena,
@@ -499,7 +500,7 @@ async function createTaskFromSignal(
     milestone = created!;
   }
 
-  const profile = input.profileKeys[0] ?? "fixer";
+  const profile = primaryRoleForSpawn(input.profileKeys);
   const labels = parseJsonArray(input.event.labelsJson);
   let estimateMicros = 50_000;
   for (const l of labels) {
@@ -577,6 +578,8 @@ async function createTaskFromSignal(
       provider: input.event.provider,
       profileKeys: input.profileKeys,
       profileHint: profile,
+      primaryProfileKey: profile,
+      spawnProfileKeys: input.profileKeys,
     },
   });
 

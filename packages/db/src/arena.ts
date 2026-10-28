@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import {
   assertSufficientBudget,
   BudgetError,
@@ -10,6 +10,12 @@ import {
   contenderDebitAuditMeta,
   describeFanoutPoolHonesty,
 } from "./contender-elimination.js";
+import {
+  DEFAULT_PRIMARY_PROFILE_KEY,
+  assertPeerTournament,
+  primaryRoleForSpawn,
+  strategiesForDuel,
+} from "./contender-peers.js";
 import type { Database } from "./client.js";
 import {
   clampFanoutToCapacity,
@@ -288,59 +294,84 @@ export async function getArenaForProject(
 }
 
 /**
- * Ensure ≥ MIN_DUEL_CONTENDERS ACTIVE seats with distinct strategies (cheap duel).
- * Tops up thin pools left from older N=1 arenas without wiping existing contenders.
+ * Ensure N ACTIVE seats for one profileKey with distinct strategies.
+ * Eliminates cross-role / clone seats so tournaments stay peer-only.
  */
-export async function ensureDuelContenderPool(
+export async function ensurePeerContenderSeats(
   db: Database,
   input: {
     workspaceId: string;
     arenaId: string;
+    profileKey: string;
+    strategies: ContenderStrategy[];
     budgetMicros?: number;
+    pinDefaultContenderN?: number;
   },
 ): Promise<Contender[]> {
+  const profileKey = input.profileKey.trim() || DEFAULT_PRIMARY_PROFILE_KEY;
+  const strategies =
+    input.strategies.length > 0
+      ? input.strategies
+      : (strategiesForDuel(MIN_DUEL_CONTENDERS) as ContenderStrategy[]);
   const budgetEach = Math.max(
     input.budgetMicros ?? DEFAULT_CONTENDER_BUDGET_MICROS,
     1,
   );
   assertNonNegativeBudget(budgetEach);
 
-  let pool = await listContendersForArena(db, {
+  const pool = await listContendersForArena(db, {
     workspaceId: input.workspaceId,
     arenaId: input.arenaId,
   });
   const now = new Date();
-  let active = pool.filter((c) => c.status === "ACTIVE");
+  const peers: Contender[] = [];
 
-  // Diversify strategies on the first two ACTIVE seats when they collide.
-  if (active.length >= 2 && active[0]!.strategy === active[1]!.strategy) {
-    const alt =
-      CONTENDER_STRATEGIES.find((s) => s !== active[0]!.strategy) ?? "blitz";
-    const [updated] = await db
-      .update(contenders)
-      .set({ strategy: alt, updatedAt: now })
-      .where(eq(contenders.id, active[1]!.id))
-      .returning();
-    if (updated) {
-      pool = pool.map((c) => (c.id === updated.id ? updated : c));
-      active = pool.filter((c) => c.status === "ACTIVE");
+  for (const c of pool) {
+    if (c.status !== "ACTIVE") continue;
+    if (c.profileKey === profileKey) {
+      peers.push(c);
+      continue;
     }
+    await db
+      .update(contenders)
+      .set({
+        status: "ELIMINATED",
+        eliminatedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(contenders.id, c.id),
+          eq(contenders.arenaId, input.arenaId),
+        ),
+      );
   }
 
-  const usedKeys = new Set(pool.map((c) => c.profileKey));
-  const usedStrategies = new Set(active.map((c) => c.strategy));
-  let nextIndex = pool.length;
-  while (active.length < MIN_DUEL_CONTENDERS) {
+  const seatCount = Math.max(strategies.length, MIN_DUEL_CONTENDERS);
+  const ensured: Contender[] = [];
+  for (let i = 0; i < seatCount; i++) {
     const strategy =
-      CONTENDER_STRATEGIES.find((s) => !usedStrategies.has(s)) ??
-      CONTENDER_STRATEGIES[active.length % CONTENDER_STRATEGIES.length]!;
-    let profileKey =
-      nextIndex === 0 ? "engineer" : `engineer_${nextIndex + 1}`;
-    while (usedKeys.has(profileKey)) {
-      nextIndex += 1;
-      profileKey = `engineer_${nextIndex + 1}`;
+      strategies[i] ??
+      CONTENDER_STRATEGIES[i % CONTENDER_STRATEGIES.length]!;
+    const existing = peers[i];
+    if (existing) {
+      const [updated] = await db
+        .update(contenders)
+        .set({
+          profileKey,
+          strategy,
+          budgetMicrosRemaining: Math.max(
+            existing.budgetMicrosRemaining,
+            budgetEach,
+          ),
+          updatedAt: now,
+        })
+        .where(eq(contenders.id, existing.id))
+        .returning();
+      ensured.push(updated ?? existing);
+      continue;
     }
-    const [c] = await db
+    const [created] = await db
       .insert(contenders)
       .values({
         id: crypto.randomUUID(),
@@ -354,14 +385,59 @@ export async function ensureDuelContenderPool(
         updatedAt: now,
       })
       .returning();
-    pool.push(c!);
-    active.push(c!);
-    usedKeys.add(profileKey);
-    usedStrategies.add(strategy);
-    nextIndex += 1;
+    ensured.push(created!);
   }
 
-  return pool;
+  if (input.pinDefaultContenderN != null) {
+    const pin = Math.max(1, Math.min(MAX_TOURNAMENT_FANOUT, input.pinDefaultContenderN));
+    await db
+      .update(arenas)
+      .set({ defaultContenderN: pin, updatedAt: now })
+      .where(
+        and(
+          eq(arenas.id, input.arenaId),
+          eq(arenas.workspaceId, input.workspaceId),
+        ),
+      );
+  }
+
+  return ensured;
+}
+
+/**
+ * Ensure ≥ MIN_DUEL_CONTENDERS ACTIVE peer seats (same role, distinct strategies).
+ * Tops up thin pools; clears sticky cross-role seats from older meta/spawn bugs.
+ */
+export async function ensureDuelContenderPool(
+  db: Database,
+  input: {
+    workspaceId: string;
+    arenaId: string;
+    budgetMicros?: number;
+    profileKey?: string;
+  },
+): Promise<Contender[]> {
+  const pool = await listContendersForArena(db, {
+    workspaceId: input.workspaceId,
+    arenaId: input.arenaId,
+  });
+  const active = pool.filter((c) => c.status === "ACTIVE");
+  const primary =
+    input.profileKey?.trim() ||
+    active.find((c) => !c.profileKey.includes("_"))?.profileKey ||
+    active[0]?.profileKey ||
+    DEFAULT_PRIMARY_PROFILE_KEY;
+  const preferred = active.find((c) => c.profileKey === primary)?.strategy;
+  return ensurePeerContenderSeats(db, {
+    workspaceId: input.workspaceId,
+    arenaId: input.arenaId,
+    profileKey: primary,
+    strategies: strategiesForDuel(
+      MIN_DUEL_CONTENDERS,
+      preferred,
+    ) as ContenderStrategy[],
+    budgetMicros: input.budgetMicros,
+  });
 }
 
 export async function ensureArenaForProject(
@@ -442,16 +518,18 @@ export async function ensureArenaForProject(
     })
     .returning();
 
+  const strategies = strategiesForDuel(contenderCount) as ContenderStrategy[];
   const pool: Contender[] = [];
   for (let i = 0; i < contenderCount; i++) {
-    const strategy = CONTENDER_STRATEGIES[i % CONTENDER_STRATEGIES.length]!;
+    const strategy =
+      strategies[i] ?? CONTENDER_STRATEGIES[i % CONTENDER_STRATEGIES.length]!;
     const [c] = await db
       .insert(contenders)
       .values({
         id: crypto.randomUUID(),
         arenaId,
         workspaceId: input.workspaceId,
-        profileKey: i === 0 ? "engineer" : `engineer_${i + 1}`,
+        profileKey: DEFAULT_PRIMARY_PROFILE_KEY,
         strategy,
         budgetMicrosRemaining: budgetEach,
         status: "ACTIVE",
@@ -487,7 +565,72 @@ export async function listContendersForArena(
         eq(contenders.workspaceId, input.workspaceId),
         eq(contenders.arenaId, input.arenaId),
       ),
-    );
+    )
+    .orderBy(asc(contenders.createdAt), asc(contenders.id));
+}
+
+/** Resolve primary ship role for a task (signal audit → engineer). */
+export async function resolvePrimaryProfileForTask(
+  db: Database,
+  input: {
+    workspaceId: string;
+    taskId: string;
+    override?: string | null;
+  },
+): Promise<string> {
+  if (input.override?.trim()) {
+    return primaryRoleForSpawn([input.override.trim()]);
+  }
+
+  const audits = await db
+    .select({ meta: auditEvents.meta, action: auditEvents.action })
+    .from(auditEvents)
+    .where(
+      and(
+        eq(auditEvents.workspaceId, input.workspaceId),
+        eq(auditEvents.targetId, input.taskId),
+        inArray(auditEvents.action, [
+          "signal.spawn_primary",
+          "signal.task_create",
+        ]),
+      ),
+    )
+    .orderBy(desc(auditEvents.createdAt))
+    .limit(4);
+
+  for (const audit of audits) {
+    if (!audit.meta) continue;
+    try {
+      const meta = JSON.parse(audit.meta) as {
+        profileHint?: unknown;
+        primaryProfileKey?: unknown;
+        profileKeys?: unknown;
+        spawnProfileKeys?: unknown;
+      };
+      if (typeof meta.primaryProfileKey === "string") {
+        return primaryRoleForSpawn([meta.primaryProfileKey]);
+      }
+      if (typeof meta.profileHint === "string") {
+        return primaryRoleForSpawn([meta.profileHint]);
+      }
+      if (Array.isArray(meta.spawnProfileKeys)) {
+        return primaryRoleForSpawn(
+          meta.spawnProfileKeys.filter(
+            (x): x is string => typeof x === "string",
+          ),
+        );
+      }
+      if (Array.isArray(meta.profileKeys)) {
+        return primaryRoleForSpawn(
+          meta.profileKeys.filter((x): x is string => typeof x === "string"),
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return DEFAULT_PRIMARY_PROFILE_KEY;
 }
 
 /** TASK053 — toggle min_human (default on after G1b 2026-10-12). */
@@ -722,6 +865,8 @@ export async function startTournamentFanout(
     /** Override width; clamped to MAX_TOURNAMENT_FANOUT and active pool. */
     n?: number;
     attempt?: number;
+    /** Preferred ship role; overrides signal/audit resolution. */
+    primaryProfileKey?: string | null;
   },
 ): Promise<{
   arena: Arena;
@@ -782,12 +927,23 @@ export async function startTournamentFanout(
     };
   }
 
+  const primaryProfileKey = await resolvePrimaryProfileForTask(db, {
+    workspaceId: input.workspaceId,
+    taskId: task.id,
+    override: input.primaryProfileKey,
+  });
+
+  const { plan, limits } = await resolveWorkspacePlanLimits(
+    db,
+    input.workspaceId,
+  );
+  const duelFloor = Math.min(MIN_DUEL_CONTENDERS, limits.maxTournamentFanout);
   const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: task.projectId,
     actor: input.actor,
-    defaultContenderN: MAX_TOURNAMENT_FANOUT,
-    contenderCount: MAX_TOURNAMENT_FANOUT,
+    defaultContenderN: Math.max(duelFloor, input.n ?? duelFloor),
+    contenderCount: Math.max(duelFloor, input.n ?? duelFloor),
     contenderBudgetMicros: Math.max(
       task.estimateMicros ?? 0,
       DEFAULT_CONTENDER_BUDGET_MICROS,
@@ -801,9 +957,17 @@ export async function startTournamentFanout(
     task.estimateMicros ?? 0,
     DEFAULT_CONTENDER_BUDGET_MICROS,
   );
-  await ensureDuelContenderPool(db, {
+  const requested = input.n ?? Math.max(arena.defaultContenderN, duelFloor);
+  const planCapped = clampTournamentFanout(requested, plan);
+  const requestedFanout = Math.min(MAX_TOURNAMENT_FANOUT, planCapped);
+
+  await ensurePeerContenderSeats(db, {
     workspaceId: input.workspaceId,
     arenaId: arena.id,
+    profileKey: primaryProfileKey,
+    strategies: strategiesForDuel(
+      Math.max(requestedFanout, MIN_DUEL_CONTENDERS),
+    ) as ContenderStrategy[],
     budgetMicros: minPurse,
   });
   await ensureContenderEnqueueBudget(db, {
@@ -816,21 +980,15 @@ export async function startTournamentFanout(
     arenaId: arena.id,
   });
 
-  const eligible = pool.filter((c) =>
-    canContenderEnqueue({
-      arenaStatus: arena.status === "ARMED" ? "ARMED" : arena.status,
-      contenderStatus: c.status,
-      budgetMicrosRemaining: c.budgetMicrosRemaining,
-    }),
+  const eligible = pool.filter(
+    (c) =>
+      c.profileKey === primaryProfileKey &&
+      canContenderEnqueue({
+        arenaStatus: arena.status === "ARMED" ? "ARMED" : arena.status,
+        contenderStatus: c.status,
+        budgetMicrosRemaining: c.budgetMicrosRemaining,
+      }),
   );
-  const { plan, limits } = await resolveWorkspacePlanLimits(
-    db,
-    input.workspaceId,
-  );
-  // Prefer a duel when the plan allows it, even if an older arena still has defaultN=1.
-  const duelFloor = Math.min(MIN_DUEL_CONTENDERS, limits.maxTournamentFanout);
-  const requested = input.n ?? Math.max(arena.defaultContenderN, duelFloor);
-  const planCapped = clampTournamentFanout(requested, plan);
   const concurrency = await getWorkspaceConcurrency(
     db,
     input.workspaceId,
@@ -853,7 +1011,6 @@ export async function startTournamentFanout(
     task.projectId,
   );
   const perRun = task.estimateMicros ?? 0;
-  const requestedFanout = Math.min(MAX_TOURNAMENT_FANOUT, planCapped);
   const capacityCapped = clampFanoutToCapacity({
     requested: Math.min(requestedFanout, eligible.length),
     concurrencySlots: concurrency.slots,
@@ -899,6 +1056,8 @@ export async function startTournamentFanout(
   }
 
   const selected = eligible.slice(0, n);
+  assertPeerTournament(selected.map((c) => c.profileKey));
+
   const tournament = await createTournament(db, {
     workspaceId: input.workspaceId,
     projectId: task.projectId,

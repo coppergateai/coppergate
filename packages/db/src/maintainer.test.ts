@@ -22,7 +22,6 @@ import {
   shouldRollbackProfileForFitness,
   taskMatchesPathAllowlist,
 } from "./maintainer.js";
-import { FULL_ARENA_PROFILE_KEYS } from "./profiles.js";
 import { shouldRollMonthlyPeriod } from "./budgets.js";
 
 describe("maintainer policy", () => {
@@ -39,15 +38,16 @@ describe("maintainer policy", () => {
     assert.equal(p.releaseTagStyle, "daily");
   });
 
-  it("uses lean arena roster when available budget is tight", () => {
+  it("uses engineer peer roster for arena seating (catalog ≠ contenders)", () => {
     assert.deepEqual(
       rosterKeysForAvailableBudget(LEAN_ROSTER_AVAILABLE_MICROS - 1),
       [...LEAN_ARENA_PROFILE_KEYS],
     );
     assert.deepEqual(
       rosterKeysForAvailableBudget(LEAN_ROSTER_AVAILABLE_MICROS),
-      [...FULL_ARENA_PROFILE_KEYS],
+      [...LEAN_ARENA_PROFILE_KEYS],
     );
+    assert.deepEqual(LEAN_ARENA_PROFILE_KEYS, ["engineer"]);
   });
 
   it("refills backlog when idle under budget (continuous)", () => {
@@ -285,10 +285,13 @@ describe("path allowlist + release tags", () => {
 });
 
 describe("meta-tournament helpers", () => {
-  it("picks bounded challenger roles", () => {
-    assert.equal(pickMetaTournamentChallenger("engineer"), "reviewer");
-    assert.equal(pickMetaTournamentChallenger("reviewer"), "engineer");
-    assert.equal(pickMetaTournamentChallenger("proposer"), "engineer");
+  it("picks same-role challengers (strategy peers)", () => {
+    assert.equal(pickMetaTournamentChallenger("engineer"), "engineer");
+    assert.equal(pickMetaTournamentChallenger("reviewer"), "reviewer");
+    assert.equal(pickMetaTournamentChallenger("proposer"), "proposer");
+    assert.equal(pickMetaTournamentChallenger("fixer"), "fixer");
+    assert.equal(pickMetaTournamentChallenger("qa"), "qa");
+    assert.equal(pickMetaTournamentChallenger("unknown"), "engineer");
   });
 
   it("gates fitness rollback on efficiency drop", () => {

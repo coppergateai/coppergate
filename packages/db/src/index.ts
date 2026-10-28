@@ -118,6 +118,7 @@ export {
   debitTournamentLosers,
   ensureArenaForProject,
   ensureDuelContenderPool,
+  ensurePeerContenderSeats,
   getArenaForProject,
   getContenderById,
   getLatestTournamentForTask,
@@ -131,6 +132,7 @@ export {
   listContendersForArena,
   listRunsForTournament,
   pauseArena,
+  resolvePrimaryProfileForTask,
   resolveTournamentByFitness,
   resumeArena,
   selectWinnerByFitness,
@@ -141,6 +143,17 @@ export {
   type FitnessCandidate,
   type PayoffCandidate,
 } from "./arena.js";
+export {
+  DEFAULT_PRIMARY_PROFILE_KEY,
+  PEER_CONTENDER_STRATEGIES,
+  assertPeerTournament,
+  flipContenderStrategy,
+  isPeerContenderStrategy,
+  isPeerTournament,
+  primaryRoleForSpawn,
+  strategiesForDuel,
+  type PeerContenderStrategy,
+} from "./contender-peers.js";
 export {
   CONTENDER_BUDGET_LEDGER_ACTIONS,
   describeFanoutPoolHonesty,

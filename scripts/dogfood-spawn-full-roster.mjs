@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Spawn the full bounded agent roster onto every project arena in a workspace.
+ * Arm peer-only contender seats (primary engineer strategy duel) on every
+ * project arena in a workspace. FULL_ARENA_PROFILE_KEYS remains catalog-only.
  *
  * Usage (Fly DATABASE_URL):
  *   pnpm --filter @coppergate/db exec node --import tsx ../../scripts/dogfood-spawn-full-roster.mjs
@@ -9,12 +10,13 @@
  *   DATABASE_URL (required)
  *   WORKSPACE_SLUG (default: kprompt)
  *   PROJECT_NAME (optional — only spawn that project)
+ *   PRIMARY_PROFILE (default: engineer)
+ *   SEAT_COUNT (default: 2)
  */
 import {
   applySpawnProfilesToArena,
   closeDb,
   createDb,
-  FULL_ARENA_PROFILE_KEYS,
   getArenaForProject,
   listContendersForArena,
   listProjectsForWorkspace,
@@ -31,6 +33,8 @@ const db = createDb(url, { max: 1 });
 const actor = "script:dogfood-spawn-full-roster";
 const slug = process.env.WORKSPACE_SLUG ?? "kprompt";
 const onlyProject = process.env.PROJECT_NAME?.trim() || null;
+const primary = process.env.PRIMARY_PROFILE?.trim() || "engineer";
+const seatCount = Math.max(1, Number(process.env.SEAT_COUNT ?? 2) || 2);
 
 try {
   const ws = (await db.select().from(workspaces)).find((w) => w.slug === slug);
@@ -55,7 +59,8 @@ try {
       workspaceId: ws.id,
       projectId: project.id,
       actor,
-      profileKeys: FULL_ARENA_PROFILE_KEYS,
+      profileKeys: [primary],
+      seatCount,
     });
     const arena = await getArenaForProject(db, {
       workspaceId: ws.id,
@@ -69,13 +74,12 @@ try {
       : [];
     const active = pool
       .filter((c) => c.status === "ACTIVE")
-      .map((c) => c.profileKey)
-      .sort();
+      .map((c) => ({ key: c.profileKey, strategy: c.strategy }));
     out.push({
       project: project.name,
       arenaId: arena?.id ?? null,
       activeCount: active.length,
-      activeKeys: active,
+      active,
     });
   }
 
@@ -83,7 +87,8 @@ try {
     JSON.stringify(
       {
         workspace: slug,
-        rosterSize: FULL_ARENA_PROFILE_KEYS.length,
+        primaryProfile: primary,
+        seatCount,
         projects: out,
       },
       null,

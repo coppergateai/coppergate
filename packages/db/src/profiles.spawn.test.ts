@@ -4,20 +4,17 @@ import {
   ensureArenaForProject,
   getArenaForProject,
   listContendersForArena,
-  MAX_TOURNAMENT_FANOUT,
+  MIN_DUEL_CONTENDERS,
 } from "./arena.js";
 import { closeDb, createDb } from "./client.js";
 import { connectRepository, upsertGithubInstallation } from "./github.js";
 import { createProjectWithRepo } from "./projects.js";
-import {
-  applySpawnProfilesToArena,
-  FULL_ARENA_PROFILE_KEYS,
-} from "./profiles.js";
+import { applySpawnProfilesToArena } from "./profiles.js";
 import { createWorkspaceWithOwner, insertTestUser } from "./workspaces.js";
 
 const url = process.env.DATABASE_URL;
 
-describe("applySpawnProfilesToArena full roster", { skip: !url }, () => {
+describe("applySpawnProfilesToArena peer seats", { skip: !url }, () => {
   const db = createDb(url!, { max: 1 });
   let workspaceId = "";
   let projectId = "";
@@ -27,7 +24,6 @@ describe("applySpawnProfilesToArena full roster", { skip: !url }, () => {
     const stamp = Date.now();
     const user = await insertTestUser(db, {
       login: `spawn-${stamp}`,
-      githubUserId: `gh-spawn-${stamp}`,
     });
     actor = user.id;
     workspaceId = (
@@ -61,7 +57,6 @@ describe("applySpawnProfilesToArena full roster", { skip: !url }, () => {
       })
     ).project.id;
 
-    // Start with a narrow 2-slot arena (legacy sole-dev shape).
     await ensureArenaForProject(db, {
       workspaceId,
       projectId,
@@ -75,15 +70,13 @@ describe("applySpawnProfilesToArena full roster", { skip: !url }, () => {
     await closeDb(db);
   });
 
-  it("expands a 2-slot arena to the full bounded roster", async () => {
-    assert.ok(FULL_ARENA_PROFILE_KEYS.length >= 11);
-    assert.equal(MAX_TOURNAMENT_FANOUT, FULL_ARENA_PROFILE_KEYS.length);
-
+  it("arms primary-role peers and clears cross-role sticky seats", async () => {
     await applySpawnProfilesToArena(db, {
       workspaceId,
       projectId,
       actor,
-      profileKeys: FULL_ARENA_PROFILE_KEYS,
+      profileKeys: ["fixer", "qa"],
+      seatCount: MIN_DUEL_CONTENDERS,
     });
 
     const arena = await getArenaForProject(db, { workspaceId, projectId });
@@ -94,12 +87,9 @@ describe("applySpawnProfilesToArena full roster", { skip: !url }, () => {
       arenaId: arena.id,
     });
     const active = pool.filter((c) => c.status === "ACTIVE");
-    assert.equal(active.length, FULL_ARENA_PROFILE_KEYS.length);
-
-    const keys = active.map((c) => c.profileKey).sort();
-    assert.deepEqual(keys, [...FULL_ARENA_PROFILE_KEYS].sort());
-
-    const orphans = active.filter((c) => c.profileKey.includes("_"));
-    assert.equal(orphans.length, 0);
+    assert.equal(active.length, MIN_DUEL_CONTENDERS);
+    assert.ok(active.every((c) => c.profileKey === "fixer"));
+    assert.equal(new Set(active.map((c) => c.strategy)).size, active.length);
+    assert.equal(active.filter((c) => c.profileKey === "qa").length, 0);
   });
 });

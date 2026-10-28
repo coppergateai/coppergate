@@ -18,14 +18,15 @@ import {
   ensureArenaForProject,
   ensureContenderEnqueueBudget,
   getArenaForProject,
+  MIN_DUEL_CONTENDERS,
   pauseArena,
   resumeArena,
   setArenaMinHuman,
 } from "./arena.js";
+import { flipContenderStrategy } from "./contender-peers.js";
 import {
   applySpawnProfilesToArena,
   BOUNDED_KEYS,
-  FULL_ARENA_PROFILE_KEYS,
 } from "./profiles.js";
 import {
   agentProfiles,
@@ -95,20 +96,23 @@ export const DEFAULT_PRODUCT_ALLOWED_PATHS = [
 /** How long a DONE/FAILED architecture ID stays excluded from re-invent (thrash guard). */
 export const ARCHITECTURE_ID_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
-/** Below this available project budget, spawn engineer+reviewer only (not FULL_ARENA). */
+/** Below this available project budget, skip meta-tournament arming (spend guard). */
 export const LEAN_ROSTER_AVAILABLE_MICROS = 2_000_000;
 
-/** Minimal spend-safe arena roster. */
-export const LEAN_ARENA_PROFILE_KEYS = ["engineer", "reviewer"] as const;
+/**
+ * Minimal spend-safe arena roster — peer seats of engineer only.
+ * Reviewer remains a catalog profile (critic/review path), not a duel seat.
+ */
+export const LEAN_ARENA_PROFILE_KEYS = ["engineer"] as const;
 
-/** Pick FULL vs lean roster from remaining project micros. */
+/**
+ * Arena seating keys from remaining project micros.
+ * Always peer-primary engineer — FULL_ARENA_PROFILE_KEYS is spawn catalog only.
+ */
 export function rosterKeysForAvailableBudget(
-  availableMicros: number,
+  _availableMicros: number,
 ): string[] {
-  if (availableMicros < LEAN_ROSTER_AVAILABLE_MICROS) {
-    return [...LEAN_ARENA_PROFILE_KEYS];
-  }
-  return [...FULL_ARENA_PROFILE_KEYS];
+  return [...LEAN_ARENA_PROFILE_KEYS];
 }
 
 /**
@@ -887,27 +891,17 @@ export async function startProjectArena(
 
   // Arm + resume BEFORE vision replan. If backlog boots while PAUSED,
   // min_human is skipped and a zombie Inbox approval is created.
-  let rosterKeys = [...FULL_ARENA_PROFILE_KEYS];
-  try {
-    const spend = await getProjectSpendSummary(
-      db,
-      input.workspaceId,
-      input.projectId,
-    );
-    rosterKeys = rosterKeysForAvailableBudget(spend.availableMicros);
-  } catch {
-    /* keep full roster if spend lookup fails */
-  }
+  // Peer seats only — FULL_ARENA_PROFILE_KEYS is catalog, not contender width.
+  const rosterKeys = rosterKeysForAvailableBudget(Number.POSITIVE_INFINITY);
   const startPolicy = parseMaintainerPolicy(project.maintainerPolicyJson);
   const duelN = Math.max(1, Math.min(3, startPolicy.maxTournamentN));
-  const rosterN = Math.max(duelN, rosterKeys.length);
   let { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
     minHuman: true,
     defaultContenderN: duelN,
-    contenderCount: rosterN,
+    contenderCount: duelN,
   });
   try {
     await applySpawnProfilesToArena(db, {
@@ -915,6 +909,7 @@ export async function startProjectArena(
       projectId: input.projectId,
       actor: input.actor,
       profileKeys: rosterKeys,
+      seatCount: duelN,
     });
   } catch {
     // spawn best-effort — tick continues
@@ -1104,14 +1099,13 @@ export async function stopProjectArena(
     projectId: input.projectId,
   });
   if (!arena) {
-    const rosterN = FULL_ARENA_PROFILE_KEYS.length;
     const ensured = await ensureArenaForProject(db, {
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       actor: input.actor,
       minHuman: true,
-      defaultContenderN: rosterN,
-      contenderCount: rosterN,
+      defaultContenderN: MIN_DUEL_CONTENDERS,
+      contenderCount: MIN_DUEL_CONTENDERS,
     });
     arena = ensured.arena;
   }
@@ -1754,17 +1748,14 @@ export async function tickAllMaintainerProjects(
   return out;
 }
 
-/** Pick a bounded challenger role distinct from the champion for meta-tournaments. */
+/**
+ * Meta-tournament challenger is the same role (strategy peer).
+ * Cross-role pairings (fixer↔qa, engineer↔reviewer) are invalid.
+ */
 export function pickMetaTournamentChallenger(
   championKey: string,
 ): string {
-  const key = BOUNDED_KEYS.has(championKey) ? championKey : "engineer";
-  if (key === "engineer") return "reviewer";
-  if (key === "reviewer") return "engineer";
-  if (key === "proposer") return "engineer";
-  if (key === "fixer") return "qa";
-  if (key === "qa") return "fixer";
-  return "engineer";
+  return BOUNDED_KEYS.has(championKey) ? championKey : "engineer";
 }
 
 /**
@@ -1988,9 +1979,16 @@ export async function maybeSelfImproveProfile(
     }
   }
 
-  // Meta-tournament: champion vs bounded challenger on the project arena
+  // Meta-tournament: same-role strategy peers on the project arena
   if (winners.length >= 3) {
     const challengerKey = pickMetaTournamentChallenger(base.key);
+    const championStrategy =
+      base.strategyDefault === "balanced" ||
+      base.strategyDefault === "blitz" ||
+      base.strategyDefault === "fortress"
+        ? base.strategyDefault
+        : "balanced";
+    const flip = flipContenderStrategy(championStrategy);
     const recentMeta = await db
       .select()
       .from(maintainerEvents)
@@ -2008,9 +2006,12 @@ export async function maybeSelfImproveProfile(
         const p = JSON.parse(recentMeta[0].payload) as {
           championKey?: string;
           challengerKey?: string;
+          challengerStrategy?: string;
         };
         alreadyArmed =
-          p.championKey === base.key && p.challengerKey === challengerKey;
+          p.championKey === base.key &&
+          (p.challengerKey === challengerKey || p.challengerKey === base.key) &&
+          p.challengerStrategy === flip;
       } catch {
         alreadyArmed = false;
       }
@@ -2028,28 +2029,15 @@ export async function maybeSelfImproveProfile(
         /* allow meta when spend unknown */
       }
       if (availableMicros >= LEAN_ROSTER_AVAILABLE_MICROS) {
-      const flip =
-        base.strategyDefault === "blitz"
-          ? "fortress"
-          : base.strategyDefault === "fortress"
-            ? "blitz"
-            : "fortress";
       await applySpawnProfilesToArena(db, {
         workspaceId: input.workspaceId,
         projectId: input.projectId,
         actor: input.actor,
-        profileKeys: [base.key, challengerKey],
-        strategyByKey: {
-          [base.key]:
-            base.strategyDefault === "balanced" ||
-            base.strategyDefault === "blitz" ||
-            base.strategyDefault === "fortress"
-              ? base.strategyDefault
-              : "balanced",
-          [challengerKey]: flip,
-        },
+        profileKeys: [base.key],
+        seatCount: 2,
+        strategies: [championStrategy, flip],
       });
-      // Meta duel = champion vs challenger (N=2), not a solo pin.
+      // Meta duel = champion vs strategy peer (N=2), not a solo pin.
       const arenaRow = await getArenaForProject(db, {
         workspaceId: input.workspaceId,
         projectId: input.projectId,
@@ -2330,21 +2318,9 @@ export async function runVisionReplan(
       .where(eq(milestones.id, m.milestone.id));
   }
 
-  // Arm roster — lean when project budget headroom is tight (BYOK spend guard).
-  // Spawn widens the contender pool; re-pin defaultContenderN to maxTournamentN
-  // so invent/replan cannot drift dogfood N back to FULL_ARENA (11).
+  // Arm peer engineer seats; re-pin defaultContenderN to maxTournamentN
+  // so invent/replan cannot drift duel width.
   try {
-    const spend = await getProjectSpendSummary(
-      db,
-      input.workspaceId,
-      input.projectId,
-    );
-    await applySpawnProfilesToArena(db, {
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      actor: input.actor,
-      profileKeys: rosterKeysForAvailableBudget(spend.availableMicros),
-    });
     const [proj] = await db
       .select({ maintainerPolicyJson: projects.maintainerPolicyJson })
       .from(projects)
@@ -2359,6 +2335,13 @@ export async function runVisionReplan(
       1,
       Math.min(3, parseMaintainerPolicy(proj?.maintainerPolicyJson).maxTournamentN),
     );
+    await applySpawnProfilesToArena(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      actor: input.actor,
+      profileKeys: rosterKeysForAvailableBudget(Number.POSITIVE_INFINITY),
+      seatCount: pinN,
+    });
     const arena = await getArenaForProject(db, {
       workspaceId: input.workspaceId,
       projectId: input.projectId,

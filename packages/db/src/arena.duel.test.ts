@@ -181,6 +181,7 @@ describe("community duel arena (N=2)", { skip: !url }, () => {
     const active = pool.filter((c) => c.status === "ACTIVE");
     assert.ok(active.length >= MIN_DUEL_CONTENDERS);
     assert.notEqual(active[0]!.strategy, active[1]!.strategy);
+    assert.ok(active.every((c) => c.profileKey === active[0]!.profileKey));
     assert.ok(
       CONTENDER_STRATEGIES.includes(
         active[0]!.strategy as (typeof CONTENDER_STRATEGIES)[number],
@@ -220,9 +221,10 @@ describe("community duel arena (N=2)", { skip: !url }, () => {
     const active = topped.filter((c) => c.status === "ACTIVE");
     assert.ok(active.length >= MIN_DUEL_CONTENDERS);
     assert.notEqual(active[0]!.strategy, active[1]!.strategy);
+    assert.ok(active.every((c) => c.profileKey === active[0]!.profileKey));
   });
 
-  it("Community fan-out spawns N=2 ContenderRuns", async () => {
+  it("Community fan-out spawns N=2 peer ContenderRuns", async () => {
     const result = await startTournamentFanout(db, {
       workspaceId,
       taskId,
@@ -234,5 +236,7 @@ describe("community duel arena (N=2)", { skip: !url }, () => {
     assert.equal(result.tournament.n, 2);
     const branches = new Set(result.runs.map((r) => r.branchName));
     assert.equal(branches.size, 2);
+    const profiles = new Set(result.runs.map((r) => r.agentProfileKey));
+    assert.equal(profiles.size, 1);
   });
 });
