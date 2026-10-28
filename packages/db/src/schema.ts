@@ -1044,7 +1044,7 @@ export const maintainerEvents = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    /** tick | auto_accept | auto_merge | release | self_improve | meta_tournament | replan | triage | community */
+    /** tick | auto_accept | auto_merge | release | self_improve | meta_tournament | replan | triage | community | design_scout */
     kind: text("kind").notNull(),
     payload: text("payload").notNull().default("{}"),
     createdAt: timestamp("created_at", { withTimezone: true })

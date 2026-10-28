@@ -15,6 +15,7 @@ describe("system skills (self-pilot roles)", () => {
       "landing-cro",
       "seo-growth",
       "qa-explore",
+      "design-audit",
       "security-asvs",
       "agent-reliability",
     ]) {
@@ -38,6 +39,7 @@ describe("system skills (self-pilot roles)", () => {
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.engineer?.includes("landing-cro"));
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.docs?.includes("seo-growth"));
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.qa?.includes("qa-explore"));
+    assert.ok(DEFAULT_PROFILE_SKILL_KEYS.qa?.includes("design-audit"));
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.security?.includes("security-asvs"));
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.fixer?.includes("agent-reliability"));
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.reviewer?.includes("agent-reliability"));

@@ -184,6 +184,19 @@ export type MaintainerPolicy = {
    * (DRAFT → submit). 0 = create-only (legacy).
    */
   communityScoutAutoImportMax: number;
+  /**
+   * Periodically screenshot target URLs and open design/ux GitHub issues
+   * (metric-driven; Playwright capture in worker).
+   */
+  designScout: boolean;
+  designScoutIntervalHours: number;
+  designScoutMaxPerRun: number;
+  /** Override capture base URL (e.g. https://www.coppergate.ai). */
+  designScoutBaseUrl: string | null;
+  /**
+   * After design scout creates issues, auto-import up to N (0 = create-only).
+   */
+  designScoutAutoImportMax: number;
   /** When true, open a revert PR if a recent auto-merge's checks go red. */
   shipRollbackOnCiFail: boolean;
   /** When true, enable multi-repo + coordinated PRs for product stacks. */
@@ -224,6 +237,11 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   communityScoutMaxPerRun: 2,
   communityScoutMaxOpenGoodFirst: 5,
   communityScoutAutoImportMax: 1,
+  designScout: false,
+  designScoutIntervalHours: 24,
+  designScoutMaxPerRun: 2,
+  designScoutBaseUrl: null,
+  designScoutAutoImportMax: 0,
   shipRollbackOnCiFail: true,
   coordinatedMultiRepo: false,
   allowedSignalProviders: ["*", "ci_failure", "sentry", "dependabot", "codeql"],
@@ -371,6 +389,30 @@ export function parseMaintainerPolicy(
         v.communityScoutAutoImportMax >= 0
           ? Math.min(5, Math.floor(v.communityScoutAutoImportMax))
           : DEFAULT_MAINTAINER_POLICY.communityScoutAutoImportMax,
+      designScout:
+        typeof v.designScout === "boolean"
+          ? v.designScout
+          : DEFAULT_MAINTAINER_POLICY.designScout,
+      designScoutIntervalHours:
+        typeof v.designScoutIntervalHours === "number" &&
+        v.designScoutIntervalHours >= 1
+          ? Math.min(168, Math.floor(v.designScoutIntervalHours))
+          : DEFAULT_MAINTAINER_POLICY.designScoutIntervalHours,
+      designScoutMaxPerRun:
+        typeof v.designScoutMaxPerRun === "number" &&
+        v.designScoutMaxPerRun >= 0
+          ? Math.min(5, Math.floor(v.designScoutMaxPerRun))
+          : DEFAULT_MAINTAINER_POLICY.designScoutMaxPerRun,
+      designScoutBaseUrl:
+        typeof v.designScoutBaseUrl === "string" &&
+        /^https?:\/\/[^\s]+$/i.test(v.designScoutBaseUrl.trim())
+          ? v.designScoutBaseUrl.trim().replace(/\/$/, "")
+          : DEFAULT_MAINTAINER_POLICY.designScoutBaseUrl,
+      designScoutAutoImportMax:
+        typeof v.designScoutAutoImportMax === "number" &&
+        v.designScoutAutoImportMax >= 0
+          ? Math.min(5, Math.floor(v.designScoutAutoImportMax))
+          : DEFAULT_MAINTAINER_POLICY.designScoutAutoImportMax,
       shipRollbackOnCiFail:
         typeof v.shipRollbackOnCiFail === "boolean"
           ? v.shipRollbackOnCiFail

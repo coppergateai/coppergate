@@ -53,6 +53,7 @@ export {
 export {
   createRevertPullRequest,
   getRepoFile,
+  putRepoBinaryFile,
   updateRepoFile,
   type RepoFile,
 } from "./contents.js";

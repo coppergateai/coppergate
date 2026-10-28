@@ -409,6 +409,19 @@ export {
   type OpenIssueRef,
 } from "./community-scout.js";
 export {
+  DEFAULT_DESIGN_SCOUT_ROUTES,
+  formatDesignIssueBody,
+  isDesignScoutDue,
+  proposeDesignIssues,
+  recordDesignScoutEvent,
+  resolveDesignScoutRoutes,
+  shotHasDesignFinding,
+  type DesignIssueCandidate,
+  type DesignScoutRoute,
+  type DesignShot,
+  type DesignShotMetrics,
+} from "./design-scout.js";
+export {
   DEFAULT_MAINTAINER_POLICY,
   DEFAULT_MONTHLY_BUDGET_MICROS,
   DEFAULT_PRODUCT_ALLOWED_PATHS,
