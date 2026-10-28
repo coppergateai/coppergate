@@ -423,8 +423,11 @@ export {
   requeueOrphanQueuedTasks,
   shouldReplanVision,
   MIN_REPLAN_AVAILABLE_MICROS,
+  computeBudgetBurnRatio,
+  countVerifiedMergesFromMaintainerEvents,
   getMaintainerMetrics,
   getWorkspaceMaintainerRollup,
+  summarizeMaintainerRollupTotals,
   listAutoMergeCandidates,
   listMaintainerProjects,
   markAutoMerged,
@@ -453,7 +456,10 @@ export {
   type ArenaControlResult,
   type MaintainerMetrics,
   type MaintainerPolicy,
+  type MaintainerProjectRollup,
+  type MaintainerRollupTotals,
   type MaintainerTickResult,
+  type WorkspaceMaintainerRollup,
 } from "./maintainer.js";
 export {
   classifyContenderRuntime,
