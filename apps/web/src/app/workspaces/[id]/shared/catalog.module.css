@@ -771,3 +771,56 @@
   font-size: 0.84rem;
   color: var(--paper);
 }
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+}
+
+.liveDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--ok, #3d9a6a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok, #3d9a6a) 22%, transparent);
+}
+
+.disclosureList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.disclosure {
+  border-bottom: 1px solid var(--line);
+}
+
+.disclosure:first-child {
+  border-top: 1px solid var(--line);
+}
+
+.disclosureHead {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.1rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.disclosureHead:hover .relatedTitle {
+  color: var(--copper);
+}
+
+.disclosure .bodyBlock {
+  margin: 0 0 0.85rem;
+}

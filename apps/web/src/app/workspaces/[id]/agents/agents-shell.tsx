@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import styles from "./agents.module.css";
+import styles from "../shared/catalog.module.css";
 
 export type AgentProfileStatsView = {
   profileKey: string;
@@ -177,6 +177,7 @@ export function AgentsShell({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     setProfiles(initialProfiles);
@@ -203,6 +204,18 @@ export function AgentsShell({
     }
     return map;
   }, [liveSeats]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return profiles;
+    return profiles.filter(
+      (p) =>
+        p.key.toLowerCase().includes(q) ||
+        p.displayName.toLowerCase().includes(q) ||
+        p.temperament.toLowerCase().includes(q) ||
+        p.promptGuidance.toLowerCase().includes(q),
+    );
+  }, [profiles, query]);
 
   const selected = profiles.find((p) => p.key === selectedKey) ?? null;
   const selectedStats = selected ? statsByKey.get(selected.key) : null;
@@ -350,7 +363,7 @@ export function AgentsShell({
         <p className={styles.eyebrow}>Workspace / {workspaceName}</p>
         <div className={styles.titleRow}>
           <h1 className={styles.title}>Agents</h1>
-          <div className={styles.headLinks}>
+          <div className={styles.headActions}>
             {isOwner ? (
               <button
                 type="button"
@@ -361,101 +374,137 @@ export function AgentsShell({
                 New agent
               </button>
             ) : null}
-            <Link
-              href={`/workspaces/${workspaceId}/skills`}
-              className={styles.headLink}
-            >
-              Skills →
-            </Link>
-            <Link
-              href={`/workspaces/${workspaceId}/tools`}
-              className={styles.headLink}
-            >
-              Tools →
-            </Link>
-            <Link
-              href={`/workspaces/${workspaceId}/arena`}
-              className={styles.headLink}
-            >
-              Open Arena →
-            </Link>
-            {isOwner ? (
+            <nav className={styles.headLinks} aria-label="Related">
               <Link
-                href={`/workspaces/${workspaceId}/settings?tab=llm`}
+                href={`/workspaces/${workspaceId}/skills`}
                 className={styles.headLink}
               >
-                BYOK →
+                Skills
               </Link>
-            ) : null}
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/tools`}
+                className={styles.headLink}
+              >
+                Tools
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/arena`}
+                className={styles.headLink}
+              >
+                Arena
+              </Link>
+              {isOwner ? (
+                <>
+                  <span className={styles.headSep} aria-hidden>
+                    ·
+                  </span>
+                  <Link
+                    href={`/workspaces/${workspaceId}/settings?tab=llm`}
+                    className={styles.headLink}
+                  >
+                    BYOK
+                  </Link>
+                </>
+              ) : null}
+            </nav>
           </div>
         </div>
         <p className={styles.lede}>
-          Catalog of coding agents in this workspace — temperament, skills,
-          spend caps, and recent Arena outcomes.
+          Coding agents in this workspace — temperament, skills, spend caps,
+          and recent Arena outcomes.
         </p>
         <div className={styles.summaryStrip} aria-label="Agents summary">
-          <span>
+          <span className={styles.summaryItem}>
             <strong>{profiles.length}</strong> profiles
           </span>
-          <span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
             <strong>{skills.length}</strong> skills
           </span>
-          <span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
             <strong>{totalRuns}</strong> runs (30d)
           </span>
-          <span>
-            <strong>{liveCount}</strong> live seats
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{liveCount}</strong> live
           </span>
         </div>
       </header>
 
       {error ? <p className={styles.error}>{error}</p> : null}
-      {ok ? (
-        <p className={styles.ok} style={{ margin: "0.5rem var(--app-pad-x-lg)" }}>
-          {ok}
-        </p>
-      ) : null}
+      {ok ? <p className={styles.ok}>{ok}</p> : null}
 
       <div
         className={`${styles.layout} ${selected || creating ? styles.layoutDetailOpen : ""}`}
       >
         <aside className={styles.listPane} aria-label="Agent profiles">
-          <ul className={styles.agentList}>
-            {profiles.map((p) => {
-              const st = statsByKey.get(p.key);
-              const live = liveByKey.get(p.key)?.length ?? 0;
-              const active = !creating && p.key === selectedKey;
-              return (
-                <li key={p.key}>
-                  <button
-                    type="button"
-                    className={`${styles.agentBtn} ${active ? styles.agentBtnActive : ""}`}
-                    aria-current={active ? "true" : undefined}
-                    onClick={() => {
-                      setSelectedKey(p.key);
-                      setOpenSkill(null);
-                      setCreating(false);
-                      setEditing(false);
-                    }}
-                  >
-                    <p className={styles.agentName}>{p.displayName}</p>
-                    <p className={styles.agentKey}>{p.key}</p>
-                    <p className={styles.agentMeta}>
-                      {live > 0 ? (
-                        <span>
-                          <span className={styles.liveDot} aria-hidden /> {live}{" "}
-                          live
+          <input
+            type="search"
+            className={styles.filter}
+            placeholder="Filter agents…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Filter agents"
+          />
+          {filtered.length === 0 ? (
+            <p className={styles.emptyList}>No agents match.</p>
+          ) : (
+            <ul className={styles.itemList}>
+              {filtered.map((p) => {
+                const st = statsByKey.get(p.key);
+                const live = liveByKey.get(p.key)?.length ?? 0;
+                const active = !creating && p.key === selectedKey;
+                return (
+                  <li key={p.key}>
+                    <button
+                      type="button"
+                      className={`${styles.itemBtn} ${active ? styles.itemBtnActive : ""}`}
+                      aria-current={active ? "true" : undefined}
+                      onClick={() => {
+                        setSelectedKey(p.key);
+                        setOpenSkill(null);
+                        setCreating(false);
+                        setEditing(false);
+                      }}
+                    >
+                      <span className={styles.itemName}>{p.displayName}</span>
+                      <span className={styles.itemAside}>
+                        {live > 0 ? (
+                          <span className={styles.liveBadge}>
+                            <span className={styles.liveDot} aria-hidden />
+                            {live}
+                          </span>
+                        ) : (
+                          p.temperament
+                        )}
+                      </span>
+                      <span className={styles.itemKey}>{p.key}</span>
+                      <span className={styles.itemMeta}>
+                        {st ? `${st.runCount} runs` : "no runs"}
+                        <span className={styles.metaSep} aria-hidden>
+                          ·
                         </span>
-                      ) : null}
-                      <span>{p.temperament}</span>
-                      <span>{st ? `${st.runCount} runs` : "no runs"}</span>
-                      {!SYSTEM_KEYS.has(p.key) ? <span>custom</span> : null}
-                    </p>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                        {sourceLabel(p)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </aside>
 
         <section className={styles.detailPane} aria-live="polite">
@@ -648,7 +697,7 @@ export function AgentsShell({
                 ← All agents
               </button>
               <div className={styles.detailHead}>
-                <div>
+                <div className={styles.detailHeadMain}>
                   <h2 className={styles.detailTitle}>{selected.displayName}</h2>
                   <p className={styles.detailKey}>
                     {selected.key} · {sourceLabel(selected)}
@@ -700,31 +749,31 @@ export function AgentsShell({
                 </div>
               ) : null}
 
-              <div className={styles.statGrid} aria-label="30-day outcomes">
-                <div className={styles.stat}>
-                  <p className={styles.statLabel}>Runs</p>
-                  <p className={styles.statValue}>
+              <div className={styles.props} aria-label="30-day outcomes">
+                <div className={styles.prop}>
+                  <span className={styles.propLabel}>Runs</span>
+                  <span className={styles.propValue}>
                     {selectedStats?.runCount ?? 0}
-                  </p>
+                  </span>
                 </div>
-                <div className={styles.stat}>
-                  <p className={styles.statLabel}>Wins / losses</p>
-                  <p className={styles.statValue}>
+                <div className={styles.prop}>
+                  <span className={styles.propLabel}>Wins / losses</span>
+                  <span className={styles.propValue}>
                     {selectedStats?.winCount ?? 0}/
                     {selectedStats?.loseCount ?? 0}
-                  </p>
+                  </span>
                 </div>
-                <div className={styles.stat}>
-                  <p className={styles.statLabel}>Failed</p>
-                  <p className={styles.statValue}>
+                <div className={styles.prop}>
+                  <span className={styles.propLabel}>Failed</span>
+                  <span className={styles.propValue}>
                     {selectedStats?.failedCount ?? 0}
-                  </p>
+                  </span>
                 </div>
-                <div className={styles.stat}>
-                  <p className={styles.statLabel}>Spend</p>
-                  <p className={styles.statValue}>
+                <div className={styles.prop}>
+                  <span className={styles.propLabel}>Spend</span>
+                  <span className={styles.propValue}>
                     {usd(selectedStats?.spendMicros ?? 0)}
-                  </p>
+                  </span>
                 </div>
               </div>
               <p className={styles.note}>
@@ -735,21 +784,19 @@ export function AgentsShell({
               {selectedLive.length > 0 ? (
                 <section className={styles.section}>
                   <h3 className={styles.sectionLabel}>Live Arena seats</h3>
-                  <ul className={styles.skillList}>
+                  <ul className={styles.relatedList}>
                     {selectedLive.map((seat, i) => (
                       <li
                         key={`${seat.projectName}-${i}`}
-                        className={styles.skillItem}
+                        className={styles.relatedItem}
                       >
-                        <div className={styles.skillHead}>
-                          <p className={styles.skillTitle}>
-                            {seat.projectName}
-                          </p>
-                          <p className={styles.skillMeta}>
-                            {seat.status} · purse{" "}
-                            {usd(seat.budgetMicrosRemaining)}
-                          </p>
-                        </div>
+                        <span className={styles.relatedTitle}>
+                          {seat.projectName}
+                        </span>
+                        <span className={styles.relatedMeta}>
+                          {seat.status} · purse{" "}
+                          {usd(seat.budgetMicrosRemaining)}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -758,7 +805,7 @@ export function AgentsShell({
 
               <section className={styles.section}>
                 <h3 className={styles.sectionLabel}>Prompt guidance</h3>
-                <p className={styles.guidance}>{selected.promptGuidance}</p>
+                <div className={styles.bodyBlock}>{selected.promptGuidance}</div>
               </section>
 
               <section className={styles.section}>
@@ -766,34 +813,34 @@ export function AgentsShell({
                 {selected.skillKeys.length === 0 ? (
                   <p className={styles.note}>No skills attached.</p>
                 ) : (
-                  <ul className={styles.skillList}>
+                  <ul className={styles.disclosureList}>
                     {selected.skillKeys.map((key) => {
                       const skill = skillByKey.get(key);
                       const open = openSkill === key;
                       return (
-                        <li key={key} className={styles.skillItem}>
+                        <li key={key} className={styles.disclosure}>
                           <button
                             type="button"
-                            className={styles.skillHead}
+                            className={styles.disclosureHead}
                             aria-expanded={open}
                             onClick={() => setOpenSkill(open ? null : key)}
                           >
-                            <p className={styles.skillTitle}>
+                            <span className={styles.relatedTitle}>
                               {skill?.title ?? key}
-                            </p>
-                            <p className={styles.skillMeta}>
+                            </span>
+                            <span className={styles.relatedMeta}>
                               {key}
                               {skill ? ` · v${skill.version}` : ""}
                               {open ? " · hide" : " · show"}
-                            </p>
+                            </span>
                           </button>
                           {open && skill ? (
-                            <pre className={styles.skillBody}>
+                            <pre className={styles.bodyBlock}>
                               {skill.bodyMarkdown}
                             </pre>
                           ) : null}
                           {open && !skill ? (
-                            <p className={styles.skillBody}>
+                            <p className={styles.note}>
                               Skill body not in catalog.
                             </p>
                           ) : null}
@@ -806,7 +853,7 @@ export function AgentsShell({
 
               <section className={styles.section}>
                 <h3 className={styles.sectionLabel}>Tool allowlist</h3>
-                <p className={styles.tools}>
+                <p className={styles.codeInline}>
                   {parseTools(selected.toolAllowlistJson).join(" · ") || "—"}
                 </p>
               </section>
