@@ -355,15 +355,14 @@ export async function ensurePeerContenderSeats(
       CONTENDER_STRATEGIES[i % CONTENDER_STRATEGIES.length]!;
     const existing = peers[i];
     if (existing) {
+      // Preserve remaining purse — re-ensure must not inflate budgets and
+      // break elimination. Zero/thin purses are topped via
+      // ensureContenderEnqueueBudget before fan-out.
       const [updated] = await db
         .update(contenders)
         .set({
           profileKey,
           strategy,
-          budgetMicrosRemaining: Math.max(
-            existing.budgetMicrosRemaining,
-            budgetEach,
-          ),
           updatedAt: now,
         })
         .where(eq(contenders.id, existing.id))
@@ -454,12 +453,11 @@ export async function ensureArenaForProject(
 ): Promise<{ arena: Arena; contenders: Contender[]; created: boolean }> {
   const existing = await getArenaForProject(db, input);
   if (existing) {
-    const budgetEach =
-      input.contenderBudgetMicros ?? DEFAULT_CONTENDER_BUDGET_MICROS;
+    // Only pass an explicit budget; omit so peer re-ensure preserves purses.
     const pool = await ensureDuelContenderPool(db, {
       workspaceId: input.workspaceId,
       arenaId: existing.id,
-      budgetMicros: budgetEach,
+      budgetMicros: input.contenderBudgetMicros,
     });
     let arena = existing;
     if (existing.defaultContenderN < MIN_DUEL_CONTENDERS) {
