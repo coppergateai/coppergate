@@ -1,7 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  describeL2AutoMerge,
+  describeMaintainerSettingsHonesty,
+} from "@coppergate/db";
 import styles from "./project-detail.module.css";
 
 type Metrics = {
@@ -38,6 +42,8 @@ type Props = {
   workspaceId: string;
   projectId: string;
   initialEnabled: boolean;
+  initialAutonomy: string;
+  initialMergeEnabled: boolean;
   isOwner: boolean;
 };
 
@@ -54,10 +60,14 @@ export function MaintainerPanel({
   workspaceId,
   projectId,
   initialEnabled,
+  initialAutonomy,
+  initialMergeEnabled,
   isOwner,
 }: Props) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
+  const [autonomy, setAutonomy] = useState(initialAutonomy);
+  const [mergeEnabled, setMergeEnabled] = useState(initialMergeEnabled);
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [budgetDollars, setBudgetDollars] = useState("5");
@@ -93,6 +103,30 @@ export function MaintainerPanel({
       setError(err instanceof Error ? err.message : "Load failed");
     });
   }, [load]);
+
+  useEffect(() => {
+    setAutonomy(initialAutonomy);
+    setMergeEnabled(initialMergeEnabled);
+  }, [initialAutonomy, initialMergeEnabled]);
+
+  const maintainerHonesty = useMemo(
+    () =>
+      describeMaintainerSettingsHonesty({
+        maintainerEnabled: enabled,
+      }),
+    [enabled],
+  );
+
+  const mergeHonesty = useMemo(
+    () =>
+      describeL2AutoMerge({
+        autonomyLevel: autonomy,
+        mergeEnabled,
+        maintainerEnabled: enabled,
+        maintainerAutoMerge: policy?.autoMerge ?? true,
+      }),
+    [autonomy, mergeEnabled, enabled, policy?.autoMerge],
+  );
 
   async function post(action: string, extra?: Record<string, unknown>) {
     setPending(true);
@@ -145,9 +179,23 @@ export function MaintainerPanel({
       </div>
       <p className={styles.sectionLede}>
         Start in Arena invents vision and backlog. While the monthly envelope
-        allows, the worker keeps shipping. Cap hit → hard pause. Canonical
-        micro-envelope: $5/mo.
+        allows, the worker keeps shipping. Cap hit → hard pause. Enabling
+        maintainer turns on L2 + merge + min_human — it is not unattended
+        production deploy.
       </p>
+      <p className={styles.hint}>{maintainerHonesty.notProdDeployLine}</p>
+      <ul className={styles.hint}>
+        {maintainerHonesty.failClosedLines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      {enabled ? (
+        <p className={styles.hint} role="status">
+          L2 auto-merge (maintainer tick):{" "}
+          {mergeHonesty.maintainerPathActive ? "active" : "inactive"} —{" "}
+          {mergeHonesty.maintainerSummary}
+        </p>
+      ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}
 
       <div className={styles.btnRow}>

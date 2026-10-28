@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  describeL2AutoMerge,
+  describeMinHumanHonesty,
+  effectiveArenaMinHuman,
+} from "@coppergate/db";
 import styles from "./project-detail.module.css";
 
 type Props = {
@@ -9,6 +14,8 @@ type Props = {
   projectId: string;
   initialAutonomy: string;
   initialMergeEnabled: boolean;
+  arenaMinHumanStored: boolean | null;
+  maintainerEnabled: boolean;
   isOwner: boolean;
 };
 
@@ -17,12 +24,17 @@ export function PolicyPresetsPanel({
   projectId,
   initialAutonomy,
   initialMergeEnabled,
+  arenaMinHumanStored,
+  maintainerEnabled,
   isOwner,
 }: Props) {
   const router = useRouter();
   const [autonomy, setAutonomy] = useState(initialAutonomy);
   const [mergeEnabled, setMergeEnabled] = useState(initialMergeEnabled);
-  const [minHuman, setMinHuman] = useState<boolean | null>(null);
+  const [storedMinHuman, setStoredMinHuman] = useState<boolean | null>(
+    arenaMinHumanStored,
+  );
+  const [maintainerOn, setMaintainerOn] = useState(maintainerEnabled);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -34,10 +46,30 @@ export function PolicyPresetsPanel({
         const body = (await res.json()) as {
           arena?: { minHuman?: boolean } | null;
         };
-        if (res.ok) setMinHuman(body.arena?.minHuman ?? false);
+        if (res.ok && body.arena) {
+          setStoredMinHuman(body.arena.minHuman ?? null);
+        }
       })
       .catch(() => undefined);
   }, [projectId, workspaceId]);
+
+  const effectiveMinHuman = effectiveArenaMinHuman(storedMinHuman);
+
+  const minHumanHonesty = useMemo(
+    () => describeMinHumanHonesty(storedMinHuman),
+    [storedMinHuman],
+  );
+
+  const mergeHonesty = useMemo(
+    () =>
+      describeL2AutoMerge({
+        autonomyLevel: autonomy,
+        mergeEnabled,
+        maintainerEnabled: maintainerOn,
+        maintainerAutoMerge: true,
+      }),
+    [autonomy, mergeEnabled, maintainerOn],
+  );
 
   async function patch(body: Record<string, unknown>) {
     if (!isOwner) return;
@@ -52,8 +84,13 @@ export function PolicyPresetsPanel({
       });
       const data = (await res.json()) as {
         error?: { message?: string };
-        project?: { autonomyLevel?: string; mergeEnabled?: boolean };
+        project?: {
+          autonomyLevel?: string;
+          mergeEnabled?: boolean;
+          maintainerEnabled?: boolean;
+        };
         minHuman?: boolean | null;
+        effectiveMinHuman?: boolean;
       };
       if (!res.ok) {
         throw new Error(data.error?.message ?? "Update failed");
@@ -62,7 +99,12 @@ export function PolicyPresetsPanel({
       if (typeof data.project?.mergeEnabled === "boolean") {
         setMergeEnabled(data.project.mergeEnabled);
       }
-      if (typeof data.minHuman === "boolean") setMinHuman(data.minHuman);
+      if (typeof data.project?.maintainerEnabled === "boolean") {
+        setMaintainerOn(data.project.maintainerEnabled);
+      }
+      if (data.minHuman === null || typeof data.minHuman === "boolean") {
+        setStoredMinHuman(data.minHuman);
+      }
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed");
@@ -81,7 +123,8 @@ export function PolicyPresetsPanel({
         Policy presets
       </h2>
       <p className={styles.sectionLede}>
-        Autonomy gate, L2 merge opt-in, and min_human in one place.
+        Autonomy gate, L2 merge opt-in, and min_human — effective behavior
+        matches worker gates (not checkbox labels alone).
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
 
@@ -117,20 +160,31 @@ export function PolicyPresetsPanel({
           />
           Merge after accept (L2)
         </label>
+        <p className={styles.hint} role="status">
+          {mergeHonesty.acceptSummary}
+          {mergeHonesty.maintainerPathActive
+            ? ` ${mergeHonesty.maintainerSummary}`
+            : mergeHonesty.acceptPathActive
+              ? ` ${mergeHonesty.maintainerSummary}`
+              : null}
+        </p>
 
         <label className={styles.checkRow}>
           <input
             type="checkbox"
-            checked={minHuman ?? false}
-            disabled={!isOwner || pending || minHuman === null}
+            checked={effectiveMinHuman}
+            disabled={!isOwner || pending}
             onChange={(e) => {
               const next = e.target.checked;
-              setMinHuman(next);
+              setStoredMinHuman(next);
               void patch({ minHuman: next });
             }}
           />
           min_human (skip inbox when on)
         </label>
+        <p className={styles.hint} role="status">
+          {minHumanHonesty.summary}
+        </p>
       </div>
     </section>
   );

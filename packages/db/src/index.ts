@@ -628,6 +628,17 @@ export {
   setProjectMergeEnabled,
 } from "./project-policy.js";
 export {
+  DEFAULT_ARENA_MIN_HUMAN,
+  describeL2AutoMerge,
+  describeMaintainerSettingsHonesty,
+  describeMinHumanHonesty,
+  effectiveArenaMinHuman,
+  type L2AutoMergeHonesty,
+  type L2AutoMergeInputs,
+  type MaintainerSettingsHonesty,
+  type MinHumanHonesty,
+} from "./project-settings-honesty.js";
+export {
   SignalError,
   armSignalEvent,
   countRecentSignalIngests,
