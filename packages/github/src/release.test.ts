@@ -51,7 +51,7 @@ describe("createGithubRelease", () => {
 
   it("treats duplicate tag as success", async () => {
     let n = 0;
-    const fetchImpl = (async (url: string) => {
+    const fetchImpl = (async (_url: string) => {
       n += 1;
       if (n === 1) {
         return new Response("Release already_exists", { status: 422 });
