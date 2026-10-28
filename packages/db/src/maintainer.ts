@@ -2635,9 +2635,11 @@ export async function getMaintainerMetrics(
   ].sort();
 
   const merges = doneTasks.length;
-  const projectSpendMicros = spend.pooled
-    ? spend.projectSpentMicros
-    : spend.spentMicros;
+  // projectSpentMicros is optional on pooled summaries — fall back to spentMicros.
+  const projectSpendMicros =
+    spend.pooled && spend.projectSpentMicros != null
+      ? spend.projectSpentMicros
+      : spend.spentMicros;
   return {
     projectId: input.projectId,
     workspaceId: input.workspaceId,
