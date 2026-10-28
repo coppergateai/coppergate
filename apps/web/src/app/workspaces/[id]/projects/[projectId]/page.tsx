@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import {
+  getArenaForProject,
   getLatestBriefForProject,
   getProjectForWorkspace,
   getProjectPlan,
@@ -153,6 +154,7 @@ export default async function ProjectDetailPage({
     ) ?? [];
 
   const isOwner = access.role === "owner";
+  const arenaRow = await getArenaForProject(db, { workspaceId, projectId });
   const pendingAll = await listPendingApprovalsForWorkspace(db, workspaceId);
   const pendingApprovals = pendingAll.filter(
     (a) => a.projectId === projectId,
@@ -332,6 +334,8 @@ export default async function ProjectDetailPage({
               workspaceId={workspaceId}
               projectId={projectId}
               initialEnabled={row.project.maintainerEnabled}
+              initialAutonomy={row.project.autonomyLevel}
+              initialMergeEnabled={row.project.mergeEnabled}
               isOwner={isOwner}
             />
             <MultiRepoPanel
@@ -344,6 +348,8 @@ export default async function ProjectDetailPage({
               projectId={projectId}
               initialAutonomy={row.project.autonomyLevel}
               initialMergeEnabled={row.project.mergeEnabled}
+              arenaMinHumanStored={arenaRow?.minHuman ?? null}
+              maintainerEnabled={row.project.maintainerEnabled}
               isOwner={isOwner}
             />
             <MergePanel
@@ -351,6 +357,7 @@ export default async function ProjectDetailPage({
               projectId={projectId}
               initialMergeEnabled={row.project.mergeEnabled}
               autonomyLevel={row.project.autonomyLevel}
+              maintainerEnabled={row.project.maintainerEnabled}
               isOwner={isOwner}
             />
           </>
