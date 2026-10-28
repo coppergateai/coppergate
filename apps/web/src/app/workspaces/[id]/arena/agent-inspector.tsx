@@ -21,9 +21,19 @@ export type InspectorContender = {
   id: string;
   profileKey: string;
   strategy: string;
+  status?: string;
   temperament: string | null;
   budgetMicrosRemaining: number;
+  eliminatedAt?: string | null;
   latestRun: InspectorRun | null;
+};
+
+type LedgerEntry = {
+  id: string;
+  action: string;
+  debitMicros: number | null;
+  remainingMicros: number | null;
+  createdAt: string;
 };
 
 type Tab = "overview" | "logs" | "artifacts";
@@ -53,6 +63,7 @@ type Props = {
   contender: InspectorContender;
   statusLabel: string;
   statusBadgeClass: string;
+  eliminated?: boolean;
   onClose: () => void;
 };
 
@@ -135,10 +146,14 @@ export function AgentInspector({
   contender,
   statusLabel,
   statusBadgeClass,
+  eliminated = false,
   onClose,
 }: Props) {
   const run = contender.latestRun;
   const [tab, setTab] = useState<Tab>("overview");
+  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [artifacts, setArtifacts] = useState<ArtifactRow[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
@@ -212,10 +227,35 @@ export function AgentInspector({
     }
   }, [runId, workspaceId]);
 
+  const loadLedger = useCallback(async () => {
+    setLedgerLoading(true);
+    setLedgerError(null);
+    try {
+      const res = await fetch(
+        `/api/workspaces/${workspaceId}/contenders/${contender.id}/ledger?limit=12`,
+        { credentials: "same-origin" },
+      );
+      const data = (await res.json()) as {
+        entries?: LedgerEntry[];
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        setLedgerError(data.error?.message ?? "Failed to load ledger");
+        return;
+      }
+      setLedger(data.entries ?? []);
+    } catch {
+      setLedgerError("Failed to load ledger");
+    } finally {
+      setLedgerLoading(false);
+    }
+  }, [workspaceId, contender.id]);
+
   useEffect(() => {
     setTab("overview");
     setExpandedArtifact(null);
-  }, [contender.id, runId]);
+    void loadLedger();
+  }, [contender.id, runId, loadLedger]);
 
   useEffect(() => {
     if (tab === "logs") void loadEvents();
@@ -332,10 +372,93 @@ export function AgentInspector({
             <p className={styles.inspectorMeta}>
               {temperLabel(contender.temperament)} · {contender.strategy}
               {" · "}
-              Budget {formatUsd(contender.budgetMicrosRemaining)} remaining
+              {eliminated || contender.status === "ELIMINATED"
+                ? "Eliminated — budget exhausted"
+                : `Budget ${formatUsd(contender.budgetMicrosRemaining)} remaining`}
             </p>
+            {contender.eliminatedAt ? (
+              <p className={styles.inspectorMeta}>
+                Eliminated {new Date(contender.eliminatedAt).toLocaleString()}
+              </p>
+            ) : null}
+          </section>
+
+          <section className={styles.inspectorSection}>
+            <h3 className={styles.inspectorSectionTitle}>Budget ledger</h3>
+            {ledgerLoading && ledger.length === 0 ? (
+              <p className={styles.inspectorEmpty}>Loading ledger…</p>
+            ) : ledgerError ? (
+              <p className={styles.inspectorError}>{ledgerError}</p>
+            ) : ledger.length === 0 ? (
+              <p className={styles.inspectorEmpty}>
+                No debits yet — loser losses appear after tournament resolve.
+              </p>
+            ) : (
+              <ol className={styles.logList}>
+                {ledger.map((row) => (
+                  <li key={row.id} className={styles.logItem}>
+                    <div className={styles.logMeta}>
+                      <span className={styles.logKind}>
+                        {row.action === "contender.eliminated"
+                          ? "Eliminated"
+                          : "Debit"}
+                      </span>
+                      <span className={styles.eventTime}>
+                        {new Date(row.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className={styles.logBody}>
+                      {row.debitMicros != null
+                        ? `−${formatUsd(row.debitMicros)}`
+                        : "Budget exhausted"}
+                      {row.remainingMicros != null
+                        ? ` · ${formatUsd(row.remainingMicros)} left`
+                        : ""}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
         </>
+      ) : null}
+
+      {!run && (eliminated || contender.status === "ELIMINATED") ? (
+        <section className={styles.inspectorSection}>
+          <h3 className={styles.inspectorSectionTitle}>Budget ledger</h3>
+          {ledgerLoading && ledger.length === 0 ? (
+            <p className={styles.inspectorEmpty}>Loading ledger…</p>
+          ) : ledgerError ? (
+            <p className={styles.inspectorError}>{ledgerError}</p>
+          ) : ledger.length === 0 ? (
+            <p className={styles.inspectorEmpty}>No ledger entries recorded.</p>
+          ) : (
+            <ol className={styles.logList}>
+              {ledger.map((row) => (
+                <li key={row.id} className={styles.logItem}>
+                  <div className={styles.logMeta}>
+                    <span className={styles.logKind}>
+                      {row.action === "contender.eliminated"
+                        ? "Eliminated"
+                        : "Debit"}
+                    </span>
+                    <span className={styles.eventTime}>
+                      {new Date(row.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className={styles.logBody}>
+                    {row.debitMicros != null
+                      ? `−${formatUsd(row.debitMicros)}`
+                      : "Budget exhausted"}
+                    {row.remainingMicros != null
+                      ? ` · ${formatUsd(row.remainingMicros)} left`
+                      : ""}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       ) : null}
 
       {run && tab === "logs" ? (

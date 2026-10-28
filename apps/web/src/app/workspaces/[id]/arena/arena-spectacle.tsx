@@ -35,7 +35,23 @@ type ContenderView = {
   status: string;
   temperament: string | null;
   budgetMicrosRemaining: number;
+  eliminatedAt: string | null;
   latestRun: ContenderRun | null;
+};
+
+type EliminatedContenderView = {
+  id: string;
+  profileKey: string;
+  strategy: string;
+  temperament: string | null;
+  eliminatedAt: string | null;
+};
+
+type PoolSummary = {
+  activeWithBudget: number;
+  eliminated: number;
+  activeBroke: number;
+  total: number;
 };
 
 type ProjectLane = {
@@ -45,6 +61,8 @@ type ProjectLane = {
   arenaId: string | null;
   arenaStatus: string | null;
   contenders: ContenderView[];
+  eliminated: EliminatedContenderView[];
+  pool: PoolSummary;
   lastRun: {
     id: string;
     status: string;
@@ -133,7 +151,8 @@ function classifyRuntime(
   return "idle";
 }
 
-function runtimeLabel(state: RuntimeState): string {
+function runtimeLabel(state: RuntimeState, eliminated?: boolean): string {
+  if (eliminated) return "Eliminated";
   switch (state) {
     case "running":
       return "Running";
@@ -144,6 +163,23 @@ function runtimeLabel(state: RuntimeState): string {
     default:
       return "Idle";
   }
+}
+
+function poolCaption(pool: PoolSummary | undefined): string {
+  if (!pool) return "";
+  const parts: string[] = [];
+  if (pool.activeWithBudget > 0) {
+    parts.push(
+      `${pool.activeWithBudget} with budget`,
+    );
+  }
+  if (pool.eliminated > 0) {
+    parts.push(`${pool.eliminated} eliminated`);
+  }
+  if (pool.activeBroke > 0) {
+    parts.push(`${pool.activeBroke} broke`);
+  }
+  return parts.length ? parts.join(" · ") : "No active contenders";
 }
 
 function projectRuntime(lane: ProjectLane): RuntimeState {
@@ -275,6 +311,7 @@ export function ArenaSpectacle({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   /** Idle roster stays collapsed — full fan-out is too noisy for ops. */
   const [showIdle, setShowIdle] = useState<Set<string>>(new Set());
+  const [showEliminated, setShowEliminated] = useState<Set<string>>(new Set());
   const expandInitialized = useRef(false);
   const [selected, setSelected] = useState<SelectedAgent | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -290,7 +327,16 @@ export function ArenaSpectacle({
         idle: 0,
       },
       syncedAt: data.syncedAt ?? new Date().toISOString(),
-      projects: data.projects ?? [],
+      projects: (data.projects ?? []).map((lane) => ({
+        ...lane,
+        eliminated: lane.eliminated ?? [],
+        pool: lane.pool ?? {
+          activeWithBudget: lane.contenders?.length ?? 0,
+          eliminated: 0,
+          activeBroke: 0,
+          total: lane.contenders?.length ?? 0,
+        },
+      })),
     });
   }, []);
 
@@ -377,14 +423,30 @@ export function ArenaSpectacle({
       (p) => p.projectId === selected.projectId,
     );
     if (!lane) return null;
-    const contender = lane.contenders.find(
-      (c) => c.id === selected.contenderId,
-    );
-    if (!contender) return null;
+    let contender = lane.contenders.find((c) => c.id === selected.contenderId);
+    let eliminated = false;
+    if (!contender) {
+      const gone = lane.eliminated?.find((c) => c.id === selected.contenderId);
+      if (!gone) return null;
+      eliminated = true;
+      contender = {
+        id: gone.id,
+        profileKey: gone.profileKey,
+        strategy: gone.strategy,
+        status: "ELIMINATED",
+        temperament: gone.temperament,
+        budgetMicrosRemaining: 0,
+        eliminatedAt: gone.eliminatedAt,
+        latestRun: null,
+      };
+    }
     return {
       lane,
       contender,
-      state: classifyRuntime(contender, isLiveStatus(lane.arenaStatus)),
+      eliminated,
+      state: eliminated
+        ? "idle"
+        : classifyRuntime(contender, isLiveStatus(lane.arenaStatus)),
     };
   }, [selected, snapshot]);
 
@@ -599,6 +661,7 @@ export function ArenaSpectacle({
                       </div>
                       <p className={styles.laneRepo}>
                         {lane.repoFullName}
+                        {lane.pool ? ` · ${poolCaption(lane.pool)}` : ""}
                         {(() => {
                           if (
                             !lane.lastRun ||
@@ -776,6 +839,70 @@ export function ArenaSpectacle({
                                 ) : null}
                               </div>
                             ) : null}
+                            {(() => {
+                              const eliminated = lane.eliminated ?? [];
+                              if (eliminated.length === 0) return null;
+                              const elimOpen = showEliminated.has(lane.projectId);
+                              return (
+                                <div className={styles.idleRoster}>
+                                  <button
+                                    type="button"
+                                    className={styles.idleToggle}
+                                    aria-expanded={elimOpen}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowEliminated((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(lane.projectId)) {
+                                          next.delete(lane.projectId);
+                                        } else {
+                                          next.add(lane.projectId);
+                                        }
+                                        return next;
+                                      });
+                                    }}
+                                  >
+                                    {elimOpen
+                                      ? `Hide ${eliminated.length} eliminated`
+                                      : `Show ${eliminated.length} eliminated`}
+                                  </button>
+                                  {elimOpen ? (
+                                    <div
+                                      className={`${styles.agents} ${styles.agentsIdle}`}
+                                    >
+                                      {eliminated.map((c) => (
+                                        <button
+                                          key={c.id}
+                                          type="button"
+                                          className={`${styles.agent} ${styles.agent_idle} ${styles.agentCompact}`}
+                                          onClick={() =>
+                                            setSelected({
+                                              projectId: lane.projectId,
+                                              contenderId: c.id,
+                                            })
+                                          }
+                                        >
+                                          <div className={styles.agentTop}>
+                                            <span className={styles.agentRole}>
+                                              {titleCase(c.profileKey)}
+                                            </span>
+                                            <span className={styles.agentState}>
+                                              Eliminated
+                                            </span>
+                                          </div>
+                                          <p className={styles.agentActivity}>
+                                            Budget exhausted
+                                            {c.eliminatedAt
+                                              ? ` · ${formatSyncAge(c.eliminatedAt, nowMs)}`
+                                              : ""}
+                                          </p>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })()}
                           </>
                         );
                       })()}
@@ -794,8 +921,12 @@ export function ArenaSpectacle({
           projectId={selectedAgent.lane.projectId}
           repoFullName={selectedAgent.lane.repoFullName}
           contender={selectedAgent.contender}
-          statusLabel={runtimeLabel(selectedAgent.state)}
+          statusLabel={runtimeLabel(
+            selectedAgent.state,
+            selectedAgent.eliminated,
+          )}
           statusBadgeClass={TONE[selectedAgent.state].badge ?? ""}
+          eliminated={selectedAgent.eliminated}
           onClose={() => setSelected(null)}
         />
       ) : null}

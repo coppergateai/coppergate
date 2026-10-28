@@ -11,6 +11,7 @@ import {
   resumeArena,
   startTournamentFanout,
 } from "./arena.js";
+import { listContenderBudgetLedger } from "./contender-elimination.js";
 import { createArtifact } from "./artifacts.js";
 import { closeDb, createDb } from "./client.js";
 import { approveBrief, createBriefDraft } from "./briefs.js";
@@ -225,6 +226,17 @@ describe("elimination + kill-switch (TASK051/052)", { skip: !url }, () => {
     assert.ok(loserContender);
     assert.equal(loserContender.status, "ELIMINATED");
     assert.equal(loserContender.budgetMicrosRemaining, 0);
+
+    const ledger = await listContenderBudgetLedger(db, {
+      workspaceId,
+      contenderId: loserContender.id,
+      limit: 5,
+    });
+    assert.ok(ledger.length >= 1);
+    assert.ok(
+      ledger.some((e) => e.action === "contender.eliminated"),
+      "elimination ledger records contender.eliminated audit",
+    );
     assert.equal(
       canContenderEnqueue({
         arenaStatus: "RUNNING",

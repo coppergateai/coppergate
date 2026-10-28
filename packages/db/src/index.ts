@@ -142,6 +142,16 @@ export {
   type PayoffCandidate,
 } from "./arena.js";
 export {
+  CONTENDER_BUDGET_LEDGER_ACTIONS,
+  describeFanoutPoolHonesty,
+  listArenaContenderBudgetLedger,
+  listContenderBudgetLedger,
+  summarizeArenaContenderPool,
+  type ArenaContenderPoolSummary,
+  type ContenderBudgetLedgerEntry,
+  type FanoutPoolHonesty,
+} from "./contender-elimination.js";
+export {
   collectCriticSignals,
   maybeScoreAndResolveTournament,
   persistContenderFitness,
@@ -448,6 +458,8 @@ export {
   type WorkspaceArenaLastRun,
   type WorkspaceArenaLiveStatus,
   type WorkspaceArenaProjectLane,
+  type WorkspaceArenaEliminatedContenderView,
+  type WorkspaceArenaPoolSummary,
   type WorkspaceArenaSnapshot,
   type WorkspaceArenaSummary,
 } from "./workspace-arena.js";

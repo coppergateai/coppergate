@@ -6,6 +6,10 @@ import {
   releaseEstimateForRun,
   reserveEstimateForTask,
 } from "./budgets.js";
+import {
+  contenderDebitAuditMeta,
+  describeFanoutPoolHonesty,
+} from "./contender-elimination.js";
 import type { Database } from "./client.js";
 import {
   clampFanoutToCapacity,
@@ -575,10 +579,13 @@ export async function applyContenderDebit(
     action: eliminated ? "contender.eliminated" : "contender.debit",
     targetType: "contender",
     targetId: c.id,
-    meta: JSON.stringify({
-      debitMicros: input.debitMicros,
-      remainingMicros,
-    }),
+    meta: JSON.stringify(
+      contenderDebitAuditMeta(c, {
+        debitMicros: input.debitMicros,
+        remainingMicros,
+        eliminated,
+      }),
+    ),
   });
 
   return updated!;
@@ -846,13 +853,24 @@ export async function startTournamentFanout(
     task.projectId,
   );
   const perRun = task.estimateMicros ?? 0;
+  const requestedFanout = Math.min(MAX_TOURNAMENT_FANOUT, planCapped);
   const capacityCapped = clampFanoutToCapacity({
-    requested: Math.min(MAX_TOURNAMENT_FANOUT, planCapped, eligible.length),
+    requested: Math.min(requestedFanout, eligible.length),
     concurrencySlots: concurrency.slots,
     availableMicros: spend.availableMicros,
     perRunMicros: perRun,
   });
   const n = capacityCapped;
+  const eliminatedInPool = pool.filter((c) => c.status === "ELIMINATED").length;
+  const fanoutHonesty = describeFanoutPoolHonesty({
+    requestedFanout,
+    actualFanout: n,
+    eligibleCount: eligible.length,
+    eliminatedInPool,
+    concurrencySlots: concurrency.slots,
+    availableMicros: spend.availableMicros,
+    perRunMicros: perRun,
+  });
   if (n < 1) {
     if (eligible.length < 1) {
       throw new ArenaError("eliminated", "no active contenders with budget");
@@ -944,9 +962,15 @@ export async function startTournamentFanout(
     targetId: tournament.id,
     meta: JSON.stringify({
       taskId: task.id,
+      projectId: task.projectId,
       n,
       runIds: runs.map((r) => r.id),
       maxFanout: MAX_TOURNAMENT_FANOUT,
+      requestedFanout: fanoutHonesty.requestedFanout,
+      eligibleCount: fanoutHonesty.eligibleCount,
+      eliminatedInPool: fanoutHonesty.eliminatedInPool,
+      poolStarved: fanoutHonesty.poolStarved,
+      poolStarvedReason: fanoutHonesty.poolStarvedReason,
       concurrencySlots: concurrency.slots,
       inflight: concurrency.inflight,
       availableMicros: spend.availableMicros,

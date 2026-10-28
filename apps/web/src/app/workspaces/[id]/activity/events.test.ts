@@ -89,6 +89,35 @@ describe("activity events", () => {
     assert.ok(groups.some((g) => g.action === "task.enqueue"));
   });
 
+  it("summarizes contender debit and elimination from meta", () => {
+    assert.match(
+      summaryFor("contender.debit", {
+        profileKey: "engineer",
+        debitMicros: 250_000,
+        remainingMicros: 750_000,
+      }) ?? "",
+      /engineer lost/,
+    );
+    assert.match(
+      summaryFor("contender.eliminated", {
+        profileKey: "reviewer",
+        debitMicros: 50_000,
+      }) ?? "",
+      /reviewer eliminated/,
+    );
+    assert.match(
+      summaryFor("tournament.fanout", {
+        n: 1,
+        requestedFanout: 2,
+        eligibleCount: 1,
+        eliminatedInPool: 2,
+        poolStarved: true,
+        poolStarvedReason: "contenders",
+      }) ?? "",
+      /only 1 contender/,
+    );
+  });
+
   it("collapses consecutive eliminations across contenders", () => {
     const groups = groupActivityEvents([
       evt({
