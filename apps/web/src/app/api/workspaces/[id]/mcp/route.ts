@@ -1,4 +1,5 @@
 import {
+  deleteMcpConnection,
   isMcpProvider,
   listMcpConnections,
   serializeMcpConnectionPublic,
@@ -108,6 +109,29 @@ export async function PATCH(request: Request, context: RouteContext) {
       { connection: serializeMcpConnectionPublic(row) },
       { correlationId },
     );
+  } catch (err) {
+    return jsonError(err, correlationId);
+  }
+}
+
+/** Delete MCP connection. Query: ?provider= */
+export async function DELETE(request: Request, context: RouteContext) {
+  const correlationId = correlationIdFrom(request);
+  try {
+    requireCsrf(request);
+    const user = await requireUser(request);
+    const { id: workspaceId } = await context.params;
+    await requireWorkspaceOwner(db, workspaceId, user.id);
+    const url = new URL(request.url);
+    const provider = url.searchParams.get("provider");
+    if (!provider) throw new ApiError("bad_request", "provider is required");
+    const result = await deleteMcpConnection(db, {
+      workspaceId,
+      provider,
+      actor: `user:${user.id}`,
+    });
+    if (!result.deleted) throw new ApiError("not_found", "connection not found");
+    return jsonOk(result, { correlationId });
   } catch (err) {
     return jsonError(err, correlationId);
   }

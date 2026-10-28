@@ -1,7 +1,11 @@
 import { and, asc, eq, isNull, or } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { recordAuditEvent } from "./briefs.js";
-import { agentSkills, type AgentSkill } from "./schema.js";
+import {
+  agentProfiles,
+  agentSkills,
+  type AgentSkill,
+} from "./schema.js";
 
 export const SYSTEM_SKILL_SEEDS = [
   {
@@ -429,6 +433,60 @@ export async function upsertWorkspaceSkill(
     meta: { key },
   });
   return created!;
+}
+
+const SYSTEM_SKILL_KEYS: Set<string> = new Set(
+  SYSTEM_SKILL_SEEDS.map((s) => s.key as string),
+);
+
+/**
+ * Delete workspace skill row — resets system override or removes custom skill.
+ * Also strips the key from workspace profile skillKeysJson.
+ */
+export async function deleteWorkspaceSkill(
+  db: Database,
+  input: { workspaceId: string; key: string; actor: string },
+): Promise<{ deleted: boolean; resetToSystem: boolean }> {
+  const key = input.key.trim().toLowerCase().replace(/\s+/g, "-");
+  const [existing] = await db
+    .select()
+    .from(agentSkills)
+    .where(
+      and(
+        eq(agentSkills.workspaceId, input.workspaceId),
+        eq(agentSkills.key, key),
+      ),
+    )
+    .limit(1);
+  if (!existing) {
+    throw new Error("workspace skill not found");
+  }
+
+  const profiles = await db
+    .select()
+    .from(agentProfiles)
+    .where(eq(agentProfiles.workspaceId, input.workspaceId));
+  const now = new Date();
+  for (const profile of profiles) {
+    const keys = parseSkillKeysJson(profile.skillKeysJson);
+    if (!keys.includes(key)) continue;
+    const next = keys.filter((k) => k !== key);
+    await db
+      .update(agentProfiles)
+      .set({ skillKeysJson: JSON.stringify(next), updatedAt: now })
+      .where(eq(agentProfiles.id, profile.id));
+  }
+
+  await db.delete(agentSkills).where(eq(agentSkills.id, existing.id));
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: SYSTEM_SKILL_KEYS.has(key) ? "skill.reset" : "skill.delete",
+    targetType: "agent_skill",
+    targetId: existing.id,
+    meta: { key },
+  });
+  return { deleted: true, resetToSystem: SYSTEM_SKILL_KEYS.has(key) };
 }
 
 /**

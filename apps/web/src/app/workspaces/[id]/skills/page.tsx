@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
+  SYSTEM_SKILL_SEEDS,
   getWorkspaceForMember,
   listAgentProfiles,
   listAgentSkills,
@@ -75,6 +76,9 @@ export default async function WorkspaceSkillsPage({
     }
   }
   const profiles = [...profilesByKey.values()];
+  const systemSkillKeys = new Set(
+    SYSTEM_SKILL_SEEDS.map((s) => s.key as string),
+  );
 
   const skillsByKey = new Map<string, SkillRow>();
   for (const s of skillRows) {
@@ -88,6 +92,7 @@ export default async function WorkspaceSkillsPage({
       bodyMarkdown: s.bodyMarkdown,
       version: s.version,
       workspaceOverride: Boolean(s.workspaceId),
+      isCustom: Boolean(s.workspaceId) && !systemSkillKeys.has(s.key),
       agents,
     };
     if (!s.workspaceId) {

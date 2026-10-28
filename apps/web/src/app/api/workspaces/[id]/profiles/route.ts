@@ -1,6 +1,8 @@
 import {
   ProfileError,
-  listAgentProfiles,
+  createWorkspaceAgentProfile,
+  deleteWorkspaceAgentProfile,
+  listEffectiveAgentProfiles,
   updateWorkspaceAgentProfile,
 } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
@@ -58,33 +60,76 @@ function serializeProfile(p: {
   };
 }
 
-/** Bounded agent profile catalog (TASK101) — workspace overrides merge in. */
+function mapProfileError(err: ProfileError): ApiError {
+  return new ApiError(
+    err.code === "not_found"
+      ? "not_found"
+      : err.code === "forbidden"
+        ? "forbidden"
+        : "bad_request",
+    err.message,
+  );
+}
+
+/** Merged agent profile catalog — system seeds + workspace overrides/customs. */
 export async function GET(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
     const user = await requireUser(request);
     const { id: workspaceId } = await context.params;
     await requireWorkspaceMember(db, workspaceId, user.id);
-    const rows = await listAgentProfiles(db, workspaceId);
-    // Prefer workspace override per key for the UI list
-    const byKey = new Map<string, (typeof rows)[number]>();
-    for (const p of rows) {
-      if (!p.workspaceId) {
-        if (!byKey.has(p.key)) byKey.set(p.key, p);
-      } else {
-        byKey.set(p.key, p);
-      }
-    }
-    const profiles = [...byKey.values()]
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map(serializeProfile);
+    const profiles = (await listEffectiveAgentProfiles(db, workspaceId)).map(
+      serializeProfile,
+    );
     return jsonOk({ profiles }, { correlationId });
   } catch (err) {
     return jsonError(err, correlationId);
   }
 }
 
-/** Constrained profile override (TASK103) — no tool escalation. */
+/** Create a workspace-custom agent or seed an override for a system key. */
+export async function POST(request: Request, context: RouteContext) {
+  const correlationId = correlationIdFrom(request);
+  try {
+    requireCsrf(request);
+    const user = await requireUser(request);
+    const { id: workspaceId } = await context.params;
+    await requireWorkspaceOwner(db, workspaceId, user.id);
+    const body = (await request.json()) as {
+      key?: string;
+      displayName?: string;
+      promptGuidance?: string;
+      strategyDefault?: string;
+      temperament?: "steady" | "swift" | "balanced";
+      skillKeys?: string[];
+      maxSpendMicros?: number;
+      toolAllowlist?: string[];
+    };
+    if (!body.key || !body.displayName) {
+      throw new ApiError("bad_request", "key and displayName required");
+    }
+    const profile = await createWorkspaceAgentProfile(db, {
+      workspaceId,
+      key: body.key,
+      displayName: body.displayName,
+      actor: `user:${user.id}`,
+      promptGuidance: body.promptGuidance,
+      strategyDefault: body.strategyDefault,
+      temperament: body.temperament,
+      skillKeys: body.skillKeys,
+      maxSpendMicros: body.maxSpendMicros,
+      toolAllowlist: body.toolAllowlist,
+    });
+    return jsonOk({ profile: serializeProfile(profile) }, { correlationId });
+  } catch (err) {
+    if (err instanceof ProfileError) {
+      return jsonError(mapProfileError(err), correlationId);
+    }
+    return jsonError(err, correlationId);
+  }
+}
+
+/** Constrained profile override / custom update (TASK103) — no tool escalation. */
 export async function PATCH(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
@@ -94,6 +139,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     await requireWorkspaceOwner(db, workspaceId, user.id);
     const body = (await request.json()) as {
       key?: string;
+      displayName?: string;
       promptGuidance?: string;
       strategyDefault?: string;
       temperament?: "steady" | "swift" | "balanced";
@@ -110,6 +156,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       workspaceId,
       key: body.key,
       actor: `user:${user.id}`,
+      displayName: body.displayName,
       promptGuidance: body.promptGuidance,
       strategyDefault: body.strategyDefault,
       temperament: body.temperament,
@@ -122,17 +169,32 @@ export async function PATCH(request: Request, context: RouteContext) {
     return jsonOk({ profile: serializeProfile(profile) }, { correlationId });
   } catch (err) {
     if (err instanceof ProfileError) {
-      return jsonError(
-        new ApiError(
-          err.code === "not_found"
-            ? "not_found"
-            : err.code === "forbidden"
-              ? "forbidden"
-              : "bad_request",
-          err.message,
-        ),
-        correlationId,
-      );
+      return jsonError(mapProfileError(err), correlationId);
+    }
+    return jsonError(err, correlationId);
+  }
+}
+
+/** Delete workspace override (reset) or custom agent. Query: ?key= */
+export async function DELETE(request: Request, context: RouteContext) {
+  const correlationId = correlationIdFrom(request);
+  try {
+    requireCsrf(request);
+    const user = await requireUser(request);
+    const { id: workspaceId } = await context.params;
+    await requireWorkspaceOwner(db, workspaceId, user.id);
+    const url = new URL(request.url);
+    const key = url.searchParams.get("key");
+    if (!key) throw new ApiError("bad_request", "key is required");
+    const result = await deleteWorkspaceAgentProfile(db, {
+      workspaceId,
+      key,
+      actor: `user:${user.id}`,
+    });
+    return jsonOk(result, { correlationId });
+  } catch (err) {
+    if (err instanceof ProfileError) {
+      return jsonError(mapProfileError(err), correlationId);
     }
     return jsonError(err, correlationId);
   }

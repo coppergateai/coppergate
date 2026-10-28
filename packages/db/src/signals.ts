@@ -18,6 +18,7 @@ import { primaryRoleForSpawn } from "./contender-peers.js";
 import { notifyWorkspace } from "./notify.js";
 import {
   applySpawnProfilesToArena,
+  listCustomWorkspaceProfileKeys,
   resolveSpawnProfileKeys,
 } from "./profiles.js";
 import {
@@ -631,9 +632,14 @@ export async function armSignalEvent(
     );
   }
 
+  const customKeys = await listCustomWorkspaceProfileKeys(
+    db,
+    input.workspaceId,
+  );
   const profileKeys = resolveSpawnProfileKeys(
     event.provider,
     input.profileKeys,
+    customKeys,
   );
 
   const task = await createTaskFromSignal(db, {
