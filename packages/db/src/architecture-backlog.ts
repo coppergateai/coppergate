@@ -10,7 +10,140 @@ export type ArchitectureOpenTask = {
   estimateComplexity: "S" | "M" | "L";
 };
 
+/** Program row for backlog UI — Open and Done from markdown. */
+export type ArchitectureProgramRow = {
+  id: string;
+  title: string;
+  notes: string;
+  status: "open" | "done";
+  /** Nearest `##` heading above the row, when present. */
+  section: string | null;
+};
+
 const ID_RE = /\b((?:P|W|A|S|AG|RT|SEC)-\d{2,4})\b/i;
+
+function cleanCell(raw: string): string {
+  return raw
+    .replace(/\*\*/g, "")
+    .replace(/`/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Parse Open + Done program table/checklist rows for the backlog board.
+ * Unlike {@link parseArchitectureOpenTasks}, Done rows are kept.
+ */
+export function parseArchitectureProgramRows(
+  markdown: string,
+): ArchitectureProgramRow[] {
+  const out: ArchitectureProgramRow[] = [];
+  const seen = new Set<string>();
+  const lines = markdown.split(/\r?\n/);
+  let section: string | null = null;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    const heading = line.match(/^#{2,3}\s+(.+)$/);
+    if (heading) {
+      section = cleanCell(heading[1]!).slice(0, 120);
+      continue;
+    }
+
+    // Skip markdown table separators
+    if (/^\|?\s*:?-{3,}/.test(line)) continue;
+
+    const idMatch = line.match(ID_RE);
+    if (!idMatch) continue;
+    const id = idMatch[1]!.toUpperCase();
+    if (seen.has(id)) continue;
+
+    const isTable = line.includes("|");
+    const isChecklist = /^\s*[-*]\s*\[[ xX]\]/.test(line);
+    if (!isTable && !isChecklist && !/^\s*[-*]\s+/.test(line)) continue;
+
+    let status: "open" | "done" | null = null;
+    if (/\|\s*(Done|Closed|Merged|Shipped)\s*\|/i.test(line)) {
+      status = "done";
+    } else if (/\|\s*Open\s*\|/i.test(line)) {
+      status = "open";
+    } else if (/^\s*[-*]\s*\[[xX]\]/.test(line)) {
+      status = "done";
+    } else if (/^\s*[-*]\s*\[ \]/.test(line) || /\bOpen\b/i.test(line)) {
+      status = "open";
+    } else if (
+      /\b(done|closed|merged|shipped)\b/i.test(line) &&
+      !/\bOpen\b/i.test(line)
+    ) {
+      status = "done";
+    } else if (isChecklist || /^\s*[-*]\s+/.test(line)) {
+      status = "open";
+    }
+
+    if (!status) continue;
+
+    let title = "";
+    let notes = "";
+
+    if (isTable) {
+      const cells = line
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((c) => cleanCell(c));
+      // Common shapes: Status | ID | Title | Notes  OR  ID | Title | … | Status | Notes
+      const statusIdx = cells.findIndex((c) =>
+        /^(Open|Done|Closed|Merged|Shipped)$/i.test(c),
+      );
+      const idIdx = cells.findIndex((c) =>
+        new RegExp(`^${id}$`, "i").test(c),
+      );
+      if (idIdx >= 0) {
+        const afterId = cells.slice(idIdx + 1).filter((c) => {
+          if (!c) return false;
+          if (/^(Open|Done|Closed|Merged|Shipped)$/i.test(c)) return false;
+          return true;
+        });
+        title = afterId[0] ?? "";
+        notes = afterId.slice(1).join(" — ");
+      } else if (statusIdx >= 0) {
+        const rest = cells.filter(
+          (c, i) =>
+            i !== statusIdx &&
+            c &&
+            !new RegExp(`^${id}$`, "i").test(c),
+        );
+        title = rest[0] ?? "";
+        notes = rest.slice(1).join(" — ");
+      }
+    } else {
+      title = line
+        .replace(/^\s*[-*]\s*\[[ xX]?\]\s*/, "")
+        .replace(/^\s*[-*]\s+/, "")
+        .replace(new RegExp(id, "i"), "")
+        .replace(/^[:\-–—]+\s*/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    title = title.replace(/^[:\-–—]+\s*/, "").slice(0, 200);
+    if (title.length < 3) title = id;
+    notes = notes.slice(0, 500);
+
+    seen.add(id);
+    out.push({
+      id,
+      title,
+      notes,
+      status,
+      section,
+    });
+  }
+
+  return out;
+}
 
 /**
  * Extract unchecked / Open tasks with program IDs from markdown tables or lists.

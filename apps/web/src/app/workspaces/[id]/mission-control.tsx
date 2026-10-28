@@ -279,6 +279,15 @@ export function MissionControl({ data, recentEvents }: Props) {
           <div className={styles.headActions}>
             <nav className={styles.headLinks} aria-label="Related">
               <Link
+                href={`/workspaces/${data.workspaceId}/backlog`}
+                className={styles.headLink}
+              >
+                Backlog
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
                 href={`/workspaces/${data.workspaceId}/arena`}
                 className={styles.headLink}
               >

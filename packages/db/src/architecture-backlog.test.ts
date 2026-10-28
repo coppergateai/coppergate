@@ -5,10 +5,38 @@ import {
   extractArchitectureIdFromTitle,
   markArchitectureIdDoneInMarkdown,
   parseArchitectureOpenTasks,
+  parseArchitectureProgramRows,
   pickNextArchitectureTask,
 } from "./architecture-backlog.js";
 
 describe("architecture-backlog", () => {
+  it("parses Open and Done program rows with section + notes", () => {
+    const md = `
+## Agent reliability (AG)
+
+| Status | ID | Title | Notes |
+| --- | --- | --- | --- |
+| Done | AG-010 | Quota fail-closed | Assert pause |
+| Open | AG-030 | Never silent autonomy escalation | PRODUCT §11 |
+| Open | SEC-036 | Prod write policy gate | refuse merge |
+
+## Other
+- [x] P-006: already shipped note
+- [ ] P-007: Add provider preset
+`;
+    const rows = parseArchitectureProgramRows(md);
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+    assert.equal(byId["AG-010"]?.status, "done");
+    assert.equal(byId["AG-010"]?.title, "Quota fail-closed");
+    assert.match(byId["AG-010"]?.notes ?? "", /Assert pause/);
+    assert.equal(byId["AG-030"]?.status, "open");
+    assert.equal(byId["AG-030"]?.section, "Agent reliability (AG)");
+    assert.equal(byId["SEC-036"]?.status, "open");
+    assert.equal(byId["P-006"]?.status, "done");
+    assert.equal(byId["P-007"]?.status, "open");
+    assert.ok(!rows.some((r) => r.id === "---"));
+  });
+
   it("parses Open checklist and table rows with program IDs", () => {
     const md = `
 # Plan

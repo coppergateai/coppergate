@@ -378,12 +378,23 @@ export {
 export {
   architectureIdsFromTitles,
   parseArchitectureOpenTasks,
+  parseArchitectureProgramRows,
   extractArchitectureIdFromTitle,
   isToyArchitectureTitle,
   markArchitectureIdDoneInMarkdown,
   pickNextArchitectureTask,
   type ArchitectureOpenTask,
+  type ArchitectureProgramRow,
 } from "./architecture-backlog.js";
+export {
+  applyOpenProgramRuntimeStatus,
+  getWorkspaceOpenProgramBacklog,
+  type InFlightTaskRef,
+  type OpenProgramBacklogItem,
+  type OpenProgramBacklogProgram,
+  type OpenProgramEffectiveStatus,
+  type WorkspaceOpenProgramBacklog,
+} from "./open-program-backlog.js";
 export {
   architectureRepoFromMaintainerPolicyJson,
   assertSpendLicenseForTask,
