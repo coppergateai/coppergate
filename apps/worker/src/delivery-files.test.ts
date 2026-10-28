@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import {
+  assertLockfileSyncedWithPackageJson,
   assertProductDeliveryPaths,
   buildDeliveryFiles,
   pathMatchesAllowlist,
@@ -29,6 +30,30 @@ describe("product delivery path gates", () => {
       paths: ["packages/db/src/maintainer.ts", "docs/HARNESS.md"],
       pathAllowlist: ["apps/**", "packages/**", "docs/**"],
     });
+    assert.equal(ok.ok, true);
+  });
+});
+
+describe("lockfile sync gate", () => {
+  it("allows package.json when lockfile is also in the delivery", () => {
+    const ok = assertLockfileSyncedWithPackageJson([
+      "packages/db/package.json",
+      "pnpm-lock.yaml",
+    ]);
+    assert.equal(ok.ok, true);
+  });
+
+  it("refuses package.json without lockfile", () => {
+    const hit = assertLockfileSyncedWithPackageJson([
+      "packages/db/package.json",
+      "packages/db/src/index.ts",
+    ]);
+    assert.equal(hit.ok, false);
+    if (!hit.ok) assert.equal(hit.code, "lockfile_out_of_sync");
+  });
+
+  it("ignores deliveries that do not touch package.json", () => {
+    const ok = assertLockfileSyncedWithPackageJson(["packages/db/src/index.ts"]);
     assert.equal(ok.ok, true);
   });
 });

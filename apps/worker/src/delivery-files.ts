@@ -101,6 +101,38 @@ export function assertProductDeliveryPaths(input: {
   return { ok: true };
 }
 
+const PACKAGE_MANIFEST_RE = /(^|\/)package\.json$/i;
+const PNPM_LOCK_RE = /(^|\/)pnpm-lock\.yaml$/i;
+const NPM_LOCK_RE = /(^|\/)package-lock\.json$/i;
+const YARN_LOCK_RE = /(^|\/)yarn\.lock$/i;
+
+/**
+ * Refuse live delivery when package.json changes without a lockfile update.
+ * Prevents CI frozen-lockfile failures (ACPP dogfood P-011 class).
+ */
+export function assertLockfileSyncedWithPackageJson(
+  paths: string[],
+): { ok: true } | { ok: false; reason: string; code: string } {
+  const normalized = paths
+    .map((p) => p.replace(/^\.\//, "").trim())
+    .filter(Boolean);
+  const touchesPackageJson = normalized.some((p) => PACKAGE_MANIFEST_RE.test(p));
+  if (!touchesPackageJson) return { ok: true };
+
+  const touchesLock =
+    normalized.some((p) => PNPM_LOCK_RE.test(p)) ||
+    normalized.some((p) => NPM_LOCK_RE.test(p)) ||
+    normalized.some((p) => YARN_LOCK_RE.test(p));
+  if (touchesLock) return { ok: true };
+
+  return {
+    ok: false,
+    reason:
+      "package.json changed without pnpm-lock.yaml / package-lock.json / yarn.lock — run the package manager to refresh the lockfile before delivery",
+    code: "lockfile_out_of_sync",
+  };
+}
+
 /** SEC-022 — refuse delivery file bodies that embed tokens or private keys. */
 export function assertDeliverySecretsRefused(
   files: DeliveryFile[],

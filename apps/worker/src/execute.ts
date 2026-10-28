@@ -68,6 +68,7 @@ import {
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
 import {
   assertDeliverySecretsRefused,
+  assertLockfileSyncedWithPackageJson,
   assertProductDeliveryPaths,
   buildDeliveryFiles,
 } from "./delivery-files.js";
@@ -739,13 +740,16 @@ export async function executeClaimedRun(
             (p) => p !== "**/*" && p !== "**",
           );
         }
+        const deliveryPaths = deliveryBundle.files.map((f) => f.path);
         const pathGate = assertProductDeliveryPaths({
-          paths: deliveryBundle.files.map((f) => f.path),
+          paths: deliveryPaths,
           pathAllowlist: deliveryAllowlist,
         });
+        const lockGate = assertLockfileSyncedWithPackageJson(deliveryPaths);
         const secretGate = assertDeliverySecretsRefused(deliveryBundle.files);
         const deliveryBlocked =
           (!pathGate.ok ? pathGate : null) ??
+          (!lockGate.ok ? lockGate : null) ??
           (!secretGate.ok ? secretGate : null);
         // CI / FakeCodingAgent paths still use fixture diffs — only enforce on live http.
         if (
