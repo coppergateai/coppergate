@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Breadcrumbs } from "@/components/app/ui";
 import { OnboardingGuide } from "@/components/onboarding-guide";
 import { CreateProjectForm } from "./create-project-form";
 import { RedetectStacksButton } from "./redetect-stacks-button";
@@ -196,176 +195,143 @@ export function ProjectsHome({
   return (
     <main className={styles.main}>
       <div className={styles.surface}>
-        <Breadcrumbs
-          className={styles.crumbs}
-          items={[
-            { label: "Workspaces", href: "/workspaces" },
-            {
-              label: workspace.name,
-              href: `/workspaces/${workspaceId}`,
-            },
-            { label: "Projects" },
-          ]}
-        />
-
         <header className={styles.hero}>
-          <div className={styles.heroIdentity}>
-            <div className={styles.heroIcon} aria-hidden>
-              <span>&gt;_</span>
-            </div>
+          <p className={styles.eyebrow}>Workspace / {workspace.name}</p>
+          <div className={styles.heroTop}>
             <div className={styles.heroText}>
               <div className={styles.heroTitleRow}>
                 <h1 className={styles.heroTitle}>Projects</h1>
-                <span className={styles.heroSlug}>
-                  {workspace.name} · /{workspace.slug}
-                </span>
+                <span className={styles.heroSlug}>/{workspace.slug}</span>
               </div>
               <p className={styles.heroLede}>{workspace.blurb}</p>
-              <div className={styles.badges} aria-label="Workspace stats">
-                <span className={styles.badge}>
-                  <PersonIcon />
-                  {formatRole(workspace.role)}
+            </div>
+            <div className={styles.heroActions}>
+              <nav className={styles.headLinks} aria-label="Related">
+                <Link
+                  href={`/workspaces/${workspaceId}/arena`}
+                  className={styles.headLink}
+                >
+                  Arena
+                </Link>
+                <span className={styles.headSep} aria-hidden>
+                  ·
                 </span>
-                <span className={styles.badge}>
-                  {projects.length}{" "}
-                  {projects.length === 1 ? "project" : "projects"}
+                <Link
+                  href={`/workspaces/${workspaceId}/activity`}
+                  className={styles.headLink}
+                >
+                  Activity
+                </Link>
+                <span className={styles.headSep} aria-hidden>
+                  ·
                 </span>
-                {showKpis ? (
-                  <>
-                    <span className={styles.badge}>
-                      {rollup.totals.verifiedMerges} verified merges (30d)
-                    </span>
-                    <span className={styles.badge}>
-                      {burnPercent(rollup.totals.budgetBurnRatio)} envelope burn
-                    </span>
-                    <span className={styles.badge}>
-                      {rollup.totals.humanTouches} human PR touches
-                      {rollup.totals.zeroTouchDelivery ? " · zero-touch" : ""}
-                    </span>
-                  </>
-                ) : null}
-              </div>
+                <Link
+                  href={`/workspaces/${workspaceId}/settings`}
+                  className={styles.headLink}
+                >
+                  Settings
+                </Link>
+              </nav>
+              {primaryRepo ? (
+                <a
+                  href={
+                    org
+                      ? `https://github.com/${org}`
+                      : githubRepoUrl(primaryRepo)
+                  }
+                  className={styles.secondaryBtn}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Repository
+                </a>
+              ) : null}
+              {canCreate ? (
+                <a href="#create-project" className={styles.primaryBtn}>
+                  Add project
+                </a>
+              ) : canManage && empty ? (
+                <Link
+                  href={`/workspaces/${workspaceId}/settings?tab=connections`}
+                  className={styles.primaryBtn}
+                >
+                  Add project
+                </Link>
+              ) : null}
+              {canManage && projects.length > 0 ? (
+                <div className={styles.overflow} ref={menuRef}>
+                  <button
+                    type="button"
+                    className={styles.iconBtn}
+                    aria-label="More actions"
+                    aria-expanded={menuOpen}
+                    onClick={() => setMenuOpen((v) => !v)}
+                  >
+                    <MoreIcon />
+                  </button>
+                  {menuOpen ? (
+                    <div className={styles.menu} role="menu">
+                      <div className={styles.menuItem}>
+                        <RedetectStacksButton workspaceId={workspaceId} />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
-
-          <div className={styles.heroActions}>
-            {primaryRepo ? (
-              <a
-                href={
-                  org
-                    ? `https://github.com/${org}`
-                    : githubRepoUrl(primaryRepo)
-                }
-                className={styles.secondaryBtn}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <GitIcon />
-                Repository
-              </a>
-            ) : null}
-            <Link
-              href={`/workspaces/${workspaceId}/arena`}
-              className={styles.secondaryBtn}
-            >
-              <PlayIcon />
-              Open in Arena
-            </Link>
-            {canCreate ? (
-              <a href="#create-project" className={styles.primaryBtn}>
-                <span aria-hidden>+</span> Add project
-              </a>
-            ) : canManage && empty ? (
-              <Link
-                href={`/workspaces/${workspaceId}/settings?tab=connections`}
-                className={styles.primaryBtn}
-              >
-                <span aria-hidden>+</span> Add project
-              </Link>
-            ) : null}
-            {canManage && projects.length > 0 ? (
-              <div className={styles.overflow} ref={menuRef}>
-                <button
-                  type="button"
-                  className={styles.iconBtn}
-                  aria-label="More actions"
-                  aria-expanded={menuOpen}
-                  onClick={() => setMenuOpen((v) => !v)}
-                >
-                  <MoreIcon />
-                </button>
-                {menuOpen ? (
-                  <div className={styles.menu} role="menu">
-                    <div className={styles.menuItem}>
-                      <RedetectStacksButton workspaceId={workspaceId} />
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+          {!empty || unboundCount > 0 ? (
+            <div className={styles.summaryStrip} aria-label="Project summary">
+              <span className={styles.summaryItem}>
+                <strong>{projects.length}</strong> projects
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>{readyCount}</strong> ready
+              </span>
+              {setupCount > 0 ? (
+                <>
+                  <span className={styles.summaryDot} aria-hidden>
+                    ·
+                  </span>
+                  <span className={styles.summaryItem}>
+                    <strong>{setupCount}</strong> setup
+                  </span>
+                </>
+              ) : null}
+              {unboundCount > 0 ? (
+                <>
+                  <span className={styles.summaryDot} aria-hidden>
+                    ·
+                  </span>
+                  <span className={styles.summaryItem}>
+                    <strong>{unboundCount}</strong> unbound
+                  </span>
+                </>
+              ) : null}
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>{formatRole(workspace.role)}</strong>
+              </span>
+              {showKpis ? (
+                <>
+                  <span className={styles.summaryDot} aria-hidden>
+                    ·
+                  </span>
+                  <span className={styles.summaryItem}>
+                    <strong>{rollup.totals.verifiedMerges}</strong> verified ·{" "}
+                    {burnPercent(rollup.totals.budgetBurnRatio)} burn · 30d
+                    {rollup.totals.zeroTouchDelivery ? " · zero-touch" : ""}
+                  </span>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </header>
-
-        <nav className={styles.pageTabs} aria-label="Workspace sections">
-          <span className={`${styles.pageTab} ${styles.pageTabActive}`}>
-            <CubeIcon />
-            Projects
-            <span className={styles.pageTabCount}>{projects.length}</span>
-          </span>
-          <Link
-            href={`/workspaces/${workspaceId}/arena`}
-            className={styles.pageTab}
-          >
-            <BotIcon />
-            Arena
-          </Link>
-          <Link
-            href={`/workspaces/${workspaceId}/settings`}
-            className={styles.pageTab}
-          >
-            <GearIcon />
-            Settings
-          </Link>
-        </nav>
-
-        {!empty || unboundCount > 0 ? (
-          <section className={styles.summaryStrip} aria-label="Project summary">
-            <p className={styles.summaryItem}>
-              <strong>{projects.length}</strong> projects
-            </p>
-            <p className={styles.summaryItem}>
-              <span
-                className={`${styles.statDot} ${styles.statDotReady}`}
-                aria-hidden
-              />
-              <strong>{readyCount}</strong> ready
-            </p>
-            {setupCount > 0 ? (
-              <p className={styles.summaryItem}>
-                <span
-                  className={`${styles.statDot} ${styles.statDotSetup}`}
-                  aria-hidden
-                />
-                <strong>{setupCount}</strong> setup
-              </p>
-            ) : null}
-            {unboundCount > 0 ? (
-              <p className={styles.summaryItem}>
-                <span
-                  className={`${styles.statDot} ${styles.statDotUnbound}`}
-                  aria-hidden
-                />
-                <strong>{unboundCount}</strong> unbound
-              </p>
-            ) : null}
-            {showKpis ? (
-              <p className={styles.summaryItem}>
-                <strong>{rollup.totals.verifiedMerges}</strong> verified merges ·{" "}
-                {burnPercent(rollup.totals.budgetBurnRatio)} burn · 30d
-              </p>
-            ) : null}
-          </section>
-        ) : null}
 
         {empty ? (
           <div className={styles.bodyPad}>
@@ -737,20 +703,6 @@ function SearchIcon() {
   );
 }
 
-function PersonIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-      <path
-        d="M3 13.5c.8-2.4 2.4-3.5 5-3.5s4.2 1.1 5 3.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function GitIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -784,75 +736,12 @@ function BranchIcon() {
   );
 }
 
-function PlayIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M5 3.5v9l8-4.5-8-4.5z" fill="currentColor" />
-    </svg>
-  );
-}
-
 function MoreIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
       <circle cx="3.5" cy="8" r="1.2" fill="currentColor" />
       <circle cx="8" cy="8" r="1.2" fill="currentColor" />
       <circle cx="12.5" cy="8" r="1.2" fill="currentColor" />
-    </svg>
-  );
-}
-
-function CubeIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M8 1.5L13.5 4.5v7L8 14.5 2.5 11.5v-7L8 1.5z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8 1.5V14.5M2.5 4.5L8 8l5.5-3.5"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function BotIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <rect
-        x="3"
-        y="5"
-        width="10"
-        height="8"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="1.3"
-      />
-      <path
-        d="M8 2.5v2.5M5.5 8.5h.01M10.5 8.5h.01"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.3" />
-      <path
-        d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.4 3.4l1 1M11.6 11.6l1 1M12.6 3.4l-1 1M4.4 11.6l-1 1"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
     </svg>
   );
 }
