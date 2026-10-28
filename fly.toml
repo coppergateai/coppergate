@@ -19,6 +19,7 @@ primary_region = "iad"
   APP_URL = "https://www.coppergate.ai"
   # Design scout: use Playwright-bundled Chromium (see Dockerfile.worker).
   PW_USE_BUNDLED = "1"
+  PLAYWRIGHT_BROWSERS_PATH = "/ms-playwright"
 
 [processes]
   worker = "pnpm start"
