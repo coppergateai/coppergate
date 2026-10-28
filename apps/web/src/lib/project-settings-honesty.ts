@@ -158,6 +158,7 @@ export function describeMaintainerSettingsHonesty(input: {
       ? "Arena prod writes are enabled — still policy-gated; this is not a hosted production deploy button."
       : "Does not enable production deploy or prod environment writes — PR merges stay fitness- and policy-gated.",
     failClosedLines: [
+      "Enabling maintainer does not raise spend cap, multi-repo, auto-release, or extra signal providers (AG-030).",
       "Kill-switch still cancels in-flight contenders and freezes enqueue.",
       "Monthly spend envelope still hard-pauses when cap is hit (fail-closed).",
       "Branch protection and required CI are never bypassed.",
