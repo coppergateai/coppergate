@@ -26,11 +26,16 @@ async function main() {
     timeout: 45_000,
   });
   await page
-    .getByRole("heading", { name: /settings/i })
+    .getByRole("heading", { name: /^settings$/i })
     .first()
     .waitFor({ timeout: 30_000 })
     .catch(() => undefined);
-  await page.waitForTimeout(1100);
+  await page
+    .getByText(/GitHub|GitLab|Source control|Checking GitHub/i)
+    .first()
+    .waitFor({ timeout: 30_000 })
+    .catch(() => undefined);
+  await page.waitForTimeout(1600);
   console.log("url", page.url());
   if (page.url().includes("/login")) throw new Error("auth expired");
   await page.screenshot({ path: `${out}/${name}`, fullPage: false });
