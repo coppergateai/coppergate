@@ -563,40 +563,84 @@ export function TaskDetailPanel({
     }
   })();
 
+  const titleText = displayTaskTitle(task.title) || task.title;
+
   return (
     <div className={styles.root}>
-      <p className={styles.kicker}>Delivery · {taskStatusLabel}</p>
-      <p className={styles.meta}>
-        Attempt {task.attemptCount}/{task.maxAttempts}
-        {task.prUrl ? (
-          <>
-            {" · "}
-            <a href={task.prUrl}>PR</a>
-          </>
-        ) : null}
-        {" · "}
-        {formatUsdFromMicros(costMicros)}
-        {agentMeta.provider ? ` · ${agentMeta.provider}` : null}
-        {agentMeta.model ? ` · ${agentMeta.model}` : null}
-        {agentMeta.sandboxMode === "sim"
-          ? " · simulated sandbox"
-          : agentMeta.sandboxMode === "git"
-            ? " · git sandbox"
-            : null}
-      </p>
-      <h1 className={styles.title}>
-        <OpenIdBadge title={task.title} />{" "}
-        {displayTaskTitle(task.title) || task.title}
-      </h1>
-      {task.status === "DONE" || task.status === "ACCEPTED" ? (
-        <p className={styles.meta}>
-          <a
-            href={`/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/receipt`}
-          >
-            Open Ship Receipt →
-          </a>
-        </p>
-      ) : null}
+      <header className={styles.head}>
+        <p className={styles.eyebrow}>Task · {taskStatusLabel}</p>
+        <div className={styles.headTop}>
+          <div className={styles.headText}>
+            <h1 className={styles.title}>
+              <OpenIdBadge title={task.title} className={styles.openId} />
+              {titleText}
+            </h1>
+            {task.goal ? (
+              <p className={styles.lede}>
+                {task.goal.length > 160
+                  ? `${task.goal.slice(0, 157).trimEnd()}…`
+                  : task.goal}
+              </p>
+            ) : null}
+          </div>
+          {task.status === "DONE" || task.status === "ACCEPTED" ? (
+            <a
+              href={`/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}/receipt`}
+              className={styles.headLink}
+            >
+              Ship Receipt
+            </a>
+          ) : null}
+        </div>
+        <div className={styles.summaryStrip} aria-label="Task summary">
+          <span className={styles.summaryItem}>
+            Attempt{" "}
+            <strong>
+              {task.attemptCount}/{task.maxAttempts}
+            </strong>
+          </span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{formatUsdFromMicros(costMicros)}</strong>
+          </span>
+          {task.prUrl ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <a href={task.prUrl}>PR</a>
+              </span>
+            </>
+          ) : null}
+          {agentMeta.provider ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                {agentMeta.provider}
+                {agentMeta.model ? ` · ${agentMeta.model}` : ""}
+              </span>
+            </>
+          ) : null}
+          {agentMeta.sandboxMode === "sim" ||
+          agentMeta.sandboxMode === "git" ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                {agentMeta.sandboxMode === "sim"
+                  ? "Simulated sandbox"
+                  : "Git sandbox"}
+              </span>
+            </>
+          ) : null}
+        </div>
+      </header>
 
       <nav className={styles.stageNav} aria-label="Delivery review stages">
         {stages.map((s) => (
