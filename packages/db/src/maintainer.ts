@@ -9,10 +9,15 @@ import {
 } from "./briefs.js";
 import {
   getProjectSpendSummary,
+  getWorkspaceBudgetRow,
   getWorkspaceSpendSummary,
   rollMonthlyBudgetIfDue,
   setWorkspaceBudget,
 } from "./budgets.js";
+import {
+  sanitizePolicyForMaintainerEnable,
+  shouldInitWorkspaceBudgetOnEnable,
+} from "./maintainer-enable-guard.js";
 import { getRunCiFitness } from "./ci-evidence.js";
 import { setProjectAutonomyLevel, setProjectMergeEnabled } from "./project-policy.js";
 import {
@@ -62,10 +67,7 @@ import {
   parseArchitectureOpenTasks,
   pickNextArchitectureTask,
 } from "./architecture-backlog.js";
-import {
-  getProjectForWorkspace,
-  setProjectMultiRepoPolicy,
-} from "./projects.js";
+import { getProjectForWorkspace } from "./projects.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
@@ -653,31 +655,33 @@ export async function enableMaintainerMode(
     input.workspaceId,
     input.projectId,
   );
-  const policy: MaintainerPolicy = {
-    ...DEFAULT_MAINTAINER_POLICY,
-    ...input.policy,
-    enabled: true,
-    visionBriefId:
-      input.policy?.visionBriefId ??
-      brief?.id ??
-      project.currentBriefId ??
-      null,
-  };
-
-  const softAlert = Math.floor(
-    policy.monthlyBudgetMicros * policy.softAlertRatio,
+  const wsBudget = await getWorkspaceBudgetRow(db, input.workspaceId);
+  const { policy, clamps } = sanitizePolicyForMaintainerEnable(
+    input.policy,
+    DEFAULT_MAINTAINER_POLICY,
+    { existingWorkspaceCapMicros: wsBudget?.capMicros ?? null },
   );
+  policy.visionBriefId =
+    input.policy?.visionBriefId ??
+    brief?.id ??
+    project.currentBriefId ??
+    null;
 
-  // Workspace pool: all projects share one monthly envelope.
-  await setWorkspaceBudget(db, {
-    workspaceId: input.workspaceId,
-    capMicros: policy.monthlyBudgetMicros,
-    softAlertMicros: softAlert,
-    actor: input.actor,
-    status: "active",
-    period: "monthly",
-    pauseProjectBudgets: true,
-  });
+  if (shouldInitWorkspaceBudgetOnEnable(wsBudget?.capMicros ?? null)) {
+    const softAlert = Math.floor(
+      policy.monthlyBudgetMicros * policy.softAlertRatio,
+    );
+    // First envelope only — never raise an existing cap via maintainer enable (AG-030).
+    await setWorkspaceBudget(db, {
+      workspaceId: input.workspaceId,
+      capMicros: policy.monthlyBudgetMicros,
+      softAlertMicros: softAlert,
+      actor: input.actor,
+      status: "active",
+      period: "monthly",
+      pauseProjectBudgets: true,
+    });
+  }
 
   await setProjectAutonomyLevel(db, {
     workspaceId: input.workspaceId,
@@ -718,19 +722,6 @@ export async function enableMaintainerMode(
     });
   }
 
-  if (policy.coordinatedMultiRepo) {
-    await setProjectMultiRepoPolicy(db, {
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      policy: {
-        enabled: true,
-        maxSecondaryRepos: 5,
-        maxSecondaryFiles: 40,
-        coordinatedPrs: true,
-      },
-    });
-  }
-
   const now = new Date();
   const [updated] = await db
     .update(projects)
@@ -756,6 +747,7 @@ export async function enableMaintainerMode(
       policy,
       prodWritesEnabled: arena.prodWritesEnabled === true,
       autoRelease: policy.autoRelease,
+      escalationClamps: clamps,
     },
   });
   await recordMaintainerEvent(db, {
@@ -1063,7 +1055,6 @@ export async function startProjectArena(
       actor: input.actor,
       policy: {
         autoMerge: true,
-        autoRelease: true,
         selfImprove: true,
         autoQueueReplanTasks: true,
         continuousBacklog: true,

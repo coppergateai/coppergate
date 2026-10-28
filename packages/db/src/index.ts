@@ -482,6 +482,11 @@ export {
   type WorkspaceMaintainerRollup,
 } from "./maintainer.js";
 export {
+  sanitizePolicyForMaintainerEnable,
+  shouldInitWorkspaceBudgetOnEnable,
+  type MaintainerEnableEscalationClamps,
+} from "./maintainer-enable-guard.js";
+export {
   classifyContenderRuntime,
   isLiveArenaStatus,
   killWorkspaceArena,

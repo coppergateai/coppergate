@@ -8,6 +8,7 @@
 
 ### Features
 
+- AG-030: Maintainer enable no silent escalation — existing workspace spend cap is never raised on enable; multi-repo, auto-release, and extra signal providers are stripped with audit `escalationClamps`. See `docs/maintainer-enable-no-escalation.md`.
 - Catalog CRUD: workspace owners can create/update/delete custom Agents and Skills, reset system overrides, manage Tools (workspace defs + allowlist) and MCP connections from Agents / Skills / Tools pages. Fail-closed allowlists; custom tool tokens are catalog/policy only (harness stays core + MCP).
 - AG-013: Cursor harness as default coding path honesty — worker prefers workspace Cursor BYOK over env LLM, emits `coding_path_honesty` run progress (including `native_openai` demotion reason), and Arena contender rows surface the hint while runs are live. See `docs/HARNESS.md`.
 - P-101: Mission Control crisis clarity (concurrency + provider quota lead attention, muted arena noise, honest empty states). See `docs/mission-control-crisis.md`.

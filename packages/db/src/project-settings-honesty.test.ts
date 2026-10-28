@@ -83,7 +83,8 @@ describe("project settings honesty (P-143)", () => {
   it("describeMaintainerSettingsHonesty — not prod deploy + fail-closed", () => {
     const on = describeMaintainerSettingsHonesty({ maintainerEnabled: true });
     assert.match(on.notProdDeployLine, /production deploy/i);
-    assert.equal(on.failClosedLines.length, 3);
+    assert.equal(on.failClosedLines.length, 4);
+    assert.ok(on.failClosedLines.some((l) => /AG-030/i.test(l)));
     assert.ok(on.failClosedLines.some((l) => /kill-switch/i.test(l)));
     assert.ok(on.failClosedLines.some((l) => /envelope/i.test(l)));
   });
