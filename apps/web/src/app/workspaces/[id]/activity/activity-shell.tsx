@@ -96,12 +96,22 @@ function tagsFor(group: ActivityGroup): string[] {
     tags.push(`project ${shortId(group.meta.projectId)}`);
   }
   // Prefer project over short verb tags that just echo the title ("stop", "pause").
-  const tech = group.technicalLabel.split(" ×")[0] ?? "";
+  const tech = (group.technicalLabel.split(" ×")[0] ?? "").trim();
   const titleLower = group.title.toLowerCase();
+  const techNoise = new Set([
+    "attempt",
+    "run",
+    "event",
+    "update",
+    "stop",
+    "pause",
+    "start",
+  ]);
   if (
     tech &&
     tags.length < 2 &&
     tech.length > 2 &&
+    !techNoise.has(tech.toLowerCase()) &&
     !titleLower.includes(tech.toLowerCase())
   ) {
     tags.push(tech);
@@ -281,54 +291,88 @@ export function ActivityShell({
       >
         <div className={styles.feed} ref={listRef}>
           <header className={styles.head}>
-            <p className={styles.eyebrow}>
-              Workspace / {workspaceName}
-            </p>
+            <p className={styles.eyebrow}>Workspace / {workspaceName}</p>
             <div className={styles.titleRow}>
-              <h1 className={styles.title}>Activity</h1>
-              <span
-                className={`${styles.health} ${metrics.systemHealthy ? "" : styles.healthWarn}`}
-              >
-                <span className={styles.healthDot} aria-hidden />
-                {metrics.healthLabel}
-              </span>
-            </div>
-            <p className={styles.lede}>
-              Your agents, decisions and executions in one place.
-            </p>
-          </header>
-
-          <div className={styles.summaryStrip} aria-label="Activity metrics">
-            <p className={styles.summaryItem}>
-              <strong>{metrics.eventsToday}</strong> events today
-            </p>
-            <p className={styles.summaryItem}>
-              <strong>{metrics.activeAgents}</strong> in flight
-            </p>
-            <p className={styles.summaryItem}>
-              {metrics.needsReview > 0 ? (
-                <>
-                  <strong>{metrics.needsReview}</strong> need attention ·{" "}
+              <div className={styles.titleCluster}>
+                <h1 className={styles.title}>Activity</h1>
+                <span
+                  className={`${styles.health} ${metrics.systemHealthy ? "" : styles.healthWarn}`}
+                >
+                  <span className={styles.healthDot} aria-hidden />
+                  {metrics.healthLabel}
+                </span>
+              </div>
+              <div className={styles.headActions}>
+                <nav className={styles.headLinks} aria-label="Related">
                   <Link
                     href={`/workspaces/${workspaceId}/arena`}
-                    className={styles.summaryLink}
+                    className={styles.headLink}
                   >
-                    Open Arena
+                    Arena
                   </Link>
-                </>
-              ) : (
-                <>
-                  <strong>0</strong> need attention ·{" "}
+                  <span className={styles.headSep} aria-hidden>
+                    ·
+                  </span>
                   <Link
                     href={`/workspaces/${workspaceId}/inbox`}
-                    className={styles.summaryLink}
+                    className={styles.headLink}
                   >
                     Inbox
                   </Link>
-                </>
-              )}
+                  <span className={styles.headSep} aria-hidden>
+                    ·
+                  </span>
+                  <Link
+                    href={`/workspaces/${workspaceId}/insights`}
+                    className={styles.headLink}
+                  >
+                    Insights
+                  </Link>
+                </nav>
+              </div>
+            </div>
+            <p className={styles.lede}>
+              Agents, decisions, and executions in one feed — filter, search,
+              and open anything that needs follow-up.
             </p>
-          </div>
+            <div className={styles.summaryStrip} aria-label="Activity metrics">
+              <span className={styles.summaryItem}>
+                <strong>{metrics.eventsToday}</strong> events today
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>{metrics.activeAgents}</strong> in flight
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                {metrics.needsReview > 0 ? (
+                  <>
+                    <strong>{metrics.needsReview}</strong> need attention ·{" "}
+                    <Link
+                      href={`/workspaces/${workspaceId}/arena`}
+                      className={styles.summaryLink}
+                    >
+                      Arena
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <strong>0</strong> need attention ·{" "}
+                    <Link
+                      href={`/workspaces/${workspaceId}/inbox`}
+                      className={styles.summaryLink}
+                    >
+                      Inbox
+                    </Link>
+                  </>
+                )}
+              </span>
+            </div>
+          </header>
 
           <div className={styles.toolbar}>
             <div className={styles.tabs} role="tablist" aria-label="Event filters">
