@@ -2,25 +2,38 @@ import styles from "./hero-mission-mock.module.css";
 
 const NAV = [
   "Overview",
-  "Program",
   "Arena",
-  "Evidence",
-  "Activity",
+  "Inbox",
+  "Insights",
+  "Projects",
   "Settings",
 ] as const;
 
-const RECEIPT = {
-  openId: "AG-011",
-  title: "WAITING_CI / lease honesty under Pause",
-  spend: "$0.42",
-  fitness: "0.91",
-  ci: "Green",
-  profile: "engineer",
-  touches: "1",
-  writeback: "OPEN_PROGRAM → Done",
-} as const;
+const CONTENDERS = [
+  {
+    name: "engineer · opus",
+    meta: "Waiting CI · $0.42",
+    fitness: "0.91",
+    status: "Survivor",
+    tone: "win" as const,
+  },
+  {
+    name: "engineer · sonnet",
+    meta: "Rejected · fitness gate",
+    fitness: "0.74",
+    status: "Out",
+    tone: "out" as const,
+  },
+  {
+    name: "reviewer · haiku",
+    meta: "Eliminated · spend",
+    fitness: "0.61",
+    status: "Out",
+    tone: "out" as const,
+  },
+] as const;
 
-/** Illustrative Program → Receipt frame for the marketing hero. */
+/** Illustrative Arena frame for the marketing hero — mirrors product chrome. */
 export function HeroMissionMock() {
   return (
     <div className={styles.frame} aria-hidden="true">
@@ -32,7 +45,7 @@ export function HeroMissionMock() {
               <span
                 key={item}
                 className={`${styles.sideLink} ${
-                  item === "Evidence" ? styles.sideLinkActive : ""
+                  item === "Arena" ? styles.sideLinkActive : ""
                 }`}
               >
                 {item}
@@ -44,90 +57,74 @@ export function HeroMissionMock() {
         <div className={styles.main}>
           <header className={styles.top}>
             <div>
-              <p className={styles.crumb}>Workspaces / coppergate / Evidence</p>
-              <p className={styles.title}>Ship Receipt</p>
+              <p className={styles.eyebrow}>Arena / coppergate</p>
+              <p className={styles.title}>WAITING_CI / lease honesty</p>
+              <p className={styles.lede}>
+                Contenders compete under budget. Fitness and CI decide the
+                survivor — Accept writes the Ship Receipt.
+              </p>
             </div>
             <div className={styles.actions}>
-              <span className={styles.btnGhost}>Share</span>
-              <span className={styles.btnStop}>Open program</span>
+              <span className={styles.btnGhost}>Pause</span>
+              <span className={styles.btnStop}>Accept</span>
             </div>
           </header>
 
-          <div className={styles.stats}>
-            <div className={styles.stat}>
-              <span className={`${styles.statDot} ${styles.dot_run}`} />
-              <div>
-                <p className={styles.statValue}>{RECEIPT.openId}</p>
-                <p className={styles.statLabel}>Open ID</p>
-              </div>
-            </div>
-            <div className={styles.stat}>
-              <span className={`${styles.statDot} ${styles.dot_wait}`} />
-              <div>
-                <p className={styles.statValue}>{RECEIPT.spend}</p>
-                <p className={styles.statLabel}>Spend</p>
-              </div>
-            </div>
-            <div className={styles.stat}>
-              <span className={`${styles.statDot} ${styles.dot_idle}`} />
-              <div>
-                <p className={styles.statValue}>{RECEIPT.fitness}</p>
-                <p className={styles.statLabel}>Fitness</p>
-              </div>
-            </div>
-            <div className={styles.stat}>
-              <span className={`${styles.statDot} ${styles.dot_attn}`} />
-              <div>
-                <p className={styles.statValue}>{RECEIPT.ci}</p>
-                <p className={styles.statLabel}>CI</p>
-              </div>
-            </div>
+          <div className={styles.summaryStrip}>
+            <span>
+              <strong>$0.42</strong> of $5.00
+            </span>
+            <span className={styles.summaryDot} aria-hidden>
+              ·
+            </span>
+            <span>
+              <strong>3</strong> contenders
+            </span>
+            <span className={styles.summaryDot} aria-hidden>
+              ·
+            </span>
+            <span>
+              <strong>1</strong> survivor
+            </span>
+            <span className={styles.summaryDot} aria-hidden>
+              ·
+            </span>
+            <span className={styles.pillLive}>
+              <span className={styles.pillDot} />
+              Live
+            </span>
           </div>
 
           <div className={styles.table}>
             <div className={styles.tableHead}>
-              <span>Field</span>
-              <span>Value</span>
-              <span />
-              <span />
-              <span />
+              <span>Contender</span>
+              <span>Fitness</span>
+              <span>Status</span>
             </div>
-            <div className={styles.row}>
-              <div className={styles.proj}>
-                <span className={styles.projMark} />
-                <div>
-                  <p className={styles.projName}>Title</p>
-                  <p className={styles.projMeta}>{RECEIPT.title}</p>
+            {CONTENDERS.map((c) => (
+              <div
+                key={c.name}
+                className={`${styles.row} ${
+                  c.tone === "win" ? styles.rowWin : ""
+                }`}
+              >
+                <div className={styles.proj}>
+                  <span className={styles.projMark} />
+                  <div>
+                    <p className={styles.projName}>{c.name}</p>
+                    <p className={styles.projMeta}>{c.meta}</p>
+                  </div>
                 </div>
+                <span className={styles.fitness}>{c.fitness}</span>
+                <span
+                  className={`${styles.badge} ${
+                    c.tone === "win" ? styles.badge_run : styles.badge_idle
+                  }`}
+                >
+                  {c.status}
+                </span>
               </div>
-              <span className={`${styles.badge} ${styles.badge_run}`}>
-                Accepted
-              </span>
-              <div className={styles.activity}>
-                <span>Winner · {RECEIPT.profile}</span>
-                <span>Human touches · {RECEIPT.touches}</span>
-              </div>
-              <span className={styles.cost}>{RECEIPT.writeback}</span>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.proj}>
-                <span className={styles.projMark} />
-                <div>
-                  <p className={styles.projName}>Program cycle</p>
-                  <p className={styles.projMeta}>
-                    Open Program → Spend License → Survivor → Receipt
-                  </p>
-                </div>
-              </div>
-              <span className={`${styles.badge} ${styles.badge_wait}`}>
-                Contracted
-              </span>
-              <div className={styles.activity}>
-                <span>No Open ID</span>
-                <span>No spend</span>
-              </div>
-              <span className={styles.cost}>Fail-closed</span>
-            </div>
+            ))}
           </div>
         </div>
       </div>
