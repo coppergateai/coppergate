@@ -25,6 +25,8 @@ API `POST /api/projects/:id/arena` omits `minHuman` → same default as the DB i
 
 **Maintainer ON ≠ prod deploy** (PRODUCT §11 non-goals). Enabling maintainer sets L2, merge, and min_human for autonomous backlog work under the monthly envelope.
 
+**AG-030:** Maintainer enable cannot silently raise spend, expand signal providers, enable multi-repo, or turn on auto-release. See `docs/maintainer-enable-no-escalation.md`.
+
 Fail-closed guards unchanged:
 
 - Arena **kill-switch** cancels contenders and freezes enqueue
@@ -40,3 +42,4 @@ UI copy is driven by `describeMaintainerSettingsHonesty`.
 ## Tests
 
 - `packages/db/src/project-settings-honesty.test.ts` — effective flags and summaries
+- `packages/db/src/maintainer-enable-guard.test.ts` — AG-030 enable clamps
