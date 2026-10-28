@@ -24,6 +24,15 @@ function formatWhen(d: Date | null | undefined) {
   });
 }
 
+function formatDay(d: Date | null | undefined) {
+  if (!d) return "—";
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function providerLabel(provider: string) {
   if (provider === "gitlab") return "GitLab";
   if (provider === "github") return "GitHub";
@@ -46,6 +55,7 @@ export default async function ProfilePage() {
 
   const displayName = user.name?.trim() || user.login;
   const initial = (displayName.charAt(0) || "?").toUpperCase();
+  const owned = workspaces.filter((w) => w.role === "owner").length;
 
   return (
     <AppChrome
@@ -59,50 +69,81 @@ export default async function ProfilePage() {
       <main className={styles.main}>
         <div className={styles.shell}>
           <header className={styles.head}>
-            <div>
-              <h1 className={styles.kicker}>Profile</h1>
-              <p className={styles.meta}>
-                Your Coppergate account · signed in via{" "}
-                {providerLabel(user.authProvider)}
-              </p>
-            </div>
-            <div className={styles.headAside}>
-              <Link href="/workspaces" className={styles.ghostBtn}>
-                Workspaces
-              </Link>
-            </div>
-          </header>
-
-          <div className={styles.body}>
-            <div className={styles.stack}>
-              <section className={styles.hero} aria-label="Identity">
+            <p className={styles.eyebrow}>Account</p>
+            <div className={styles.headTop}>
+              <div className={styles.identity}>
                 {user.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     className={styles.avatar}
                     src={user.avatarUrl}
                     alt=""
-                    width={68}
-                    height={68}
+                    width={52}
+                    height={52}
                   />
                 ) : (
                   <span className={styles.avatarFallback} aria-hidden>
                     {initial}
                   </span>
                 )}
-                <div className={styles.heroCopy}>
-                  <h2 className={styles.heroName}>{displayName}</h2>
-                  <p className={styles.heroLogin}>@{user.login}</p>
+                <div className={styles.headText}>
+                  <h1 className={styles.title}>{displayName}</h1>
+                  <p className={styles.lede}>
+                    @{user.login} · signed in via{" "}
+                    {providerLabel(user.authProvider)}. Update how you appear in
+                    Coppergate — provider identity stays read-only.
+                  </p>
                 </div>
-              </section>
+              </div>
+              <nav className={styles.headLinks} aria-label="Related">
+                <Link href="/workspaces" className={styles.headLink}>
+                  Workspaces
+                </Link>
+                <span className={styles.headSep} aria-hidden>
+                  ·
+                </span>
+                <Link href="/docs" className={styles.headLink}>
+                  Docs
+                </Link>
+              </nav>
+            </div>
+            <div className={styles.summaryStrip} aria-label="Account summary">
+              <span className={styles.summaryItem}>
+                <strong>{workspaces.length}</strong>{" "}
+                {workspaces.length === 1 ? "workspace" : "workspaces"}
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>{owned}</strong> owned
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                {providerLabel(user.authProvider)}
+              </span>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                Member since {formatDay(user.createdAt)}
+              </span>
+            </div>
+          </header>
 
-              <section className={styles.section} aria-labelledby="profile-edit">
+          <div className={styles.body}>
+            <div className={styles.stack}>
+              <section
+                className={styles.section}
+                aria-labelledby="profile-edit"
+              >
                 <h2 id="profile-edit" className={styles.sectionLabel}>
                   Display name
                 </h2>
                 <p className={styles.sectionLede}>
-                  Customize how you appear in Coppergate. Provider identity
-                  stays read-only.
+                  Shown in the sidebar and workspace UI.
                 </p>
                 <ProfileForm
                   initialName={user.name?.trim() ?? ""}
@@ -110,34 +151,35 @@ export default async function ProfilePage() {
                 />
               </section>
 
-              <section className={styles.section} aria-labelledby="account-meta">
+              <section
+                className={styles.section}
+                aria-labelledby="account-meta"
+              >
                 <h2 id="account-meta" className={styles.sectionLabel}>
                   Account
                 </h2>
-                <div className={styles.panel}>
-                  <dl className={styles.dl}>
-                    <div className={styles.dlRow}>
-                      <dt>Login</dt>
-                      <dd>@{user.login}</dd>
-                    </div>
-                    <div className={styles.dlRow}>
-                      <dt>Email</dt>
-                      <dd>{user.email ?? "—"}</dd>
-                    </div>
-                    <div className={styles.dlRow}>
-                      <dt>Auth provider</dt>
-                      <dd>{providerLabel(user.authProvider)}</dd>
-                    </div>
-                    <div className={styles.dlRow}>
-                      <dt>Last login</dt>
-                      <dd>{formatWhen(user.lastLoginAt)}</dd>
-                    </div>
-                    <div className={styles.dlRow}>
-                      <dt>Member since</dt>
-                      <dd>{formatWhen(user.createdAt)}</dd>
-                    </div>
-                  </dl>
-                </div>
+                <dl className={styles.dl}>
+                  <div className={styles.dlRow}>
+                    <dt>Login</dt>
+                    <dd>@{user.login}</dd>
+                  </div>
+                  <div className={styles.dlRow}>
+                    <dt>Email</dt>
+                    <dd>{user.email ?? "—"}</dd>
+                  </div>
+                  <div className={styles.dlRow}>
+                    <dt>Auth provider</dt>
+                    <dd>{providerLabel(user.authProvider)}</dd>
+                  </div>
+                  <div className={styles.dlRow}>
+                    <dt>Last login</dt>
+                    <dd>{formatWhen(user.lastLoginAt)}</dd>
+                  </div>
+                  <div className={styles.dlRow}>
+                    <dt>Member since</dt>
+                    <dd>{formatWhen(user.createdAt)}</dd>
+                  </div>
+                </dl>
               </section>
             </div>
 
@@ -146,7 +188,7 @@ export default async function ProfilePage() {
                 Workspaces
               </h2>
               <p className={styles.sectionLede}>
-                Open a workspace or jump straight to its settings.
+                Open a workspace or jump to its settings.
               </p>
               {workspaces.length === 0 ? (
                 <p className={styles.empty}>
@@ -168,14 +210,12 @@ export default async function ProfilePage() {
                           /{ws.slug} · {ws.role}
                         </p>
                       </div>
-                      <div className={styles.wsActions}>
-                        <Link
-                          href={`/workspaces/${ws.id}/settings`}
-                          className={styles.ghostBtn}
-                        >
-                          Workspace settings
-                        </Link>
-                      </div>
+                      <Link
+                        href={`/workspaces/${ws.id}/settings`}
+                        className={styles.wsSettings}
+                      >
+                        Settings
+                      </Link>
                     </li>
                   ))}
                 </ul>
