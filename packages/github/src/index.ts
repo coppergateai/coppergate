@@ -44,6 +44,7 @@ export {
   type GithubIssueCommentResult,
 } from "./community.js";
 export {
+  buildMaintainerReleaseRequest,
   createGithubRelease,
   formatReleaseNotes,
   type GithubReleaseResult,
