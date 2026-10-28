@@ -14,6 +14,7 @@ export type CommunityIssueCandidate = {
 
 export type OpenIssueRef = {
   title: string;
+  body?: string | null;
   labels?: string[];
 };
 

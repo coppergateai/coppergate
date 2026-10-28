@@ -40,16 +40,43 @@ const METRICS_JS = `(() => {
   const client = document.documentElement.clientWidth;
   const scrollW = document.documentElement.scrollWidth;
   const mainW = main ? Math.round(main.getBoundingClientRect().width) : 0;
+
+  function isClippedByAncestor(el) {
+    let node = el.parentElement;
+    while (node && node !== document.documentElement) {
+      const style = window.getComputedStyle(node);
+      const ox = style.overflowX;
+      const o = style.overflow;
+      if (
+        ox === "hidden" ||
+        ox === "clip" ||
+        ox === "scroll" ||
+        ox === "auto" ||
+        o === "hidden" ||
+        o === "clip" ||
+        o === "scroll" ||
+        o === "auto"
+      ) {
+        const nr = node.getBoundingClientRect();
+        const er = el.getBoundingClientRect();
+        // Fully outside the clip edge → intentional marquee / carousel bleed.
+        if (er.right > nr.right + 1) return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  }
+
   const overflowRight = [];
   for (const el of document.querySelectorAll("main *")) {
     const r = el.getBoundingClientRect();
-    if (r.width > 40 && r.right > client + 2) {
-      overflowRight.push({
-        cls: String(el.className || "").slice(0, 60),
-        right: Math.round(r.right),
-      });
-      if (overflowRight.length >= 5) break;
-    }
+    if (r.width <= 40 || r.right <= client + 2) continue;
+    if (isClippedByAncestor(el)) continue;
+    overflowRight.push({
+      cls: String(el.className || "").slice(0, 60),
+      right: Math.round(r.right),
+    });
+    if (overflowRight.length >= 5) break;
   }
   return {
     client,

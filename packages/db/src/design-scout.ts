@@ -157,16 +157,34 @@ export function proposeDesignIssues(input: {
     const title = `design: fix layout overflow on ${shot.path}`.slice(0, 200);
     const dup = input.openIssues.some((i) => {
       const t = i.title.toLowerCase();
+      const body = (i.body ?? "").toLowerCase();
       const labels = (i.labels ?? []).map((l) => l.toLowerCase());
       const isDesignLabeled =
         labels.includes("design") ||
         labels.includes("ux") ||
-        t.startsWith("design:");
+        t.startsWith("design:") ||
+        body.includes("coppergate-design-scout");
       if (!isDesignLabeled) return titlesOverlap(i.title, title);
+      // Prefer scout HTML comment path=… (exact; "/" must not match "/docs").
+      const pathMarker = `path=${pathKey}`;
+      const pathIdx = body.indexOf(pathMarker);
+      if (pathIdx >= 0) {
+        const after = body.slice(pathIdx + pathMarker.length, pathIdx + pathMarker.length + 1);
+        if (after === "" || after === " " || after === "-" || after === "\n") {
+          return true;
+        }
+      }
+      if (pathKey === "/") {
+        return (
+          /(?:^|[\s:])design:.*overflow on \/$/i.test(t.trim()) ||
+          /\*\*route:\*\* `\/`/i.test(body)
+        );
+      }
       return (
-        t.includes(` ${pathKey}`) ||
+        t.includes(`on ${pathKey}`) ||
+        t.endsWith(` ${pathKey}`) ||
         t.endsWith(pathKey) ||
-        t.includes(`on ${pathKey}`)
+        body.includes(`**route:** \`${pathKey}\``)
       );
     });
     if (dup) continue;

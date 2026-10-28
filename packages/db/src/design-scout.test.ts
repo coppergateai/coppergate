@@ -50,6 +50,36 @@ describe("design scout propose", () => {
     );
   });
 
+  it("dedups root path `/` via title and scout body marker", () => {
+    const proposed = proposeDesignIssues({
+      shots: [
+        shot({
+          name: "landing",
+          url: "https://www.coppergate.ai/",
+          path: "/",
+          metrics: {
+            client: 1440,
+            scrollW: 1600,
+            hScroll: true,
+            mainW: 1200,
+            overflowRight: [{ cls: "hero", right: 1500 }],
+            title: "Coppergate",
+          },
+        }),
+      ],
+      openIssues: [
+        {
+          title: "design: fix layout overflow on /",
+          body: "<!-- coppergate-design-scout runId=x shot=landing path=/ -->",
+          labels: ["design"],
+        },
+      ],
+      max: 2,
+      runId: "run-2",
+    });
+    assert.equal(proposed.length, 0);
+  });
+
   it("dedups against open design issues and respects max", () => {
     const shots = [
       shot({

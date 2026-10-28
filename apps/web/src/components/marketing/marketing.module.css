@@ -3229,7 +3229,10 @@
 .integrationRows {
   display: grid;
   gap: 1rem;
+  min-width: 0;
+  overflow-x: clip;
   padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
 }
 
 .integrationRow {
@@ -3254,6 +3257,8 @@
   position: relative;
   overflow: hidden;
   min-width: 0;
+  max-width: 100%;
+  contain: paint;
   mask-image: var(--marquee-fade);
 }
 
@@ -3362,11 +3367,13 @@
     animation: none !important;
     flex-wrap: wrap;
     width: auto;
-    padding-right: max(var(--gutter), env(safe-area-inset-right));
+    max-width: 100%;
   }
 
   .integrationTrack {
-    overflow: visible;
+    /* Keep clip so wrap does not expand page scrollWidth. */
+    overflow-x: auto;
+    overflow-y: hidden;
     mask-image: none;
   }
 }
