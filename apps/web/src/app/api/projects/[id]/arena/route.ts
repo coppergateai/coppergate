@@ -93,7 +93,8 @@ export async function POST(request: Request, context: RouteContext) {
       workspaceId: body.workspaceId,
       projectId,
       actor: user.id,
-      minHuman: body.minHuman === true,
+      minHuman:
+        typeof body.minHuman === "boolean" ? body.minHuman : undefined,
       defaultContenderN: n,
       contenderCount: n,
       contenderBudgetMicros: budget,
@@ -119,7 +120,7 @@ export async function POST(request: Request, context: RouteContext) {
   }
 }
 
-/** PATCH arena policy (min_human). Default remains false until G1b. */
+/** PATCH arena policy (min_human). New arenas default min_human on (G1b). */
 export async function PATCH(request: Request, context: RouteContext) {
   const correlationId = correlationIdFrom(request);
   try {
