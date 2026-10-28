@@ -134,6 +134,8 @@ export async function runDesignScoutForProject(
         path: repoPath,
         content: shot.pngBytes,
         message: `chore(design-scout): capture ${shot.name} (${runId})`,
+        defaultBranch: primary.defaultBranch,
+        allowDefaultBranchWrite: policy.designScout === true,
       });
       const rawUrl = `https://raw.githubusercontent.com/${owner}/${name}/HEAD/${repoPath}`;
       imageMarkdownByShot[shot.name] = `![${shot.name}](${rawUrl})`;

@@ -9,6 +9,7 @@
 
 ### Features
 
+- SEC-036: **Prod / default-branch write policy gate** — refuse merge-to-default, GitHub Release, default-branch Contents writes, and sandbox production deploy commands unless explicit policy flags (`mergeEnabled`, `autoRelease`, `prodWritesEnabled`). See `docs/prod-write-policy-gate.md`.
 - P-142: Critic fitness cites evidence refs — non-zero fitness requires cited CI/validation + tests(/coverage/e2e) artifact ids; vibes-only promote blocked (`vibes_only_blocked`). See `docs/critic-fitness-evidence-refs.md`.
 - P-140: Arena efficiency payoff UX — board strip + agent cards + inspector show `e · f · spend` (`e=f/spend^α`), CI fail ⇒ e=0 copy, and winner promote reason. See `docs/arena-efficiency-payoff.md`.
 - Claude Code (Agent SDK) coding harness — `ClaudeCodeCodingAgent` via `@anthropic-ai/claude-agent-sdk`, BYOK vendor `claude_code`, harness kind `claude_code`, env `ANTHROPIC_API_KEY` / `CLAUDE_CODE_MODEL`. Prefer Cursor when both exist; Claude Code is OpenAI failover when Cursor is absent. See `docs/HARNESS.md`.

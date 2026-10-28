@@ -26,6 +26,7 @@ import {
   getRepoDefaultBranchHead,
   mergePullRequest,
 } from "@coppergate/github";
+import { resolveDefaultBranchMergeFlag } from "@coppergate/scm";
 import type { Logger } from "@coppergate/telemetry";
 import { writeArchitectureTaskDone } from "./architecture-writeback.js";
 import { runCommunityScoutForProject } from "./community-scout-tick.js";
@@ -236,6 +237,11 @@ export async function runMaintainerSchedulerTick(
           owner,
           repo: name,
           prNumber: c.prNumber,
+          allowDefaultBranchWrite: resolveDefaultBranchMergeFlag({
+            mergeEnabled: bound.project.mergeEnabled,
+            via: "maintainer",
+            maintainerAutoMerge: policy.autoMerge,
+          }),
         });
         await markAutoMerged(db, {
           workspaceId: tick.workspaceId,
@@ -319,6 +325,7 @@ export async function runMaintainerSchedulerTick(
           tagName: req.tagName,
           name: req.name,
           body: req.body,
+          allowRelease: policy.autoRelease,
         });
         releases += 1;
         await recordMaintainerReleaseOutcome(db, {

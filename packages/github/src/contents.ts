@@ -2,6 +2,8 @@
  * GitHub Contents API helpers for architecture writeback + ship rollback.
  */
 
+import { assertDefaultBranchContentsWriteAllowed } from "@coppergate/scm";
+
 export type RepoFile = {
   path: string;
   content: string;
@@ -57,8 +59,19 @@ export async function updateRepoFile(input: {
   sha: string;
   message: string;
   branch?: string;
+  /** Repository default branch name — required for SEC-036 default-branch gate. */
+  defaultBranch?: string;
+  /** SEC-036 — explicit opt-in when branch targets default. */
+  allowDefaultBranchWrite: boolean;
   fetchImpl?: typeof fetch;
 }): Promise<{ commitSha: string | null }> {
+  const defaultBranch = input.defaultBranch?.trim() || "main";
+  assertDefaultBranchContentsWriteAllowed({
+    allowDefaultBranchWrite: input.allowDefaultBranchWrite,
+    branch: input.branch,
+    defaultBranch,
+  });
+
   const fetchImpl = input.fetchImpl ?? fetch;
   const res = await fetchImpl(
     `https://api.github.com/repos/${input.owner}/${input.repo}/contents/${encodeURIComponent(input.path).replace(/%2F/g, "/")}`,
@@ -106,8 +119,18 @@ export async function putRepoBinaryFile(input: {
   encoding?: "utf8" | "base64";
   message: string;
   branch?: string;
+  defaultBranch?: string;
+  /** SEC-036 — explicit opt-in when branch targets default. */
+  allowDefaultBranchWrite: boolean;
   fetchImpl?: typeof fetch;
 }): Promise<{ commitSha: string | null; contentPath: string }> {
+  const defaultBranch = input.defaultBranch?.trim() || "main";
+  assertDefaultBranchContentsWriteAllowed({
+    allowDefaultBranchWrite: input.allowDefaultBranchWrite,
+    branch: input.branch,
+    defaultBranch,
+  });
+
   const fetchImpl = input.fetchImpl ?? fetch;
   const encodedPath = input.path
     .split("/")

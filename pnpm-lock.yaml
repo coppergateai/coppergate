@@ -453,6 +453,10 @@ importers:
         version: 5.9.3
 
   packages/sandbox:
+    dependencies:
+      '@coppergate/scm':
+        specifier: workspace:*
+        version: link:../scm
     devDependencies:
       '@coppergate/eslint-config':
         specifier: workspace:*
