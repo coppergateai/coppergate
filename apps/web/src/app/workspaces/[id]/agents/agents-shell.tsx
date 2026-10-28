@@ -703,9 +703,11 @@ export function AgentsShell({
                     {selected.key} · {sourceLabel(selected)}
                   </p>
                   <div className={styles.chipRow}>
-                    <span className={styles.chip}>{selected.temperament}</span>
                     <span className={styles.chip}>
-                      {selected.strategyDefault}
+                      temp {selected.temperament}
+                    </span>
+                    <span className={styles.chip}>
+                      strategy {selected.strategyDefault}
                     </span>
                     <span className={styles.chip}>
                       cap {usd(selected.maxSpendMicros)}
