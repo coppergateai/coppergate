@@ -55,8 +55,3 @@ export function isStubOrToyDelivery(input: {
   }
   return { toy: false, reason: null };
 }
-
-/** Allow legacy OpenHands/Aider stub only when explicitly opted in. */
-export function harnessStubAllowed(): boolean {
-  return process.env.ALLOW_HARNESS_STUB === "1";
-}

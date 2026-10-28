@@ -1,5 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import type { AgentEvent, AgentRunInput, CodingAgent } from "./types.js";
 import { createCodingAgent } from "./create-agent.js";
 import {
@@ -8,8 +6,6 @@ import {
 } from "./cursor-sdk.js";
 import { FakeCodingAgent } from "./fake.js";
 import type { OpenAiCompatibleConfig } from "./openai-compatible.js";
-import { resolveSafeWorkdirPath } from "./path-policy.js";
-import { harnessStubAllowed } from "./stub-detect.js";
 
 /**
  * ContenderHarness port (TASK113) — external coding runtimes as arena backends.
@@ -51,105 +47,23 @@ export class NativeOpenAiHarness implements ContenderHarness {
 
 /**
  * OpenHands / Aider harness — real runtime not wired in-process.
- * Refuses stub scaffold writes unless ALLOW_HARNESS_STUB=1 (dev only).
+ * Always fail-closed; legacy FakeCodingAgent / scaffold stub path removed.
  */
 export class OpenHandsSandboxHarness implements ContenderHarness {
   readonly kind = "openhands" as const;
   readonly capability =
-    "OpenHands BYO — requires real runtime; stub disabled by default";
+    "OpenHands BYO — requires real runtime; stub path removed";
 
-  async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
-    if (!harnessStubAllowed()) {
-      yield {
-        kind: "error",
-        message:
-          "OpenHands/Aider stub harness disabled. Configure workspace BYOK (native OpenAI-compatible) or set ALLOW_HARNESS_STUB=1 for local demos only.",
-        payload: {
-          code: "harness_stub_disabled",
-          harness: this.kind,
-          hint: "native_openai_byok",
-        },
-      };
-      return;
-    }
-
-    // Legacy stub path — only with explicit opt-in (tests / demos).
-    const { buildFakeCompletion } = await import("./fake.js");
-
-    const workdir = input.sandboxWorkdir?.trim();
-    if (!workdir) {
-      yield {
-        kind: "progress",
-        message:
-          "OpenHands harness stub — no sandbox workdir; FakeCodingAgent fallback",
-        payload: { harness: this.kind, status: "no_sandbox" },
-      };
-      yield* new FakeCodingAgent().run(input);
-      return;
-    }
-
+  async *run(_input: AgentRunInput): AsyncIterable<AgentEvent> {
     yield {
-      kind: "progress",
-      message: "OpenHands harness stub — applying fix in sandbox (ALLOW_HARNESS_STUB)",
+      kind: "error",
+      message:
+        "OpenHands/Aider harness is not wired. Configure workspace BYOK (native OpenAI-compatible or Cursor local) instead.",
       payload: {
+        code: "harness_stub_disabled",
         harness: this.kind,
-        status: "sandbox",
-        sandboxId: input.sandboxId ?? null,
+        hint: "native_openai_byok",
       },
-    };
-
-    const relPath = resolveHarnessWritePath(input.allowedPaths);
-    const absPath = resolveSafeWorkdirPath(workdir, relPath);
-    if (!absPath) {
-      yield {
-        kind: "error",
-        message: `Refused harness write outside sandbox: ${relPath}`,
-        payload: { code: "path_escape", path: relPath },
-      };
-      return;
-    }
-    await mkdir(dirname(absPath), { recursive: true });
-    const goalOneLine = input.goal.slice(0, 160).replace(/\n/g, " ");
-    const body = [
-      `/**`,
-      ` * Coppergate OpenHands sandbox fix`,
-      ` * run: ${input.runId}`,
-      ` * goal: ${goalOneLine}`,
-      ` */`,
-      `export function coppergateSignalFix() {`,
-      `  return { runId: ${JSON.stringify(input.runId)}, ok: true };`,
-      `}`,
-      ``,
-    ].join("\n");
-    await writeFile(absPath, body, "utf8");
-
-    yield {
-      kind: "file",
-      message: `wrote ${relPath}`,
-      payload: { path: relPath, harness: this.kind },
-    };
-
-    const costMicros = Math.min(2_500, Math.max(500, input.spendCapMicros || 2_500));
-    yield {
-      kind: "cost",
-      message: "OpenHands sandbox harness estimate",
-      payload: {
-        costMicros,
-        harness: this.kind,
-        provider: "openhands",
-        model: "openhands-sandbox-v1",
-      },
-    };
-
-    const completion = {
-      ...buildFakeCompletion(input, costMicros),
-      filesChanged: [relPath],
-    };
-
-    yield {
-      kind: "completion",
-      message: "OpenHands sandbox harness ready for validation/review",
-      payload: completion as unknown as Record<string, unknown>,
     };
   }
 }
@@ -168,29 +82,19 @@ export class CursorLocalHarness implements ContenderHarness {
   }
 }
 
-/** Cursor Cloud / Codex stub (TASK115) — API wait-state. */
+/** Cursor Cloud / Codex — API wait-state; no FakeCodingAgent fallback. */
 export class CursorCloudHarnessStub implements ContenderHarness {
   readonly kind = "cursor_cloud" as const;
   readonly capability =
-    "Cursor Cloud Background Agents (stub) — awaiting public API; Fake fallback";
-  private readonly fallback = new FakeCodingAgent();
+    "Cursor Cloud Background Agents — awaiting public API; no stub fallback";
 
-  async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
-    if (!harnessStubAllowed()) {
-      yield {
-        kind: "error",
-        message:
-          "Cursor Cloud harness not available. Use BYOK vendor=cursor (cursor_local) or OpenAI-compatible agent.",
-        payload: { code: "harness_stub_disabled", harness: this.kind },
-      };
-      return;
-    }
+  async *run(_input: AgentRunInput): AsyncIterable<AgentEvent> {
     yield {
-      kind: "progress",
-      message: "Cursor Cloud harness stub — using FakeCodingAgent fallback",
-      payload: { harness: this.kind, status: "wait_api" },
+      kind: "error",
+      message:
+        "Cursor Cloud harness not available. Use BYOK vendor=cursor (cursor_local) or OpenAI-compatible agent.",
+      payload: { code: "harness_stub_disabled", harness: this.kind },
     };
-    yield* this.fallback.run(input);
   }
 }
 
@@ -263,21 +167,4 @@ export function harnessAsCodingAgent(harness: ContenderHarness): CodingAgent {
       return harness.run(input);
     },
   } as CodingAgent & { kind: ContenderHarnessKind; capability: string };
-}
-
-function resolveHarnessWritePath(allowedPaths: string[]): string {
-  const first = allowedPaths[0]?.trim();
-  if (!first || first === "**/*" || first.includes("*")) {
-    return "app/page.tsx";
-  }
-  const cleaned = first.replace(/^\.\//, "").replace(/\\/g, "/");
-  if (
-    !cleaned ||
-    cleaned.startsWith("/") ||
-    cleaned.split("/").includes("..") ||
-    /^[a-zA-Z]:/.test(cleaned)
-  ) {
-    return "app/page.tsx";
-  }
-  return cleaned;
 }

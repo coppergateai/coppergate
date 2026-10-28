@@ -99,7 +99,6 @@ export {
   type HarnessCapability,
 } from "./capability-matrix.js";
 export {
-  harnessStubAllowed,
   isStubFileContent,
   isStubOrToyDelivery,
   isToyPrTitle,

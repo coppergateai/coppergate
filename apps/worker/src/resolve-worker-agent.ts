@@ -182,7 +182,6 @@ export async function resolveWorkerAgent(
     log.info("using ContenderHarness", {
       harnessKind: explicit,
       workspaceId,
-      stubAllowed: process.env.ALLOW_HARNESS_STUB === "1",
     });
     return wrap(
       harnessAsCodingAgent(createContenderHarness({ kind: explicit })),
