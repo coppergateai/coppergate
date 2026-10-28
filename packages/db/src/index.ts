@@ -382,9 +382,11 @@ export {
   type ArchitectureOpenTask,
 } from "./architecture-backlog.js";
 export {
+  architectureRepoFromMaintainerPolicyJson,
   assertSpendLicenseForTask,
   licenseTitleForProgram,
   openIdFromTaskTitle,
+  programBoundFromMaintainerPolicyJson,
   SpendLicenseError,
   type SpendLicense,
 } from "./spend-license.js";
@@ -407,6 +409,19 @@ export {
   type OpenIssueRef,
 } from "./community-scout.js";
 export {
+  DEFAULT_DESIGN_SCOUT_ROUTES,
+  formatDesignIssueBody,
+  isDesignScoutDue,
+  proposeDesignIssues,
+  recordDesignScoutEvent,
+  resolveDesignScoutRoutes,
+  shotHasDesignFinding,
+  type DesignIssueCandidate,
+  type DesignScoutRoute,
+  type DesignShot,
+  type DesignShotMetrics,
+} from "./design-scout.js";
+export {
   DEFAULT_MAINTAINER_POLICY,
   DEFAULT_MONTHLY_BUDGET_MICROS,
   DEFAULT_PRODUCT_ALLOWED_PATHS,
@@ -428,8 +443,11 @@ export {
   requeueOrphanQueuedTasks,
   shouldReplanVision,
   MIN_REPLAN_AVAILABLE_MICROS,
+  computeBudgetBurnRatio,
+  countVerifiedMergesFromMaintainerEvents,
   getMaintainerMetrics,
   getWorkspaceMaintainerRollup,
+  summarizeMaintainerRollupTotals,
   listAutoMergeCandidates,
   listMaintainerProjects,
   markAutoMerged,
@@ -458,7 +476,10 @@ export {
   type ArenaControlResult,
   type MaintainerMetrics,
   type MaintainerPolicy,
+  type MaintainerProjectRollup,
+  type MaintainerRollupTotals,
   type MaintainerTickResult,
+  type WorkspaceMaintainerRollup,
 } from "./maintainer.js";
 export {
   sanitizePolicyForMaintainerEnable,
@@ -642,6 +663,15 @@ export {
   IssueImportError,
   importGithubIssueAsTask,
 } from "./issue-import.js";
+export {
+  computeIssueWedgeNextStep,
+  D14_LOCKED_KPI_PATH,
+  describeIssueWedgeHonesty,
+  issueWedgeHonestyForProject,
+  type IssueWedgeHonesty,
+  type IssueWedgeNextStep,
+  type IssueWedgeNextStepInput,
+} from "./issue-wedge-honesty.js";
 export {
   PrImportError,
   importGithubPrAsTask,

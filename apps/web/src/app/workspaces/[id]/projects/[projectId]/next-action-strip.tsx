@@ -6,6 +6,7 @@ export type NextActionStep =
   | "budget"
   | "issue"
   | "arena"
+  | "ci"
   | "review"
   | "done";
 
@@ -20,13 +21,14 @@ type Props = {
 };
 
 const PIPELINE: Array<{
-  id: "budget" | "issue" | "arena" | "review";
+  id: "budget" | "issue" | "arena" | "ci" | "review";
   label: string;
 }> = [
   { id: "budget", label: "Budget" },
-  { id: "issue", label: "Issue" },
+  { id: "issue", label: "Import" },
   { id: "arena", label: "Arena" },
-  { id: "review", label: "Evidence" },
+  { id: "ci", label: "CI" },
+  { id: "review", label: "Accept" },
 ];
 
 function stepIndex(step: NextActionStep): number {
@@ -68,9 +70,15 @@ export function NextActionStrip({
   } else if (step === "arena") {
     title = "Start execution in Arena";
     detail =
-      "Contenders compete under budget. Fitness + CI decide the survivor.";
+      "Contenders compete under budget. Survivor opens a PR — CI is the promotion gate.";
     href = `${base}?tab=arena`;
     cta = "Open Arena";
+  } else if (step === "ci") {
+    title = "Wait for CI to finish";
+    detail =
+      "Accept stays blocked until GitHub checks pass. Delivery promotes to Evidence when gates clear.";
+    href = `${base}?tab=delivery`;
+    cta = "Open Delivery";
   } else if (step === "review") {
     const plainReview = displayTaskTitle(reviewTaskTitle);
     title = plainReview

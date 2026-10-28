@@ -19,7 +19,8 @@
     "@coppergate/gitlab": "workspace:*",
     "@coppergate/sandbox": "workspace:*",
     "@coppergate/scm": "workspace:*",
-    "@coppergate/telemetry": "workspace:*"
+    "@coppergate/telemetry": "workspace:*",
+    "@playwright/test": "^1.55.0"
   },
   "devDependencies": {
     "@coppergate/eslint-config": "workspace:*",

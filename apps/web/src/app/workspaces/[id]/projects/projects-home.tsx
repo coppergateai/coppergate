@@ -7,7 +7,10 @@ import { OnboardingGuide } from "@/components/onboarding-guide";
 import { CreateProjectForm } from "./create-project-form";
 import { RedetectStacksButton } from "./redetect-stacks-button";
 import { UnboundReposPanel } from "./unbound-repos-panel";
-import { dollars, useMaintainerRollup } from "./use-maintainer-rollup";
+import {
+  burnPercent,
+  useMaintainerRollup,
+} from "./use-maintainer-rollup";
 import styles from "./projects.module.css";
 
 export type ProjectListItem = {
@@ -230,13 +233,14 @@ export function ProjectsHome({
                 {showKpis ? (
                   <>
                     <span className={styles.badge}>
-                      {rollup.totals.merges} merges (30d)
+                      {rollup.totals.verifiedMerges} verified merges (30d)
                     </span>
                     <span className={styles.badge}>
-                      {dollars(rollup.totals.spendMicros)} spend (30d)
+                      {burnPercent(rollup.totals.budgetBurnRatio)} envelope burn
                     </span>
                     <span className={styles.badge}>
                       {rollup.totals.humanTouches} human PR touches
+                      {rollup.totals.zeroTouchDelivery ? " · zero-touch" : ""}
                     </span>
                   </>
                 ) : null}
@@ -356,7 +360,8 @@ export function ProjectsHome({
             ) : null}
             {showKpis ? (
               <p className={styles.summaryItem}>
-                <strong>{rollup.totals.merges}</strong> merges · 30d
+                <strong>{rollup.totals.verifiedMerges}</strong> verified merges ·{" "}
+                {burnPercent(rollup.totals.budgetBurnRatio)} burn · 30d
               </p>
             ) : null}
           </section>

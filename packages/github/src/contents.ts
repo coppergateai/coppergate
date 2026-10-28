@@ -92,6 +92,91 @@ export async function updateRepoFile(input: {
 /**
  * Open a revert PR for a merged pull request via GraphQL revertPullRequest.
  */
+
+/**
+ * Create or replace a binary (or any) file via Contents API.
+ * Omits sha when the path does not exist yet.
+ */
+export async function putRepoBinaryFile(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  path: string;
+  content: Uint8Array | string;
+  encoding?: "utf8" | "base64";
+  message: string;
+  branch?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ commitSha: string | null; contentPath: string }> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const encodedPath = input.path
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+  const refQ = input.branch
+    ? `?ref=${encodeURIComponent(input.branch)}`
+    : "";
+  const getRes = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/contents/${encodedPath}${refQ}`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${input.token}`,
+        "User-Agent": "coppergate-maintainer",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  );
+  let sha: string | undefined;
+  if (getRes.ok) {
+    const existing = (await getRes.json()) as { sha?: string };
+    sha = existing.sha;
+  }
+
+  const content =
+    input.encoding === "base64"
+      ? typeof input.content === "string"
+        ? input.content
+        : Buffer.from(input.content).toString("base64")
+      : typeof input.content === "string"
+        ? Buffer.from(input.content, "utf8").toString("base64")
+        : Buffer.from(input.content).toString("base64");
+
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/contents/${encodedPath}`,
+    {
+      method: "PUT",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${input.token}`,
+        "User-Agent": "coppergate-maintainer",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: input.message,
+        content,
+        branch: input.branch,
+        ...(sha ? { sha } : {}),
+      }),
+    },
+  );
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(
+      `putRepoBinaryFile failed (${res.status}): ${errBody.slice(0, 200)}`,
+    );
+  }
+  const body = (await res.json()) as {
+    commit?: { sha?: string };
+    content?: { path?: string };
+  };
+  return {
+    commitSha: body.commit?.sha ?? null,
+    contentPath: body.content?.path ?? input.path,
+  };
+}
+
 export async function createRevertPullRequest(input: {
   token: string;
   owner: string;

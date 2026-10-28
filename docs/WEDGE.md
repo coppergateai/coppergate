@@ -10,7 +10,7 @@
 
 ## Onboarding (product)
 
-Default guide title: **Path to first PR**
+Default guide title: **Path to first PR**. Overview **Next action** and Issues copy follow the locked KPI path (`Import → Arena → CI → Accept`); see [`issue-wedge-honesty.md`](./issue-wedge-honesty.md) (P-146).
 
 1. Set spend cap  
 2. Import a GitHub issue (project → Issues → **Import → queue**)  
