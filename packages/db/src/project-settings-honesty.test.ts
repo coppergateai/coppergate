@@ -5,6 +5,7 @@ import {
   describeL2AutoMerge,
   describeMaintainerSettingsHonesty,
   describeMinHumanHonesty,
+  describeReleaseAssistantHonesty,
   effectiveArenaMinHuman,
 } from "./project-settings-honesty.js";
 
@@ -59,6 +60,24 @@ describe("project settings honesty (P-143)", () => {
     assert.equal(d.effective, true);
     assert.equal(d.stored, null);
     assert.match(d.summary, /default/i);
+  });
+
+  it("describeReleaseAssistantHonesty — opt-in release path (P-144)", () => {
+    const off = describeReleaseAssistantHonesty({
+      maintainerEnabled: true,
+      autoRelease: false,
+    });
+    assert.equal(off.releasePathActive, false);
+    assert.match(off.summary, /auto-release/i);
+    assert.match(off.notProdDeployLine, /production/i);
+    assert.match(off.auditLine, /maintainer\.release/);
+
+    const on = describeReleaseAssistantHonesty({
+      maintainerEnabled: true,
+      autoRelease: true,
+    });
+    assert.equal(on.releasePathActive, true);
+    assert.match(on.summary, /GitHub tag/i);
   });
 
   it("describeMaintainerSettingsHonesty — not prod deploy + fail-closed", () => {
