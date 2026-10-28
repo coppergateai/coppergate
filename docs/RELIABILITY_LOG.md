@@ -95,6 +95,11 @@ Date: 2026-10-24
 - **Evidence attention**: title includes project so duplicate P-00N rows are distinguishable
 - **Issues API**: GitHub 403/404 no longer 500 the project Overview issues panel
 
+## Cycle 16
+- **Elimination ledger**: `contender.debit` / `contender.eliminated` audit meta includes profile + purse; inspector + API list ledger rows (P-141)
+- **Arena UX**: collapsed **Eliminated** roster + per-lane pool caption (`N with budget · M eliminated`) without inflating idle strip
+- **Fan-out honesty**: `tournament.fanout` audit + Activity summaries when N < requested (pool / concurrency / budget)
+
 ## Cycle 15
 - **Soft-cancel reaper**: lease-expired / stuck `RUNNING|VALIDATING` with `cancel_requested_at` → hard `CANCELLED` + estimate release (no requeue / recover / immortal inflight)
 - **Lease renew refuse**: `renewRunLease` fails with `cancelled` when soft-cancel is set so ownership dies at the lease boundary
