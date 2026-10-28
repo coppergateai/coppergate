@@ -27,9 +27,8 @@ export function FinalCta() {
           />
         </div>
         <h2 id="final-title" className={styles.finalTitle}>
-          Ready for autonomy
-          <br />
-          under contract.
+          Ready for autonomy{" "}
+          <span className={styles.finalTitleBreak}>under contract.</span>
         </h2>
         <p className={styles.finalLede}>
           Bind an Open Program, set a spend cap, and let survivors earn Accept

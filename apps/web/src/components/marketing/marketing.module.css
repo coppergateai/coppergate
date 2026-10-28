@@ -287,7 +287,10 @@
 .navCenter {
   display: none;
   justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
   gap: 1.35rem;
+  min-width: 0;
 }
 
 .navCenter a {
@@ -295,6 +298,8 @@
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: color 0.15s ease;
 }
 
@@ -598,6 +603,11 @@
     font-size: 0.75rem;
   }
 
+  /* Docs / Self-host already live in the drawer — free the bar for the message. */
+  .announceRight .announceLink {
+    display: none;
+  }
+
   .ctaRow {
     flex-direction: column;
     align-items: stretch;
@@ -632,7 +642,42 @@
   }
 }
 
-@media (min-width: 960px) {
+/* Full nav chrome needs ~1180px — below that, keep the drawer so links
+   never wrap into a multi-line header (Playwright: 1100px "How it works" → 3 lines). */
+@media (min-width: 960px) and (max-width: 1179px) {
+  .navCenter {
+    display: none;
+  }
+
+  .githubLink,
+  .githubChip,
+  .navGhost {
+    display: none;
+  }
+
+  .menuBtn {
+    display: inline-flex;
+  }
+
+  .headerInner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .navActions {
+    margin-left: auto;
+  }
+
+  /* Keep primary CTA + theme; hide chip/ghost already above. */
+  .navActions > .btnPrimary,
+  .navActions > .themeToggle {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 1180px) {
   .navCenter {
     display: flex;
   }
@@ -696,12 +741,12 @@
 }
 
 .heroBrand {
-  margin: 0 0 0.9rem;
+  margin: 0 0 0.75rem;
   font-family: var(--font-display);
   font-size: clamp(1.85rem, 3.4vw, 2.45rem);
   font-weight: 700;
   letter-spacing: -0.05em;
-  line-height: 1;
+  line-height: 1.05;
   color: var(--paper);
 }
 
@@ -831,11 +876,13 @@
   font-size: clamp(2.05rem, 3.8vw, 3.05rem);
   font-weight: 700;
   letter-spacing: -0.04em;
-  line-height: 1.06;
+  line-height: 1.18;
   color: var(--paper);
 }
 
 .headlineAccent {
+  display: inline-block;
+  margin-top: 0.12em;
   color: var(--copper-hot);
 }
 
@@ -2196,6 +2243,10 @@
   letter-spacing: -0.03em;
   line-height: 1.1;
   max-width: 14ch;
+}
+
+.finalTitleBreak {
+  display: block;
 }
 
 .finalLede {
