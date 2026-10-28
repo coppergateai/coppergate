@@ -12,6 +12,8 @@ import {
   parseMaintainerPolicy,
   reconcileStaleEstimateReserves,
   recordAuditEvent,
+  recordMaintainerReleaseOutcome,
+  shouldRunMaintainerRelease,
   tickMaintainerProject,
   type Database,
   type GithubInstallation,
@@ -19,8 +21,8 @@ import {
 import {
   commitCheckSuitesFailed,
   countOpenShipRollbackPrs,
+  buildMaintainerReleaseRequest,
   createGithubRelease,
-  formatReleaseNotes,
   getRepoDefaultBranchHead,
   mergePullRequest,
 } from "@coppergate/github";
@@ -280,36 +282,40 @@ export async function runMaintainerSchedulerTick(
       }
     }
 
-    if (policy.autoRelease && mergedTitles.length > 0) {
+    if (
+      shouldRunMaintainerRelease({
+        autoRelease: policy.autoRelease,
+        mergedTitles,
+      })
+    ) {
       try {
         const tag = buildMaintainerReleaseTag(
           policy.releaseTagStyle,
           new Date(),
           mergedTitles.length,
         );
+        const req = buildMaintainerReleaseRequest({
+          tagName: tag,
+          highlights: mergedTitles,
+        });
         const release = await createGithubRelease({
           token,
           owner,
           repo: name,
-          tagName: tag,
-          name: `Maintainer ${tag}`,
-          body: formatReleaseNotes({
-            version: tag,
-            highlights: mergedTitles.slice(0, 20),
-          }),
+          tagName: req.tagName,
+          name: req.name,
+          body: req.body,
         });
         releases += 1;
-        await recordAuditEvent(db, {
+        await recordMaintainerReleaseOutcome(db, {
           workspaceId: tick.workspaceId,
+          projectId: tick.projectId,
           actor,
-          action: "maintainer.release",
-          targetType: "project",
-          targetId: tick.projectId,
-          meta: {
-            tagName: release.tagName,
-            htmlUrl: release.htmlUrl,
-            releaseTagStyle: policy.releaseTagStyle,
-          },
+          tagName: release.tagName,
+          htmlUrl: release.htmlUrl,
+          releaseTagStyle: policy.releaseTagStyle,
+          mergeCount: mergedTitles.length,
+          highlights: mergedTitles,
         });
       } catch (err) {
         log.warn("maintainer release skipped", {

@@ -215,7 +215,8 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   monthlyBudgetMicros: DEFAULT_MONTHLY_BUDGET_MICROS,
   softAlertRatio: 0.8,
   autoMerge: true,
-  autoRelease: true,
+  /** P-144: GitHub tag + Release only when explicitly enabled — not prod deploy. */
+  autoRelease: false,
   selfImprove: true,
   communityReplies: true,
   communityScout: true,
@@ -311,6 +312,14 @@ export function parseMaintainerPolicy(
         v.softAlertRatio <= 1
           ? v.softAlertRatio
           : DEFAULT_MAINTAINER_POLICY.softAlertRatio,
+      autoMerge:
+        typeof v.autoMerge === "boolean"
+          ? v.autoMerge
+          : DEFAULT_MAINTAINER_POLICY.autoMerge,
+      autoRelease:
+        typeof v.autoRelease === "boolean"
+          ? v.autoRelease
+          : DEFAULT_MAINTAINER_POLICY.autoRelease,
       allowedSignalProviders: Array.isArray(v.allowedSignalProviders)
         ? v.allowedSignalProviders.filter((x) => typeof x === "string")
         : DEFAULT_MAINTAINER_POLICY.allowedSignalProviders,
@@ -481,6 +490,14 @@ export function taskMatchesPathAllowlist(
   );
 }
 
+/** True when maintainer tick should open a GitHub Release after merges this cycle. */
+export function shouldRunMaintainerRelease(input: {
+  autoRelease: boolean;
+  mergedTitles: string[];
+}): boolean {
+  return input.autoRelease && input.mergedTitles.length > 0;
+}
+
 export function buildMaintainerReleaseTag(
   style: MaintainerPolicy["releaseTagStyle"],
   when = new Date(),
@@ -522,6 +539,44 @@ async function recordMaintainerEvent(
     .returning();
   if (!row) throw new Error("Failed to record maintainer event");
   return row;
+}
+
+/** P-144 — audit + maintainer event after a GitHub Release is created (or idempotent hit). */
+export async function recordMaintainerReleaseOutcome(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    actor: string;
+    tagName: string;
+    htmlUrl: string;
+    releaseTagStyle: MaintainerPolicy["releaseTagStyle"];
+    mergeCount: number;
+    highlights: string[];
+  },
+): Promise<void> {
+  const meta = {
+    tagName: input.tagName,
+    htmlUrl: input.htmlUrl,
+    releaseTagStyle: input.releaseTagStyle,
+    mergeCount: input.mergeCount,
+    highlights: input.highlights.slice(0, 20),
+    prodDeploy: false,
+  };
+  await recordAuditEvent(db, {
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "maintainer.release",
+    targetType: "project",
+    targetId: input.projectId,
+    meta,
+  });
+  await recordMaintainerEvent(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    kind: "release",
+    payload: meta,
+  });
 }
 
 /**
@@ -655,7 +710,11 @@ export async function enableMaintainerMode(
     action: "maintainer.enable",
     targetType: "project",
     targetId: input.projectId,
-    meta: { policy },
+    meta: {
+      policy,
+      prodWritesEnabled: arena.prodWritesEnabled === true,
+      autoRelease: policy.autoRelease,
+    },
   });
   await recordMaintainerEvent(db, {
     workspaceId: input.workspaceId,

@@ -10,6 +10,7 @@ import {
   buildMaintainerReleaseTag,
   computeBudgetBurnRatio,
   countVerifiedMergesFromMaintainerEvents,
+  shouldRunMaintainerRelease,
   isMergeProtectionBlock,
   isTerminalMergeSkip,
   isTransientNotMergeable,
@@ -78,6 +79,8 @@ describe("maintainer policy", () => {
     assert.equal(DEFAULT_MONTHLY_BUDGET_MICROS, 8_000_000);
     assert.equal(p.maxTournamentN, 2);
     assert.equal(p.autoMerge, true);
+    assert.equal(p.autoRelease, false);
+    assert.equal(DEFAULT_MAINTAINER_POLICY.autoRelease, false);
     assert.equal(p.autoQueueReplanTasks, true);
     assert.equal(p.maxAutoQueuePerReplan, 2);
     assert.equal(p.continuousBacklog, true);
@@ -314,6 +317,24 @@ describe("path allowlist + release tags", () => {
     assert.equal(
       taskMatchesPathAllowlist('["docs/**"]', ["cmd/", "internal/"]),
       false,
+    );
+  });
+
+  it("shouldRunMaintainerRelease requires policy opt-in and merges", () => {
+    assert.equal(
+      shouldRunMaintainerRelease({ autoRelease: false, mergedTitles: ["a"] }),
+      false,
+    );
+    assert.equal(
+      shouldRunMaintainerRelease({ autoRelease: true, mergedTitles: [] }),
+      false,
+    );
+    assert.equal(
+      shouldRunMaintainerRelease({
+        autoRelease: true,
+        mergedTitles: ["P-144: ship"],
+      }),
+      true,
     );
   });
 

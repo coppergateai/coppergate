@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   describeL2AutoMerge,
   describeMaintainerSettingsHonesty,
+  describeReleaseAssistantHonesty,
 } from "@/lib/project-settings-honesty";
 import styles from "./project-detail.module.css";
 
@@ -118,6 +119,15 @@ export function MaintainerPanel({
     [enabled],
   );
 
+  const releaseHonesty = useMemo(
+    () =>
+      describeReleaseAssistantHonesty({
+        maintainerEnabled: enabled,
+        autoRelease: policy?.autoRelease,
+      }),
+    [enabled, policy?.autoRelease],
+  );
+
   const mergeHonesty = useMemo(
     () =>
       describeL2AutoMerge({
@@ -190,6 +200,19 @@ export function MaintainerPanel({
           <li key={line}>{line}</li>
         ))}
       </ul>
+      {enabled ? (
+        <p className={styles.hint} role="status">
+          Release assistant (GitHub tag + Release):{" "}
+          {releaseHonesty.releasePathActive ? "active" : "inactive"} —{" "}
+          {releaseHonesty.summary}
+        </p>
+      ) : null}
+      {enabled ? (
+        <p className={styles.hint}>{releaseHonesty.notProdDeployLine}</p>
+      ) : null}
+      {enabled && releaseHonesty.releasePathActive ? (
+        <p className={styles.hint}>{releaseHonesty.auditLine}</p>
+      ) : null}
       {enabled ? (
         <p className={styles.hint} role="status">
           L2 auto-merge (maintainer tick):{" "}
@@ -272,7 +295,7 @@ export function MaintainerPanel({
             </div>
             <div>
               <dt>Auto-release</dt>
-              <dd>{yn(policy.autoRelease)}</dd>
+              <dd>{yn(policy.autoRelease, false)}</dd>
             </div>
             <div>
               <dt>Auto-queue replan</dt>

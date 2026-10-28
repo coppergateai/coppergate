@@ -416,6 +416,8 @@ export {
   LEAN_ROSTER_AVAILABLE_MICROS,
   MaintainerError,
   buildMaintainerReleaseTag,
+  recordMaintainerReleaseOutcome,
+  shouldRunMaintainerRelease,
   disableMaintainerMode,
   enableMaintainerMode,
   ensureAutonomousVisionAndBacklog,
@@ -654,11 +656,13 @@ export {
   describeL2AutoMerge,
   describeMaintainerSettingsHonesty,
   describeMinHumanHonesty,
+  describeReleaseAssistantHonesty,
   effectiveArenaMinHuman,
   type L2AutoMergeHonesty,
   type L2AutoMergeInputs,
   type MaintainerSettingsHonesty,
   type MinHumanHonesty,
+  type ReleaseAssistantHonesty,
 } from "./project-settings-honesty.js";
 export {
   SignalError,

@@ -33,6 +33,10 @@ Fail-closed guards unchanged:
 
 UI copy is driven by `describeMaintainerSettingsHonesty`.
 
+## L3 Release Assistant (P-144)
+
+**Auto-release** on maintainer policy is **off by default**. When on, maintainer ticks create a GitHub tag + Release after merges — still not prod deploy. Copy: `describeReleaseAssistantHonesty`. See `docs/l3-release-assistant.md`.
+
 ## Tests
 
 - `packages/db/src/project-settings-honesty.test.ts` — effective flags and summaries
