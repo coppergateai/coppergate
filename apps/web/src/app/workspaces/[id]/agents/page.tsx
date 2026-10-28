@@ -6,13 +6,16 @@ import {
   listAgentProfiles,
   listAgentSkills,
   listWorkspaceArenaSnapshot,
+  listWorkspaceToolDefs,
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { TOOL_CATALOG } from "../tools/tool-catalog";
 import {
   AgentsShell,
   type AgentProfileView,
   type AgentSkillView,
+  type ToolOption,
 } from "./agents-shell";
 
 type PageProps = {
@@ -70,6 +73,7 @@ function serializeProfile(p: {
     locked: p.locked,
     preferredModel: p.preferredModel,
     llmCredentialId: p.llmCredentialId,
+    workspaceId: p.workspaceId,
   };
 }
 
@@ -88,9 +92,10 @@ export default async function WorkspaceAgentsPage({
   const initialKey =
     typeof query.agent === "string" ? query.agent : null;
 
-  const [profileRows, skillRows, stats, arena] = await Promise.all([
+  const [profileRows, skillRows, toolDefs, stats, arena] = await Promise.all([
     listAgentProfiles(db, access.workspace.id),
     listAgentSkills(db, access.workspace.id),
+    listWorkspaceToolDefs(db, access.workspace.id),
     getWorkspaceAgentProfileStats(db, {
       workspaceId: access.workspace.id,
       days: 30,
@@ -128,6 +133,24 @@ export default async function WorkspaceAgentsPage({
     a.key.localeCompare(b.key),
   );
 
+  const toolOptions: ToolOption[] = [
+    ...TOOL_CATALOG.filter(
+      (t) =>
+        t.kind === "core" ||
+        t.kind === "mcp" ||
+        t.key.startsWith("mcp:") ||
+        t.key.startsWith("sonar_"),
+    ).map((t) => ({ key: t.key, title: t.title })),
+    ...toolDefs.map((t) => ({ key: t.key, title: t.title })),
+  ];
+  // Dedupe by key
+  const toolSeen = new Set<string>();
+  const uniqueTools = toolOptions.filter((t) => {
+    if (toolSeen.has(t.key)) return false;
+    toolSeen.add(t.key);
+    return true;
+  });
+
   const liveSeats = arena.projects.flatMap((lane) =>
     lane.contenders
       .filter((c) => c.status === "ACTIVE")
@@ -146,6 +169,7 @@ export default async function WorkspaceAgentsPage({
       isOwner={access.role === "owner"}
       profiles={profiles}
       skills={skills}
+      toolOptions={uniqueTools}
       stats={stats}
       liveSeats={liveSeats}
       initialKey={initialKey}

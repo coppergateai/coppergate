@@ -36,11 +36,39 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
       "Branch, commit, and prepare SCM diffs for delivery. Does not bypass path policy.",
   },
   {
+    key: "mcp:*",
+    title: "MCP · all",
+    kind: "mcp",
+    description:
+      "Allow every connected MCP provider’s tools for this profile. Prefer narrower mcp:… or sonar_* grants when possible.",
+  },
+  {
     key: "mcp:sonarqube",
     title: "MCP · SonarQube",
     kind: "mcp",
     description:
-      "Optional MCP connector for Sonar / SAST findings. Used by fixer and security profiles when connected.",
+      "All tools from a connected SonarQube MCP connector (issues, quality gate, hotspots).",
+  },
+  {
+    key: "sonar_list_issues",
+    title: "Sonar · list issues",
+    kind: "mcp",
+    description:
+      "List open SonarQube issues for the bound project. Requires an enabled SonarQube MCP connection.",
+  },
+  {
+    key: "sonar_quality_gate",
+    title: "Sonar · quality gate",
+    kind: "mcp",
+    description:
+      "Read the SonarQube quality-gate status used for fitness / ship evidence.",
+  },
+  {
+    key: "sonar_hotspots",
+    title: "Sonar · hotspots",
+    kind: "mcp",
+    description:
+      "Fetch SonarQube security hotspots for review by fixer / security profiles.",
   },
   {
     key: "write",
@@ -68,6 +96,16 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = [
 export function toolMeta(key: string): ToolCatalogEntry {
   const known = TOOL_CATALOG.find((t) => t.key === key);
   if (known) return known;
+  if (key.startsWith("sonar_")) {
+    const label = key.slice("sonar_".length).replaceAll("_", " ");
+    return {
+      key,
+      title: `Sonar · ${label}`,
+      kind: "mcp",
+      description:
+        "SonarQube MCP tool token from a profile allowlist or connector.",
+    };
+  }
   const mcp = key.startsWith("mcp:");
   return {
     key,
