@@ -14,9 +14,19 @@ type Props = {
   workspaceId: string;
   projectId: string;
   isOwner: boolean;
+  wedgeLede: string;
+  wedgeEmptyHint: string;
+  programBoundNote?: string | null;
 };
 
-export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
+export function IssuesPanel({
+  workspaceId,
+  projectId,
+  isOwner,
+  wedgeLede,
+  wedgeEmptyHint,
+  programBoundNote,
+}: Props) {
   const router = useRouter();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [repo, setRepo] = useState<string | null>(null);
@@ -100,20 +110,21 @@ export function IssuesPanel({ workspaceId, projectId, isOwner }: Props) {
         Path to first PR · GitHub issues
       </h2>
       <p className={styles.sectionLede}>
-        Primary path: Import → queue a small issue, then review cost, diff, and
-        CI before Accept. Arena Start can invent work later under the same
-        spend envelope.
+        {wedgeLede}
         {repo ? ` · ${repo}` : null}
       </p>
+      {programBoundNote ? (
+        <p className={styles.muted}>{programBoundNote}</p>
+      ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}
       {warning && !error ? <p className={styles.muted}>{warning}</p> : null}
       <ul className={styles.arenaList}>
         {issues.length === 0 ? (
           <li className={styles.muted}>
             {error || warning
-              ? "Issues could not be listed from GitHub right now. Retry later, or use Arena Start under budget."
+              ? "Issues could not be listed from GitHub right now. Retry later."
               : repo
-                ? `No open issues on ${repo}. Open a small scoped issue on GitHub, or use Arena Start under budget.`
+                ? wedgeEmptyHint.replace("this repo", repo)
                 : "Connect GitHub under Workspace settings → Connections to list issues."}
           </li>
         ) : (
