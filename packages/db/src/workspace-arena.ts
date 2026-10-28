@@ -5,6 +5,7 @@ import {
   killArena,
   listContendersForArena,
 } from "./arena.js";
+import { summarizeArenaContenderPool } from "./contender-elimination.js";
 import { startProjectArena, stopProjectArena } from "./maintainer.js";
 import { listAgentProfiles } from "./profiles.js";
 import { listProjectsForWorkspace } from "./projects.js";
@@ -47,7 +48,23 @@ export type WorkspaceArenaContenderView = {
   status: string;
   temperament: string | null;
   budgetMicrosRemaining: number;
+  eliminatedAt: string | null;
   latestRun: WorkspaceArenaContenderRun | null;
+};
+
+export type WorkspaceArenaEliminatedContenderView = {
+  id: string;
+  profileKey: string;
+  strategy: string;
+  temperament: string | null;
+  eliminatedAt: string | null;
+};
+
+export type WorkspaceArenaPoolSummary = {
+  activeWithBudget: number;
+  eliminated: number;
+  activeBroke: number;
+  total: number;
 };
 
 export type WorkspaceArenaLastRun = {
@@ -77,6 +94,9 @@ export type WorkspaceArenaProjectLane = {
   arenaId: string | null;
   arenaStatus: string | null;
   contenders: WorkspaceArenaContenderView[];
+  /** Budget-exhausted contenders — visible but excluded from live roster counts. */
+  eliminated: WorkspaceArenaEliminatedContenderView[];
+  pool: WorkspaceArenaPoolSummary;
   lastRun: WorkspaceArenaLastRun | null;
 };
 
@@ -267,20 +287,41 @@ function contenderViews(
   pool: Contender[],
   temperamentByKey: Map<string, string>,
   runsByContender: Map<string, WorkspaceArenaContenderRun>,
-): WorkspaceArenaContenderView[] {
-  // Spectacle / Mission Control only need the live roster — eliminated history
-  // was inflating "1313 idle" after repeated spawn/eliminate cycles.
-  return pool
-    .filter((c) => c.status !== "ELIMINATED")
-    .map((c) => ({
+): {
+  active: WorkspaceArenaContenderView[];
+  eliminated: WorkspaceArenaEliminatedContenderView[];
+} {
+  const active: WorkspaceArenaContenderView[] = [];
+  const eliminated: WorkspaceArenaEliminatedContenderView[] = [];
+  for (const c of pool) {
+    const temperament = temperamentByKey.get(c.profileKey) ?? null;
+    if (c.status === "ELIMINATED") {
+      eliminated.push({
+        id: c.id,
+        profileKey: c.profileKey,
+        strategy: c.strategy,
+        temperament,
+        eliminatedAt: c.eliminatedAt?.toISOString() ?? null,
+      });
+      continue;
+    }
+    active.push({
       id: c.id,
       profileKey: c.profileKey,
       strategy: c.strategy,
       status: c.status,
-      temperament: temperamentByKey.get(c.profileKey) ?? null,
+      temperament,
       budgetMicrosRemaining: c.budgetMicrosRemaining,
+      eliminatedAt: c.eliminatedAt?.toISOString() ?? null,
       latestRun: runsByContender.get(c.id) ?? null,
-    }));
+    });
+  }
+  eliminated.sort((a, b) => {
+    const ta = a.eliminatedAt ? Date.parse(a.eliminatedAt) : 0;
+    const tb = b.eliminatedAt ? Date.parse(b.eliminatedAt) : 0;
+    return tb - ta;
+  });
+  return { active, eliminated };
 }
 
 async function lastRunForProject(
@@ -402,6 +443,7 @@ export async function listWorkspaceArenaSnapshot(
       pool.map((c) => c.id),
     );
     const lastRun = await lastRunForProject(db, workspaceId, project.id);
+    const roster = contenderViews(pool, temperamentByKey, runsByContender);
     projects.push({
       projectId: project.id,
       projectName: project.name,
@@ -410,7 +452,9 @@ export async function listWorkspaceArenaSnapshot(
         `${repository.owner}/${repository.name}`,
       arenaId: arena?.id ?? null,
       arenaStatus: arena?.status ?? null,
-      contenders: contenderViews(pool, temperamentByKey, runsByContender),
+      contenders: roster.active,
+      eliminated: roster.eliminated,
+      pool: summarizeArenaContenderPool(pool),
       lastRun,
     });
   }
