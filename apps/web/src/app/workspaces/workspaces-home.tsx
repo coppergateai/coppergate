@@ -95,14 +95,69 @@ export function WorkspacesHome({ workspaces, inviteRequired }: Props) {
   return (
     <div className={styles.surface}>
       <header className={styles.hero}>
-        <div className={styles.heroText}>
-          <p className={styles.eyebrow}>Workspaces</p>
-          <h1 className={styles.heroTitle}>Your workspaces</h1>
-          <p className={styles.heroLede}>
-            Organize your codebases, agents and runs in one place.
-          </p>
+        <p className={styles.eyebrow}>Account</p>
+        <div className={styles.heroTop}>
+          <div className={styles.heroText}>
+            <h1 className={styles.heroTitle}>Workspaces</h1>
+            <p className={styles.heroLede}>
+              Pick a workspace to open Arena, projects, and spend — or create a
+              new one.
+            </p>
+          </div>
+          <div className={styles.heroActions}>
+            <nav className={styles.headLinks} aria-label="Related">
+              <Link href="/docs" className={styles.headLink}>
+                Docs
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link href="/profile" className={styles.headLink}>
+                Profile
+              </Link>
+            </nav>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              onClick={() => setCreateOpen(true)}
+            >
+              New workspace
+            </button>
+          </div>
         </div>
-        <div className={styles.heroActions}>
+        {!empty ? (
+          <div className={styles.summaryStrip} aria-label="Workspace summary">
+            <span className={styles.summaryItem}>
+              <strong>{counts.all}</strong> active
+            </span>
+            <span className={styles.summaryDot} aria-hidden>
+              ·
+            </span>
+            <span className={styles.summaryItem}>
+              <strong>{counts.owned}</strong> owned
+            </span>
+            <span className={styles.summaryDot} aria-hidden>
+              ·
+            </span>
+            <span className={styles.summaryItem}>
+              <strong>{counts.shared}</strong> shared
+            </span>
+            {counts.archived > 0 ? (
+              <>
+                <span className={styles.summaryDot} aria-hidden>
+                  ·
+                </span>
+                <span className={styles.summaryItem}>
+                  <strong>{counts.archived}</strong> archived
+                </span>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+      </header>
+
+      {!empty ? (
+        <div className={styles.toolbar}>
           <label className={styles.search}>
             <SearchIcon />
             <input
@@ -113,18 +168,6 @@ export function WorkspacesHome({ workspaces, inviteRequired }: Props) {
               aria-label="Search workspaces"
             />
           </label>
-          <button
-            type="button"
-            className={styles.primaryBtn}
-            onClick={() => setCreateOpen(true)}
-          >
-            <span aria-hidden>+</span> New workspace
-          </button>
-        </div>
-      </header>
-
-      {!empty ? (
-        <div className={styles.toolbar}>
           <div className={styles.tabs} role="tablist" aria-label="Filter workspaces">
             {(
               [
@@ -147,13 +190,6 @@ export function WorkspacesHome({ workspaces, inviteRequired }: Props) {
             ))}
           </div>
           <div className={styles.toolbarRight}>
-            <button
-              type="button"
-              className={styles.textLink}
-              onClick={() => setCreateOpen(true)}
-            >
-              Create another
-            </button>
             <span className={styles.sortLabel}>Last updated</span>
             <div className={styles.viewToggle} role="group" aria-label="View mode">
               <button
