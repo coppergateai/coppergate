@@ -1,97 +1,143 @@
 .main {
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
   min-height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-.pageBar {
+.head {
+  padding: var(--app-pad-y-lg) var(--app-pad-x-lg) 0;
+  flex-shrink: 0;
+}
+
+.eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mute-soft);
+}
+
+.titleRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.65rem 1rem;
-  padding: 0.7rem var(--app-pad-x);
-  border-bottom: 1px solid var(--line);
-  background: var(--page-bar-bg);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
-  z-index: 5;
-}
-
-.pageBarLeft {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem 0.85rem;
-  min-width: 0;
-}
-
-.pageBarRight {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.kbdHint {
-  color: var(--mute-soft);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  gap: 0.75rem 1.25rem;
 }
 
 .title {
   margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 2.8vw, 1.9rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
   color: var(--paper);
+  line-height: 1.15;
 }
 
-.chips {
+.headActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.chip {
-  padding: 0.12rem 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--mute);
-  font-size: 0.68rem;
-  font-weight: 550;
-}
-
-.toolbarGhost {
-  display: inline-flex;
   align-items: center;
-  min-height: 1.9rem;
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--mute);
-  font-size: 0.78rem;
-  font-weight: 500;
-  text-decoration: none;
+  gap: 0.55rem 0.85rem;
 }
 
-.toolbarGhost:hover {
+.headLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.headLink {
+  font-size: 0.82rem;
+  font-weight: 550;
+  color: var(--mute);
+  text-decoration: none;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-sm, 8px);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.headLink:hover {
+  color: var(--copper);
+  background: var(--copper-fill-soft);
+}
+
+.headSep {
+  color: var(--line);
+  font-size: 0.75rem;
+  user-select: none;
+}
+
+.kbdHint {
+  color: var(--mute-soft);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.lede {
+  margin: 0.45rem 0 0;
+  max-width: 36rem;
+  font-size: 0.92rem;
+  color: var(--mute);
+  line-height: 1.45;
+}
+
+.summaryStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0;
+  margin: 0.85rem 0 0;
+  padding: 0 0 0.95rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--mute-soft);
+  font-size: 0.8rem;
+}
+
+.summaryStrip strong {
   color: var(--paper);
-  border-color: var(--copper-border);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display);
+}
+
+.summaryItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.summaryDot {
+  margin: 0 0.55rem;
+  color: var(--line);
+  user-select: none;
+}
+
+@media (max-width: 560px) {
+  .headActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .headLinks {
+    display: none;
+  }
 }
 
 .tabs {
   display: flex;
   flex-wrap: nowrap;
   gap: 0.15rem;
-  padding: 0.45rem var(--app-pad-x) 0;
+  padding: 0.45rem var(--app-pad-x-lg) 0;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
   scrollbar-width: thin;
@@ -141,13 +187,13 @@
 .listPane {
   border-right: 1px solid var(--line);
   min-height: 22rem;
-  max-height: calc(100vh - 7.5rem);
+  max-height: calc(100vh - 14rem);
   overflow: auto;
 }
 
 .detailPane {
   min-height: 22rem;
-  max-height: calc(100vh - 7.5rem);
+  max-height: calc(100vh - 14rem);
   overflow: auto;
 }
 

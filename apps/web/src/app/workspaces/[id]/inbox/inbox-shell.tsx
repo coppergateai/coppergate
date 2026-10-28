@@ -83,6 +83,38 @@ function shortId(id: string): string {
   return id.length > 10 ? `${id.slice(0, 8)}…` : id;
 }
 
+/** Prefer human labels over truncated machine actor ids (script:d…). */
+function actorLabel(id: string | null | undefined): string {
+  if (!id) return "—";
+  const raw = id.trim();
+  if (!raw) return "—";
+  if (raw === "system" || raw.startsWith("system:")) return "system";
+  if (raw.startsWith("script:")) return "script";
+  if (raw.startsWith("user:")) return shortId(raw.slice(5));
+  if (raw.startsWith("agent:")) return shortId(raw.slice(6));
+  return shortId(raw);
+}
+
+function displayTitle(a: SerializedApproval): string {
+  return (
+    a.title?.trim() ||
+    a.riskSummary?.trim() ||
+    `${typeLabel(a.targetType)} ${shortId(a.targetId)}`
+  );
+}
+
+function usefulRiskSummary(a: SerializedApproval): string | null {
+  const risk = a.riskSummary?.trim();
+  if (!risk) return null;
+  const title = a.title?.trim();
+  if (!title) return risk;
+  if (risk === title) return null;
+  // "Brief r1: {title}" style echoes — skip when the title already carries it.
+  const stripped = risk.replace(/^(brief|task|review|merge)\s+r?\d*\s*:\s*/i, "");
+  if (stripped === title || risk.endsWith(title)) return null;
+  return risk;
+}
+
 export function InboxShell({
   workspaceId,
   workspaceName,
@@ -340,28 +372,78 @@ export function InboxShell({
 
   return (
     <main className={styles.main}>
-      <header className={styles.pageBar}>
-        <div className={styles.pageBarLeft}>
+      <header className={styles.head}>
+        <p className={styles.eyebrow}>Workspace / {workspaceName}</p>
+        <div className={styles.titleRow}>
           <h1 className={styles.title}>Inbox</h1>
-          <div className={styles.chips}>
-            <span className={styles.chip}>{workspaceName}</span>
-            <span className={styles.chip}>
-              {counts.pending} pending
+          <div className={styles.headActions}>
+            <span className={styles.kbdHint}>
+              {canManage ? "j/k · a approve · r reject · ↵" : "j/k · ↵ open"}
             </span>
+            <nav className={styles.headLinks} aria-label="Related">
+              <Link
+                href={`/workspaces/${workspaceId}/arena`}
+                className={styles.headLink}
+              >
+                Arena
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/activity`}
+                className={styles.headLink}
+              >
+                Activity
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/projects`}
+                className={styles.headLink}
+              >
+                Projects
+              </Link>
+            </nav>
           </div>
         </div>
-        <div className={styles.pageBarRight}>
-          {canManage ? (
-            <span className={styles.kbdHint}>j/k · a approve · r reject · ↵</span>
-          ) : (
-            <span className={styles.kbdHint}>j/k · ↵ open</span>
-          )}
-          <Link
-            href={`/workspaces/${workspaceId}/projects`}
-            className={styles.toolbarGhost}
-          >
-            Projects
-          </Link>
+        <p className={styles.lede}>
+          Human gates for briefs and tasks. Pending needs a decision; Recent
+          keeps the last two weeks of settled calls.
+        </p>
+        <div className={styles.summaryStrip} aria-label="Inbox summary">
+          <span className={styles.summaryItem}>
+            <strong>{counts.pending}</strong> pending
+          </span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{counts.brief}</strong> briefs
+          </span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{counts.task}</strong> tasks
+          </span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{counts.recent}</strong> recent
+          </span>
+          {evidenceCount > 0 ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>{evidenceCount}</strong> on Evidence
+              </span>
+            </>
+          ) : null}
         </div>
       </header>
 
@@ -428,10 +510,8 @@ export function InboxShell({
             <ul className={styles.list}>
               {rows.map((a) => {
                 const active = selected?.id === a.id;
-                const title =
-                  a.title?.trim() ||
-                  a.riskSummary?.trim() ||
-                  `${typeLabel(a.targetType)} ${shortId(a.targetId)}`;
+                const title = displayTitle(a);
+                const risk = usefulRiskSummary(a);
                 return (
                   <li key={a.id}>
                     <button
@@ -457,6 +537,9 @@ export function InboxShell({
                         <span className={styles.rowTop}>
                           <span className={styles.rowType}>
                             {typeLabel(a.targetType)}
+                            {a.status !== "pending"
+                              ? ` · ${statusLabel(a.status)}`
+                              : ""}
                           </span>
                           <span className={styles.rowTime}>
                             {formatRelative(
@@ -469,9 +552,7 @@ export function InboxShell({
                         <span className={styles.rowTitle}>{title}</span>
                         <span className={styles.rowMeta}>
                           {a.projectName ?? "Project"}
-                          {a.riskSummary && a.title !== a.riskSummary
-                            ? ` · ${a.riskSummary}`
-                            : null}
+                          {risk ? ` · ${risk}` : null}
                         </span>
                       </span>
                     </button>
@@ -507,11 +588,7 @@ export function InboxShell({
                   {typeLabel(selected.targetType)}
                 </span>
               </div>
-              <h2 className={styles.detailTitle}>
-                {selected.title?.trim() ||
-                  selected.riskSummary?.trim() ||
-                  `${typeLabel(selected.targetType)} ${shortId(selected.targetId)}`}
-              </h2>
+              <h2 className={styles.detailTitle}>{displayTitle(selected)}</h2>
               <dl className={styles.detailMeta}>
                 <div>
                   <dt>Project</dt>
@@ -528,7 +605,7 @@ export function InboxShell({
                   <dt>Requested</dt>
                   <dd>
                     {formatRelative(selected.createdAt)} ·{" "}
-                    {shortId(selected.requestedBy)}
+                    {actorLabel(selected.requestedBy)}
                   </dd>
                 </div>
                 {selected.decidedAt ? (
@@ -537,21 +614,23 @@ export function InboxShell({
                     <dd>
                       {formatRelative(selected.decidedAt)}
                       {selected.decidedBy
-                        ? ` · ${shortId(selected.decidedBy)}`
+                        ? ` · ${actorLabel(selected.decidedBy)}`
                         : null}
                     </dd>
                   </div>
                 ) : null}
               </dl>
 
-              {selected.riskSummary ? (
-                <div className={styles.detailBlock}>
-                  <p className={styles.detailBlockLabel}>Risk summary</p>
-                  <p className={styles.detailBlockBody}>
-                    {selected.riskSummary}
-                  </p>
-                </div>
-              ) : null}
+              {(() => {
+                const risk = usefulRiskSummary(selected);
+                if (!risk) return null;
+                return (
+                  <div className={styles.detailBlock}>
+                    <p className={styles.detailBlockLabel}>Risk summary</p>
+                    <p className={styles.detailBlockBody}>{risk}</p>
+                  </div>
+                );
+              })()}
 
               {selected.decisionNote ? (
                 <div className={styles.detailBlock}>
