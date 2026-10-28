@@ -1,4 +1,5 @@
 import {
+  effectiveArenaMinHuman,
   ensureArenaForProject,
   getArenaForProject,
   getProjectForWorkspace,
@@ -95,7 +96,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         workspaceId: body.workspaceId,
         projectId,
       });
-      minHuman = arena?.minHuman ?? null;
+      minHuman = arena ? arena.minHuman : null;
     }
 
     return jsonOk(
@@ -104,8 +105,10 @@ export async function PATCH(request: Request, context: RouteContext) {
           id: project.id,
           autonomyLevel: project.autonomyLevel,
           mergeEnabled: project.mergeEnabled,
+          maintainerEnabled: project.maintainerEnabled,
         },
         minHuman,
+        effectiveMinHuman: effectiveArenaMinHuman(minHuman),
       },
       { correlationId },
     );
