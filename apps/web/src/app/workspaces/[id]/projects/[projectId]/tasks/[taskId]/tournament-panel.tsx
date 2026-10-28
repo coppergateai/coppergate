@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { TournamentFlowGraph } from "../../../../arena/tournament-flow-graph";
 import styles from "./task-detail.module.css";
 
 type TournamentView = {
@@ -31,6 +32,7 @@ type ContenderRun = {
   tournamentResult: string | null;
   prUrl: string | null;
   agentProfileKey: string;
+  contenderId: string | null;
   estimatedCostMicros: number;
   actualCostMicros: number;
   fitnessReasons?: string[];
@@ -160,6 +162,10 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
         <p className={styles.muted}>
           Contenders cancelled or eliminated — selected run continues below.
         </p>
+      ) : null}
+
+      {!allQuiet ? (
+        <TournamentFlowGraph tournament={tournament} runs={sorted} />
       ) : null}
 
       {winner && tournament.status === "RESOLVED" ? (

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { SkeletonStack } from "@/components/app/ui";
 import { displayTaskTitle } from "@/lib/display-title";
 import { AgentInspector } from "./agent-inspector";
+import { LaneTournamentFlow } from "./lane-tournament-flow";
 import styles from "./arena-mission.module.css";
 
 type ContenderRun = {
@@ -721,6 +722,21 @@ export function ArenaSpectacle({
 
                   {isExpanded ? (
                     <div className={styles.laneBody}>
+                      <LaneTournamentFlow
+                        workspaceId={workspaceId}
+                        lane={lane}
+                        selectedContenderId={
+                          selected?.projectId === lane.projectId
+                            ? selected.contenderId
+                            : null
+                        }
+                        onSelectContender={(contenderId) =>
+                          setSelected({
+                            projectId: lane.projectId,
+                            contenderId,
+                          })
+                        }
+                      />
                       <div className={styles.phases} aria-label="Execution phase">
                         {PHASES.map((phase, i) => (
                           <span
