@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { describeL2AutoMerge } from "@coppergate/db";
 import styles from "./project-detail.module.css";
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
   projectId: string;
   initialMergeEnabled: boolean;
   autonomyLevel: string;
+  maintainerEnabled: boolean;
   isOwner: boolean;
 };
 
@@ -17,12 +19,24 @@ export function MergePanel({
   projectId,
   initialMergeEnabled,
   autonomyLevel,
+  maintainerEnabled,
   isOwner,
 }: Props) {
   const router = useRouter();
   const [mergeEnabled, setMergeEnabled] = useState(initialMergeEnabled);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const mergeHonesty = useMemo(
+    () =>
+      describeL2AutoMerge({
+        autonomyLevel,
+        mergeEnabled,
+        maintainerEnabled,
+        maintainerAutoMerge: true,
+      }),
+    [autonomyLevel, mergeEnabled, maintainerEnabled],
+  );
 
   return (
     <section
@@ -34,8 +48,13 @@ export function MergePanel({
         L2 merge (opt-in)
       </h2>
       <p className={styles.sectionLede}>
-        At autonomy L2, accepting a review can merge the PR. Default off.
-        Current autonomy: {autonomyLevel}.
+        Policy-gated merge to the default branch — not a production deploy
+        switch. Default off. Current autonomy: {autonomyLevel}.
+      </p>
+      <p className={styles.hint} role="status">
+        Accept path:{" "}
+        {mergeHonesty.acceptPathActive ? "active" : "inactive"} —{" "}
+        {mergeHonesty.acceptSummary}
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
       <label className={styles.checkRow}>
