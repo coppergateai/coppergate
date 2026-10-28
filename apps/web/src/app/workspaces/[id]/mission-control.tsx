@@ -262,93 +262,119 @@ export function MissionControl({ data, recentEvents }: Props) {
   return (
     <main className={styles.main}>
       <header className={styles.head}>
-        <div className={styles.headLeft}>
-          <p className={styles.eyebrow}>Workspace / {data.workspaceName}</p>
-          <h1 className={styles.title}>Mission Control</h1>
-          <p className={styles.lede}>
-            Your AI engineering operations — decide next, then verify
-            deliveries.
-          </p>
-          <div className={styles.statusRow}>
+        <p className={styles.eyebrow}>
+          Workspace / {data.workspaceName}
+          <span className={styles.eyebrowSep} aria-hidden>
+            ·
+          </span>
+          <span className={styles.stamp}>{formatStamp()}</span>
+        </p>
+        <div className={styles.titleRow}>
+          <div className={styles.titleCluster}>
+            <h1 className={styles.title}>Mission Control</h1>
             <span
               className={`${styles.opsChip} ${opsWarn ? styles.opsChipWarn : ""}`}
             >
               <span className={styles.opsDot} aria-hidden />
               {opsWarn ? "Needs attention" : "Operational"}
             </span>
-            <p className={styles.statusText}>{statusLine}</p>
+          </div>
+          <div className={styles.headActions}>
+            <nav className={styles.headLinks} aria-label="Related">
+              <Link
+                href={`/workspaces/${data.workspaceId}/arena`}
+                className={styles.headLink}
+              >
+                Arena
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${data.workspaceId}/inbox`}
+                className={styles.headLink}
+              >
+                Inbox
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${data.workspaceId}/activity`}
+                className={styles.headLink}
+              >
+                Activity
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${data.workspaceId}/insights`}
+                className={styles.headLink}
+              >
+                Insights
+              </Link>
+            </nav>
+            {crisisItem ? (
+              <Link href={crisisItem.href} className={styles.arenaCta}>
+                {providerQuotaItem
+                  ? "Fix provider quota"
+                  : mergeBlockedItem
+                    ? "Fix merge rights"
+                    : "Pause Arena"}
+              </Link>
+            ) : (
+              <Link
+                href={`/workspaces/${data.workspaceId}/arena`}
+                className={styles.arenaCta}
+              >
+                Open Arena
+              </Link>
+            )}
           </div>
         </div>
-        <div className={styles.headRight}>
-          <p className={styles.stamp}>{formatStamp()}</p>
-          {crisisItem ? (
-            <Link
-              href={crisisItem.href}
-              className={styles.arenaCta}
-            >
-              {providerQuotaItem
-                ? "Fix provider quota →"
-                : mergeBlockedItem
-                  ? "Fix merge rights →"
-                  : "Pause Arena →"}
-            </Link>
-          ) : (
-            <Link
-              href={`/workspaces/${data.workspaceId}/arena`}
-              className={styles.arenaCta}
-            >
-              Open Arena →
-            </Link>
-          )}
-          <Link
-            href={`/workspaces/${data.workspaceId}/insights`}
-            className={styles.insightsLink}
-          >
-            30d insights →
-          </Link>
-        </div>
-      </header>
-
-      <div className={styles.summaryStrip} aria-label="Workspace metrics">
-        <p className={styles.summaryItem}>
+        <p className={styles.lede}>
+          Decide next, then verify deliveries — Arena, inbox gates, and recent
+          activity in one place.
+        </p>
+        <p className={styles.statusText}>{statusLine}</p>
+        <div className={styles.summaryStrip} aria-label="Workspace metrics">
           <Link
             href={`/workspaces/${data.workspaceId}/arena`}
-            className={styles.summaryLink}
+            className={styles.summaryItem}
           >
             <strong>{metrics.arenaRunning}</strong> running
+            <span className={styles.summaryMute}>
+              {" "}
+              · {metrics.arenaAwaitingCi} awaiting CI
+            </span>
           </Link>
-          <span className={styles.summaryMute}>
-            {metrics.arenaAwaitingCi} awaiting CI
-            {metrics.activeRuns >
-            metrics.arenaRunning + metrics.arenaAwaitingCi
-              ? ` · ${metrics.activeRuns} slots`
-              : ""}
+          <span className={styles.summaryDot} aria-hidden>
+            ·
           </span>
-        </p>
-        <p className={styles.summaryItem}>
-          <Link href={attentionHref} className={styles.summaryLink}>
-            <strong>{attentionTotal}</strong>{" "}
-            {attentionTotal === 1 ? "needs" : "need"} attention
+          <Link href={attentionHref} className={styles.summaryItem}>
+            <strong>{attentionTotal}</strong> need attention
+            <span className={styles.summaryMute}>
+              {" "}
+              · {humanGates} inbox · {evidenceGates} evidence
+              {capacityCrisis ? " · crisis" : ""}
+            </span>
           </Link>
-          <span className={styles.summaryMute}>
-            {humanGates} inbox · {evidenceGates} evidence ·{" "}
-            {arenaInAttentionTotal} arena
-            {capacityCrisis ? " · crisis" : ""}
+          <span className={styles.summaryDot} aria-hidden>
+            ·
           </span>
-        </p>
-        <p className={styles.summaryItem}>
           <Link
             href={`/workspaces/${data.workspaceId}/projects`}
-            className={styles.summaryLink}
+            className={styles.summaryItem}
           >
-            <strong>{metrics.verifiedPrsThisMonth}</strong> verified PRs
+            <strong>{metrics.verifiedPrsThisMonth}</strong> verified
           </Link>
-          <span className={styles.summaryMute}>this month</span>
-        </p>
-        <p className={styles.summaryItem}>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
           <Link
             href={`/workspaces/${data.workspaceId}/settings?tab=billing`}
-            className={styles.summaryLink}
+            className={styles.summaryItem}
           >
             <strong>
               {hasBudget
@@ -359,20 +385,21 @@ export function MissionControl({ data, recentEvents }: Props) {
                 : "—"}
             </strong>{" "}
             available
+            {hasBudget ? (
+              <span className={styles.summaryMute}>
+                {" "}
+                · reserved{" "}
+                {formatUsd(
+                  metrics.budgetReservedMicros,
+                  metrics.budgetCurrency,
+                )}{" "}
+                / {formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}
+                {budgetPaused ? " · paused" : ""}
+              </span>
+            ) : null}
           </Link>
-          {hasBudget ? (
-            <span className={styles.summaryMute}>
-              reserved{" "}
-              {formatUsd(
-                metrics.budgetReservedMicros,
-                metrics.budgetCurrency,
-              )}{" "}
-              / {formatUsd(metrics.budgetCapMicros, metrics.budgetCurrency)}
-              {budgetPaused ? " · paused" : ""}
-            </span>
-          ) : null}
-        </p>
-      </div>
+        </div>
+      </header>
 
       <div className={styles.grid}>
         <div className={styles.stack}>
@@ -597,26 +624,18 @@ export function MissionControl({ data, recentEvents }: Props) {
                   href={crisisItem.href}
                   className={`${styles.action} ${styles.actionPrimary}`}
                 >
-                  <span className={styles.actionIcon} aria-hidden>
-                    ■
-                  </span>
-                  <span className={styles.actionLabel}>
-                    {mergeBlockedItem
-                      ? (mergeBlockedItem.ctaLabel ?? "Fix merge rights")
-                      : providerQuotaItem
-                        ? "Open Arena"
-                        : "Pause Arena"}
-                  </span>
+                  {mergeBlockedItem
+                    ? (mergeBlockedItem.ctaLabel ?? "Fix merge rights")
+                    : providerQuotaItem
+                      ? "Open Arena"
+                      : "Pause Arena"}
                 </Link>
               ) : (
                 <Link
                   href={`/workspaces/${data.workspaceId}/arena`}
                   className={styles.action}
                 >
-                  <span className={styles.actionIcon} aria-hidden>
-                    ◆
-                  </span>
-                  <span className={styles.actionLabel}>Open Arena</span>
+                  Open Arena
                 </Link>
               )}
               {metrics.needsApproval > 0 ? (
@@ -624,52 +643,31 @@ export function MissionControl({ data, recentEvents }: Props) {
                   href={`/workspaces/${data.workspaceId}/inbox`}
                   className={styles.action}
                 >
-                  <span className={styles.actionIcon} aria-hidden>
-                    ▣
-                  </span>
-                  <span className={styles.actionLabel}>
-                    Review inbox ({metrics.needsApproval})
-                  </span>
+                  Review inbox ({metrics.needsApproval})
                 </Link>
               ) : evidenceItem ? (
                 <Link href={evidenceItem.href} className={styles.action}>
-                  <span className={styles.actionIcon} aria-hidden>
-                    ✓
-                  </span>
-                  <span className={styles.actionLabel}>
-                    Accept evidence ({evidenceGates})
-                  </span>
+                  Accept evidence ({evidenceGates})
                 </Link>
               ) : (
                 <Link
                   href={`/workspaces/${data.workspaceId}/projects`}
                   className={styles.action}
                 >
-                  <span className={styles.actionIcon} aria-hidden>
-                    ▷
-                  </span>
-                  <span className={styles.actionLabel}>
-                    Import issue → queue
-                  </span>
+                  Import issue → queue
                 </Link>
               )}
               <Link
                 href={`/workspaces/${data.workspaceId}/projects`}
                 className={styles.action}
               >
-                <span className={styles.actionIcon} aria-hidden>
-                  ▤
-                </span>
-                <span className={styles.actionLabel}>View projects</span>
+                View projects
               </Link>
               <Link
                 href={`/workspaces/${data.workspaceId}/settings`}
                 className={styles.action}
               >
-                <span className={styles.actionIcon} aria-hidden>
-                  ⚙
-                </span>
-                <span className={styles.actionLabel}>Workspace settings</span>
+                Workspace settings
               </Link>
             </div>
           </section>
