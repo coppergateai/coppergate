@@ -1,8 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Breadcrumbs } from "@/components/app/ui";
 import styles from "./project-detail.module.css";
 import { type ProjectTab } from "./project-tabs";
 
@@ -150,65 +150,142 @@ export function ProjectShell({
             : overview;
 
   const availableLabel = pooled
-    ? `Available ${formatCap(availableMicros ?? 0, currency)}`
+    ? formatCap(availableMicros ?? 0, currency)
     : formatCap(capMicros, currency);
+
+  const budgetPaused = budgetStatus === "paused";
 
   return (
     <main className={styles.shell}>
-      <header className={styles.pageBar}>
-        <div className={styles.pageBarLeft}>
-          <Breadcrumbs
-            items={[
-              {
-                label: "Projects",
-                href: `/workspaces/${workspaceId}/projects`,
-              },
-              { label: name },
-            ]}
-          />
-          <h1 className={styles.pageName}>{name}</h1>
-          <p className={styles.pageSub}>
-            {repoFullName}
-            <span aria-hidden> · </span>
-            {formatStack(stack)}
-            <span aria-hidden> · </span>
-            {autonomyLevel}
-          </p>
-          <div className={styles.chips}>
-            <span
-              className={
-                budgetStatus === "paused"
-                  ? `${styles.chip} ${styles.chipWarn}`
-                  : styles.chip
-              }
-            >
-              {budgetStatus === "paused" ? "Paused" : availableLabel}
-            </span>
-            {pendingApprovals > 0 ? (
-              <span className={`${styles.chip} ${styles.chipWarn}`}>
-                {pendingApprovals} pending
+      <header className={styles.head}>
+        <p className={styles.eyebrow}>
+          <Link
+            href={`/workspaces/${workspaceId}/projects`}
+            className={styles.eyebrowLink}
+          >
+            Projects
+          </Link>
+          <span className={styles.eyebrowSep} aria-hidden>
+            /
+          </span>
+          {name}
+        </p>
+        <div className={styles.titleRow}>
+          <h1 className={styles.title}>{name}</h1>
+          <div className={styles.headActions}>
+            <nav className={styles.headLinks} aria-label="Related">
+              <Link
+                href={`/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(projectId)}`}
+                className={styles.headLink}
+              >
+                Arena
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
               </span>
-            ) : null}
+              <Link
+                href={`/workspaces/${workspaceId}/inbox`}
+                className={styles.headLink}
+              >
+                Inbox
+              </Link>
+              {repoFullName ? (
+                <>
+                  <span className={styles.headSep} aria-hidden>
+                    ·
+                  </span>
+                  <a
+                    href={`https://github.com/${repoFullName}`}
+                    className={styles.headLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Repository
+                  </a>
+                </>
+              ) : null}
+            </nav>
           </div>
-          <details className={styles.detailsMeta}>
-            <summary>Details</summary>
-            <div className={styles.chips}>
-              <span className={styles.chip}>{formatMode(mode)}</span>
-              {lastRunStatus ? (
-                <span className={styles.chip}>Run {lastRunStatus}</span>
-              ) : null}
-              {stack !== "nextjs_ts" ? (
-                <span className={`${styles.chip} ${styles.chipMute}`}>
-                  Agent best-effort
-                </span>
-              ) : null}
-              {!pooled && projectSpentMicros != null ? (
-                <span className={styles.chip}>
-                  Project spend {formatCap(projectSpentMicros, currency)}
-                </span>
-              ) : null}
-            </div>
-          </details>
+        </div>
+        <p className={styles.lede}>
+          {repoFullName}
+          <span aria-hidden> · </span>
+          {formatStack(stack)}
+          <span aria-hidden> · </span>
+          {autonomyLevel}
+          <span aria-hidden> · </span>
+          {formatMode(mode)}
+        </p>
+        <div className={styles.summaryStrip} aria-label="Project summary">
+          <span
+            className={`${styles.summaryItem} ${
+              budgetPaused ? styles.summaryWarn : ""
+            }`}
+          >
+            <strong>
+              {budgetPaused ? "Paused" : availableLabel}
+            </strong>
+            {budgetPaused ? " budget" : " available"}
+          </span>
+          {pendingApprovals > 0 ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={`${styles.summaryItem} ${styles.summaryWarn}`}>
+                <strong>{pendingApprovals}</strong> pending
+              </span>
+            </>
+          ) : null}
+          {evidenceCount > 0 ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>{evidenceCount}</strong> evidence
+              </span>
+            </>
+          ) : null}
+          {deliveryCount > 0 ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                <strong>{deliveryCount}</strong> in delivery
+              </span>
+            </>
+          ) : null}
+          {lastRunStatus ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                last run <strong>{lastRunStatus}</strong>
+              </span>
+            </>
+          ) : null}
+          {!pooled && projectSpentMicros != null ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>
+                spend{" "}
+                <strong>{formatCap(projectSpentMicros, currency)}</strong>
+              </span>
+            </>
+          ) : null}
+          {stack !== "nextjs_ts" ? (
+            <>
+              <span className={styles.summaryDot} aria-hidden>
+                ·
+              </span>
+              <span className={styles.summaryItem}>agent best-effort</span>
+            </>
+          ) : null}
         </div>
       </header>
 
