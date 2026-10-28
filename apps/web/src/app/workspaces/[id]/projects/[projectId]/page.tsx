@@ -6,8 +6,10 @@ import {
   getLatestBriefForProject,
   getProjectForWorkspace,
   getProjectPlan,
+  computeIssueWedgeNextStep,
   getProjectSpendSummary,
   getWorkspaceForMember,
+  issueWedgeHonestyForProject,
   listPendingApprovalsForWorkspace,
   parseClarifyingAnswers,
   parseJsonArray,
@@ -167,6 +169,12 @@ export default async function ProjectDetailPage({
     )?.status ?? null;
 
   const reviewTask = boardTasks.find((t) => t.status === "REVIEW_REQUIRED");
+  const hasWaitingCi = boardTasks.some((t) => t.status === "WAITING_CI");
+  const hasReviewRequired = Boolean(reviewTask);
+  const wedgeHonesty = issueWedgeHonestyForProject({
+    mode: row.project.mode,
+    maintainerPolicyJson: row.project.maintainerPolicyJson,
+  });
   const hasIssueLinked =
     plan?.milestones.some(({ tasks }) =>
       tasks.some(({ task }) => task.githubIssueNumber != null),
@@ -187,12 +195,14 @@ export default async function ProjectDetailPage({
     (t) => t.status === "REVIEW_REQUIRED",
   ).length;
 
-  let nextStep: NextActionStep = "done";
-  if (!hasBudget) nextStep = "budget";
-  else if (reviewTask) nextStep = "review";
-  else if (!hasQueuedOrBeyond && !hasIssueLinked) nextStep = "issue";
-  else if (!hasQueuedOrBeyond) nextStep = "arena";
-  else if (!hasAcceptedPr) nextStep = hasQueuedOrBeyond ? "arena" : "issue";
+  const nextStep: NextActionStep = computeIssueWedgeNextStep({
+    hasBudget,
+    hasAcceptedPr,
+    hasIssueLinked,
+    hasQueuedOrBeyond,
+    hasReviewRequired,
+    hasWaitingCi,
+  });
 
   const stackHint =
     row.project.stack === "go"
@@ -278,6 +288,9 @@ export default async function ProjectDetailPage({
                 workspaceId={workspaceId}
                 projectId={projectId}
                 isOwner={isOwner}
+                wedgeLede={wedgeHonesty.issuesPanelLede}
+                wedgeEmptyHint={wedgeHonesty.issuesEmptyHint}
+                programBoundNote={wedgeHonesty.programBoundNote}
               />
             </details>
             <details
