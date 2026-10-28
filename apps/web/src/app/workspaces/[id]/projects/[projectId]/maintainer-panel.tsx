@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   describeL2AutoMerge,
   describeMaintainerSettingsHonesty,
-} from "@coppergate/db";
+} from "@/lib/project-settings-honesty";
 import styles from "./project-detail.module.css";
 
 type Metrics = {

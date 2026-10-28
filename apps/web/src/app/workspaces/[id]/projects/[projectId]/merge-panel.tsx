@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { describeL2AutoMerge } from "@coppergate/db";
+import { describeL2AutoMerge } from "@/lib/project-settings-honesty";
 import styles from "./project-detail.module.css";
 
 type Props = {

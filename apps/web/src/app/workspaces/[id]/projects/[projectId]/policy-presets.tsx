@@ -6,7 +6,7 @@ import {
   describeL2AutoMerge,
   describeMinHumanHonesty,
   effectiveArenaMinHuman,
-} from "@coppergate/db";
+} from "@/lib/project-settings-honesty";
 import styles from "./project-detail.module.css";
 
 type Props = {
