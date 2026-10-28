@@ -300,6 +300,12 @@ export function MissionControl({ data, recentEvents }: Props) {
               Open Arena →
             </Link>
           )}
+          <Link
+            href={`/workspaces/${data.workspaceId}/insights`}
+            className={styles.insightsLink}
+          >
+            30d insights →
+          </Link>
         </div>
       </header>
 

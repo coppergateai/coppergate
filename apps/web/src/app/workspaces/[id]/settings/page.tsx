@@ -11,12 +11,10 @@ import {
 } from "@coppergate/db";
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { AnalyticsPanel } from "./analytics-panel";
 import { BillingPanel } from "./billing-panel";
 import { AgentsPanel } from "./agents-panel";
 import { ByokPanel } from "./byok-panel";
 import { McpPanel } from "./mcp-panel";
-import { CostExplorerPanel } from "./cost-explorer";
 import { DangerZone } from "./danger-zone";
 import { DemoSeedPanel } from "./demo-seed-panel";
 import { NotifyPanel } from "./notify-panel";
@@ -58,6 +56,9 @@ export default async function WorkspaceSettingsPage({
   const githubFlag = typeof query.github === "string" ? query.github : undefined;
   const gitlabFlag = typeof query.gitlab === "string" ? query.gitlab : undefined;
   const tabParam = typeof query.tab === "string" ? query.tab : undefined;
+  if (tabParam === "analytics") {
+    redirect(`/workspaces/${workspace.id}/insights`);
+  }
   const checkoutFlag =
     typeof query.checkout === "string" ? query.checkout : undefined;
   const initialQuery = [
@@ -234,15 +235,6 @@ export default async function WorkspaceSettingsPage({
                   isOwner={role === "owner"}
                 />
                 <McpPanel
-                  workspaceId={workspace.id}
-                  isOwner={role === "owner"}
-                />
-              </div>
-            ),
-            analytics: (
-              <div className={styles.stackWide}>
-                <CostExplorerPanel workspaceId={workspace.id} />
-                <AnalyticsPanel
                   workspaceId={workspace.id}
                   isOwner={role === "owner"}
                 />

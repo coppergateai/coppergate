@@ -209,17 +209,22 @@ async function main() {
     await shot("06-login", loginPage);
     await loginCtx.close();
   } else if (wave === "3") {
+    await gotoReady(`${ws}/insights`, /Insights|Cost analytics|verified/i);
+    await shot("insights");
+    await page.evaluate(`(() => { window.scrollTo(0, Math.min(600, document.body.scrollHeight)); })()`);
+    await page.waitForTimeout(250);
+    await shot("insights-scrolled");
+
     const tabs = [
       "connections",
       "general",
       "billing",
       "signals",
       "llm",
-      "analytics",
       "danger",
     ];
     for (const tab of tabs) {
-      await gotoReady(`${ws}/settings?tab=${tab}`, /Settings|General|Billing|Connections|Danger|LLM|Signals|Analytics/i);
+      await gotoReady(`${ws}/settings?tab=${tab}`, /Settings|General|Billing|Connections|Danger|LLM|Signals/i);
       await shot(`settings-${tab}`);
       await page.evaluate(`(() => { window.scrollTo(0, Math.min(600, document.body.scrollHeight)); })()`);
       await page.waitForTimeout(250);

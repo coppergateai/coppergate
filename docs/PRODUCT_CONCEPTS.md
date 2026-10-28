@@ -40,6 +40,7 @@ Issue → Execution → Verification → Human Approval → Delivery
 Surfaces:
 
 - **Mission Control** (`/workspaces/[id]`) — what needs intervention now
+- **Insights** (`/workspaces/[id]/insights`) — period economics & verified delivery
 - **Evidence** — why a delivery is acceptable
 - **Arena** — which contender won and why (hard gates, then rank)
 - **Delivery Review** (task detail) — Accept with explicit gate status

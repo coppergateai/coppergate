@@ -135,6 +135,17 @@
   border-color: var(--copper-hot);
 }
 
+.insightsLink {
+  font-size: 0.78rem;
+  font-weight: 550;
+  color: var(--mute);
+  text-decoration: none;
+}
+
+.insightsLink:hover {
+  color: var(--copper-hot, var(--copper));
+}
+
 .summaryStrip {
   display: grid;
   /* Fit the content column (sidebar-aware), not the viewport */

@@ -78,7 +78,7 @@ Web uygulamasındaki (`apps/web`) route’ların sayfa sayfa özeti. Auth gerekt
 
 ## Workspace (`/workspaces/[id]/…`)
 
-Layout: AppChrome sidebar — **Overview**, Projects, Arena, Inbox, Activity, Settings.
+Layout: AppChrome sidebar — **Overview**, Projects, Arena, Inbox, Insights, Activity, Settings.
 Varsayılan app teması: **light** (toggle ile dark).
 
 ### `/workspaces/[id]` — Mission Control (Overview)
@@ -87,6 +87,15 @@ Varsayılan app teması: **light** (toggle ile dark).
 - Sol: Needs your attention + Recent activity timeline (audit events, Activity ile aynı human labels)
 - Sağ: Active executions (pipeline steps) + Quick actions
 - İlk 10 sn’de müdahale gereken iş görünür
+- Period köprüsü: **30d insights →** `/insights` (operasyon paneli değil)
+
+### `/workspaces/[id]/insights` — Insights
+- Period economics & verified delivery (Mission Control’dan ayrı)
+- 30d cost analytics strip (owner): spend, accepted PRs, median/PR, runs, failed-run spend
+- Cost by project (7d) + signal spend by provider (owner)
+- Verified PRs this month + Activity / Projects deep-links
+- Export CSV (31d); Manage budget → Settings · Billing
+- Eski `settings?tab=analytics` buraya redirect
 
 ### `/workspaces/[id]/projects` — Projeler
 - Workspace hero, maintainer KPI’lar, arama/filtre (Ready/Setup/Unbound)
@@ -146,8 +155,9 @@ Sekmeler (`?tab=`):
 | **billing** | Hosted Stripe Checkout / portal |
 | **signals** | Signal adapters + Slack/Teams/Discord notify |
 | **llm** | BYOK keys, Agents routing, MCP |
-| **analytics** | Cost explorer + analytics |
 | **danger** | Workspace silme |
+
+Cost / period analytics → [`/insights`](#workspacesidinsights--insights) (`?tab=analytics` redirect).
 
 ---
 
@@ -180,6 +190,7 @@ Sekmeler (`?tab=`):
 /workspaces/[id]/projects/[projectId]/tasks/[taskId]  Task + Accept
 /workspaces/[id]/arena     Arena spectacle
 /workspaces/[id]/inbox     Approvals
+/workspaces/[id]/insights  Period economics & verified delivery
 /workspaces/[id]/activity  Agent Operations Timeline
 /workspaces/[id]/settings  Workspace config
 /share/r/[token]           Public redacted report

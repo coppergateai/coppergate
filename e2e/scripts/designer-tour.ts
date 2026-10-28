@@ -133,7 +133,8 @@ async function main() {
   );
   await capture("09-arena", `${ws}/arena`, /Arena/i);
   await capture("10-inbox", `${ws}/inbox`, /Inbox|caught up|attention/i);
-  await capture("11-activity", `${ws}/activity`, /Activity/i);
+  await capture("11-insights", `${ws}/insights`, /Insights|Cost analytics|verified/i);
+  await capture("12-activity", `${ws}/activity`, /Activity/i);
 
   for (const tab of [
     "connections",
@@ -141,17 +142,16 @@ async function main() {
     "billing",
     "signals",
     "llm",
-    "analytics",
     "danger",
   ]) {
     await capture(
-      `12-settings-${tab}`,
+      `13-settings-${tab}`,
       `${ws}/settings?tab=${tab}`,
-      /Settings|General|Billing|Connections|Danger|LLM|Signals|Analytics/i,
+      /Settings|General|Billing|Connections|Danger|LLM|Signals/i,
     );
   }
 
-  await capture("13-profile", `${root}/profile`, /Profile|Account/i);
+  await capture("14-profile", `${root}/profile`, /Profile|Account/i);
 
   // Task detail + receipt
   await page.goto(`${target.projectUrl}?tab=delivery`, {
@@ -170,7 +170,7 @@ async function main() {
     .catch(() => null);
   if (taskHref) {
     const abs = taskHref.startsWith("http") ? taskHref : `${root}${taskHref}`;
-    await capture("14-task-detail", abs, /Task|Tournament|Status|Evidence|Scope/i);
+    await capture("15-task-detail", abs, /Task|Tournament|Status|Evidence|Scope/i);
     const receipt = await page
       .locator('a[href*="/receipt"]')
       .first()
@@ -178,7 +178,7 @@ async function main() {
       .catch(() => null);
     if (receipt) {
       const rAbs = receipt.startsWith("http") ? receipt : `${root}${receipt}`;
-      await capture("15-receipt", rAbs, /Ship Receipt|Accept|Back to task/i);
+      await capture("16-receipt", rAbs, /Ship Receipt|Accept|Back to task/i);
     }
   }
 

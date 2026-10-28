@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import styles from "./settings.module.css";
+import { EmptyState } from "@/components/app/ui";
+import styles from "./insights.module.css";
 
 type CostData = {
   windowDays: number;
@@ -22,7 +23,7 @@ function usd(micros: number): string {
   return `$${(micros / 1_000_000).toFixed(4)}`;
 }
 
-export function CostExplorerPanel({ workspaceId }: Props) {
+export function CostByProject({ workspaceId }: Props) {
   const [data, setData] = useState<CostData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,13 +46,13 @@ export function CostExplorerPanel({ workspaceId }: Props) {
   }, [load]);
 
   return (
-    <section className={styles.section} aria-labelledby="cost-strip-heading">
-      <h2 id="cost-strip-heading" className={styles.sectionLabel}>
-        Cost explorer (7d)
+    <section className={styles.section} aria-labelledby="cost-7d-heading">
+      <h2 id="cost-7d-heading" className={styles.sectionLabel}>
+        Cost by project (7d)
       </h2>
       <p className={styles.sectionLede}>
         Coppergate budget units by project (internal estimates) — not your
-        OpenAI/BYOK invoice. Companion to 30d analytics.
+        OpenAI/BYOK invoice.
       </p>
       {error ? <p className={styles.error}>{error}</p> : null}
       {data ? (
@@ -60,7 +61,10 @@ export function CostExplorerPanel({ workspaceId }: Props) {
             Workspace total: <strong>{usd(data.spentMicros)}</strong>
           </p>
           {data.projects.length === 0 ? (
-            <p className={styles.note}>No usage in the last {data.windowDays} days.</p>
+            <EmptyState
+              title="No usage in this window"
+              body={`No project spend in the last ${data.windowDays} days.`}
+            />
           ) : (
             <ul className={styles.costList}>
               {data.projects.slice(0, 8).map((p) => (

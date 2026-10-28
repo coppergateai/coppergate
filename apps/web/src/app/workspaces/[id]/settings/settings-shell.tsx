@@ -37,12 +37,6 @@ export const SETTINGS_TABS = [
     group: "Advanced",
   },
   {
-    id: "analytics",
-    label: "Analytics",
-    blurb: "Spend by source",
-    group: "Spend",
-  },
-  {
     id: "danger",
     label: "Danger",
     blurb: "Delete workspace",
