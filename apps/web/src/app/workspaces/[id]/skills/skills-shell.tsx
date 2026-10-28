@@ -30,6 +30,14 @@ type FormState = {
   bodyMarkdown: string;
 };
 
+type KindFilter = "all" | "attached" | "system" | "override" | "custom";
+
+function sourceLabel(s: SkillRow): string {
+  if (s.isCustom) return "custom";
+  if (s.workspaceOverride) return "override";
+  return "system";
+}
+
 export function SkillsShell({
   workspaceId,
   workspaceName,
@@ -44,6 +52,8 @@ export function SkillsShell({
       ? initialKey
       : (initialSkills[0]?.key ?? null),
   );
+  const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<FormState>({
@@ -59,12 +69,47 @@ export function SkillsShell({
     setSkills(initialSkills);
   }, [initialSkills]);
 
+  useEffect(() => {
+    if (!selectedKey || creating) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("skill") === selectedKey) return;
+    url.searchParams.set("skill", selectedKey);
+    router.replace(`${url.pathname}?${url.searchParams.toString()}`, {
+      scroll: false,
+    });
+  }, [selectedKey, creating, router]);
+
   const selected = useMemo(
     () => skills.find((s) => s.key === selectedKey) ?? null,
     [skills, selectedKey],
   );
 
   const attached = skills.filter((s) => s.agents.length > 0).length;
+  const overrideCount = skills.filter((s) => s.workspaceOverride).length;
+  const customCount = skills.filter((s) => s.isCustom).length;
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return skills.filter((s) => {
+      if (kindFilter === "attached" && s.agents.length === 0) return false;
+      if (kindFilter === "system" && (s.isCustom || s.workspaceOverride)) {
+        return false;
+      }
+      if (kindFilter === "override" && !s.workspaceOverride) return false;
+      if (kindFilter === "custom" && !s.isCustom) return false;
+      if (!q) return true;
+      return (
+        s.key.toLowerCase().includes(q) ||
+        s.title.toLowerCase().includes(q) ||
+        s.bodyMarkdown.toLowerCase().includes(q) ||
+        s.agents.some(
+          (a) =>
+            a.key.toLowerCase().includes(q) ||
+            a.displayName.toLowerCase().includes(q),
+        )
+      );
+    });
+  }, [skills, query, kindFilter]);
 
   function startCreate() {
     setCreating(true);
@@ -90,6 +135,12 @@ export function SkillsShell({
     setCreating(false);
     setEditing(false);
     setError(null);
+  }
+
+  function selectSkill(key: string) {
+    setSelectedKey(key);
+    setCreating(false);
+    setEditing(false);
   }
 
   async function save() {
@@ -157,6 +208,13 @@ export function SkillsShell({
   }
 
   const showEditor = isOwner && (creating || editing);
+  const kindFilters: KindFilter[] = [
+    "all",
+    "attached",
+    "system",
+    "override",
+    "custom",
+  ];
 
   return (
     <main className={styles.main}>
@@ -164,7 +222,7 @@ export function SkillsShell({
         <p className={styles.eyebrow}>Workspace / {workspaceName}</p>
         <div className={styles.titleRow}>
           <h1 className={styles.title}>Skills</h1>
-          <div className={styles.headLinks}>
+          <div className={styles.headActions}>
             {isOwner ? (
               <button
                 type="button"
@@ -175,18 +233,23 @@ export function SkillsShell({
                 New skill
               </button>
             ) : null}
-            <Link
-              href={`/workspaces/${workspaceId}/agents`}
-              className={styles.headLink}
-            >
-              Agents →
-            </Link>
-            <Link
-              href={`/workspaces/${workspaceId}/tools`}
-              className={styles.headLink}
-            >
-              Tools →
-            </Link>
+            <nav className={styles.headLinks} aria-label="Related">
+              <Link
+                href={`/workspaces/${workspaceId}/agents`}
+                className={styles.headLink}
+              >
+                Agents
+              </Link>
+              <span className={styles.headSep} aria-hidden>
+                ·
+              </span>
+              <Link
+                href={`/workspaces/${workspaceId}/tools`}
+                className={styles.headLink}
+              >
+                Tools
+              </Link>
+            </nav>
           </div>
         </div>
         <p className={styles.lede}>
@@ -194,70 +257,95 @@ export function SkillsShell({
           reliability, and more. Owners can create overrides or custom skills.
         </p>
         <div className={styles.summaryStrip} aria-label="Skills summary">
-          <span>
+          <span className={styles.summaryItem}>
             <strong>{skills.length}</strong> skills
           </span>
-          <span>
-            <strong>{attached}</strong> attached to agents
+          <span className={styles.summaryDot} aria-hidden>
+            ·
           </span>
-          <span>
-            <strong>
-              {skills.filter((s) => s.workspaceOverride).length}
-            </strong>{" "}
-            workspace overrides
+          <span className={styles.summaryItem}>
+            <strong>{attached}</strong> attached
+          </span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{overrideCount}</strong> overrides
+          </span>
+          <span className={styles.summaryDot} aria-hidden>
+            ·
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>{customCount}</strong> custom
           </span>
         </div>
       </header>
 
-      {error ? (
-        <p className={styles.error} style={{ margin: "0.5rem var(--app-pad-x-lg)" }}>
-          {error}
-        </p>
-      ) : null}
-      {ok ? (
-        <p className={styles.ok} style={{ margin: "0.5rem var(--app-pad-x-lg)" }}>
-          {ok}
-        </p>
-      ) : null}
+      {error ? <p className={styles.error}>{error}</p> : null}
+      {ok ? <p className={styles.ok}>{ok}</p> : null}
 
       <div
         className={`${styles.layout} ${selected || creating ? styles.layoutDetailOpen : ""}`}
       >
         <aside className={styles.listPane} aria-label="Skill catalog">
-          <ul className={styles.itemList}>
-            {skills.map((s) => {
-              const active = !creating && s.key === selectedKey;
-              return (
-                <li key={s.key}>
-                  <button
-                    type="button"
-                    className={`${styles.itemBtn} ${active ? styles.itemBtnActive : ""}`}
-                    aria-current={active ? "true" : undefined}
-                    onClick={() => {
-                      setSelectedKey(s.key);
-                      setCreating(false);
-                      setEditing(false);
-                    }}
-                  >
-                    <p className={styles.itemName}>{s.title}</p>
-                    <p className={styles.itemKey}>{s.key}</p>
-                    <p className={styles.itemMeta}>
-                      <span>v{s.version}</span>
-                      <span>
-                        {s.agents.length} agent
-                        {s.agents.length === 1 ? "" : "s"}
+          <input
+            type="search"
+            className={styles.filter}
+            placeholder="Filter skills…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Filter skills"
+          />
+          <div className={styles.kindFilters} role="group" aria-label="Kind">
+            {kindFilters.map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={`${styles.kindChip} ${kindFilter === k ? styles.kindChipActive : ""}`}
+                onClick={() => setKindFilter(k)}
+                aria-pressed={kindFilter === k}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+          {filtered.length === 0 ? (
+            <p className={styles.emptyList}>
+              No skills match
+              {query.trim() ? ` “${query.trim()}”` : " this filter"}.
+            </p>
+          ) : (
+            <ul className={styles.itemList}>
+              {filtered.map((s) => {
+                const active = !creating && s.key === selectedKey;
+                return (
+                  <li key={s.key}>
+                    <button
+                      type="button"
+                      className={`${styles.itemBtn} ${active ? styles.itemBtnActive : ""}`}
+                      aria-current={active ? "true" : undefined}
+                      onClick={() => selectSkill(s.key)}
+                    >
+                      <span className={styles.itemName}>{s.title}</span>
+                      <span className={styles.itemAside}>
+                        {s.agents.length > 0
+                          ? `${s.agents.length} agent${s.agents.length === 1 ? "" : "s"}`
+                          : "—"}
                       </span>
-                      {s.isCustom ? (
-                        <span>custom</span>
-                      ) : s.workspaceOverride ? (
-                        <span>override</span>
-                      ) : null}
-                    </p>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                      <span className={styles.itemKey}>{s.key}</span>
+                      <span className={styles.itemMeta}>
+                        v{s.version}
+                        <span className={styles.metaSep} aria-hidden>
+                          ·
+                        </span>
+                        {sourceLabel(s)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </aside>
 
         <section className={styles.detailPane} aria-live="polite">
@@ -361,20 +449,18 @@ export function SkillsShell({
                 ← All skills
               </button>
               <div className={styles.detailHead}>
-                <h2 className={styles.detailTitle}>{selected.title}</h2>
-                <p className={styles.detailKey}>
-                  {selected.key} · v{selected.version}
-                  {selected.isCustom
-                    ? " · custom"
-                    : selected.workspaceOverride
-                      ? " · workspace override"
-                      : " · system"}
-                </p>
-                <div className={styles.chipRow}>
-                  <span className={styles.chip}>
-                    {selected.agents.length} agent
-                    {selected.agents.length === 1 ? "" : "s"}
-                  </span>
+                <div className={styles.detailHeadMain}>
+                  <h2 className={styles.detailTitle}>{selected.title}</h2>
+                  <p className={styles.detailKey}>
+                    {selected.key} · v{selected.version} · {sourceLabel(selected)}
+                  </p>
+                  <div className={styles.chipRow}>
+                    <span className={styles.chip}>
+                      {selected.agents.length} agent
+                      {selected.agents.length === 1 ? "" : "s"}
+                    </span>
+                    <span className={styles.chip}>{sourceLabel(selected)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -420,8 +506,10 @@ export function SkillsShell({
                           href={`/workspaces/${workspaceId}/agents?agent=${encodeURIComponent(a.key)}`}
                           className={styles.relatedItem}
                         >
-                          <p className={styles.relatedTitle}>{a.displayName}</p>
-                          <p className={styles.relatedMeta}>{a.key}</p>
+                          <span className={styles.relatedTitle}>
+                            {a.displayName}
+                          </span>
+                          <span className={styles.relatedMeta}>{a.key}</span>
                         </Link>
                       </li>
                     ))}
@@ -435,6 +523,12 @@ export function SkillsShell({
                   className={styles.footerLink}
                 >
                   Browse agents →
+                </Link>
+                <Link
+                  href={`/workspaces/${workspaceId}/tools`}
+                  className={styles.footerLink}
+                >
+                  Browse tools →
                 </Link>
               </div>
             </>
