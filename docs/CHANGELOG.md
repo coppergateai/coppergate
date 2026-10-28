@@ -13,4 +13,5 @@
 - P-102: Arena Pause drain copy, Live/Paused/Stopped labeling, Resume vs Start controls, and quiet idle/CI/review counts while paused (not ops fires). See `docs/arena-pause-drain.md`.
 - P-141: Contender elimination ledger (audit-backed debits), Arena **Eliminated** roster + pool honesty, and Activity fan-out starvation summaries. See `docs/contender-elimination-ledger.md`.
 - P-143: L2 auto-merge + min_human **Settings honesty** — effective merge/min_human copy, maintainer ON ≠ prod deploy, kill-switch + envelope fail-closed reminders; arena ensure defaults min_human on. See `docs/project-settings-honesty.md`.
+- P-144: **L3 Release Assistant** — maintainer policy `autoRelease` off by default; when enabled, tick ships GitHub tag + Release with notes, `maintainer.release` + `release` maintainer event audit (`prodDeploy: false`). See `docs/l3-release-assistant.md`.
 - AG-012: Lean meta gate under $2 available micros; arena seating is engineer strategy peers (Reviewer is critic/catalog, not a duel seat).
