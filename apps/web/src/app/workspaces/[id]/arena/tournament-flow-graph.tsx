@@ -32,58 +32,12 @@ type Props = {
   }) => void;
 };
 
-type RunTone = "running" | "waiting" | "attention" | "idle";
-
 function titleCase(key: string): string {
   if (!key) return "Agent";
   return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
-function runTone(status: string): RunTone {
-  switch (status) {
-    case "QUEUED":
-    case "RUNNING":
-      return "running";
-    case "VALIDATING":
-    case "WAITING_CI":
-      return "waiting";
-    case "FAILED":
-    case "BLOCKED":
-    case "EXPIRED":
-      return "attention";
-    default:
-      return "idle";
-  }
-}
-
-function statusLabel(run: TournamentFlowRun): string {
-  if (run.tournamentResult === "WINNER") return "Winner";
-  if (run.tournamentResult === "LOSER") return "Loser";
-  if (run.tournamentResult === "CANCELLED") return "Cancelled";
-  return run.status.replace(/_/g, " ");
-}
-
-function toneClass(tone: RunTone): string {
-  switch (tone) {
-    case "running":
-      return styles.nodeRunning ?? "";
-    case "waiting":
-      return styles.nodeWaiting ?? "";
-    case "attention":
-      return styles.nodeAttention ?? "";
-    default:
-      return "";
-  }
-}
-
-function pillToneClass(tone: RunTone, result: string | null): string {
-  if (result === "WINNER") return styles.pillWin ?? "";
-  if (result === "LOSER" || result === "CANCELLED") return styles.pillBad ?? "";
-  if (tone === "running") return styles.pillRunning ?? "";
-  if (tone === "waiting") return styles.pillWaiting ?? "";
-  return "";
-}
-
+/** Compact Linear-style strip — replaces the boxed pipeline flowchart. */
 export function TournamentFlowGraph({
   tournament,
   runs,
@@ -108,227 +62,100 @@ export function TournamentFlowGraph({
       (r) =>
         r.tournamentResult === "WINNER" || r.id === tournament.winnerRunId,
     ) ?? null;
-  const loserCount = sorted.filter(
-    (r) =>
-      r.tournamentResult === "LOSER" || r.tournamentResult === "CANCELLED",
-  ).length;
 
-  const captionParts = [
-    tournament.status.replace(/_/g, " "),
-    `N=${tournament.n}`,
-  ];
-  if (tournament.provisional) {
-    captionParts.push("awaiting CI before final decision");
-  } else if (resolved && winner) {
-    captionParts.push("winner selected");
-  }
-
-  const shellClass = [
-    styles.flow,
-    tournament.provisional
-      ? styles.flowProvisional
-      : resolved
-        ? styles.flowResolved
-        : open
-          ? styles.flowLive
-          : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const statusTag = tournament.provisional
-    ? {
-        className: `${styles.liveTag} ${styles.provisionalTag}`,
-        label: "Provisional",
-      }
+  const tag = tournament.provisional
+    ? { className: `${styles.tag} ${styles.tagProvisional}`, label: "Provisional" }
     : resolved
-      ? {
-          className: `${styles.liveTag} ${styles.resolvedTag}`,
-          label: "Resolved",
-        }
+      ? { className: `${styles.tag} ${styles.tagResolved}`, label: "Resolved" }
       : open
-        ? { className: styles.liveTag ?? "", label: "Live" }
+        ? { className: styles.tag ?? "", label: "Live" }
         : null;
 
+  const title = taskTitle?.trim() || "Active Open ID";
+  const outcome = tournament.provisional
+    ? "Scoring when CI is ready"
+    : winner
+      ? `Winner · ${titleCase(winner.agentProfileKey)}${
+          winner.efficiencyScore == null
+            ? ""
+            : ` · e=${winner.efficiencyScore.toFixed(3)}`
+        }`
+      : open
+        ? `${tournament.n} contenders · efficiency contest`
+        : tournament.status.replace(/_/g, " ");
+
   return (
-    <div className={shellClass} aria-label="Tournament flow">
-      <div className={styles.header}>
-        <p className={styles.caption}>{captionParts.join(" · ")}</p>
-        {statusTag ? (
-          <span className={statusTag.className}>
-            <span className={styles.liveDot} aria-hidden />
-            {statusTag.label}
+    <div className={styles.strip} aria-label="Tournament status">
+      <div className={styles.left}>
+        <p className={styles.openId} title={title}>
+          {title}
+        </p>
+        <p className={styles.meta}>
+          N={tournament.n}
+          {" · "}
+          {tournament.status.replace(/_/g, " ")}
+        </p>
+        {tag ? (
+          <span className={tag.className}>
+            <span
+              className={`${styles.dot} ${open && !tournament.provisional ? styles.dotLive : ""}`}
+              aria-hidden
+            />
+            {tag.label}
           </span>
         ) : null}
       </div>
-
-      <div className={`${styles.col} ${styles.colTask}`}>
-        <div className={`${styles.node} ${styles.nodeTask}`}>
-          <p className={styles.eyebrow}>Open ID</p>
-          <p className={styles.title}>
-            {taskTitle?.trim() ? taskTitle : "Active task"}
-          </p>
-          <p className={styles.meta}>Fan-out → {tournament.n} contenders</p>
-        </div>
-      </div>
-
-      <div className={styles.edge} aria-hidden />
-
-      <div className={`${styles.col} ${styles.colRuns}`}>
-        <div className={styles.runs} role="list">
-          {sorted.map((run) => {
-            const tone = runTone(run.status);
-            const clickable = Boolean(onSelectRun && run.contenderId);
+      <div className={styles.right}>
+        <div className={styles.runners} role="list">
+          {sorted.slice(0, 6).map((run) => {
             const selected =
               selectedContenderId != null &&
               run.contenderId === selectedContenderId;
             const isWinner =
               run.tournamentResult === "WINNER" ||
               run.id === tournament.winnerRunId;
-            const isLoser =
-              run.tournamentResult === "LOSER" ||
-              run.tournamentResult === "CANCELLED";
+            const clickable = Boolean(onSelectRun && run.contenderId);
             const className = [
-              styles.node,
-              styles.nodeRun,
-              toneClass(tone),
-              clickable ? styles.nodeRunClickable : "",
-              selected ? styles.nodeSelected : "",
-              tone === "running" && !resolved ? styles.nodePulse : "",
-              isWinner && resolved ? styles.nodeIsWinner : "",
-              isLoser && resolved ? styles.nodeIsLoser : "",
+              styles.runner,
+              selected ? styles.runnerSelected : "",
+              isWinner ? styles.runnerWin : "",
             ]
               .filter(Boolean)
               .join(" ");
-
-            const body = (
-              <>
-                <div className={styles.statusRow}>
-                  <p className={styles.title}>
-                    {titleCase(run.agentProfileKey)}
-                  </p>
-                  <span
-                    className={`${styles.pill} ${pillToneClass(tone, run.tournamentResult)}`}
-                  >
-                    {statusLabel(run)}
-                  </span>
-                </div>
-                <p className={styles.meta}>
-                  efficiency{" "}
-                  {run.efficiencyScore == null
-                    ? "—"
-                    : run.efficiencyScore.toFixed(3)}
-                  {" · "}fitness{" "}
-                  {run.fitnessScore == null
-                    ? "—"
-                    : run.fitnessScore.toFixed(2)}
-                </p>
-                {run.prUrl ? (
-                  <a
-                    href={run.prUrl}
-                    className={styles.prChip}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    PR →
-                  </a>
-                ) : null}
-              </>
-            );
-
-            if (clickable) {
+            const label = `${titleCase(run.agentProfileKey)}${
+              run.efficiencyScore == null
+                ? ""
+                : ` · e=${run.efficiencyScore.toFixed(2)}`
+            }`;
+            if (!clickable) {
               return (
-                <button
-                  key={run.id}
-                  type="button"
-                  role="listitem"
-                  className={className}
-                  aria-pressed={selected}
-                  onClick={() =>
-                    onSelectRun?.({
-                      contenderId: run.contenderId,
-                      runId: run.id,
-                    })
-                  }
-                >
-                  {body}
-                </button>
+                <span key={run.id} role="listitem" className={className}>
+                  {label}
+                </span>
               );
             }
-
             return (
-              <div key={run.id} role="listitem" className={className}>
-                {body}
-              </div>
+              <button
+                key={run.id}
+                type="button"
+                role="listitem"
+                className={className}
+                aria-pressed={selected}
+                onClick={() =>
+                  onSelectRun?.({
+                    contenderId: run.contenderId,
+                    runId: run.id,
+                  })
+                }
+              >
+                {label}
+              </button>
             );
           })}
         </div>
-      </div>
-
-      <div className={styles.edge} aria-hidden />
-
-      <div className={`${styles.col} ${styles.colScore}`}>
-        <div className={`${styles.node} ${styles.nodeScore}`}>
-          <p className={styles.eyebrow}>Score</p>
-          <p className={styles.title}>Critic · CI · Efficiency</p>
-          <p className={styles.meta}>
-            {tournament.provisional
-              ? "Waiting on CI before final payoff"
-              : resolved
-                ? "Payoff resolved"
-                : "Scoring when runs are ready"}
-          </p>
-        </div>
-      </div>
-
-      <div className={styles.edge} aria-hidden />
-
-      <div className={`${styles.col} ${styles.colOutcomes}`}>
-        <div
-          className={[
-            styles.node,
-            styles.nodeWinner,
-            winner ? styles.nodeWinnerLit : styles.nodePending,
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <p className={styles.eyebrow}>Winner</p>
-          <p className={styles.title}>
-            {winner ? titleCase(winner.agentProfileKey) : "Pending"}
-          </p>
-          <p className={styles.meta}>
-            {winner
-              ? `Promote · e=${
-                  winner.efficiencyScore == null
-                    ? "—"
-                    : winner.efficiencyScore.toFixed(3)
-                }`
-              : "Efficiency contest open"}
-          </p>
-        </div>
-        <div
-          className={[
-            styles.node,
-            styles.nodeLoser,
-            resolved && loserCount > 0 ? styles.nodeLoserDim : styles.nodePending,
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <p className={styles.eyebrow}>Losers</p>
-          <p className={styles.title}>
-            {resolved && loserCount > 0
-              ? `${loserCount} eliminated`
-              : "Pending"}
-          </p>
-          <p className={styles.meta}>
-            {resolved && loserCount > 0
-              ? "Budget debit · optional eliminate"
-              : "Awaiting resolve"}
-          </p>
-        </div>
+        <p className={styles.outcome}>
+          <strong>{outcome}</strong>
+        </p>
       </div>
     </div>
   );

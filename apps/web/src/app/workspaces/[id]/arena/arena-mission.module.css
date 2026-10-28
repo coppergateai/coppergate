@@ -298,6 +298,20 @@ html[data-theme="light"] .laneFocused {
   border-left: 2px solid transparent;
 }
 
+.laneCollapsedIdle {
+  opacity: 0.78;
+}
+
+.laneCollapsedIdle .laneName {
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.laneCollapsedIdle .laneHeader {
+  padding-top: 0.72rem;
+  padding-bottom: 0.72rem;
+}
+
 .laneHeader {
   width: 100%;
   display: grid;
@@ -475,39 +489,41 @@ html[data-theme="light"] .chip_needsAttention {
 }
 
 .phases {
-  margin: 0.85rem 0 0.95rem;
+  margin: 0.55rem 0 0.85rem;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0;
+  border-bottom: 1px solid var(--mc-line);
 }
 
 .phase {
-  padding: 0.22rem 0.5rem;
-  border-radius: 2px;
-  font-size: 0.65rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
+  margin: 0 0 -1px;
+  padding: 0.4rem 0.7rem 0.5rem;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--mc-idle);
-  border: 1px solid var(--line);
+  background: transparent;
 }
 
 .phaseDone {
   color: var(--mc-text-mute);
-  border-color: color-mix(in srgb, var(--mc-active) 28%, transparent);
 }
 
 .phaseActive {
-  color: var(--mc-active);
-  border-color: color-mix(in srgb, var(--mc-active) 45%, transparent);
-  background: color-mix(in srgb, var(--mc-active) 12%, transparent);
+  color: var(--mc-text);
+  border-bottom-color: var(--mc-copper);
 }
 
 .agents {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+  gap: 0.45rem;
 }
 
 .agentsIdle {
@@ -556,11 +572,11 @@ html[data-theme="light"] .chip_needsAttention {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.35rem;
-  padding: 0.75rem 0.85rem;
+  gap: 0.28rem;
+  padding: 0.65rem 0.75rem;
   border-radius: var(--radius-sm, 4px);
   border: 1px solid var(--mc-line);
-  background: var(--mc-canvas);
+  background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -568,8 +584,36 @@ html[data-theme="light"] .chip_needsAttention {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
+.agentWinner {
+  border-color: color-mix(in srgb, var(--mc-active) 42%, var(--mc-line));
+}
+
+.agentMetrics {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.1rem;
+  font-size: 0.68rem;
+  color: var(--mc-text-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.agentPr {
+  color: var(--mc-copper);
+  text-decoration: none;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.agentPr:hover {
+  text-decoration: underline;
+}
+
 html[data-theme="light"] .agent {
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
   border-color: var(--line);
 }
 

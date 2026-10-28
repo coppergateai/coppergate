@@ -5,7 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { SkeletonStack } from "@/components/app/ui";
 import { displayTaskTitle } from "@/lib/display-title";
 import { AgentInspector } from "./agent-inspector";
-import { LaneTournamentFlow } from "./lane-tournament-flow";
+import {
+  LaneTournamentFlow,
+  type LaneTournamentScore,
+} from "./lane-tournament-flow";
 import styles from "./arena-mission.module.css";
 
 type ContenderRun = {
@@ -324,6 +327,9 @@ export function ArenaSpectacle({
   const expandInitialized = useRef(false);
   const [selected, setSelected] = useState<SelectedAgent | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [laneScores, setLaneScores] = useState<
+    Record<string, LaneTournamentScore[]>
+  >({});
 
   const applySnapshot = useCallback((data: Snapshot) => {
     setSnapshot({
@@ -394,18 +400,14 @@ export function ArenaSpectacle({
     if (focusProjectId) {
       next.add(focusProjectId);
     } else {
-      // Prefer lanes that need human action after the attention classifier.
+      // Prefer hot lanes only — do not expand idle LIVE shells (.github).
       const attention = snapshot.projects.find(
         (lane) => projectRuntime(lane) === "needsAttention",
       );
       const active =
         attention ??
-        snapshot.projects.find((lane) => {
-          const runtime = projectRuntime(lane);
-          return runtime !== "idle" || isLiveStatus(lane.arenaStatus);
-        });
+        snapshot.projects.find((lane) => projectRuntime(lane) !== "idle");
       if (active) next.add(active.projectId);
-      else if (snapshot.projects[0]) next.add(snapshot.projects[0].projectId);
     }
     setExpanded(next);
   }, [snapshot, loading, focusProjectId]);
@@ -499,11 +501,15 @@ export function ArenaSpectacle({
 
   const ordered = useMemo(() => {
     const projects = snapshot?.projects ?? [];
-    if (!focusProjectId) return projects;
     return [...projects].sort((a, b) => {
-      if (a.projectId === focusProjectId) return -1;
-      if (b.projectId === focusProjectId) return 1;
-      return 0;
+      if (focusProjectId) {
+        if (a.projectId === focusProjectId) return -1;
+        if (b.projectId === focusProjectId) return 1;
+      }
+      const ra = RUNTIME_RANK[projectRuntime(a)];
+      const rb = RUNTIME_RANK[projectRuntime(b)];
+      if (ra !== rb) return ra - rb;
+      return a.projectName.localeCompare(b.projectName);
     });
   }, [snapshot?.projects, focusProjectId]);
 
@@ -651,7 +657,11 @@ export function ArenaSpectacle({
                   role="listitem"
                   className={`${styles.lane} ${
                     focused ? styles.laneFocused : ""
-                  } ${TONE[laneRuntime].lane}`}
+                  } ${TONE[laneRuntime].lane} ${
+                    laneRuntime === "idle" && !isExpanded
+                      ? styles.laneCollapsedIdle
+                      : ""
+                  }`}
                 >
                   <button
                     type="button"
@@ -736,11 +746,38 @@ export function ArenaSpectacle({
                             contenderId,
                           })
                         }
+                        onScores={(scores) => {
+                          setLaneScores((prev) => {
+                            const prevScores = prev[lane.projectId];
+                            if (
+                              prevScores &&
+                              prevScores.length === scores.length &&
+                              prevScores.every(
+                                (s, i) =>
+                                  s.contenderId === scores[i]?.contenderId &&
+                                  s.efficiencyScore ===
+                                    scores[i]?.efficiencyScore &&
+                                  s.fitnessScore === scores[i]?.fitnessScore &&
+                                  s.tournamentResult ===
+                                    scores[i]?.tournamentResult,
+                              )
+                            ) {
+                              return prev;
+                            }
+                            return { ...prev, [lane.projectId]: scores };
+                          });
+                        }}
                       />
-                      <div className={styles.phases} aria-label="Execution phase">
+                      <div
+                        className={styles.phases}
+                        role="tablist"
+                        aria-label="Execution phase"
+                      >
                         {PHASES.map((phase, i) => (
                           <span
                             key={phase}
+                            role="tab"
+                            aria-selected={i === activePhase}
                             className={`${styles.phase} ${
                               i === activePhase ? styles.phaseActive : ""
                             } ${i < activePhase ? styles.phaseDone : ""}`}
@@ -750,6 +787,12 @@ export function ArenaSpectacle({
                         ))}
                       </div>
                       {(() => {
+                        const scoresByContender = new Map(
+                          (laneScores[lane.projectId] ?? []).map((s) => [
+                            s.contenderId,
+                            s,
+                          ]),
+                        );
                         const ranked = [...lane.contenders]
                           .map((c) => ({
                             c,
@@ -771,6 +814,9 @@ export function ArenaSpectacle({
                             selected?.contenderId === c.id &&
                             selected.projectId === lane.projectId;
                           const hot = state !== "idle";
+                          const score = scoresByContender.get(c.id);
+                          const result = score?.tournamentResult;
+                          const prUrl = score?.prUrl ?? c.latestRun?.prUrl;
                           return (
                             <button
                               key={c.id}
@@ -779,6 +825,8 @@ export function ArenaSpectacle({
                                 state === "running" ? styles.agentPulse : ""
                               } ${selectedHere ? styles.agentSelected : ""} ${
                                 compact ? styles.agentCompact : ""
+                              } ${
+                                result === "WINNER" ? styles.agentWinner : ""
                               }`}
                               onClick={() =>
                                 setSelected({
@@ -792,7 +840,11 @@ export function ArenaSpectacle({
                                   {titleCase(c.profileKey)}
                                 </span>
                                 <span className={styles.agentState}>
-                                  {runtimeLabel(state)}
+                                  {result === "WINNER"
+                                    ? "Winner"
+                                    : result === "LOSER"
+                                      ? "Loser"
+                                      : runtimeLabel(state)}
                                 </span>
                               </div>
                               {hot ? (
@@ -804,6 +856,33 @@ export function ArenaSpectacle({
                                   {temperLabel(c.temperament)} · {c.strategy}
                                 </p>
                               )}
+                              {!compact && (score || prUrl) ? (
+                                <div className={styles.agentMetrics}>
+                                  {score ? (
+                                    <span>
+                                      e=
+                                      {score.efficiencyScore == null
+                                        ? "—"
+                                        : score.efficiencyScore.toFixed(3)}
+                                      {" · "}f=
+                                      {score.fitnessScore == null
+                                        ? "—"
+                                        : score.fitnessScore.toFixed(2)}
+                                    </span>
+                                  ) : null}
+                                  {prUrl ? (
+                                    <a
+                                      href={prUrl}
+                                      className={styles.agentPr}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      PR
+                                    </a>
+                                  ) : null}
+                                </div>
+                              ) : null}
                             </button>
                           );
                         };
