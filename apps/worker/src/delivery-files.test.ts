@@ -7,6 +7,9 @@ import {
   assertLockfileSyncedWithPackageJson,
   assertProductDeliveryPaths,
   buildDeliveryFiles,
+  findOnDiskLockfilePaths,
+  lockfilePathForPackageManager,
+  lockfileRefreshCommand,
   pathMatchesAllowlist,
 } from "./delivery-files.js";
 
@@ -55,6 +58,34 @@ describe("lockfile sync gate", () => {
   it("ignores deliveries that do not touch package.json", () => {
     const ok = assertLockfileSyncedWithPackageJson(["packages/db/src/index.ts"]);
     assert.equal(ok.ok, true);
+  });
+
+  it("finds on-disk root lockfile omitted from filesChanged", async () => {
+    const workdir = await mkdtemp(join(tmpdir(), "cg-lock-"));
+    await mkdir(join(workdir, "packages/db"), { recursive: true });
+    await writeFile(join(workdir, "packages/db/package.json"), "{}", "utf8");
+    await writeFile(join(workdir, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n", "utf8");
+    const found = await findOnDiskLockfilePaths(workdir, [
+      "packages/db/package.json",
+    ]);
+    assert.deepEqual(found, ["pnpm-lock.yaml"]);
+    assert.equal(
+      assertLockfileSyncedWithPackageJson([
+        "packages/db/package.json",
+        ...found,
+      ]).ok,
+      true,
+    );
+  });
+
+  it("lockfile refresh command is argv-safe (no shell -c)", () => {
+    assert.deepEqual(lockfileRefreshCommand("pnpm"), [
+      "pnpm",
+      "install",
+      "--lockfile-only",
+      "--ignore-scripts",
+    ]);
+    assert.equal(lockfilePathForPackageManager("pnpm"), "pnpm-lock.yaml");
   });
 });
 

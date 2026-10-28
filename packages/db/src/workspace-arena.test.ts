@@ -185,6 +185,14 @@ describe("classifyContenderRuntime", () => {
       "idle",
     );
     assert.equal(
+      classifyContenderRuntime(
+        runStub({ status: "FAILED", errorCode: "lockfile_out_of_sync" }),
+        1,
+        { arenaLive: true, nowMs: now },
+      ),
+      "idle",
+    );
+    assert.equal(
       classifyContenderRuntime(runStub({ status: "FAILED" }), 1, {
         arenaLive: true,
         contenderStatus: "ELIMINATED",

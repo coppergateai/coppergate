@@ -2,7 +2,8 @@ import {
   evaluateAgentWritePath,
   isForbiddenAgentPath,
 } from "@coppergate/agents";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import { resolveContainedPath } from "@coppergate/sandbox";
 
 export type DeliveryFile = { path: string; content: string };
@@ -106,6 +107,22 @@ const PNPM_LOCK_RE = /(^|\/)pnpm-lock\.yaml$/i;
 const NPM_LOCK_RE = /(^|\/)package-lock\.json$/i;
 const YARN_LOCK_RE = /(^|\/)yarn\.lock$/i;
 
+const ROOT_LOCKFILE_CANDIDATES = [
+  "pnpm-lock.yaml",
+  "package-lock.json",
+  "yarn.lock",
+] as const;
+
+export type LockfilePackageManager = "pnpm" | "npm" | "yarn";
+
+function touchesLockfilePath(paths: string[]): boolean {
+  return (
+    paths.some((p) => PNPM_LOCK_RE.test(p)) ||
+    paths.some((p) => NPM_LOCK_RE.test(p)) ||
+    paths.some((p) => YARN_LOCK_RE.test(p))
+  );
+}
+
 /**
  * Refuse live delivery when package.json changes without a lockfile update.
  * Prevents CI frozen-lockfile failures (ACPP dogfood P-011 class).
@@ -119,11 +136,7 @@ export function assertLockfileSyncedWithPackageJson(
   const touchesPackageJson = normalized.some((p) => PACKAGE_MANIFEST_RE.test(p));
   if (!touchesPackageJson) return { ok: true };
 
-  const touchesLock =
-    normalized.some((p) => PNPM_LOCK_RE.test(p)) ||
-    normalized.some((p) => NPM_LOCK_RE.test(p)) ||
-    normalized.some((p) => YARN_LOCK_RE.test(p));
-  if (touchesLock) return { ok: true };
+  if (touchesLockfilePath(normalized)) return { ok: true };
 
   return {
     ok: false,
@@ -131,6 +144,74 @@ export function assertLockfileSyncedWithPackageJson(
       "package.json changed without pnpm-lock.yaml / package-lock.json / yarn.lock — run the package manager to refresh the lockfile before delivery",
     code: "lockfile_out_of_sync",
   };
+}
+
+async function pathExistsInWorkdir(
+  workdir: string,
+  relPath: string,
+): Promise<boolean> {
+  try {
+    const abs = resolveContainedPath(workdir, relPath);
+    await access(abs, fsConstants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * When agents edit package.json but omit the lockfile from filesChanged,
+ * include an on-disk root lockfile so delivery stays CI-frozen-lockfile safe.
+ */
+export async function findOnDiskLockfilePaths(
+  workdir: string | null | undefined,
+  paths: string[],
+): Promise<string[]> {
+  const normalized = paths
+    .map((p) => p.replace(/^\.\//, "").trim())
+    .filter(Boolean);
+  if (!normalized.some((p) => PACKAGE_MANIFEST_RE.test(p))) return [];
+  if (touchesLockfilePath(normalized)) return [];
+  const root = workdir?.trim();
+  if (!root) return [];
+
+  const found: string[] = [];
+  for (const candidate of ROOT_LOCKFILE_CANDIDATES) {
+    if (await pathExistsInWorkdir(root, candidate)) {
+      found.push(candidate);
+    }
+  }
+  return found;
+}
+
+/** Prefer the lockfile already on disk; default pnpm for JS monorepos. */
+export async function detectLockfilePackageManager(
+  workdir: string | null | undefined,
+): Promise<LockfilePackageManager> {
+  const root = workdir?.trim();
+  if (!root) return "pnpm";
+  if (await pathExistsInWorkdir(root, "pnpm-lock.yaml")) return "pnpm";
+  if (await pathExistsInWorkdir(root, "yarn.lock")) return "yarn";
+  if (await pathExistsInWorkdir(root, "package-lock.json")) return "npm";
+  return "pnpm";
+}
+
+/** argv for refreshing the lockfile after package.json edits (no shell -c). */
+export function lockfileRefreshCommand(
+  pm: LockfilePackageManager,
+): string[] {
+  if (pm === "yarn") return ["yarn", "install", "--mode=update-lockfile"];
+  if (pm === "npm") return ["npm", "install", "--package-lock-only", "--ignore-scripts"];
+  return ["pnpm", "install", "--lockfile-only", "--ignore-scripts"];
+}
+
+/** Root lockfile path expected after a refresh for the given package manager. */
+export function lockfilePathForPackageManager(
+  pm: LockfilePackageManager,
+): string {
+  if (pm === "yarn") return "yarn.lock";
+  if (pm === "npm") return "package-lock.json";
+  return "pnpm-lock.yaml";
 }
 
 /** SEC-022 — refuse delivery file bodies that embed tokens or private keys. */

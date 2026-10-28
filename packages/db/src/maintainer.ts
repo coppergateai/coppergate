@@ -2781,6 +2781,8 @@ export async function listInFlightArchitectureIds(
   },
 ): Promise<string[]> {
   // Workspace-wide open/in-flight — not just this project.
+  // ORDER BY updated_at DESC is required: without it, LIMIT 300 can omit
+  // recent Open IDs and replan thrash-reinvents them (ACPP P-010 class).
   const openTasks = await db
     .select({ title: tasks.title })
     .from(tasks)
@@ -2790,6 +2792,7 @@ export async function listInFlightArchitectureIds(
         inArray(tasks.status, [...IN_FLIGHT_ARCH_TASK_STATUSES]),
       ),
     )
+    .orderBy(desc(tasks.updatedAt))
     .limit(300);
 
   const ids = new Set(architectureIdsFromTitles(openTasks.map((t) => t.title)));
@@ -2806,6 +2809,7 @@ export async function listInFlightArchitectureIds(
         gte(tasks.updatedAt, since),
       ),
     )
+    .orderBy(desc(tasks.updatedAt))
     .limit(300);
   for (const id of architectureIdsFromTitles(
     recentTerminal.map((t) => t.title),

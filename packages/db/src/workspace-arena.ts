@@ -66,7 +66,9 @@ function isQuietFailureErrorCode(errorCode: string | null | undefined): boolean 
     errorCode === "validating_lease_expired" ||
     errorCode === "lease_expired_poison" ||
     // Operator closed the PR (or GitHub already closed it) — terminal, not an ops fire.
-    errorCode === "pr_closed"
+    errorCode === "pr_closed" ||
+    // Delivery gate refused before PR — expected until agent/lockfile repair lands.
+    errorCode === "lockfile_out_of_sync"
   );
 }
 

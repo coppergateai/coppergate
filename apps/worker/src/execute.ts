@@ -71,6 +71,10 @@ import {
   assertLockfileSyncedWithPackageJson,
   assertProductDeliveryPaths,
   buildDeliveryFiles,
+  detectLockfilePackageManager,
+  findOnDiskLockfilePaths,
+  lockfilePathForPackageManager,
+  lockfileRefreshCommand,
 } from "./delivery-files.js";
 import {
   mergeArchitectureContext,
@@ -740,12 +744,97 @@ export async function executeClaimedRun(
             (p) => p !== "**/*" && p !== "**",
           );
         }
-        const deliveryPaths = deliveryBundle.files.map((f) => f.path);
+        let deliveryPaths = deliveryBundle.files.map((f) => f.path);
+        // Same-run lockfile repair: agents often edit package.json but omit the
+        // lockfile from filesChanged even when it already exists (or after install).
+        let lockGate = assertLockfileSyncedWithPackageJson(deliveryPaths);
+        if (
+          !lockGate.ok &&
+          deliveryModeHint === "http" &&
+          !(agent instanceof FakeCodingAgent)
+        ) {
+          const changed = completion.filesChanged ?? [];
+          let repairedPaths = [...changed];
+          const onDisk = await findOnDiskLockfilePaths(
+            sandbox?.workdir,
+            repairedPaths,
+          );
+          if (onDisk.length > 0) {
+            repairedPaths = [...new Set([...repairedPaths, ...onDisk])];
+            await appendRunEvent(db, {
+              runId: run.id,
+              workspaceId: run.workspaceId,
+              kind: "progress",
+              payload: {
+                message: `Including on-disk lockfile(s) omitted from filesChanged: ${onDisk.join(", ")}`,
+                code: "lockfile_auto_include",
+                paths: onDisk,
+              },
+            });
+          } else if (sandbox && sandboxManager) {
+            const pm = await detectLockfilePackageManager(sandbox.workdir);
+            const cmd = lockfileRefreshCommand(pm);
+            const lockPath = lockfilePathForPackageManager(pm);
+            try {
+              const result = await sandboxManager.exec(sandbox, cmd, {
+                timeoutMs: 180_000,
+              });
+              if (result.exitCode === 0) {
+                repairedPaths = [...new Set([...repairedPaths, lockPath])];
+                await appendRunEvent(db, {
+                  runId: run.id,
+                  workspaceId: run.workspaceId,
+                  kind: "progress",
+                  payload: {
+                    message: `Refreshed ${lockPath} via ${cmd.join(" ")}`,
+                    code: "lockfile_auto_refresh",
+                    exitCode: result.exitCode,
+                  },
+                });
+              } else {
+                await appendRunEvent(db, {
+                  runId: run.id,
+                  workspaceId: run.workspaceId,
+                  kind: "progress",
+                  payload: {
+                    message: `Lockfile refresh failed (exit ${result.exitCode}); delivery will refuse`,
+                    code: "lockfile_refresh_failed",
+                    stderr: result.stderr.slice(0, 400),
+                  },
+                });
+              }
+            } catch (err) {
+              await appendRunEvent(db, {
+                runId: run.id,
+                workspaceId: run.workspaceId,
+                kind: "progress",
+                payload: {
+                  message: `Lockfile refresh error: ${err instanceof Error ? err.message : String(err)}`.slice(
+                    0,
+                    400,
+                  ),
+                  code: "lockfile_refresh_failed",
+                },
+              });
+            }
+          }
+          const addedLock = repairedPaths.some(
+            (p) => !changed.includes(p) && /lock/i.test(p),
+          );
+          if (addedLock) {
+            deliveryBundle = await buildDeliveryFiles({
+              workdir: sandbox?.workdir,
+              filesChanged: repairedPaths,
+              runId: run.id,
+            });
+            deliveryPaths = deliveryBundle.files.map((f) => f.path);
+            lockGate = assertLockfileSyncedWithPackageJson(deliveryPaths);
+          }
+        }
         const pathGate = assertProductDeliveryPaths({
           paths: deliveryPaths,
           pathAllowlist: deliveryAllowlist,
         });
-        const lockGate = assertLockfileSyncedWithPackageJson(deliveryPaths);
         const secretGate = assertDeliverySecretsRefused(deliveryBundle.files);
         const deliveryBlocked =
           (!pathGate.ok ? pathGate : null) ??
