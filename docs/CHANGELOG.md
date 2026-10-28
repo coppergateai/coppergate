@@ -15,4 +15,5 @@
 - P-141: Contender elimination ledger (audit-backed debits), Arena **Eliminated** roster + pool honesty, and Activity fan-out starvation summaries. See `docs/contender-elimination-ledger.md`.
 - P-143: L2 auto-merge + min_human **Settings honesty** — effective merge/min_human copy, maintainer ON ≠ prod deploy, kill-switch + envelope fail-closed reminders; arena ensure defaults min_human on. See `docs/project-settings-honesty.md`.
 - P-144: **L3 Release Assistant** — maintainer policy `autoRelease` off by default; when enabled, tick ships GitHub tag + Release with notes, `maintainer.release` + `release` maintainer event audit (`prodDeploy: false`). See `docs/l3-release-assistant.md`.
+- P-145: **Multi-project maintainer rollup** — workspace envelope burn, verified `auto_merge` counts, and zero-touch delivery signal across maintainer-enabled projects without double-counting pooled spend. See `docs/maintainer-multi-project-rollup.md`.
 - AG-012: Lean meta gate under $2 available micros; arena seating is engineer strategy peers (Reviewer is critic/catalog, not a duel seat).

@@ -11,6 +11,7 @@ import styles from "./project-detail.module.css";
 
 type Metrics = {
   merges: number;
+  verifiedMerges?: number;
   spendMicros: number;
   capMicros: number;
   spendWithinCap: boolean;
@@ -347,6 +348,10 @@ export function MaintainerPanel({
                 <dd>~{dollars(metrics.costPerAcceptedMergeMicros)}</dd>
               </div>
             ) : null}
+            <div>
+              <dt>Verified merges</dt>
+              <dd>{metrics.verifiedMerges ?? 0}</dd>
+            </div>
             <div>
               <dt>Human touches</dt>
               <dd>{metrics.humanTouches}</dd>
