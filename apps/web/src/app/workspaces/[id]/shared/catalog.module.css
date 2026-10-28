@@ -536,6 +536,13 @@
   flex-wrap: wrap;
 }
 
+.mcpRow > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
 .statusPill {
   display: inline-flex;
   align-items: center;

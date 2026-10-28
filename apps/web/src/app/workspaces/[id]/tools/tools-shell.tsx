@@ -109,7 +109,13 @@ export function ToolsShell({
         t.title.toLowerCase().includes(q) ||
         t.key.toLowerCase().includes(q) ||
         t.kind.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q)
+        t.description.toLowerCase().includes(q) ||
+        (t.targetToken?.toLowerCase().includes(q) ?? false) ||
+        t.agents.some(
+          (a) =>
+            a.key.toLowerCase().includes(q) ||
+            a.displayName.toLowerCase().includes(q),
+        )
       );
     });
   }, [tools, query, kindFilter]);
@@ -392,24 +398,20 @@ export function ToolsShell({
                       aria-current={active ? "true" : undefined}
                       onClick={() => selectTool(t.key)}
                     >
-                      <p className={styles.itemName}>{t.title}</p>
-                      <p className={styles.itemAside}>
+                      <span className={styles.itemName}>{t.title}</span>
+                      <span className={styles.itemAside}>
                         {t.agents.length > 0
                           ? `${t.agents.length} agent${t.agents.length === 1 ? "" : "s"}`
                           : "—"}
-                      </p>
-                      <p className={styles.itemKey}>{t.key}</p>
-                      <p className={styles.itemMeta}>
-                        <span>{t.kind}</span>
-                        {t.workspaceOwned ? (
-                          <>
-                            <span className={styles.metaSep} aria-hidden>
-                              ·
-                            </span>
-                            <span>workspace</span>
-                          </>
-                        ) : null}
-                      </p>
+                      </span>
+                      <span className={styles.itemKey}>{t.key}</span>
+                      <span className={styles.itemMeta}>
+                        {t.kind}
+                        <span className={styles.metaSep} aria-hidden>
+                          ·
+                        </span>
+                        {sourceLabel(t)}
+                      </span>
                     </button>
                   </li>
                 );
@@ -441,15 +443,17 @@ export function ToolsShell({
                 {mcpConnections.map((c) => (
                   <li key={c.provider} className={styles.mcpRow}>
                     <div>
-                      <p className={styles.relatedTitle}>{c.displayName}</p>
-                      <p className={styles.relatedMeta}>
+                      <span className={styles.relatedTitle}>
+                        {c.displayName}
+                      </span>
+                      <span className={styles.relatedMeta}>
                         {c.provider}{" "}
                         <span
                           className={`${styles.statusPill} ${c.enabled ? styles.statusOn : styles.statusOff}`}
                         >
                           {c.enabled ? "on" : "off"}
                         </span>
-                      </p>
+                      </span>
                     </div>
                     {isOwner ? (
                       <div className={styles.btnRow}>
@@ -483,7 +487,7 @@ export function ToolsShell({
         <section className={styles.detailPane} aria-live="polite">
           {showEditor ? (
             <div className={styles.editor}>
-              <h2 className={styles.editorTitle}>
+              <h2 className={styles.detailTitle}>
                 {creating ? "New tool" : `Edit ${selected?.title}`}
               </h2>
               {creating ? (
@@ -627,32 +631,17 @@ export function ToolsShell({
                 <div className={styles.detailHeadMain}>
                   <h2 className={styles.detailTitle}>{selected.title}</h2>
                   <p className={styles.detailKey}>
-                    {selected.key} · {sourceLabel(selected)}
+                    {selected.key} · {selected.kind} · {sourceLabel(selected)}
                   </p>
-                  <div className={styles.props}>
-                    <div className={styles.prop}>
-                      <span className={styles.propLabel}>Kind</span>
-                      <span className={styles.propValue}>{selected.kind}</span>
-                    </div>
-                    <div className={styles.prop}>
-                      <span className={styles.propLabel}>Agents</span>
-                      <span className={styles.propValue}>
-                        {selected.agents.length}
-                      </span>
-                    </div>
-                    <div className={styles.prop}>
-                      <span className={styles.propLabel}>Source</span>
-                      <span className={styles.propValue}>
-                        {sourceLabel(selected)}
-                      </span>
-                    </div>
+                  <div className={styles.chipRow}>
+                    <span className={styles.chip}>{selected.kind}</span>
+                    <span className={styles.chip}>{sourceLabel(selected)}</span>
+                    <span className={styles.chip}>
+                      {selected.agents.length} agent
+                      {selected.agents.length === 1 ? "" : "s"}
+                    </span>
                     {selected.targetToken ? (
-                      <div className={styles.prop}>
-                        <span className={styles.propLabel}>Target</span>
-                        <span className={`${styles.propValue} ${styles.codeInline}`}>
-                          {selected.targetToken}
-                        </span>
-                      </div>
+                      <span className={styles.chip}>{selected.targetToken}</span>
                     ) : null}
                   </div>
                 </div>
@@ -708,8 +697,10 @@ export function ToolsShell({
                           href={`/workspaces/${workspaceId}/agents?agent=${encodeURIComponent(a.key)}`}
                           className={styles.relatedItem}
                         >
-                          <p className={styles.relatedTitle}>{a.displayName}</p>
-                          <p className={styles.relatedMeta}>{a.key}</p>
+                          <span className={styles.relatedTitle}>
+                            {a.displayName}
+                          </span>
+                          <span className={styles.relatedMeta}>{a.key}</span>
                         </Link>
                       </li>
                     ))}
