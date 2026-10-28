@@ -53,13 +53,27 @@ export type InstallationTokenResult = {
   expiresAt: Date;
 };
 
+/**
+ * GitHub App installation ids are numeric. Non-numeric values are test
+ * fixtures / GitLab bindings / stale rows — never call the installations API.
+ */
+export function isGithubNumericInstallationId(id: string): boolean {
+  return /^\d+$/.test(id.trim());
+}
+
 export async function createInstallationAccessToken(
   appJwt: string,
   installationId: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<InstallationTokenResult> {
+  const id = installationId.trim();
+  if (!isGithubNumericInstallationId(id)) {
+    throw new Error(
+      `GitHub installation token failed (invalid_id: non-numeric)`,
+    );
+  }
   const res = await fetchImpl(
-    `https://api.github.com/app/installations/${installationId}/access_tokens`,
+    `https://api.github.com/app/installations/${id}/access_tokens`,
     {
       method: "POST",
       headers: {

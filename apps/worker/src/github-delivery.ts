@@ -11,6 +11,7 @@ import {
   HttpGithubDelivery,
   createAppJwt,
   createInstallationAccessToken,
+  isGithubNumericInstallationId,
   openSecret,
   parseEncryptionKey,
   sealSecret,
@@ -55,6 +56,11 @@ async function resolveInstallationToken(
   db: Database,
   installation: GithubInstallation,
 ): Promise<string> {
+  if (!isGithubNumericInstallationId(installation.githubInstallationId)) {
+    throw new Error(
+      `GitHub installation token failed (invalid_id: non-numeric)`,
+    );
+  }
   const env = loadEnv();
   if (
     !env.GITHUB_APP_ID ||
