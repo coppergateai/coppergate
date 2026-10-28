@@ -18,6 +18,7 @@ type ContenderRun = {
   errorCode: string | null;
   tournamentResult?: string | null;
   updatedAt: string;
+  activityHint?: string | null;
 };
 
 const STALE_FAILURE_MS = 2 * 60 * 60 * 1000;
@@ -222,6 +223,13 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
   }
   if (run.errorCode === "pr_closed") return "PR closed — terminal";
   if (run.errorCode) return run.errorCode.replace(/_/g, " ");
+  if (
+    state === "running" &&
+    typeof run.activityHint === "string" &&
+    run.activityHint.trim()
+  ) {
+    return run.activityHint;
+  }
   if (title) {
     if (state === "running") return title;
     if (state === "awaitingCi") return `Awaiting validation · ${title}`;

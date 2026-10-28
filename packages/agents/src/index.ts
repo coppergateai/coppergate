@@ -37,6 +37,20 @@ export {
 } from "./create-agent.js";
 export { FailoverCodingAgent } from "./failover.js";
 export {
+  CODING_PATH_HONESTY_CODE,
+  NATIVE_OPENAI_DEMOTED_REASON,
+  buildCodingPathHonestyEvent,
+  buildNativeOpenAiDemotion,
+  formatCodingPathHonestyLine,
+  formatProviderFailoverLine,
+  withCodingPathHonesty,
+  type CodingPathHonestyMeta,
+  type CodingPathHonestyPayload,
+  type CodingPathPrimary,
+  type CodingPathSource,
+  type NativeOpenAiDemotion,
+} from "./coding-path-honesty.js";
+export {
   CursorSdkCodingAgent,
   type CursorSdkAgentHandle,
   type CursorSdkBridge,

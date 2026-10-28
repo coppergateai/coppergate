@@ -509,6 +509,12 @@ export {
   recoverDeliveredRun,
 } from "./run-events.js";
 export {
+  latestRunProgressHints,
+  mergeRunActivityLine,
+  runProgressHintFromPayload,
+  type RunProgressHint,
+} from "./run-event-hints.js";
+export {
   containsSecretMaterial,
   redactPayload,
   redactString,
