@@ -180,6 +180,26 @@ describe("selectAutoAcceptRun", () => {
     };
     assert.equal(selectAutoAcceptRun([solo]), solo);
   });
+
+  it("treats same-PR multi-profile tournament as solo for unattended accept", () => {
+    const qa = {
+      id: "qa",
+      tournamentId: "t1",
+      tournamentResult: null,
+      status: "REVIEW_REQUIRED",
+      prNumber: 176,
+      headSha: "abc",
+    };
+    const fixer = {
+      id: "fixer",
+      tournamentId: "t1",
+      tournamentResult: null,
+      status: "WAITING_CI",
+      prNumber: 176,
+      headSha: "abc",
+    };
+    assert.equal(selectAutoAcceptRun([fixer, qa]), qa);
+  });
 });
 
 describe("selectCiRefreshRun", () => {

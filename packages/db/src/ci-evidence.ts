@@ -1,8 +1,15 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { createArtifact } from "./artifacts.js";
 import { appendRunEvent } from "./run-events.js";
 import { agentRuns, artifacts, type AgentRun } from "./schema.js";
+
+/** Runs that still need CI evidence attached for unattended accept. */
+const CI_ATTACH_RUN_STATUSES = [
+  "WAITING_CI",
+  "REVIEW_REQUIRED",
+  "VALIDATING",
+] as const;
 
 export type CiEvidenceInput = {
   /** Required — headSha lookups must be tenant-scoped (no cross-workspace attach). */
@@ -65,8 +72,10 @@ type CiArtifactBody = {
 };
 
 /**
- * Attach CI evidence to the latest run matching headSha within a workspace.
- * Failing checks prevent auto ACCEPTED (task stays REVIEW_REQUIRED or → FAILED).
+ * Attach CI evidence to every active run matching headSha in the workspace.
+ *
+ * Attaching only to the newest run left peer WAITING_CI runs (fixer vs qa on the
+ * same PR) without the required check — auto-accept deadlocked forever.
  */
 export async function ingestCiEvidence(
   db: Database,
@@ -76,22 +85,53 @@ export async function ingestCiEvidence(
     return { run: null, attached: false };
   }
 
-  const [run] = await db
+  const matches = await db
     .select()
     .from(agentRuns)
     .where(
       and(
         eq(agentRuns.headSha, evidence.headSha),
         eq(agentRuns.workspaceId, evidence.workspaceId),
+        inArray(agentRuns.status, [...CI_ATTACH_RUN_STATUSES]),
       ),
     )
     .orderBy(desc(agentRuns.createdAt))
-    .limit(1);
+    .limit(20);
 
-  if (!run) {
+  // Fallback: terminal/other statuses still get evidence on the newest match
+  // (webhook race before WAITING_CI, or late check after promote).
+  const targets =
+    matches.length > 0
+      ? matches
+      : await db
+          .select()
+          .from(agentRuns)
+          .where(
+            and(
+              eq(agentRuns.headSha, evidence.headSha),
+              eq(agentRuns.workspaceId, evidence.workspaceId),
+            ),
+          )
+          .orderBy(desc(agentRuns.createdAt))
+          .limit(1);
+
+  if (targets.length === 0) {
     return { run: null, attached: false };
   }
 
+  let primary: AgentRun | null = null;
+  for (const run of targets) {
+    const updated = await attachCiEvidenceToRun(db, run, evidence);
+    if (!primary) primary = updated;
+  }
+  return { run: primary, attached: true };
+}
+
+async function attachCiEvidenceToRun(
+  db: Database,
+  run: AgentRun,
+  evidence: CiEvidenceInput,
+): Promise<AgentRun> {
   await appendRunEvent(db, {
     runId: run.id,
     workspaceId: run.workspaceId,
@@ -197,13 +237,13 @@ export async function ingestCiEvidence(
           /* peer may still be WAITING_CI */
         }
       }
-      return { run: promoted, attached: true };
+      return promoted;
     } catch {
       /* best-effort */
     }
   }
 
-  return { run, attached: true };
+  return run;
 }
 
 /** Latest CI check state per name (github_check validation_report artifacts). */

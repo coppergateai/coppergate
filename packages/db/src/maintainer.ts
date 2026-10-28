@@ -381,20 +381,45 @@ export function parseMaintainerPolicy(
 
 /**
  * Pick the run eligible for maintainer auto-accept.
- * Tournament tasks require an explicit WINNER; solo tasks use latest run.
+ * Tournament tasks require an explicit WINNER — unless every peer shares the
+ * same delivery (one PR / one headSha), which is multi-profile fan-out, not a
+ * competing duel. Those are treated as solo so unattended auto-accept works.
  */
 export function selectAutoAcceptRun<
   T extends {
     tournamentId: string | null;
     tournamentResult: string | null;
+    status?: string | null;
+    prNumber?: number | null;
+    headSha?: string | null;
   },
 >(runs: T[]): T | null {
   if (runs.length === 0) return null;
   const winner = runs.find((r) => r.tournamentResult === "WINNER");
   if (winner) return winner;
   const inTournament = runs.some((r) => r.tournamentId != null);
-  if (inTournament) return null;
-  return runs[0] ?? null;
+  if (!inTournament) return runs[0] ?? null;
+
+  const prNums = [
+    ...new Set(
+      runs
+        .map((r) => r.prNumber)
+        .filter((n): n is number => typeof n === "number" && n > 0),
+    ),
+  ];
+  const shas = [
+    ...new Set(
+      runs
+        .map((r) => r.headSha?.trim())
+        .filter((s): s is string => Boolean(s) && s !== "unknown"),
+    ),
+  ];
+  const sameDelivery =
+    prNums.length === 1 || (prNums.length === 0 && shas.length === 1);
+  if (!sameDelivery) return null;
+
+  const review = runs.find((r) => r.status === "REVIEW_REQUIRED");
+  return review ?? runs[0] ?? null;
 }
 
 /**
