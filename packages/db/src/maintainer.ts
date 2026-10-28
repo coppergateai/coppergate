@@ -1545,10 +1545,47 @@ export async function tickMaintainerProject(
     );
   }
 
-  // Auto-accept when CI green AND tournament WINNER (or solo).
+  // Auto-accept when CI green AND tournament WINNER (or solo / same-PR fan-out).
   // Include WAITING_CI tasks whose run already promoted to REVIEW_REQUIRED.
+  // Also resurrect FAILED waiting_ci_timeout tasks that still have a
+  // REVIEW_REQUIRED delivery run (PR open) so unattended Accept does not stall.
   if (policy.autoMerge) {
     try {
+      const timedOutFailed = await db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.projectId, input.projectId),
+            eq(tasks.workspaceId, input.workspaceId),
+            eq(tasks.status, "FAILED"),
+          ),
+        )
+        .limit(20);
+      for (const task of timedOutFailed) {
+        if (task.githubPrNumber != null) continue;
+        const runs = await listRunsForTask(db, input.workspaceId, task.id);
+        const hasReviewDelivery = runs.some(
+          (r) => r.status === "REVIEW_REQUIRED" && r.prNumber != null,
+        );
+        const hitTimeout = runs.some(
+          (r) => r.errorCode === "waiting_ci_timeout",
+        );
+        if (!hasReviewDelivery || !hitTimeout) continue;
+        try {
+          await applyTaskTransition(db, {
+            workspaceId: input.workspaceId,
+            taskId: task.id,
+            toStatus: "REVIEW_REQUIRED",
+            actor,
+            reason:
+              "unattended recover: CI evidence after waiting_ci_timeout",
+          });
+        } catch {
+          /* illegal / race — skip */
+        }
+      }
+
       const pending = await db
         .select()
         .from(tasks)

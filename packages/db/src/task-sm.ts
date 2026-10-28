@@ -40,8 +40,19 @@ export const ALLOWED_TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
   ACCEPTED: ["DONE", "CANCELLED"],
   DONE: [],
   BLOCKED: ["READY_FOR_APPROVAL", "QUEUED", "CANCELLED", "NEEDS_REPLAN"],
-  /** FAILED → QUEUED: safe retry within max_attempts (TASK016). */
-  FAILED: ["QUEUED", "READY_FOR_APPROVAL", "DRAFT", "CANCELLED", "NEEDS_REPLAN"],
+  /**
+   * FAILED → QUEUED: safe retry within max_attempts (TASK016).
+   * FAILED → REVIEW_REQUIRED: unattended recovery when CI later went green
+   * (waiting_ci_timeout) but the PR is still open with accept-ready evidence.
+   */
+  FAILED: [
+    "QUEUED",
+    "READY_FOR_APPROVAL",
+    "DRAFT",
+    "CANCELLED",
+    "NEEDS_REPLAN",
+    "REVIEW_REQUIRED",
+  ],
   CANCELLED: [],
   EXPIRED: ["READY_FOR_APPROVAL", "DRAFT", "CANCELLED"],
   NEEDS_REPLAN: ["DRAFT", "READY_FOR_APPROVAL", "CANCELLED"],
