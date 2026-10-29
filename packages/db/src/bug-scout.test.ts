@@ -8,6 +8,7 @@ import {
   BUG_SCOUT_SECTION_HEADING,
   appendBugScoutOpenRowsToMarkdown,
   bugScoutFingerprint,
+  collectBugEvidenceFromCiLogs,
   collectBugEvidenceFromRuns,
   extractBugScoutFingerprints,
   isBugScoutNoise,
@@ -124,6 +125,31 @@ describe("bug-scout", () => {
     assert.equal(changed, true);
     assert.match(content, /## Bug scout \(continuous\)/);
     assert.match(content, /\| Open \| AG-100 \| Fix foo \|/);
+  });
+
+  it("collectBugEvidenceFromCiLogs clusters failed checks", () => {
+    const evidence = collectBugEvidenceFromCiLogs([
+      {
+        checkName: "unit tests",
+        conclusion: "failure",
+        headSha: "deadbeef",
+        logSnippet: "AssertionError: expected 1 to equal 2",
+      },
+      {
+        checkName: "unit tests",
+        conclusion: "failure",
+        headSha: "cafebebe",
+        logSnippet: "AssertionError: expected 1 to equal 2",
+      },
+      {
+        checkName: "[ship-gate] tip CI",
+        conclusion: "failure",
+        logSnippet: "red",
+      },
+    ]);
+    assert.equal(evidence.length, 1);
+    assert.match(evidence[0]!.title, /unit tests/);
+    assert.equal(evidence[0]!.count, 2);
   });
 
   it("fingerprint is stable for similar messages", () => {

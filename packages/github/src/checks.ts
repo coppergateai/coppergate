@@ -242,6 +242,51 @@ export async function fetchCommitCheckEvidence(input: {
   return out;
 }
 
+type GhCheckAnnotation = {
+  path?: string | null;
+  title?: string | null;
+  message?: string | null;
+  raw_details?: string | null;
+};
+
+/**
+ * Pull a short failure snippet from GitHub check-run annotations (CI log scan).
+ */
+export async function fetchCheckRunAnnotationSnippet(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  checkRunId: number;
+  fetchImpl?: typeof fetch;
+  maxItems?: number;
+}): Promise<string | null> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const maxItems = Math.max(1, Math.min(10, Math.floor(input.maxItems ?? 4)));
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/check-runs/${input.checkRunId}/annotations?per_page=30`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${input.token}`,
+        "User-Agent": "coppergate-worker",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  );
+  if (!res.ok) return null;
+  const body = (await res.json()) as GhCheckAnnotation[];
+  const parts: string[] = [];
+  for (const ann of body.slice(0, maxItems)) {
+    const bit = [ann.title, ann.message, ann.raw_details, ann.path]
+      .map((s) => (typeof s === "string" ? s.trim() : ""))
+      .filter(Boolean)
+      .join(": ");
+    if (bit) parts.push(bit);
+  }
+  if (parts.length === 0) return null;
+  return parts.join(" | ").replace(/\s+/g, " ").slice(0, 400);
+}
+
 const GH_API_HEADERS = (token: string) => ({
   Accept: "application/vnd.github+json",
   Authorization: `Bearer ${token}`,

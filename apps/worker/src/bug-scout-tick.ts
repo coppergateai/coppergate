@@ -17,6 +17,7 @@ import {
   type Project,
 } from "@coppergate/db";
 import {
+  fetchCheckRunAnnotationSnippet,
   fetchCommitCheckEvidence,
   getRepoDefaultBranchHead,
   getRepoFile,
@@ -42,22 +43,38 @@ async function collectTipCiEvidence(input: {
       repo: input.repo,
       headSha: tip.sha,
     });
-    return checks
+    const failed = checks
       .filter(
         (c) =>
           c.blocksAccept ||
           c.conclusion === "failure" ||
           c.conclusion === "timed_out",
       )
-      .slice(0, 8)
-      .map((c) => ({
+      .slice(0, 8);
+
+    const out: CiLogEvidenceInput[] = [];
+    for (const c of failed) {
+      let logSnippet: string | null = null;
+      if (c.checkRunId != null) {
+        logSnippet = await fetchCheckRunAnnotationSnippet({
+          token: input.token,
+          owner: input.owner,
+          repo: input.repo,
+          checkRunId: c.checkRunId,
+        });
+      }
+      out.push({
         checkName: c.name || "check",
         conclusion:
           c.conclusion === "timed_out" ? "timed_out" : "failure",
         headSha: tip.sha,
-        logSnippet: `${c.name || "check"} failed on ${tip.sha.slice(0, 8)}`,
+        logSnippet:
+          logSnippet ??
+          `${c.name || "check"} failed on ${tip.sha.slice(0, 8)}`,
         detailsUrl: c.detailsUrl ?? null,
-      }));
+      });
+    }
+    return out;
   } catch {
     return [];
   }
