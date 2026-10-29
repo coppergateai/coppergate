@@ -938,7 +938,7 @@ export async function startTournamentFanout(
     override: input.primaryProfileKey,
   });
 
-  const { plan, limits } = await resolveWorkspacePlanLimits(
+  const { plan } = await resolveWorkspacePlanLimits(
     db,
     input.workspaceId,
   );
