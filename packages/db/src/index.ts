@@ -295,6 +295,7 @@ export {
 } from "./briefs.js";
 export {
   countAuditEventsForWorkspace,
+  latestAuditAtForTaskTarget,
   listAuditEventsForWorkspace,
   type ListAuditOptions,
 } from "./audit.js";
@@ -650,6 +651,14 @@ export {
   type CiCheckHistoryEntry,
   type CiWaitingKind,
 } from "./ci-waiting-honesty.js";
+export {
+  evaluateFlakeRetryDeferral,
+  flakeRetryBlockedMessage,
+  ciHistoryToFlakeObservations,
+  FLAKE_RETRY_COOLDOWN_ACTIONS,
+  FLAKE_RETRY_COOLDOWN_MS,
+  type FlakeRetryDeferral,
+} from "./flake-retry-cooldown.js";
 export {
   listWaitingCiRunsForPr,
   resolveWaitingCiForPrOutcome,

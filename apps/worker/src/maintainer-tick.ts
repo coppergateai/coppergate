@@ -313,7 +313,8 @@ export async function runMaintainerSchedulerTick(
         stale.conflictSignals ||
         stale.deliveryHeals ||
         stale.replanned ||
-        stale.retiredShipGates
+        stale.retiredShipGates ||
+        stale.flakeCooldownSkipped
       ) {
         log.info("stale review heal", {
           projectId: tick.projectId,
@@ -321,6 +322,7 @@ export async function runMaintainerSchedulerTick(
           deliveryHeals: stale.deliveryHeals,
           replanned: stale.replanned,
           retiredShipGates: stale.retiredShipGates,
+          flakeCooldownSkipped: stale.flakeCooldownSkipped,
         });
       }
     } catch (err) {
