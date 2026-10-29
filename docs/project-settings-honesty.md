@@ -13,6 +13,8 @@ Two paths can merge a PR to the default branch:
 
 Neither path is “production deploy.” `prod_writes_enabled` on Arena stays off unless explicitly enabled; releases remain policy-gated.
 
+SEC-036 enforces this in code: merge, release, default-branch Contents writes, and sandbox deploy commands fail closed without the matching flag. See `docs/prod-write-policy-gate.md`.
+
 Pure helpers: `describeL2AutoMerge` in `@coppergate/db` (`project-settings-honesty.ts`).
 
 ## min_human

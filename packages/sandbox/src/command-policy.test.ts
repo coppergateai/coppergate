@@ -67,4 +67,15 @@ describe("assertSandboxCommandArgs", () => {
       assertSandboxCommandArgs(["git", "status"]),
     );
   });
+
+  it("SEC-036 blocks production deploy without prodWritesEnabled", () => {
+    denied(() => assertSandboxCommandArgs(["fly", "deploy"]));
+    denied(() =>
+      assertSandboxCommandArgs(["kubectl", "apply", "-f", "x.yaml"]),
+    );
+    assert.doesNotThrow(() =>
+      assertSandboxCommandArgs(["fly", "deploy"], { prodWritesEnabled: true }),
+    );
+    assert.doesNotThrow(() => assertSandboxCommandArgs(["npm", "test"]));
+  });
 });

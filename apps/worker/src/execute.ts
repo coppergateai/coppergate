@@ -24,6 +24,7 @@ import {
   buildDiffSummary,
   createArtifact,
   effectivePlan,
+  getArenaForProject,
   getContenderById,
   getDeliveryCheckpoint,
   getEffectiveAgentProfile,
@@ -508,6 +509,10 @@ export async function executeClaimedRun(
               : `coppergate://project/${run.projectId}`;
           const baseSha =
             deliveryResolved?.baseSha || run.baseSha || "unknown";
+          const arenaRow = await getArenaForProject(db, {
+            workspaceId: run.workspaceId,
+            projectId: run.projectId,
+          });
           sandbox = await sandboxManager.create({
             runId: run.id,
             workspaceId: run.workspaceId,
@@ -517,6 +522,7 @@ export async function executeClaimedRun(
             cloneMode,
             authToken:
               cloneMode === "git" ? deliveryResolved?.authToken : null,
+            prodWritesEnabled: arenaRow?.prodWritesEnabled === true,
           });
           await attachSandboxToRun(db, {
             runId: run.id,
