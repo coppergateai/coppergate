@@ -1,0 +1,24 @@
+{
+  "name": "@coppergate/opp-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "node -e \"process.exit(0)\"",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "devDependencies": {
+    "@coppergate/typescript-config": "workspace:*",
+    "@types/node": "^22.15.21",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
