@@ -610,7 +610,7 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     outcome: "review",
     summary: (m) => {
       const pr = m?.prNumber;
-      return typeof pr === "number" ? `PR #${pr}` : undefined;
+      return typeof pr === "number" ? `PR #${pr}` : null;
     },
   },
   "fitness.score": {
