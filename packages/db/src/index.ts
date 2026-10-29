@@ -525,6 +525,7 @@ export {
 } from "./maintainer-enable-guard.js";
 export {
   classifyContenderRuntime,
+  isClosedParentTaskStatus,
   isLiveArenaStatus,
   killWorkspaceArena,
   listWorkspaceArenaSnapshot,
