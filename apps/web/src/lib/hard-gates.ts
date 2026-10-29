@@ -5,6 +5,9 @@ export type GateStatus = "passed" | "failed" | "pending" | "skipped" | "n/a";
 export const HARD_GATE_COPY = {
   ciFailed: "CI checks failed — Accept disabled",
   ciPending: "Awaiting live CI evidence — Accept disabled",
+  ciRequiredMissing:
+    "Required CI check never reported — helper greens are not Accept-ready",
+  ciFlake: "Required CI check is flaking — Accept disabled until green stabilizes",
   stillValidating: "Delivery still validating — Accept disabled",
   deliveryFailed: "Delivery failed — Retry or re-scope",
   validationFailed: "Sandbox validation failed — fix scope or Retry",
@@ -39,6 +42,8 @@ export function acceptBlockedReason(input: {
   stillValidating?: boolean;
   /** Task already failed — never call this “still validating”. */
   deliveryFailed?: boolean;
+  /** AG-017 — server-classified WAITING_CI reason when available. */
+  ciWaitingKind?: "required_missing" | "flake" | "blocking" | "awaiting" | null;
 }): string | null {
   if (input.acceptReady) return null;
   if (input.policyFailed) return HARD_GATE_COPY.policyFailed;
@@ -46,6 +51,10 @@ export function acceptBlockedReason(input: {
   if (input.deliveryFailed) return HARD_GATE_COPY.deliveryFailed;
   if (input.stillValidating) return HARD_GATE_COPY.stillValidating;
   if (input.ciBlocking) return HARD_GATE_COPY.ciFailed;
+  if (input.ciWaitingKind === "required_missing") {
+    return HARD_GATE_COPY.ciRequiredMissing;
+  }
+  if (input.ciWaitingKind === "flake") return HARD_GATE_COPY.ciFlake;
   if (input.ciAwaitingLive && !input.ciPassed) return HARD_GATE_COPY.ciPending;
   return HARD_GATE_COPY.ciPending;
 }

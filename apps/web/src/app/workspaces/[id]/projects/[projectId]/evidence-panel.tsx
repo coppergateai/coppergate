@@ -15,6 +15,7 @@ type DeliveryRow = {
   updatedAt: string;
   runId: string | null;
   acceptReady: boolean | null;
+  ciWaitingHint?: string | null;
   winnerRunId?: string | null;
   isSurvivor?: boolean;
 };
@@ -37,6 +38,7 @@ function statusHint(
   status: string,
   acceptReady: boolean | null,
   isSurvivor?: boolean,
+  ciWaitingHint?: string | null,
 ): string {
   if (status === "REVIEW_REQUIRED") {
     if (acceptReady) {
@@ -47,7 +49,9 @@ function statusHint(
     return "Review required — check hard gates";
   }
   if (status === "ACCEPTED" || status === "DONE") return "Verified delivery";
-  if (status === "WAITING_CI") return "Awaiting CI evidence";
+  if (status === "WAITING_CI") {
+    return ciWaitingHint?.trim() || "Awaiting CI evidence — Accept disabled";
+  }
   if (status === "FAILED") return "Failed — Retry or re-scope";
   return status;
 }
@@ -311,7 +315,7 @@ export function EvidencePanel({
                     </button>
                   </div>
                   <p className={styles.evidenceMeta}>
-                    {statusHint(d.status, d.acceptReady, survivor)}
+                    {statusHint(d.status, d.acceptReady, survivor, d.ciWaitingHint)}
                     {d.prUrl ? " · PR attached" : ""}
                     {d.updatedAt ? ` · ${formatWhen(d.updatedAt)}` : ""}
                     {!open ? " · Expand gates" : ""}
