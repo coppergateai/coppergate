@@ -10,6 +10,7 @@
 
 ### Features
 
+- AG-014: Mid-run file-write checkpoint — after each sandbox write, persist `file_write_checkpoint`; on reclaim restore bodies and skip identical OpenAI-compatible rewrites. See `docs/file-write-checkpoint.md`.
 - AG-035: Unattended board drain — retire obsolete `[ship-gate]` when tip is green / PR closed; dirty delivery PRs get `merge_conflict` after ~15m (no 6h wait) and free parent concurrency; signal arm survives min_human/approve races. See `docs/ship-receipts/AG-035.md`.
 - SEC-036: **Prod / default-branch write policy gate** — refuse merge-to-default, GitHub Release, default-branch Contents writes, and sandbox production deploy commands unless explicit policy flags (`mergeEnabled`, `autoRelease`, `prodWritesEnabled`). See `docs/prod-write-policy-gate.md`.
 - AG-034: Ship-gate heal-only merge — while tip is `default_branch_ci_red`, product auto-merge stays halted but `[ship-gate]` heal PRs still merge (`shipGateMergeMode=heal_only`), closing the AG-031 enqueue→never-merge deadlock. See `docs/ship-gate-self-heal.md`.

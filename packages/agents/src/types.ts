@@ -76,6 +76,11 @@ export type AgentRunInput = {
   invokeTool?: ToolInvoker;
   /** Max tool rounds in harness loop. Default 4. */
   maxToolInvokes?: number;
+  /**
+   * AG-014 — fingerprints of sandbox writes already restored from
+   * `file_write_checkpoint`. Identical proposed writes are skipped.
+   */
+  completedWritePaths?: Array<{ path: string; contentSha256: string }>;
 };
 
 export type AgentEventKind =

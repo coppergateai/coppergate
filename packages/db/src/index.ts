@@ -669,6 +669,20 @@ export {
   type DiffSummaryBody,
 } from "./delivery-artifacts.js";
 export {
+  FILE_WRITE_CHECKPOINT_KIND,
+  FILE_WRITE_CHECKPOINT_MAX_BYTES,
+  buildFileWriteCheckpointEntry,
+  filterProposedWritesAgainstCheckpoint,
+  getFileWriteCheckpoint,
+  hashFileWriteContent,
+  mergeFileWriteCheckpoint,
+  parseFileWriteCheckpoint,
+  persistFileWriteCheckpoint,
+  restorableWritePaths,
+  type FileWriteCheckpointBody,
+  type FileWriteCheckpointEntry,
+} from "./file-write-checkpoint.js";
+export {
   CredentialError,
   createLlmByok,
   getActiveLlmByok,

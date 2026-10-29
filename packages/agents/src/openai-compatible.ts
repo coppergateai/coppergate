@@ -15,6 +15,7 @@ import {
   guardPromptFields,
   PROMPT_ISOLATION_SYSTEM_RULES,
 } from "./prompt-guard.js";
+import { filterProposedWritesAgainstCompleted } from "./file-write-skip.js";
 import { isStubFileContent } from "./stub-detect.js";
 import type {
   AgentEvent,
@@ -320,9 +321,26 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
       }
     }
 
+    const { toWrite, skipped } = filterProposedWritesAgainstCompleted(
+      files,
+      input.completedWritePaths,
+    );
+    for (const path of skipped) {
+      yield {
+        kind: "file",
+        message: `skipped ${path} (checkpoint)`,
+        payload: {
+          path,
+          action: "skip_checkpoint",
+          sandbox: true,
+          code: "file_write_checkpoint_skip",
+        },
+      };
+    }
+
     const workdir = input.sandboxWorkdir?.trim();
     if (workdir) {
-      for (const f of files) {
+      for (const f of toWrite) {
         const absPath = resolveSafeWorkdirPath(workdir, f.path);
         if (!absPath) {
           yield {
@@ -346,7 +364,7 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
         };
       }
     } else {
-      for (const f of files) {
+      for (const f of toWrite) {
         yield {
           kind: "file",
           message: `Proposed ${f.path}`,
@@ -361,7 +379,9 @@ export class OpenAiCompatibleCodingAgent implements CodingAgent {
     }
 
     const completion = buildFakeCompletion(input, costMicros);
-    completion.filesChanged = files.map((f) => f.path);
+    completion.filesChanged = [
+      ...new Set([...skipped, ...toWrite.map((f) => f.path)]),
+    ];
 
     yield {
       kind: "completion",

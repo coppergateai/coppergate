@@ -123,6 +123,15 @@ export {
 } from "./stub-detect.js";
 export { findDuplicateFilePath, parseFileBlocks } from "./openai-compatible.js";
 export {
+  filterProposedWritesAgainstCompleted,
+  sha256Utf8,
+  type CompletedWriteFingerprint,
+} from "./file-write-skip.js";
+export {
+  restoreFileWritesToWorkdir,
+  type RestorableWrite,
+} from "./file-write-restore.js";
+export {
   containsForbiddenWriteSecret,
   evaluateAgentWritePath,
   isAgentWritePathAllowed,
