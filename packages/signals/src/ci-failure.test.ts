@@ -21,6 +21,21 @@ describe("envelopeFromCiFailure", () => {
     assert.equal(env.severity, "high");
     assert.match(env.fingerprint, /ci_failure:github:org\/repo:test:abc/);
   });
+
+  it("tags Vercel deploy-fail provider in fingerprint", () => {
+    const env = envelopeFromCiFailure({
+      provider: "vercel",
+      externalId: "status:Vercel:deadbeef",
+      name: "Vercel",
+      conclusion: "failure",
+      headSha: "deadbeef",
+      repoFullName: "acme/app",
+      detailsUrl: "https://vercel.com/acme/app/dpl_x",
+    });
+    assert.equal(env.provider, "ci_failure");
+    assert.ok(env.labels.includes("vercel"));
+    assert.match(env.fingerprint, /ci_failure:vercel:acme\/app:Vercel:deadbeef/);
+  });
 });
 
 describe("CiFailureSignalAdapter", () => {

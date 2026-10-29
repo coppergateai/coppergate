@@ -15,6 +15,14 @@ export {
   scmWebBaseUrl,
 } from "./policy.js";
 export {
+  ProdWritePolicyError,
+  assertDefaultBranchContentsWriteAllowed,
+  assertDefaultBranchMergeAllowed,
+  assertProductionDeployAllowed,
+  assertReleaseAllowed,
+  resolveDefaultBranchMergeFlag,
+} from "./prod-write-policy.js";
+export {
   FakeBitbucketDelivery,
   HttpBitbucketDelivery,
 } from "./bitbucket-delivery.js";

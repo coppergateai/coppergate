@@ -12,6 +12,7 @@ export type ToolCatalogEntry = {
   title: string;
   kind: "core" | "mcp" | "alias";
   description: string;
+  invokable: boolean;
 };
 
 export const TOOL_CATALOG: ToolCatalogEntry[] = SYSTEM_TOOL_CATALOG.map(
@@ -20,6 +21,7 @@ export const TOOL_CATALOG: ToolCatalogEntry[] = SYSTEM_TOOL_CATALOG.map(
     title: t.title,
     kind: t.kind,
     description: t.description,
+    invokable: t.invokable,
   }),
 );
 
@@ -30,5 +32,6 @@ export function toolMeta(key: string): ToolCatalogEntry {
     title: m.title,
     kind: m.kind,
     description: m.description,
+    invokable: m.invokable,
   };
 }

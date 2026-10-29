@@ -8,6 +8,8 @@ import {
   mapCheckRunPayload,
   mapCheckSuitePayload,
   mapCommitStatusPayload,
+  isVercelCommitStatusContext,
+  scoreTipCheckSuites,
 } from "./checks.js";
 
 describe("CI check mapping", () => {
@@ -40,6 +42,20 @@ describe("CI check mapping", () => {
     assert.equal(ev.blocksAccept, true);
   });
 
+  it("does not treat cancelled as accept-blocking (cancel-in-progress)", () => {
+    const ev = mapCheckRunPayload({
+      check_run: {
+        id: 3,
+        name: "check",
+        status: "completed",
+        conclusion: "cancelled",
+        head_sha: "cab",
+      },
+    });
+    assert.equal(ev.passed, false);
+    assert.equal(ev.blocksAccept, false);
+  });
+
   it("maps check_suite timeout as blocking", () => {
     const ev = mapCheckSuitePayload({
       check_suite: {
@@ -62,6 +78,27 @@ describe("CI check mapping", () => {
     assert.equal(ev.passed, true);
     assert.equal(ev.blocksAccept, false);
     assert.equal(ev.headSha, "abc123");
+  });
+
+  it("maps Vercel commit status failure as blocking", () => {
+    const ev = mapCommitStatusPayload({
+      state: "error",
+      context: "Vercel",
+      sha: "deadbeef",
+      target_url: "https://vercel.com/acme/app/dpl_x",
+      repository: { full_name: "acme/app" },
+    });
+    assert.equal(ev.blocksAccept, true);
+    assert.equal(ev.conclusion, "failure");
+    assert.equal(isVercelCommitStatusContext(ev.name), true);
+  });
+
+  it("detects Vercel status contexts only", () => {
+    assert.equal(isVercelCommitStatusContext("Vercel"), true);
+    assert.equal(isVercelCommitStatusContext("Vercel – Production"), true);
+    assert.equal(isVercelCommitStatusContext("Vercel - Preview"), true);
+    assert.equal(isVercelCommitStatusContext("ci/circleci"), false);
+    assert.equal(isVercelCommitStatusContext("check"), false);
   });
 
   it("polls check-runs and statuses for a sha", async () => {
@@ -168,6 +205,32 @@ describe("CI check mapping", () => {
         fetchImpl,
       }),
       3,
+    );
+  });
+
+  it("scores tip suites: positive green required; cancelled-only is pending", () => {
+    assert.equal(scoreTipCheckSuites([]).kind, "pending");
+    assert.equal(
+      scoreTipCheckSuites([{ status: "in_progress", conclusion: null }]).kind,
+      "pending",
+    );
+    assert.equal(
+      scoreTipCheckSuites([
+        { status: "completed", conclusion: "cancelled" },
+      ]).kind,
+      "pending",
+    );
+    assert.equal(
+      scoreTipCheckSuites([{ status: "completed", conclusion: "success" }])
+        .kind,
+      "green",
+    );
+    assert.equal(
+      scoreTipCheckSuites([
+        { status: "completed", conclusion: "success" },
+        { status: "completed", conclusion: "failure" },
+      ]).kind,
+      "red",
     );
   });
 });

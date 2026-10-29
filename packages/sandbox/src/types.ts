@@ -16,6 +16,8 @@ export type SandboxCloneMode = "sim" | "git";
 export type CreateSandboxInput = {
   runId: string;
   workspaceId: string;
+  /** Arena prod_writes_enabled — allows production deploy commands (SEC-036). */
+  prodWritesEnabled?: boolean;
   /** Repo clone URL or local path for fixtures. */
   repoUrl: string;
   /** Pinned commit SHA. */
@@ -44,6 +46,7 @@ export type SandboxHandle = {
   runtime: "local" | "docker-gvisor";
   /** How the tree was materialized. */
   cloneMode?: SandboxCloneMode;
+  prodWritesEnabled?: boolean;
 };
 
 export type ExecResult = {

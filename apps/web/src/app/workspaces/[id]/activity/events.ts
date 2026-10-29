@@ -3,6 +3,13 @@
  * Summaries and outcomes are derived only from stored meta — never invented.
  */
 
+import {
+  isReplanArchitectureIdleReason,
+  isReplanQueueArchitectureIdleMeta,
+  replanArchitectureIdleCopy,
+  replanSkipReasonFromMeta,
+} from "@/lib/replan-architecture-idle";
+
 export type ActivityCategory =
   | "execution"
   | "decision"
@@ -611,6 +618,26 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     category: "decision",
     outcome: "review",
   },
+  "ship_gate.heal_enqueued": {
+    title: "Ship-gate heal enqueued",
+    category: "decision",
+    outcome: "review",
+    summary: (m) => str(m, "title") ?? str(m, "headSha"),
+  },
+  "review.stale_ci_timeout_replan": {
+    title: "Stale CI timeout → replan",
+    category: "decision",
+    outcome: "review",
+  },
+  "review.stale_ci_timeout_heal": {
+    title: "Stale CI timeout → same-head heal",
+    category: "decision",
+    outcome: "review",
+    summary: (m) => {
+      const pr = m?.prNumber;
+      return typeof pr === "number" ? `PR #${pr}` : null;
+    },
+  },
   "fitness.score": {
     title: "Fitness scored",
     category: "decision",
@@ -850,28 +877,73 @@ function isConcurrencyThrottleError(err: string): boolean {
   );
 }
 
+function replanArchitectureIdleTitle(
+  meta: Record<string, unknown> | null,
+): string | null {
+  const skipReason = replanSkipReasonFromMeta(meta);
+  if (skipReason && isReplanArchitectureIdleReason(skipReason)) {
+    const n = Array.isArray(meta?.excludeIds)
+      ? meta.excludeIds.filter((x): x is string => typeof x === "string").length
+      : null;
+    return replanArchitectureIdleCopy(skipReason, { inFlightCount: n }).title;
+  }
+  if (isReplanQueueArchitectureIdleMeta(meta)) {
+    const reason =
+      str(meta, "reason") ?? str(meta, "error") ?? "no_architecture_open_id";
+    return replanArchitectureIdleCopy(reason).title;
+  }
+  return null;
+}
+
 function replanQueueTitle(meta: Record<string, unknown> | null): string {
+  const idleTitle = replanArchitectureIdleTitle(meta);
+  if (idleTitle) return idleTitle;
   const err = str(meta, "error");
   if (err && isConcurrencyThrottleError(err)) return "Waiting on capacity";
   return "Replan queue failed";
 }
 
 function replanQueueOutcome(meta: Record<string, unknown> | null): ActivityOutcome {
+  if (replanArchitectureIdleTitle(meta)) return "neutral";
   const err = str(meta, "error");
   if (err && isConcurrencyThrottleError(err)) return "review";
   return "failed";
 }
 
+function replanEventTitle(
+  action: string,
+  meta: Record<string, unknown> | null,
+): string {
+  if (action === "maintainer.replan") {
+    const idleTitle = replanArchitectureIdleTitle(meta);
+    if (idleTitle) return idleTitle;
+  }
+  return humanTitle(action);
+}
+
+function replanEventOutcome(
+  action: string,
+  meta: Record<string, unknown> | null,
+): ActivityOutcome {
+  if (action === "maintainer.replan" && replanArchitectureIdleTitle(meta)) {
+    return "neutral";
+  }
+  return outcomeFor(action);
+}
+
 function annotate(event: ActivityEvent, count = 1): ActivityChildEvent {
   const isMergeAttempt = event.action === "merge.attempt";
   const isReplanQueue = event.action === "maintainer.replan_queue_failed";
+  const isReplan = event.action === "maintainer.replan";
   return {
     ...event,
     title: isMergeAttempt
       ? mergeAttemptTitle(event.meta)
       : isReplanQueue
         ? replanQueueTitle(event.meta)
-        : humanTitle(event.action),
+        : isReplan
+          ? replanEventTitle(event.action, event.meta)
+          : humanTitle(event.action),
     summary: summaryFor(event.action, event.meta, count),
     technicalLabel: technicalLabel(event.action),
     category: categoryFor(event.action),
@@ -879,7 +951,9 @@ function annotate(event: ActivityEvent, count = 1): ActivityChildEvent {
       ? mergeAttemptOutcome(event.meta)
       : isReplanQueue
         ? replanQueueOutcome(event.meta)
-        : outcomeFor(event.action),
+        : isReplan
+          ? replanEventOutcome(event.action, event.meta)
+          : outcomeFor(event.action),
   };
 }
 
@@ -1036,6 +1110,7 @@ function buildTournamentGroup(events: ActivityEvent[]): ActivityGroup {
 function applyMergeAttemptCollapse(group: ActivityGroup): void {
   const merged = group.children.filter((c) => c.meta?.merged === true).length;
   const notReady = group.children.length - merged;
+  const latest = group.children[0]!;
   group.title =
     merged > 0 && notReady === 0
       ? "PRs merged"
@@ -1043,12 +1118,18 @@ function applyMergeAttemptCollapse(group: ActivityGroup): void {
         ? "Merge activity"
         : "Merge not ready";
   group.technicalLabel = `attempt ×${group.count}`;
+  if (merged > 0) {
+    group.summary = `${merged} merged${notReady > 0 ? ` · ${notReady} not ready` : ""}`;
+    group.outcome = notReady === 0 ? "completed" : "review";
+    return;
+  }
+  // Not-ready storms: Cycle 11 per-project bucket, AG-019 last outcome only (no ×N summary spam).
   group.summary =
-    merged > 0
-      ? `${merged} merged${notReady > 0 ? ` · ${notReady} not ready` : ""}`
-      : `${notReady} not mergeable`;
-  group.outcome =
-    merged > 0 && notReady === 0 ? "completed" : "review";
+    str(latest.meta, "message") ??
+    str(latest.meta, "cta") ??
+    summaryFor("merge.attempt", latest.meta, 1);
+  group.outcome = mergeAttemptOutcome(latest.meta);
+  group.meta = latest.meta;
 }
 
 function buildMergeAttemptGroup(events: ActivityEvent[]): ActivityGroup {
@@ -1122,7 +1203,8 @@ function buildArenaControlGroup(events: ActivityEvent[]): ActivityGroup {
 /**
  * Group raw audit events (newest-first) into timeline groups.
  * - Tournament create/fanout/resolve with same tournament id → one execution
- * - merge.attempt storms per project → one collapse (even when interleaved)
+ * - merge.attempt storms per project → one collapse (even when interleaved);
+ *   pure not-ready buckets show the latest outcome only (AG-019 noise floor)
  * - arena.start/stop/pause storms → one Arena control collapse
  * - Consecutive identical actions (same target) → collapsed with count
  */

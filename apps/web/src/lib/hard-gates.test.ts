@@ -40,6 +40,19 @@ describe("acceptBlockedReason", () => {
     );
   });
 
+  it("AG-017: required-missing is not Accept-ready copy", () => {
+    assert.equal(
+      acceptBlockedReason({
+        acceptReady: false,
+        ciBlocking: false,
+        ciAwaitingLive: true,
+        ciPassed: false,
+        ciWaitingKind: "required_missing",
+      }),
+      HARD_GATE_COPY.ciRequiredMissing,
+    );
+  });
+
   it("surfaces real CI failures", () => {
     assert.equal(
       acceptBlockedReason({

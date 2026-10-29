@@ -897,22 +897,54 @@ export async function reapStaleRuns(db: Database): Promise<ReapStaleRunsResult> 
     RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
   `;
 
-  const failedWaitingCiRows = await db.$client<FailedRow[]>`
-    UPDATE agent_runs
-    SET
-      status = 'FAILED',
-      error_code = 'waiting_ci_timeout',
-      error_message = 'WAITING_CI exceeded wall-clock without CI accept-ready',
-      lease_owner = NULL,
-      lease_until = NULL,
-      finished_at = now(),
-      updated_at = now()
+  const staleWaitingCi = await db.$client<{ id: string }[]>`
+    SELECT id
+    FROM agent_runs
     WHERE status = 'WAITING_CI'
       AND cancel_requested_at IS NULL
       AND finished_at IS NOT NULL
       AND finished_at < ${waitingCiCutoff}::timestamptz
-    RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
   `;
+
+  const failedWaitingCiRows: FailedRow[] = [];
+  if (staleWaitingCi.length > 0) {
+    const {
+      getRunCiFitness,
+      listRunCiCheckHistory,
+      resolveRequiredCheckNames,
+    } = await import("./ci-evidence.js");
+    const { waitingCiTimeoutMessage } = await import("./ci-waiting-honesty.js");
+    const requiredNames = resolveRequiredCheckNames();
+    for (const row of staleWaitingCi) {
+      const runId = String(row.id);
+      const fitness = await getRunCiFitness(db, runId);
+      const history = await listRunCiCheckHistory(db, runId);
+      const msg = waitingCiTimeoutMessage({
+        checks: fitness.checks,
+        requiredNames,
+        statusAwaitingCi: true,
+        blocking: fitness.blocking,
+        passed: fitness.passed,
+        checkHistory: history,
+        timedOut: true,
+      });
+      const updated = await db.$client<FailedRow[]>`
+        UPDATE agent_runs
+        SET
+          status = 'FAILED',
+          error_code = 'waiting_ci_timeout',
+          error_message = ${msg},
+          lease_owner = NULL,
+          lease_until = NULL,
+          finished_at = now(),
+          updated_at = now()
+        WHERE id = ${runId}::uuid
+          AND status = 'WAITING_CI'
+        RETURNING id, task_id, workspace_id, project_id, estimated_cost_micros, error_code
+      `;
+      if (updated[0]) failedWaitingCiRows.push(updated[0]);
+    }
+  }
 
   const cancelledRuns = mapFailedRows(cancelledSoftRows);
   const failedPoison = mapFailedRows(poisonRows);

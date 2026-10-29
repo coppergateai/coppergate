@@ -14,6 +14,7 @@
     "db:generate": "pnpm --filter @coppergate/db generate",
     "db:migrate": "pnpm --filter @coppergate/db migrate",
     "db:migrate:down": "pnpm --filter @coppergate/db migrate:down",
+    "smoke:opp-hosted": "node packages/opp-client/scripts/smoke-hosted.mjs",
     "ops:stripe-env": "node scripts/stripe-env-check.mjs",
     "ops:waitlist": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/list-waitlist.mjs",
     "ops:pilot-invite": "pnpm --filter @coppergate/db exec node --import tsx ../../scripts/create-pilot-invite.mjs",

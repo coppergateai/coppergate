@@ -347,7 +347,7 @@ export async function ensurePeerContenderSeats(
       );
   }
 
-  const seatCount = Math.max(strategies.length, MIN_DUEL_CONTENDERS);
+  const seatCount = Math.max(1, strategies.length);
   const ensured: Contender[] = [];
   for (let i = 0; i < seatCount; i++) {
     const strategy =
@@ -460,11 +460,18 @@ export async function ensureArenaForProject(
       budgetMicros: input.contenderBudgetMicros,
     });
     let arena = existing;
-    if (existing.defaultContenderN < MIN_DUEL_CONTENDERS) {
+    // Honor explicit width (incl. solo N=1). Do not force-bump to duel.
+    if (
+      input.defaultContenderN != null &&
+      input.defaultContenderN !== existing.defaultContenderN &&
+      Number.isInteger(input.defaultContenderN) &&
+      input.defaultContenderN >= 1 &&
+      input.defaultContenderN <= 16
+    ) {
       const [updated] = await db
         .update(arenas)
         .set({
-          defaultContenderN: MIN_DUEL_CONTENDERS,
+          defaultContenderN: input.defaultContenderN,
           updatedAt: new Date(),
         })
         .where(eq(arenas.id, existing.id))
@@ -488,12 +495,12 @@ export async function ensureArenaForProject(
     throw new ArenaError("not_found", "project not found");
   }
 
-  const n = input.defaultContenderN ?? MIN_DUEL_CONTENDERS;
+  const n = input.defaultContenderN ?? 1;
   if (!Number.isInteger(n) || n < 1 || n > 16) {
     throw new ArenaError("invalid", "defaultContenderN must be 1..16");
   }
-  // Default seat count is a duel; callers may still pass contenderCount: 1 for fixtures.
-  const contenderCount = input.contenderCount ?? Math.max(n, MIN_DUEL_CONTENDERS);
+  // Seat count follows N (solo N=1 or duel N=2+); fixtures may override contenderCount.
+  const contenderCount = input.contenderCount ?? n;
   const budgetEach =
     input.contenderBudgetMicros ?? DEFAULT_CONTENDER_BUDGET_MICROS;
   assertNonNegativeBudget(budgetEach);
@@ -931,17 +938,28 @@ export async function startTournamentFanout(
     override: input.primaryProfileKey,
   });
 
-  const { plan, limits } = await resolveWorkspacePlanLimits(
+  const { plan } = await resolveWorkspacePlanLimits(
     db,
     input.workspaceId,
   );
-  const duelFloor = Math.min(MIN_DUEL_CONTENDERS, limits.maxTournamentFanout);
+  // Honor explicit n; otherwise keep existing arena width (do not force solo).
+  const existingArena = await getArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: task.projectId,
+  });
+  const desiredN = Math.max(
+    1,
+    Math.min(
+      MAX_TOURNAMENT_FANOUT,
+      input.n ?? existingArena?.defaultContenderN ?? 1,
+    ),
+  );
   const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: task.projectId,
     actor: input.actor,
-    defaultContenderN: Math.max(duelFloor, input.n ?? duelFloor),
-    contenderCount: Math.max(duelFloor, input.n ?? duelFloor),
+    defaultContenderN: desiredN,
+    contenderCount: desiredN,
     contenderBudgetMicros: Math.max(
       task.estimateMicros ?? 0,
       DEFAULT_CONTENDER_BUDGET_MICROS,
@@ -955,7 +973,7 @@ export async function startTournamentFanout(
     task.estimateMicros ?? 0,
     DEFAULT_CONTENDER_BUDGET_MICROS,
   );
-  const requested = input.n ?? Math.max(arena.defaultContenderN, duelFloor);
+  const requested = input.n ?? Math.max(1, arena.defaultContenderN);
   const planCapped = clampTournamentFanout(requested, plan);
   const requestedFanout = Math.min(MAX_TOURNAMENT_FANOUT, planCapped);
 
@@ -964,7 +982,7 @@ export async function startTournamentFanout(
     arenaId: arena.id,
     profileKey: primaryProfileKey,
     strategies: strategiesForDuel(
-      Math.max(requestedFanout, MIN_DUEL_CONTENDERS),
+      Math.max(requestedFanout, 1),
     ) as ContenderStrategy[],
     budgetMicros: minPurse,
   });

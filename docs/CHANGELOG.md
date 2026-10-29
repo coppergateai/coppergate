@@ -9,6 +9,15 @@
 
 ### Features
 
+- AG-035: Unattended board drain — retire obsolete `[ship-gate]` when tip is green / PR closed; dirty delivery PRs get `merge_conflict` after ~15m (no 6h wait) and free parent concurrency; signal arm survives min_human/approve races. See `docs/ship-receipts/AG-035.md`.
+- SEC-036: **Prod / default-branch write policy gate** — refuse merge-to-default, GitHub Release, default-branch Contents writes, and sandbox production deploy commands unless explicit policy flags (`mergeEnabled`, `autoRelease`, `prodWritesEnabled`). See `docs/prod-write-policy-gate.md`.
+- AG-034: Ship-gate heal-only merge — while tip is `default_branch_ci_red`, product auto-merge stays halted but `[ship-gate]` heal PRs still merge (`shipGateMergeMode=heal_only`), closing the AG-031 enqueue→never-merge deadlock. See `docs/ship-gate-self-heal.md`.
+- AG-033: `stale_delivery` signal — open (non-dirty) delivery PRs after `waiting_ci_timeout` arm a same-head fixer instead of `NEEDS_REPLAN`; dirty stays AG-032; replan only when no healable PR. See `docs/stale-delivery-heal.md`.
+- AG-019: Activity **merge.attempt** noise floor — keeps Cycle 11 per-project bucketing (interleaved-safe); pure “not mergeable” storms collapse to the **latest** outcome instead of “×N not mergeable” spam. Mixed buckets still show honest merged / not-ready counts. See `docs/activity-merge-noise-floor.md`.
+- AG-032: `merge_conflict` signal — dirty delivery PRs arm a fixer task to rebase the same head instead of AG-031 `request_changes` → NEEDS_REPLAN. See `docs/merge-conflict-signal.md`.
+- AG-031: Ship-gate tip-red self-heal — when auto-merge halts on `default_branch_ci_red`, maintainer enqueues a `[ship-gate]` tip-CI fix task (spend-licensed reliability, not freestyle invent); stale `waiting_ci_timeout` REVIEW no longer freezes continuous backlog. See `docs/ship-gate-self-heal.md`.
+- AG-017: WAITING_CI required-check honesty — when `CI_REQUIRED_CHECK_NAMES` never arrive (or flake), Evidence Center and Arena explain required-missing vs flake; reaper timeout messages stay fail-closed (no fake Accept-ready). See `docs/waiting-ci-required-check-honesty.md`.
+- AG-015: Mission Control replan skip reasons (`no_architecture_open_id`, `architecture_ids_in_flight`) surface as calm Open Program idle attention — not `replan_failed` ops fire. See `docs/mission-control-crisis.md`.
 - P-142: Critic fitness cites evidence refs — non-zero fitness requires cited CI/validation + tests(/coverage/e2e) artifact ids; vibes-only promote blocked (`vibes_only_blocked`). See `docs/critic-fitness-evidence-refs.md`.
 - P-140: Arena efficiency payoff UX — board strip + agent cards + inspector show `e · f · spend` (`e=f/spend^α`), CI fail ⇒ e=0 copy, and winner promote reason. See `docs/arena-efficiency-payoff.md`.
 - Claude Code (Agent SDK) coding harness — `ClaudeCodeCodingAgent` via `@anthropic-ai/claude-agent-sdk`, BYOK vendor `claude_code`, harness kind `claude_code`, env `ANTHROPIC_API_KEY` / `CLAUDE_CODE_MODEL`. Prefer Cursor when both exist; Claude Code is OpenAI failover when Cursor is absent. See `docs/HARNESS.md`.

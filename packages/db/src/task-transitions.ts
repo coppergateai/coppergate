@@ -23,7 +23,10 @@ import {
   resolveWorkspacePlanLimits,
 } from "./plan-policy.js";
 import { enqueueAgentRun, listRunsForTask } from "./runs.js";
+import { fetchArchitectureBacklogMarkdown } from "./architecture-program-fetch.js";
 import { persistShipReceipt } from "./ship-receipt.js";
+import { auditOppVerifyAfterAccept } from "./ship-receipt-opp.js";
+import { architectureRepoFromMaintainerPolicyJson } from "./spend-license.js";
 import {
   assertSpendLicenseForTask,
   SpendLicenseError,
@@ -713,6 +716,55 @@ export async function decideTaskReview(
           spendMicros: receipt.spendMicros,
           runId: receipt.runId,
         },
+      });
+      // RT-020 — optional OPP verify (OPP_API_URL); never blocks Accept.
+      let programMarkdown = process.env.ARCHITECTURE_BACKLOG_MD?.trim() ?? "";
+      try {
+        const [proj] = await db
+          .select({ maintainerPolicyJson: projects.maintainerPolicyJson })
+          .from(projects)
+          .where(
+            and(
+              eq(projects.id, done.task.projectId),
+              eq(projects.workspaceId, input.workspaceId),
+            ),
+          )
+          .limit(1);
+        const repo = architectureRepoFromMaintainerPolicyJson(
+          proj?.maintainerPolicyJson,
+        );
+        let paths: string | null = null;
+        try {
+          const raw = proj?.maintainerPolicyJson
+            ? (JSON.parse(proj.maintainerPolicyJson) as {
+                architecturePaths?: unknown;
+              })
+            : null;
+          if (
+            typeof raw?.architecturePaths === "string" &&
+            raw.architecturePaths.trim()
+          ) {
+            paths = raw.architecturePaths.trim();
+          }
+        } catch {
+          /* ignore */
+        }
+        if (repo && paths) {
+          const fetched = await fetchArchitectureBacklogMarkdown({
+            repo,
+            paths,
+          });
+          if (fetched.trim()) programMarkdown = fetched;
+        }
+      } catch {
+        /* fall back to env markdown */
+      }
+      await auditOppVerifyAfterAccept(db, {
+        workspaceId: input.workspaceId,
+        taskId: task.id,
+        actor: input.actor,
+        receipt,
+        markdown: programMarkdown,
       });
     } catch {
       // Receipt must not roll back Accept — surface via audit absence.

@@ -39,6 +39,7 @@ describe("createGithubRelease", () => {
       tagName: "v1",
       name: "Maintainer v1",
       body: "notes",
+      allowRelease: true,
       fetchImpl,
     });
     assert.equal(result.tagName, "v1");
@@ -73,10 +74,27 @@ describe("createGithubRelease", () => {
       tagName: "v1",
       name: "n",
       body: "b",
+      allowRelease: true,
       fetchImpl,
     });
     assert.equal(result.id, 2);
     assert.equal(n, 2);
+  });
+
+  it("refuses release without autoRelease policy flag (SEC-036)", async () => {
+    await assert.rejects(
+      () =>
+        createGithubRelease({
+          token: "tok",
+          owner: "o",
+          repo: "r",
+          tagName: "v1",
+          name: "n",
+          body: "b",
+          allowRelease: false,
+        }),
+      /explicit policy flag/,
+    );
   });
 });
 

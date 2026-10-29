@@ -169,7 +169,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     await ingestCiEvidence(db, {
       workspaceId,
       headSha,
-      name: "test",
+      name: "check",
       status: "completed",
       conclusion: "failure",
       passed: false,
@@ -234,7 +234,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     await ingestCiEvidence(db, {
       workspaceId,
       headSha: sha,
-      name: "test",
+      name: "check",
       status: "completed",
       conclusion: "failure",
       passed: false,
@@ -248,7 +248,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     await ingestCiEvidence(db, {
       workspaceId,
       headSha: sha,
-      name: "test",
+      name: "check",
       status: "completed",
       conclusion: "success",
       passed: true,
@@ -370,7 +370,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     const { run: afterIngest } = await ingestCiEvidence(db, {
       workspaceId,
       headSha: sha,
-      name: "test",
+      name: "check",
       status: "completed",
       conclusion: "success",
       passed: true,
@@ -440,7 +440,7 @@ describe("CI evidence ingestion", { skip: !url }, () => {
     const { run: afterIngest } = await ingestCiEvidence(db, {
       workspaceId,
       headSha: pendingSha,
-      name: "test",
+      name: "check",
       status: "completed",
       conclusion: "success",
       passed: true,

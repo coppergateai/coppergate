@@ -2,6 +2,8 @@
  * Release Assistant — create GitHub Release + notes under maintainer policy.
  */
 
+import { assertReleaseAllowed } from "@coppergate/scm";
+
 export type GithubReleaseResult = {
   id: number;
   htmlUrl: string;
@@ -18,8 +20,12 @@ export async function createGithubRelease(input: {
   targetCommitish?: string;
   draft?: boolean;
   prerelease?: boolean;
+  /** SEC-036 — maintainer policy autoRelease must be explicitly true. */
+  allowRelease: boolean;
   fetchImpl?: typeof fetch;
 }): Promise<GithubReleaseResult> {
+  assertReleaseAllowed({ allowRelease: input.allowRelease });
+
   const fetchImpl = input.fetchImpl ?? fetch;
   const res = await fetchImpl(
     `https://api.github.com/repos/${input.owner}/${input.repo}/releases`,

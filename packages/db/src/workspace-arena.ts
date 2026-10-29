@@ -9,6 +9,7 @@ import { summarizeArenaContenderPool } from "./contender-elimination.js";
 import { startProjectArena, stopProjectArena } from "./maintainer.js";
 import { listAgentProfiles } from "./profiles.js";
 import { listProjectsForWorkspace } from "./projects.js";
+import { getRunCiFitness } from "./ci-evidence.js";
 import { latestRunProgressHints, mergeRunActivityLine } from "./run-event-hints.js";
 import {
   agentRuns,
@@ -28,6 +29,7 @@ export type WorkspaceArenaContenderRun = {
   prUrl: string | null;
   prNumber: number | null;
   errorCode: string | null;
+  errorMessage: string | null;
   /** WINNER | LOSER | CANCELLED — losers are expected, not ops fires. */
   tournamentResult: string | null;
   updatedAt: string;
@@ -256,6 +258,7 @@ async function latestRunsByContender(
       prUrl: agentRuns.prUrl,
       prNumber: agentRuns.prNumber,
       errorCode: agentRuns.errorCode,
+      errorMessage: agentRuns.errorMessage,
       tournamentResult: agentRuns.tournamentResult,
       updatedAt: agentRuns.updatedAt,
     })
@@ -281,6 +284,7 @@ async function latestRunsByContender(
       prUrl: row.prUrl,
       prNumber: row.prNumber,
       errorCode: row.errorCode,
+      errorMessage: row.errorMessage ?? null,
       tournamentResult: row.tournamentResult ?? null,
       updatedAt: row.updatedAt.toISOString(),
       activityHint: null,
@@ -291,9 +295,19 @@ async function latestRunsByContender(
   const hints = await latestRunProgressHints(db, runIds);
   for (const entry of map.values()) {
     const hint = hints.get(entry.id);
-    if (!hint) continue;
-    const line = mergeRunActivityLine("", hint, "running");
-    entry.activityHint = line || hint.codingPathLine || hint.failoverLine;
+    if (hint) {
+      const line = mergeRunActivityLine("", hint, "running");
+      entry.activityHint = line || hint.codingPathLine || hint.failoverLine;
+    }
+    if (
+      (entry.status === "WAITING_CI" || entry.status === "VALIDATING") &&
+      !entry.activityHint
+    ) {
+      const fitness = await getRunCiFitness(db, entry.id);
+      if (fitness.waitingArenaLine) {
+        entry.activityHint = fitness.waitingArenaLine;
+      }
+    }
   }
 
   return map;

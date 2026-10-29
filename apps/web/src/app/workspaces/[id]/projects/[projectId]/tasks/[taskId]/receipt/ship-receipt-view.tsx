@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { displayTaskTitle } from "@/lib/display-title";
+import { ShipReceiptShareControls } from "./ship-receipt-share-controls";
 import styles from "./ship-receipt.module.css";
 
 export type ShipReceiptViewModel = {
@@ -215,6 +216,12 @@ export function ShipReceiptView({
           <dd>{receipt.acceptedBy || "—"}</dd>
         </div>
       </dl>
+
+      <ShipReceiptShareControls
+        workspaceId={workspaceId}
+        projectId={projectId}
+        taskId={taskId}
+      />
 
       <div className={styles.actions}>
         <Link href={taskHref} className={styles.primary}>

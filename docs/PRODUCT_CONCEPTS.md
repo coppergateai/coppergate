@@ -42,7 +42,7 @@ Surfaces:
 - **Mission Control** (`/workspaces/[id]`) — what needs intervention now
 - **Agents** (`/workspaces/[id]/agents`) — profile catalog, skills, tools, 30d outcomes
 - **Skills** (`/workspaces/[id]/skills`) — procedure playbooks; grantable to agents; prompt-capped (max 4 / ~6k chars)
-- **Tools** (`/workspaces/[id]/tools`) — capability tokens + MCP home (SonarQube / generic HTTPS MCP); invokable vs custom(policy-only)
+- **Tools** (`/workspaces/[id]/tools`) — capability tokens + MCP home (SonarQube / generic HTTPS MCP); invokable vs custom (policy-only); system descriptions are short markdown playbooks (When / Focus / Hard rules) rendered in the Tools UI (not prompt-injected like skills)
 
 Runtime hierarchy: **Agent → Skills (prompt procedures) → Tools (allowlist + ToolRuntime)**. MCP connections are workspace-scoped; optional `ACPP_GATEWAY_URL` bridges invoke through ACPP identity/policy.
 - **Insights** (`/workspaces/[id]/insights`) — period economics & verified delivery

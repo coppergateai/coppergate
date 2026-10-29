@@ -1,4 +1,5 @@
 import { basename } from "node:path";
+import { assertProductionDeployAllowed } from "@coppergate/scm";
 import {
   METADATA_IPV4,
   SandboxPolicyError,
@@ -29,6 +30,67 @@ const DENIED_NETWORK_BINARIES = new Set([
 
 const SHELL_BINARIES = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
 
+/** Production deploy verbs blocked unless arena prod_writes_enabled (SEC-036). */
+const PROD_DEPLOY_BINARIES = new Set([
+  "fly",
+  "flyctl",
+  "vercel",
+  "railway",
+  "render",
+  "kubectl",
+  "helm",
+  "terraform",
+  "pulumi",
+  "serverless",
+  "sam",
+  "cdk",
+  "eb",
+  "gcloud",
+  "aws",
+  "az",
+]);
+
+function looksLikeProductionDeploy(command: readonly string[]): boolean {
+  const bin = commandBasename(command);
+  if (PROD_DEPLOY_BINARIES.has(bin)) {
+    if (bin === "vercel") {
+      return command.some(
+        (a) => typeof a === "string" && /--prod(?:uction)?\b/.test(a),
+      );
+    }
+    if (bin === "aws") {
+      const joined = command.join(" ").toLowerCase();
+      return /\b(deploy|cloudformation)\b/.test(joined);
+    }
+    if (bin === "gcloud") {
+      return command.some(
+        (a) => typeof a === "string" && /\b(app|run)\b/.test(a),
+      );
+    }
+    if (bin === "az") {
+      return command.some((a) => typeof a === "string" && /\bwebapp\b/.test(a));
+    }
+    if (bin === "terraform" || bin === "pulumi") {
+      return command.some((a) => typeof a === "string" && a === "apply");
+    }
+    if (bin === "kubectl") {
+      return command.some(
+        (a) => typeof a === "string" && /\b(apply|rollout)\b/.test(a),
+      );
+    }
+    if (bin === "helm") {
+      return command.some((a) => typeof a === "string" && a === "upgrade");
+    }
+    // fly deploy, railway up, render deploy, serverless deploy, etc.
+    return command.some(
+      (a) =>
+        typeof a === "string" &&
+        /^(deploy|up|push|release|sync)$/i.test(a.trim()),
+    );
+  }
+  return false;
+}
+
 /** Interpreter eval flags that enable arbitrary code / hidden egress. */
 const INTERPRETER_EVAL_FLAGS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ["node", new Set(["-e", "--eval", "-p", "--print"])],
@@ -50,9 +112,27 @@ function commandBasename(command: readonly string[]): string {
  * Deny risky binaries / eval modes, then scan argv for metadata / private /
  * non-allowlisted hosts.
  */
-export function assertSandboxCommandArgs(command: readonly string[]): void {
+export function assertSandboxCommandArgs(
+  command: readonly string[],
+  opts?: { prodWritesEnabled?: boolean },
+): void {
   if (!command.length) {
     throw new SandboxPolicyError("invalid", "command required");
+  }
+
+  if (looksLikeProductionDeploy(command)) {
+    try {
+      assertProductionDeployAllowed({
+        prodWritesEnabled: opts?.prodWritesEnabled === true,
+      });
+    } catch (err) {
+      throw new SandboxPolicyError(
+        "egress_denied",
+        err instanceof Error
+          ? err.message
+          : "Production deploy blocked without prodWritesEnabled",
+      );
+    }
   }
 
   const bin = commandBasename(command);

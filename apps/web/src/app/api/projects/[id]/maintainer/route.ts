@@ -3,8 +3,10 @@ import {
   DEFAULT_MONTHLY_BUDGET_MICROS,
   disableMaintainerMode,
   enableMaintainerMode,
+  fetchArchitectureBacklogMarkdown,
   getMaintainerMetrics,
   getProjectForWorkspace,
+  parseArchitectureProgramRows,
   parseMaintainerPolicy,
   updateMaintainerPolicy,
 } from "@coppergate/db";
@@ -110,6 +112,64 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
+    if (action === "validate_open_program") {
+      const patch =
+        body.policy && typeof body.policy === "object"
+          ? (body.policy as Record<string, unknown>)
+          : {};
+      const current = parseMaintainerPolicy(bound.project.maintainerPolicyJson);
+      const architectureRepo =
+        typeof patch.architectureRepo === "string"
+          ? patch.architectureRepo.trim()
+          : (current.architectureRepo ?? "");
+      const architecturePaths =
+        typeof patch.architecturePaths === "string"
+          ? patch.architecturePaths.trim()
+          : (current.architecturePaths ?? "");
+      if (
+        !architectureRepo ||
+        !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(architectureRepo)
+      ) {
+        throw new ApiError(
+          "bad_request",
+          "architectureRepo must be owner/name",
+        );
+      }
+      if (!architecturePaths) {
+        throw new ApiError("bad_request", "architecturePaths required");
+      }
+      const md = await fetchArchitectureBacklogMarkdown({
+        repo: architectureRepo,
+        paths: architecturePaths,
+      });
+      if (!md.trim()) {
+        throw new ApiError(
+          "bad_request",
+          "Could not fetch Open Program markdown (404/empty). Check repo, path, and token.",
+        );
+      }
+      const rows = parseArchitectureProgramRows(md);
+      const openCount = rows.filter((r) => r.status === "open").length;
+      const doneCount = rows.filter((r) => r.status === "done").length;
+      if (rows.length === 0) {
+        throw new ApiError(
+          "bad_request",
+          "No Open/Done program IDs parsed from markdown",
+        );
+      }
+      return jsonOk(
+        {
+          ok: true,
+          architectureRepo,
+          architecturePaths,
+          openCount,
+          doneCount,
+          sampleIds: rows.slice(0, 8).map((r) => r.id),
+        },
+        { correlationId },
+      );
+    }
+
     if (action === "update") {
       const patch =
         body.policy && typeof body.policy === "object"
@@ -121,6 +181,24 @@ export async function POST(request: Request, context: RouteContext) {
           : typeof patch.monthlyBudgetMicros === "number"
             ? patch.monthlyBudgetMicros
             : undefined;
+      const architectureRepo =
+        typeof patch.architectureRepo === "string"
+          ? patch.architectureRepo.trim() || null
+          : undefined;
+      const architecturePaths =
+        typeof patch.architecturePaths === "string"
+          ? patch.architecturePaths.trim() || null
+          : undefined;
+      if (
+        architectureRepo !== undefined &&
+        architectureRepo !== null &&
+        !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(architectureRepo)
+      ) {
+        throw new ApiError(
+          "bad_request",
+          "architectureRepo must be owner/name",
+        );
+      }
       const { project, policy } = await updateMaintainerPolicy(db, {
         workspaceId: body.workspaceId,
         projectId,
@@ -139,7 +217,13 @@ export async function POST(request: Request, context: RouteContext) {
           ...(typeof patch.communityReplies === "boolean"
             ? { communityReplies: patch.communityReplies }
             : {}),
-          enabled: true,
+          ...(architectureRepo !== undefined ? { architectureRepo } : {}),
+          ...(architecturePaths !== undefined ? { architecturePaths } : {}),
+          // Preserve current enabled flag unless an explicit boolean is patched.
+          enabled:
+            typeof patch.enabled === "boolean"
+              ? patch.enabled
+              : bound.project.maintainerEnabled,
         },
       });
       return jsonOk(

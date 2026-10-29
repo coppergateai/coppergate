@@ -5,6 +5,7 @@ import {
   mapCheckRunPayload,
   mapCheckSuitePayload,
   mapCommitStatusPayload,
+  isVercelCommitStatusContext,
   parseGithubWebhookHeaders,
   verifyGithubWebhookSignature,
   type CheckRunWebhookPayload,
@@ -17,6 +18,7 @@ import {
   ingestCiEvidence,
   ingestSignal,
   recordWebhookDelivery,
+  resolveWaitingCiRunsForPr,
   setInstallationStatusByGithubId,
 } from "@coppergate/db";
 import { ApiError } from "@coppergate/errors";
@@ -207,6 +209,73 @@ export async function POST(request: Request) {
       note = ingested.attached
         ? `status attached to run ${ingested.runId}`
         : `status.${evidence.conclusion ?? evidence.status} (no matching run)`;
+
+      // Deploy-fail reverse path — Vercel classic commit status (no matching run).
+      // Redeploy happens via Accept → merge → Vercel Git integration (not L3 API).
+      if (
+        !ingested.attached &&
+        evidence.blocksAccept &&
+        isCiFailureConclusion(evidence.conclusion) &&
+        evidence.repoFullName &&
+        isVercelCommitStatusContext(evidence.name)
+      ) {
+        const targets = await findWorkspacesForRepo(
+          db,
+          evidence.repoFullName,
+        );
+        for (const t of targets) {
+          await ensureDefaultAutoArmRule(db, {
+            workspaceId: t.workspaceId,
+            provider: "ci_failure",
+            actor: "system:webhook",
+            profileKeys: ["fixer", "engineer"],
+          });
+          const envelope = envelopeFromCiFailure({
+            provider: "vercel",
+            externalId: `status:${evidence.name}:${evidence.headSha ?? headers.deliveryId}`,
+            name: evidence.name,
+            conclusion: evidence.conclusion,
+            headSha: evidence.headSha,
+            repoFullName: evidence.repoFullName,
+            detailsUrl: evidence.detailsUrl,
+          });
+          const armed = await ingestSignal(db, {
+            workspaceId: t.workspaceId,
+            projectId: t.projectId,
+            envelope,
+            actor: "system:webhook",
+          });
+          if (armed.armed) {
+            note = `${note}; ci_failure armed task ${armed.task?.id}`;
+          }
+        }
+      }
+    } else if (headers.event === "pull_request" && action === "closed") {
+      const pr = parsed.pull_request as
+        | { number?: number; merged?: boolean }
+        | undefined;
+      const repo = parsed.repository as { full_name?: string } | undefined;
+      const prNumber = typeof pr?.number === "number" ? pr.number : null;
+      const repoFullName =
+        typeof repo?.full_name === "string" ? repo.full_name : null;
+      if (prNumber != null && repoFullName) {
+        const targets = await findWorkspacesForRepo(db, repoFullName);
+        const seen = new Set<string>();
+        let resolved = 0;
+        for (const t of targets) {
+          if (seen.has(t.workspaceId)) continue;
+          seen.add(t.workspaceId);
+          resolved += await resolveWaitingCiRunsForPr(db, {
+            workspaceId: t.workspaceId,
+            prNumber,
+            outcome: pr?.merged === true ? "merged" : "closed_unmerged",
+            actor: "system:webhook",
+          });
+        }
+        note = `pull_request.closed resolved=${resolved} pr=${prNumber}`;
+      } else {
+        note = "pull_request.closed ignored (no pr/repo)";
+      }
     } else if (
       headers.event === "code_scanning_alert" ||
       headers.event === "dependabot_alert"

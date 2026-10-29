@@ -659,18 +659,39 @@ export async function armSignalEvent(
     });
   }
 
-  const submitted = await submitTaskForApproval(db, {
-    workspaceId: input.workspaceId,
-    taskId: task.id,
-    actor: input.actor,
-  });
+  // min_human submit can race a concurrent maintainer approve (READY→QUEUED).
+  // If the task is already live, treat arm as success instead of failing the signal.
+  let armedTask = task;
+  try {
+    const submitted = await submitTaskForApproval(db, {
+      workspaceId: input.workspaceId,
+      taskId: task.id,
+      actor: input.actor,
+    });
+    armedTask = submitted.task;
+  } catch (err) {
+    const [current] = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, task.id))
+      .limit(1);
+    const live =
+      current &&
+      (current.status === "QUEUED" ||
+        current.status === "RUNNING" ||
+        current.status === "VALIDATING" ||
+        current.status === "WAITING_CI" ||
+        current.status === "REVIEW_REQUIRED");
+    if (!live) throw err;
+    armedTask = current;
+  }
 
   const [updated] = await db
     .update(signalEvents)
     .set({
       status: "armed",
       projectId,
-      taskId: submitted.task.id,
+      taskId: armedTask.id,
       errorMessage: null,
       updatedAt: new Date(),
     })
@@ -684,8 +705,8 @@ export async function armSignalEvent(
     targetType: "signal_event",
     targetId: event.id,
     meta: {
-      taskId: submitted.task.id,
-      autoQueued: Boolean(submitted.autoQueued),
+      taskId: armedTask.id,
+      autoQueued: armedTask.status === "QUEUED" || armedTask.status === "RUNNING",
       armArena: input.armArena ?? true,
       provider: event.provider,
     },
@@ -695,12 +716,12 @@ export async function armSignalEvent(
     event: "signal_armed",
     workspaceId: input.workspaceId,
     projectId,
-    taskId: submitted.task.id,
+    taskId: armedTask.id,
     message: `Signal armed: ${event.provider} — ${event.title}`,
     meta: { signalId: event.id, provider: event.provider },
   }).catch(() => undefined);
 
-  return { event: updated!, task: submitted.task };
+  return { event: updated!, task: armedTask };
 }
 
 export async function dismissSignalEvent(

@@ -20,6 +20,9 @@
     "test": "node --import tsx --test $(find src -name '*.test.ts')",
     "prepare": "tsc -p tsconfig.json"
   },
+  "dependencies": {
+    "@coppergate/scm": "workspace:*"
+  },
   "devDependencies": {
     "@coppergate/eslint-config": "workspace:*",
     "@coppergate/typescript-config": "workspace:*",

@@ -28,12 +28,8 @@ export type NormalizedCheckEvidence = {
   repoFullName: string | null;
 };
 
-const BLOCKING = new Set([
-  "failure",
-  "timed_out",
-  "cancelled",
-  "action_required",
-]);
+/** Accept/WAITING_CI blockers — cancelled/skipped are ignored (cancel-in-progress). */
+const BLOCKING = new Set(["failure", "timed_out", "action_required"]);
 
 export function mapCheckRunPayload(payload: {
   action?: string;
@@ -101,6 +97,22 @@ export function mapCheckSuitePayload(
     detailsUrl: null,
     repoFullName: payload.repository?.full_name ?? null,
   };
+}
+
+/**
+ * Classic commit-status contexts used by Vercel (and Vercel-named variants).
+ * Used to arm deploy-fail → ci_failure arenas without treating every status as a signal.
+ */
+export function isVercelCommitStatusContext(
+  context: string | null | undefined,
+): boolean {
+  if (!context?.trim()) return false;
+  // Normalize en/em dashes so "Vercel – Production" matches.
+  const c = context
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2013\u2014]/g, "-");
+  return c === "vercel" || c.startsWith("vercel ") || c.startsWith("vercel-");
 }
 
 /** Classic commit status webhook (`status` event) — Vercel often uses this. */
@@ -237,6 +249,35 @@ const GH_API_HEADERS = (token: string) => ({
   "X-GitHub-Api-Version": "2022-11-28",
 });
 
+export type TipCiShipGate =
+  | { kind: "green" }
+  | { kind: "red" }
+  | { kind: "pending" };
+
+/**
+ * Ship-gate tip status: require a completed success suite (positive green).
+ * Empty / in-progress / cancelled-only → pending (halt merges, not "red").
+ */
+export function scoreTipCheckSuites(
+  suites: Array<{ conclusion?: string | null; status?: string }>,
+): TipCiShipGate {
+  if (suites.length === 0) return { kind: "pending" };
+  const completed = suites.filter((s) => s.status === "completed");
+  if (completed.length === 0) return { kind: "pending" };
+  if (
+    completed.some(
+      (s) => s.conclusion === "failure" || s.conclusion === "timed_out",
+    )
+  ) {
+    return { kind: "red" };
+  }
+  if (completed.some((s) => s.conclusion === "success")) {
+    return { kind: "green" };
+  }
+  // Only cancelled/neutral/skipped completed — treat as pending (not green).
+  return { kind: "pending" };
+}
+
 /** True when any completed check suite on the SHA failed or timed out. */
 export async function commitCheckSuitesFailed(input: {
   token: string;
@@ -245,22 +286,28 @@ export async function commitCheckSuitesFailed(input: {
   sha: string;
   fetchImpl?: typeof fetch;
 }): Promise<boolean> {
+  const tip = await commitCheckSuitesShipGate(input);
+  return tip.kind === "red";
+}
+
+/** Tip CI for auto-merge ship gate (positive green required). */
+export async function commitCheckSuitesShipGate(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  sha: string;
+  fetchImpl?: typeof fetch;
+}): Promise<TipCiShipGate> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const res = await fetchImpl(
     `https://api.github.com/repos/${input.owner}/${input.repo}/commits/${encodeURIComponent(input.sha)}/check-suites`,
     { headers: GH_API_HEADERS(input.token) },
   );
-  if (!res.ok) return false;
+  if (!res.ok) return { kind: "pending" };
   const body = (await res.json()) as {
     check_suites?: Array<{ conclusion?: string | null; status?: string }>;
   };
-  const suites = body.check_suites ?? [];
-  if (suites.length === 0) return false;
-  return suites.some(
-    (s) =>
-      s.status === "completed" &&
-      (s.conclusion === "failure" || s.conclusion === "timed_out"),
-  );
+  return scoreTipCheckSuites(body.check_suites ?? []);
 }
 
 /** Default branch tip SHA for a repo (null when the API call fails). */

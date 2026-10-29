@@ -1,6 +1,11 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { createArtifact } from "./artifacts.js";
+import {
+  classifyCiWaiting,
+  type CiCheckHistoryEntry,
+  type CiWaitingKind,
+} from "./ci-waiting-honesty.js";
 import { appendRunEvent } from "./run-events.js";
 import { agentRuns, artifacts, type AgentRun } from "./schema.js";
 
@@ -35,8 +40,7 @@ export type RunCiCheckSummary = {
   createdAt: Date;
 };
 
-export type RunCiFitness = {
-  checks: RunCiCheckSummary[];
+export type CiCheckScore = {
   /** Latest conclusion per check name is blocking. */
   blocking: boolean;
   /** At least one latest check passed. */
@@ -50,6 +54,16 @@ export type RunCiFitness = {
   ciSatisfied: boolean;
   /** Safe to Accept: not WAITING_CI; not blocking; if awaiting live CI, must have passed. */
   acceptReady: boolean;
+};
+
+export type RunCiFitness = CiCheckScore & {
+  checks: RunCiCheckSummary[];
+  /** AG-017 — why Accept is still closed while CI is pending. */
+  waitingKind: CiWaitingKind;
+  waitingDetail: string | null;
+  /** Short line for Arena activity while awaiting CI. */
+  waitingArenaLine: string | null;
+  missingRequiredNames: string[];
 };
 
 type CiArtifactMeta = {
@@ -312,11 +326,85 @@ export async function listRunCiChecks(
   return [...byName.values()];
 }
 
-/** Parse CI_REQUIRED_CHECK_NAMES (default: branch-protection "test"). */
+function parseCiArtifactRow(row: {
+  meta: string | null;
+  createdAt: Date;
+}): RunCiCheckSummary | null {
+  let meta: CiArtifactMeta = {};
+  try {
+    meta = JSON.parse(row.meta ?? "") as CiArtifactMeta;
+  } catch {
+    return null;
+  }
+  let body: CiArtifactBody = {};
+  if (typeof meta.inlineBody === "string") {
+    try {
+      body = JSON.parse(meta.inlineBody) as CiArtifactBody;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (meta.validator === "fake-v1") return null;
+  const hasAcceptFlag =
+    typeof meta.blocksAccept === "boolean" ||
+    typeof meta.passed === "boolean" ||
+    typeof body.blocksAccept === "boolean" ||
+    typeof body.passed === "boolean";
+  if (!hasAcceptFlag) return null;
+  const source =
+    (typeof body.source === "string" && body.source) ||
+    (typeof meta.validator === "string" && meta.validator) ||
+    "check";
+  const shortName =
+    (typeof body.name === "string" && body.name) ||
+    (typeof meta.checkName === "string" && meta.checkName) ||
+    source;
+  return {
+    name: shortName,
+    status: typeof body.status === "string" ? body.status : "unknown",
+    conclusion:
+      typeof body.conclusion === "string" || body.conclusion === null
+        ? (body.conclusion ?? null)
+        : null,
+    passed: body.passed === true || meta.passed === true,
+    blocksAccept: body.blocksAccept === true || meta.blocksAccept === true,
+    detailsUrl: typeof body.detailsUrl === "string" ? body.detailsUrl : null,
+    createdAt: row.createdAt,
+  };
+}
+
+/** All CI check snapshots for flake detection (not deduped by name). */
+export async function listRunCiCheckHistory(
+  db: Database,
+  runId: string,
+): Promise<CiCheckHistoryEntry[]> {
+  const rows = await db
+    .select()
+    .from(artifacts)
+    .where(
+      and(eq(artifacts.runId, runId), eq(artifacts.kind, "validation_report")),
+    )
+    .orderBy(desc(artifacts.createdAt));
+
+  const out: CiCheckHistoryEntry[] = [];
+  for (const row of rows) {
+    const parsed = parseCiArtifactRow(row);
+    if (!parsed) continue;
+    out.push({
+      name: parsed.name,
+      conclusion: parsed.conclusion,
+      passed: parsed.passed,
+      at: parsed.createdAt,
+    });
+  }
+  return out;
+}
+
+/** Parse CI_REQUIRED_CHECK_NAMES (default: Actions job id "check"). */
 export function resolveRequiredCheckNames(
   env: Record<string, string | undefined> = process.env,
 ): string[] {
-  return (env.CI_REQUIRED_CHECK_NAMES ?? "test")
+  return (env.CI_REQUIRED_CHECK_NAMES ?? "check")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -335,7 +423,7 @@ export function scoreCiChecks(
     requiredNames: string[];
     statusAwaitingCi: boolean;
   },
-): Omit<RunCiFitness, "checks"> {
+): CiCheckScore {
   const requiredNames = new Set(options.requiredNames);
   const requiredConfigured = requiredNames.size > 0;
   const isRequired = (name: string) =>
@@ -382,14 +470,29 @@ export async function getRunCiFitness(
     .where(eq(agentRuns.id, runId))
     .limit(1);
   const statusAwaitingCi = run?.status === "WAITING_CI";
+  const requiredNames = resolveRequiredCheckNames();
   const scored = scoreCiChecks(checks, {
-    requiredNames: resolveRequiredCheckNames(),
+    requiredNames,
     statusAwaitingCi,
+  });
+
+  const history = await listRunCiCheckHistory(db, runId);
+  const waiting = classifyCiWaiting({
+    checks,
+    requiredNames,
+    statusAwaitingCi,
+    blocking: scored.blocking,
+    passed: scored.passed,
+    checkHistory: history,
   });
 
   return {
     checks,
     ...scored,
+    waitingKind: waiting.kind,
+    waitingDetail: waiting.detail,
+    waitingArenaLine: waiting.arenaLine,
+    missingRequiredNames: waiting.missingRequiredNames,
   };
 }
 
