@@ -15,8 +15,14 @@ import {
   reserveEstimateForTask,
 } from "./budgets.js";
 import type { Database } from "./client.js";
+import { latestAuditAtForTaskTarget } from "./audit.js";
 import { assertCanStartTasks, recordAuditEvent } from "./briefs.js";
-import { getRunCiFitness } from "./ci-evidence.js";
+import { getRunCiFitness, listRunCiCheckHistory } from "./ci-evidence.js";
+import {
+  evaluateFlakeRetryDeferral,
+  flakeRetryBlockedMessage,
+  FLAKE_RETRY_COOLDOWN_ACTIONS,
+} from "./flake-retry-cooldown.js";
 import { notifyWorkspace } from "./notify.js";
 import {
   assertPlanConcurrency,
@@ -544,6 +550,31 @@ export async function retryFailedTask(
     );
   }
 
+  const runs = await listRunsForTask(db, input.workspaceId, task.id);
+  const ciRun =
+    runs.find((r) => r.errorCode === "waiting_ci_timeout") ??
+    runs.find((r) => r.status === "FAILED" || r.status === "WAITING_CI") ??
+    runs[0];
+  if (ciRun) {
+    const history = await listRunCiCheckHistory(db, ciRun.id);
+    const lastRetryOrHeal = await latestAuditAtForTaskTarget(
+      db,
+      input.workspaceId,
+      task.id,
+      FLAKE_RETRY_COOLDOWN_ACTIONS,
+    );
+    const flakeDefer = evaluateFlakeRetryDeferral({
+      checkHistory: history,
+      lastRetryOrHealAt: lastRetryOrHeal,
+    });
+    if (flakeDefer.defer) {
+      throw new TaskTransitionError(
+        "policy",
+        flakeRetryBlockedMessage(flakeDefer.retryAfterMs),
+      );
+    }
+  }
+
   await assertQueuePolicies(db, input.workspaceId, task);
 
   const nextAttempt = task.attemptCount + 1;
@@ -562,11 +593,11 @@ export async function retryFailedTask(
     reason: `retry attempt ${nextAttempt}`,
   });
 
-  const runs = await listRunsForTask(db, input.workspaceId, bumped.id);
+  const bumpedRuns = await listRunsForTask(db, input.workspaceId, bumped.id);
   const run =
-    runs.find(
+    bumpedRuns.find(
       (r) => r.idempotencyKey === `task:${bumped.id}:attempt:${nextAttempt}`,
-    ) ?? runs[0];
+    ) ?? bumpedRuns[0];
   if (!run) {
     throw new TaskTransitionError(
       "policy",

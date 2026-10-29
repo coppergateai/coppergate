@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@coppergate/opp-client": "workspace:*",
+    "@coppergate/signals": "workspace:*",
     "@coppergate/sandbox": "workspace:*",
     "drizzle-orm": "^0.43.1",
     "postgres": "^3.4.5"

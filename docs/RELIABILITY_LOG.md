@@ -115,6 +115,7 @@ Date: 2026-10-24
 - `runs.claim.test.ts` — soft-cancel reaper → CANCELLED (needs `DATABASE_URL`)
 - `ci-evidence.score.test.ts` — required-missing helpers ≠ accept-ready
 - `ci-waiting-honesty.test.ts` — AG-017 required-missing vs flake copy + timeout messages
+- **Flake retry cooldown (AG-021)**: `detectFlakePattern` + 30m audit backoff on `task.retry` / stale CI-timeout heal so maintainer ticks and Evidence Retry do not thrash while checks oscillate
 - `ci-evidence.test.ts` — WAITING_CI status alone not accept-ready (needs `DATABASE_URL`)
 - `budgets.test.ts` — llm_tokens once-per-runId (needs `DATABASE_URL`)
 - DB claim/execute suites need `DATABASE_URL`
