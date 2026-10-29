@@ -816,7 +816,7 @@ export async function decideTaskReview(
       await resolvePendingApproval(db, {
         workspaceId: input.workspaceId,
         targetType: "run_review",
-        targetId: latest?.id ?? task.id,
+        targetId: selected.id,
         decision: "approved",
         actor: input.actor,
         decisionNote: input.note ?? "accepted",
