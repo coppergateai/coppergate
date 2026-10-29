@@ -111,20 +111,43 @@ export const ARCHITECTURE_ID_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 /** Below this available project budget, skip meta-tournament arming (spend guard). */
 export const LEAN_ROSTER_AVAILABLE_MICROS = 2_000_000;
 
+/** Below $1 available, vision replan caps auto-queue to 1 and uses lean roster (AG-025). */
+export const REPLAN_LEAN_BUDGET_MICROS = 1_000_000;
+
 /**
  * Minimal spend-safe arena roster — peer seats of engineer only.
  * Reviewer remains a catalog profile (critic/review path), not a duel seat.
  */
 export const LEAN_ARENA_PROFILE_KEYS = ["engineer"] as const;
 
+/** Arena spawn keys for vision replan when budget is above the lean replan floor. */
+export const VISION_REPLAN_ARENA_PROFILE_KEYS = ["proposer", "engineer"] as const;
+
 /**
  * Arena seating keys from remaining project micros.
- * Always peer-primary engineer — FULL_ARENA_PROFILE_KEYS is spawn catalog only.
+ * Under AG-025 lean floor: engineer peers only; otherwise vision_replan spawn keys.
  */
 export function rosterKeysForAvailableBudget(
-  _availableMicros: number,
+  availableMicros: number,
 ): string[] {
-  return [...LEAN_ARENA_PROFILE_KEYS];
+  if (availableMicros < REPLAN_LEAN_BUDGET_MICROS) {
+    return [...LEAN_ARENA_PROFILE_KEYS];
+  }
+  return [...VISION_REPLAN_ARENA_PROFILE_KEYS];
+}
+
+/** Effective replan auto-queue cap from residual budget (AG-025). */
+export function maxAutoQueueForReplan(input: {
+  availableMicros: number;
+  policyMaxAutoQueuePerReplan: number;
+  override?: number;
+}): number {
+  const raw = input.override ?? input.policyMaxAutoQueuePerReplan;
+  const capped = Math.max(1, Math.min(5, Math.floor(raw)));
+  if (input.availableMicros < REPLAN_LEAN_BUDGET_MICROS) {
+    return 1;
+  }
+  return capped;
 }
 
 /**
@@ -1034,7 +1057,18 @@ export async function startProjectArena(
   // Arm + resume BEFORE vision replan. If backlog boots while PAUSED,
   // min_human is skipped and a zombie Inbox approval is created.
   // Peer seats only — FULL_ARENA_PROFILE_KEYS is catalog, not contender width.
-  const rosterKeys = rosterKeysForAvailableBudget(Number.POSITIVE_INFINITY);
+  let startAvailableMicros = Number.POSITIVE_INFINITY;
+  try {
+    const spend = await getProjectSpendSummary(
+      db,
+      input.workspaceId,
+      input.projectId,
+    );
+    startAvailableMicros = spend.availableMicros;
+  } catch {
+    /* best-effort — lean when unknown */
+  }
+  const rosterKeys = rosterKeysForAvailableBudget(startAvailableMicros);
   const startPolicy = parseMaintainerPolicy(project.maintainerPolicyJson);
   const duelN = maintainerContenderPinN(startPolicy.maxTournamentN);
   let { arena } = await ensureArenaForProject(db, {
@@ -2366,8 +2400,26 @@ export async function runVisionReplan(
   const policy = parseMaintainerPolicy(project?.maintainerPolicyJson);
   const autoQueue =
     input.autoQueue ?? policy.autoQueueReplanTasks;
-  const maxAutoQueue =
-    input.maxAutoQueue ?? policy.maxAutoQueuePerReplan;
+
+  let replanAvailableMicros = Number.POSITIVE_INFINITY;
+  try {
+    const spend = await getProjectSpendSummary(
+      db,
+      input.workspaceId,
+      input.projectId,
+    );
+    replanAvailableMicros = spend.availableMicros;
+  } catch {
+    /* lean replan when spend unknown */
+    replanAvailableMicros = 0;
+  }
+  const maxAutoQueue = maxAutoQueueForReplan({
+    availableMicros: replanAvailableMicros,
+    policyMaxAutoQueuePerReplan: policy.maxAutoQueuePerReplan,
+    override: input.maxAutoQueue,
+  });
+  const leanReplan =
+    replanAvailableMicros < REPLAN_LEAN_BUDGET_MICROS;
 
   // Primary-only invent: archive / secondary product shells stay quiet.
   if (
@@ -2553,7 +2605,7 @@ export async function runVisionReplan(
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       actor: input.actor,
-      profileKeys: rosterKeysForAvailableBudget(Number.POSITIVE_INFINITY),
+      profileKeys: rosterKeysForAvailableBudget(replanAvailableMicros),
       seatCount: pinN,
       policyMaxContenderN: pinN,
     });
@@ -2628,6 +2680,11 @@ export async function runVisionReplan(
       taskCount,
       queued,
       autoQueue,
+      maxAutoQueue,
+      leanReplan,
+      availableMicros: Number.isFinite(replanAvailableMicros)
+        ? replanAvailableMicros
+        : null,
       architectureId: archTask.id,
       architectureTitle: archTask.title.slice(0, 160),
     },
@@ -2644,6 +2701,11 @@ export async function runVisionReplan(
       briefId: brief.id,
       taskCount,
       queued,
+      maxAutoQueue,
+      leanReplan,
+      availableMicros: Number.isFinite(replanAvailableMicros)
+        ? replanAvailableMicros
+        : null,
       architectureId: archTask.id,
       architectureTitle: archTask.title.slice(0, 160),
     },
