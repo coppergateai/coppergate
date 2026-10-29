@@ -59,10 +59,7 @@ import {
   submitTaskForApproval,
 } from "./task-transitions.js";
 import { listRunsForTask } from "./runs.js";
-import {
-  selectAutoAcceptRun,
-  selectCiRefreshRun,
-} from "./run-selection.js";
+import { selectAutoAcceptRun } from "./run-selection.js";
 import { armSignalEvent, listSignalEvents } from "./signals.js";
 import { generateProjectPlan } from "./plans.js";
 import {
