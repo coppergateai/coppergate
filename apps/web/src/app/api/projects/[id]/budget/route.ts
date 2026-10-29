@@ -18,6 +18,7 @@ function mapBudgetError(err: unknown): never {
       case "not_found":
         throw new ApiError("not_found", err.message);
       case "invalid":
+      case "mismatch":
         throw new ApiError("bad_request", err.message);
       case "insufficient":
       case "paused":
