@@ -1085,6 +1085,7 @@ function buildTournamentGroup(events: ActivityEvent[]): ActivityGroup {
 function applyMergeAttemptCollapse(group: ActivityGroup): void {
   const merged = group.children.filter((c) => c.meta?.merged === true).length;
   const notReady = group.children.length - merged;
+  const latest = group.children[0]!;
   group.title =
     merged > 0 && notReady === 0
       ? "PRs merged"
@@ -1092,12 +1093,18 @@ function applyMergeAttemptCollapse(group: ActivityGroup): void {
         ? "Merge activity"
         : "Merge not ready";
   group.technicalLabel = `attempt ×${group.count}`;
+  if (merged > 0) {
+    group.summary = `${merged} merged${notReady > 0 ? ` · ${notReady} not ready` : ""}`;
+    group.outcome = notReady === 0 ? "completed" : "review";
+    return;
+  }
+  // Not-ready storms: Cycle 11 per-project bucket, AG-019 last outcome only (no ×N summary spam).
   group.summary =
-    merged > 0
-      ? `${merged} merged${notReady > 0 ? ` · ${notReady} not ready` : ""}`
-      : `${notReady} not mergeable`;
-  group.outcome =
-    merged > 0 && notReady === 0 ? "completed" : "review";
+    str(latest.meta, "message") ??
+    str(latest.meta, "cta") ??
+    summaryFor("merge.attempt", latest.meta, 1);
+  group.outcome = mergeAttemptOutcome(latest.meta);
+  group.meta = latest.meta;
 }
 
 function buildMergeAttemptGroup(events: ActivityEvent[]): ActivityGroup {
@@ -1171,7 +1178,8 @@ function buildArenaControlGroup(events: ActivityEvent[]): ActivityGroup {
 /**
  * Group raw audit events (newest-first) into timeline groups.
  * - Tournament create/fanout/resolve with same tournament id → one execution
- * - merge.attempt storms per project → one collapse (even when interleaved)
+ * - merge.attempt storms per project → one collapse (even when interleaved);
+ *   pure not-ready buckets show the latest outcome only (AG-019 noise floor)
  * - arena.start/stop/pause storms → one Arena control collapse
  * - Consecutive identical actions (same target) → collapsed with count
  */
