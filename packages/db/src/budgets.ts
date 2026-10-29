@@ -574,6 +574,48 @@ export async function assertSufficientBudget(
   return summary;
 }
 
+function isUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: string }).code;
+  if (code === "23505") return true;
+  const cause = (err as { cause?: unknown }).cause;
+  return isUniqueViolation(cause);
+}
+
+async function findLlmTokensUsage(
+  db: DbLike,
+  runId: string,
+  role: ReturnType<typeof llmUsageProviderRoleFromMeta>,
+): Promise<UsageEvent | undefined> {
+  const [byColumn] = await db
+    .select()
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.runId, runId),
+        eq(usageEvents.kind, "llm_tokens"),
+        eq(usageEvents.llmProviderRole, role),
+      ),
+    )
+    .limit(1);
+  if (byColumn) return byColumn;
+
+  // Pre-migration / null-column rows: match via meta parse.
+  const existingRows = await db
+    .select()
+    .from(usageEvents)
+    .where(
+      and(eq(usageEvents.runId, runId), eq(usageEvents.kind, "llm_tokens")),
+    );
+  for (const existing of existingRows) {
+    const existingRole = llmUsageProviderRoleFromMeta(existing.meta);
+    if (llmUsageRolesDedupe(existingRole, role)) {
+      return existing;
+    }
+  }
+  return undefined;
+}
+
 export async function appendUsageEvent(
   db: DbLike,
   input: {
@@ -589,45 +631,51 @@ export async function appendUsageEvent(
     meta?: unknown;
   },
 ): Promise<UsageEvent> {
-  // llm_tokens idempotency: once per run for legacy rows; AG-016 primary + fallback debited separately.
-  if (input.kind === "llm_tokens" && input.runId) {
-    const incomingRole = llmUsageProviderRoleFromMeta(input.meta);
-    const existingRows = await db
-      .select()
-      .from(usageEvents)
-      .where(
-        and(
-          eq(usageEvents.runId, input.runId),
-          eq(usageEvents.kind, "llm_tokens"),
-        ),
-      );
-    for (const existing of existingRows) {
-      const existingRole = llmUsageProviderRoleFromMeta(existing.meta);
-      if (llmUsageRolesDedupe(existingRole, incomingRole)) {
-        return existing;
-      }
-    }
+  // llm_tokens idempotency: once per run+role (legacy | primary | fallback).
+  // Unique index usage_events_llm_tokens_run_role_uidx closes the select→insert race (F2).
+  const llmRole =
+    input.kind === "llm_tokens" && input.runId
+      ? llmUsageProviderRoleFromMeta(input.meta)
+      : null;
+
+  if (input.kind === "llm_tokens" && input.runId && llmRole) {
+    const existing = await findLlmTokensUsage(db, input.runId, llmRole);
+    if (existing) return existing;
   }
 
-  const [row] = await db
-    .insert(usageEvents)
-    .values({
-      id: crypto.randomUUID(),
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      taskId: input.taskId ?? null,
-      runId: input.runId ?? null,
-      kind: input.kind,
-      quantity: input.quantity ?? "0",
-      costMicros: input.costMicros,
-      provider: input.provider ?? null,
-      model: input.model ?? null,
-      meta: input.meta === undefined ? null : JSON.stringify(input.meta),
-      createdAt: new Date(),
-    })
-    .returning();
-  if (!row) throw new Error("Failed to append usage event");
-  return row;
+  try {
+    const [row] = await db
+      .insert(usageEvents)
+      .values({
+        id: crypto.randomUUID(),
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        taskId: input.taskId ?? null,
+        runId: input.runId ?? null,
+        kind: input.kind,
+        quantity: input.quantity ?? "0",
+        costMicros: input.costMicros,
+        provider: input.provider ?? null,
+        model: input.model ?? null,
+        meta: input.meta === undefined ? null : JSON.stringify(input.meta),
+        llmProviderRole: llmRole,
+        createdAt: new Date(),
+      })
+      .returning();
+    if (!row) throw new Error("Failed to append usage event");
+    return row;
+  } catch (err) {
+    if (
+      input.kind === "llm_tokens" &&
+      input.runId &&
+      llmRole &&
+      isUniqueViolation(err)
+    ) {
+      const raced = await findLlmTokensUsage(db, input.runId, llmRole);
+      if (raced) return raced;
+    }
+    throw err;
+  }
 }
 
 /**

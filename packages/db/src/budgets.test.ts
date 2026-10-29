@@ -1,5 +1,6 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { and, eq } from "drizzle-orm";
 import { closeDb, createDb } from "./client.js";
 import { approveBrief, createBriefDraft } from "./briefs.js";
 import {
@@ -17,6 +18,7 @@ import {
 import { connectRepository, upsertGithubInstallation } from "./github.js";
 import { generateProjectPlan } from "./plans.js";
 import { createProjectWithRepo } from "./projects.js";
+import { usageEvents } from "./schema.js";
 import { createWorkspaceWithOwner, insertTestUser } from "./workspaces.js";
 
 const url = process.env.DATABASE_URL;
@@ -410,6 +412,8 @@ describe("workspace pooled budgets", { skip: !url }, () => {
     });
     assert.notEqual(fallback.id, primary.id);
     assert.equal(fallback.costMicros, 2_000);
+    assert.equal(primary.llmProviderRole, "primary");
+    assert.equal(fallback.llmProviderRole, "fallback");
 
     const retryPrimary = await appendUsageEvent(db, {
       workspaceId,
@@ -427,5 +431,37 @@ describe("workspace pooled budgets", { skip: !url }, () => {
     const delta =
       (afterA.projectSpentMicros ?? 0) - (beforeA.projectSpentMicros ?? 0);
     assert.equal(delta, 3_000);
+  });
+
+  it("F2: concurrent llm_tokens inserts for the same role collapse to one row", async () => {
+    const runId = crypto.randomUUID();
+    const results = await Promise.all(
+      Array.from({ length: 16 }, (_, i) =>
+        appendUsageEvent(db, {
+          workspaceId,
+          projectId: projectA,
+          runId,
+          kind: "llm_tokens",
+          costMicros: 1_000 + i,
+          quantity: String(i),
+          meta: { providerRole: "primary" },
+        }),
+      ),
+    );
+    const ids = new Set(results.map((r) => r.id));
+    assert.equal(ids.size, 1, "exactly one usage row should win");
+
+    const rows = await db
+      .select()
+      .from(usageEvents)
+      .where(
+        and(
+          eq(usageEvents.runId, runId),
+          eq(usageEvents.kind, "llm_tokens"),
+          eq(usageEvents.llmProviderRole, "primary"),
+        ),
+      );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.costMicros, results[0]!.costMicros);
   });
 });
