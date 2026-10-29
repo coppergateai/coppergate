@@ -26,6 +26,7 @@ function runStub(
     id: "run-1",
     taskId: "task-1",
     taskTitle: "Stub",
+    taskStatus: "QUEUED",
     actualCostMicros: 0,
     prUrl: null,
     prNumber: null,
@@ -44,6 +45,33 @@ describe("classifyContenderRuntime", () => {
       classifyContenderRuntime(
         runStub({ status: "CANCELLED", errorCode: "incomplete" }),
         1_000_000,
+      ),
+      "idle",
+    );
+  });
+
+  it("quiets leftover FAILED/REVIEW when parent task is closed", () => {
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({
+          status: "FAILED",
+          errorCode: "delivery_error",
+          tournamentResult: "WINNER",
+          taskStatus: "CANCELLED",
+        }),
+        1_000_000,
+        { arenaLive: true },
+      ),
+      "idle",
+    );
+    assert.equal(
+      classifyContenderRuntime(
+        runStub({
+          status: "REVIEW_REQUIRED",
+          taskStatus: "DONE",
+        }),
+        1_000_000,
+        { arenaLive: true },
       ),
       "idle",
     );

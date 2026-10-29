@@ -17,6 +17,8 @@ type ContenderRun = {
   status: string;
   taskId: string;
   taskTitle: string;
+  /** Parent task status — closed parents must not inflate Needs attention. */
+  taskStatus?: string;
   actualCostMicros: number;
   prUrl: string | null;
   prNumber: number | null;
@@ -128,6 +130,15 @@ function classifyRuntime(
   if (c.status === "ELIMINATED") return "idle";
   const run = c.latestRun;
   if (!run) return "idle";
+  // Parent task already closed (retired ship-gate, etc.) — leftover runs are quiet.
+  if (
+    run.taskStatus === "CANCELLED" ||
+    run.taskStatus === "DONE" ||
+    run.taskStatus === "FAILED" ||
+    run.taskStatus === "EXPIRED"
+  ) {
+    return "idle";
+  }
   const st = run.status;
   // Soft-cancel / stop is a quiet terminal — not an ops fire to chase.
   if (st === "CANCELLED") return "idle";

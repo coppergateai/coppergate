@@ -25,6 +25,8 @@ export type WorkspaceArenaContenderRun = {
   status: string;
   taskId: string;
   taskTitle: string;
+  /** Parent task status — CANCELLED/DONE means the board card is closed. */
+  taskStatus: string;
   actualCostMicros: number;
   prUrl: string | null;
   prNumber: number | null;
@@ -36,6 +38,18 @@ export type WorkspaceArenaContenderRun = {
   /** Latest coding-path / failover honesty from run progress events (AG-013). */
   activityHint: string | null;
 };
+
+/** Parent task closed — leftover FAILED/REVIEW runs must not scream Needs attention. */
+export function isClosedParentTaskStatus(
+  taskStatus: string | null | undefined,
+): boolean {
+  return (
+    taskStatus === "CANCELLED" ||
+    taskStatus === "DONE" ||
+    taskStatus === "FAILED" ||
+    taskStatus === "EXPIRED"
+  );
+}
 
 /** Failures older than this do not inflate Needs attention while the arena is live. */
 export const STALE_FAILURE_ATTENTION_MS = 2 * 60 * 60 * 1000;
@@ -171,6 +185,8 @@ export function classifyContenderRuntime(
   void budgetMicrosRemaining;
   if (options?.contenderStatus === "ELIMINATED") return "idle";
   if (!latestRun) return "idle";
+  // Parent task already closed (e.g. retired [ship-gate]) — ignore leftover runs.
+  if (isClosedParentTaskStatus(latestRun.taskStatus)) return "idle";
   const st = latestRun.status;
   // Soft-cancel / stop is a quiet terminal — not an ops fire to chase.
   if (st === "CANCELLED") return "idle";
@@ -254,6 +270,7 @@ async function latestRunsByContender(
       contenderId: agentRuns.contenderId,
       taskId: agentRuns.taskId,
       taskTitle: tasks.title,
+      taskStatus: tasks.status,
       actualCostMicros: agentRuns.actualCostMicros,
       prUrl: agentRuns.prUrl,
       prNumber: agentRuns.prNumber,
@@ -280,6 +297,7 @@ async function latestRunsByContender(
       status: row.status,
       taskId: row.taskId,
       taskTitle: row.taskTitle,
+      taskStatus: row.taskStatus,
       actualCostMicros: row.actualCostMicros,
       prUrl: row.prUrl,
       prNumber: row.prNumber,
