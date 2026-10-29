@@ -33,7 +33,10 @@ function runProgressHintFromPayload(
       typeof payload.provider === "string" ? payload.provider : "provider";
     const model =
       typeof payload.model === "string" ? payload.model : "model";
-    return `${role} LLM debit — ${provider}/${model}`;
+    return {
+      codingPathLine: `${role} LLM debit — ${provider}/${model}`,
+      failoverLine: null,
+    };
   }
   if (code === "provider_failover") {
     const reason =
