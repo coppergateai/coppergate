@@ -99,6 +99,22 @@ export function mapCheckSuitePayload(
   };
 }
 
+/**
+ * Classic commit-status contexts used by Vercel (and Vercel-named variants).
+ * Used to arm deploy-fail → ci_failure arenas without treating every status as a signal.
+ */
+export function isVercelCommitStatusContext(
+  context: string | null | undefined,
+): boolean {
+  if (!context?.trim()) return false;
+  // Normalize en/em dashes so "Vercel – Production" matches.
+  const c = context
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2013\u2014]/g, "-");
+  return c === "vercel" || c.startsWith("vercel ") || c.startsWith("vercel-");
+}
+
 /** Classic commit status webhook (`status` event) — Vercel often uses this. */
 export function mapCommitStatusPayload(payload: {
   state?: string;

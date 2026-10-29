@@ -5,6 +5,7 @@ import {
   mapCheckRunPayload,
   mapCheckSuitePayload,
   mapCommitStatusPayload,
+  isVercelCommitStatusContext,
   parseGithubWebhookHeaders,
   verifyGithubWebhookSignature,
   type CheckRunWebhookPayload,
@@ -208,6 +209,47 @@ export async function POST(request: Request) {
       note = ingested.attached
         ? `status attached to run ${ingested.runId}`
         : `status.${evidence.conclusion ?? evidence.status} (no matching run)`;
+
+      // Deploy-fail reverse path — Vercel classic commit status (no matching run).
+      // Redeploy happens via Accept → merge → Vercel Git integration (not L3 API).
+      if (
+        !ingested.attached &&
+        evidence.blocksAccept &&
+        isCiFailureConclusion(evidence.conclusion) &&
+        evidence.repoFullName &&
+        isVercelCommitStatusContext(evidence.name)
+      ) {
+        const targets = await findWorkspacesForRepo(
+          db,
+          evidence.repoFullName,
+        );
+        for (const t of targets) {
+          await ensureDefaultAutoArmRule(db, {
+            workspaceId: t.workspaceId,
+            provider: "ci_failure",
+            actor: "system:webhook",
+            profileKeys: ["fixer", "engineer"],
+          });
+          const envelope = envelopeFromCiFailure({
+            provider: "vercel",
+            externalId: `status:${evidence.name}:${evidence.headSha ?? headers.deliveryId}`,
+            name: evidence.name,
+            conclusion: evidence.conclusion,
+            headSha: evidence.headSha,
+            repoFullName: evidence.repoFullName,
+            detailsUrl: evidence.detailsUrl,
+          });
+          const armed = await ingestSignal(db, {
+            workspaceId: t.workspaceId,
+            projectId: t.projectId,
+            envelope,
+            actor: "system:webhook",
+          });
+          if (armed.armed) {
+            note = `${note}; ci_failure armed task ${armed.task?.id}`;
+          }
+        }
+      }
     } else if (headers.event === "pull_request" && action === "closed") {
       const pr = parsed.pull_request as
         | { number?: number; merged?: boolean }
