@@ -137,6 +137,9 @@ Date: 2026-10-24
 ## Cycle 19
 - **Merge conflict signal (AG-032)**: dirty open delivery PR → `merge_conflict` ingest + auto-arm (same head rebase) instead of abandoning the PR via NEEDS_REPLAN; AG-031 replan remains only when no healable PR
 
+## Cycle 20
+- **Stale delivery heal (AG-033)**: `waiting_ci_timeout` + open non-dirty PR → `stale_delivery` same-head heal (not NEEDS_REPLAN); merge-state API fail still prefers heal when PR number is known
+
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly

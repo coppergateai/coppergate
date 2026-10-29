@@ -1,16 +1,18 @@
 /**
- * AG-031 / AG-032 — stale WAITING_CI timeout reviews:
- * dirty PR → merge_conflict signal; otherwise request_changes → NEEDS_REPLAN.
+ * AG-031 / AG-032 / AG-033 — stale WAITING_CI timeout reviews:
+ * dirty open PR → merge_conflict; other open PR → stale_delivery heal;
+ * otherwise request_changes → NEEDS_REPLAN.
  */
 import { and, eq, inArray } from "drizzle-orm";
 import {
   decideTaskReview,
   ensureMergeConflictSignal,
+  ensureStaleDeliveryHealSignal,
   getRunCiFitness,
   listRunsForTask,
   recordAuditEvent,
+  routeStaleReviewHeal,
   selectAutoAcceptRun,
-  shouldEmitMergeConflictInsteadOfReplan,
   shouldRequestChangesForStaleCiTimeoutReview,
   tasks,
   type Database,
@@ -29,8 +31,13 @@ export async function healStaleReviewsOrEmitConflict(
     token: string;
     actor: string;
   },
-): Promise<{ conflictSignals: number; replanned: number }> {
+): Promise<{
+  conflictSignals: number;
+  deliveryHeals: number;
+  replanned: number;
+}> {
   let conflictSignals = 0;
+  let deliveryHeals = 0;
   let replanned = 0;
 
   const pending = await db
@@ -78,14 +85,14 @@ export async function healStaleReviewsOrEmitConflict(
           repo: input.repo,
           prNumber,
         });
-        if (
-          shouldEmitMergeConflictInsteadOfReplan({
-            prOpen: pr.state === "open" && !pr.merged,
-            merged: pr.merged,
-            mergeable: pr.mergeable,
-            mergeableState: pr.mergeableState,
-          })
-        ) {
+        const route = routeStaleReviewHeal({
+          hasPrNumber: true,
+          prOpen: pr.state === "open" && !pr.merged,
+          merged: pr.merged,
+          mergeable: pr.mergeable,
+          mergeableState: pr.mergeableState,
+        });
+        if (route === "merge_conflict") {
           const signal = await ensureMergeConflictSignal(db, {
             workspaceId: input.workspaceId,
             projectId: input.projectId,
@@ -110,12 +117,99 @@ export async function healStaleReviewsOrEmitConflict(
           });
           continue;
         }
+        if (route === "stale_delivery") {
+          const signal = await ensureStaleDeliveryHealSignal(db, {
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            actor: input.actor,
+            owner: input.owner,
+            repo: input.repo,
+            prNumber,
+            headRef: pr.headRef,
+            headSha: pr.headSha,
+            baseRef: pr.baseRef,
+            parentTitle: task.title,
+            reasonNote:
+              "unattended: waiting_ci_timeout without accept-ready — same-head heal",
+          });
+          deliveryHeals += 1;
+          await recordAuditEvent(db, {
+            workspaceId: input.workspaceId,
+            actor: input.actor,
+            action: "review.stale_ci_timeout_heal",
+            targetType: "task",
+            targetId: task.id,
+            meta: {
+              projectId: input.projectId,
+              runId: candidate?.id ?? null,
+              prNumber,
+              signalId: signal.signalId,
+              healTaskId: signal.taskId,
+              armed: signal.armed,
+            },
+          });
+          log.info("stale_delivery heal for stale review", {
+            projectId: input.projectId,
+            taskId: task.id,
+            prNumber,
+            ingested: signal.ingested,
+            duplicate: signal.duplicate,
+            armed: signal.armed,
+            signalId: signal.signalId,
+          });
+          continue;
+        }
       } catch (err) {
-        log.warn("merge conflict check failed — falling back to replan", {
-          taskId: task.id,
-          prNumber,
-          error: err instanceof Error ? err.message : String(err),
-        });
+        // PR number known but merge-state check failed — still prefer heal
+        // over abandoning the open delivery via NEEDS_REPLAN.
+        try {
+          const signal = await ensureStaleDeliveryHealSignal(db, {
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            actor: input.actor,
+            owner: input.owner,
+            repo: input.repo,
+            prNumber,
+            parentTitle: task.title,
+            reasonNote:
+              "unattended: waiting_ci_timeout; merge-state check failed — same-head heal fallback",
+          });
+          deliveryHeals += 1;
+          await recordAuditEvent(db, {
+            workspaceId: input.workspaceId,
+            actor: input.actor,
+            action: "review.stale_ci_timeout_heal",
+            targetType: "task",
+            targetId: task.id,
+            meta: {
+              projectId: input.projectId,
+              runId: candidate?.id ?? null,
+              prNumber,
+              signalId: signal.signalId,
+              healTaskId: signal.taskId,
+              armed: signal.armed,
+              mergeStateError:
+                err instanceof Error ? err.message : String(err),
+            },
+          });
+          log.warn(
+            "merge state check failed — stale_delivery heal fallback",
+            {
+              taskId: task.id,
+              prNumber,
+              error: err instanceof Error ? err.message : String(err),
+              armed: signal.armed,
+            },
+          );
+          continue;
+        } catch (healErr) {
+          log.warn("stale delivery heal fallback failed — will replan", {
+            taskId: task.id,
+            prNumber,
+            error:
+              healErr instanceof Error ? healErr.message : String(healErr),
+          });
+        }
       }
     }
 
@@ -147,5 +241,5 @@ export async function healStaleReviewsOrEmitConflict(
     }
   }
 
-  return { conflictSignals, replanned };
+  return { conflictSignals, deliveryHeals, replanned };
 }

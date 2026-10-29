@@ -295,10 +295,15 @@ export async function runMaintainerSchedulerTick(
         token,
         actor,
       });
-      if (stale.conflictSignals || stale.replanned) {
+      if (
+        stale.conflictSignals ||
+        stale.deliveryHeals ||
+        stale.replanned
+      ) {
         log.info("stale review heal", {
           projectId: tick.projectId,
           conflictSignals: stale.conflictSignals,
+          deliveryHeals: stale.deliveryHeals,
           replanned: stale.replanned,
         });
       }

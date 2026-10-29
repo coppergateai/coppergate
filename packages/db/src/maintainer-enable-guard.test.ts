@@ -28,6 +28,7 @@ const TEST_DEFAULTS: MaintainerPolicy = {
     "*",
     "ci_failure",
     "merge_conflict",
+    "stale_delivery",
     "sentry",
     "dependabot",
     "codeql",

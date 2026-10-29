@@ -777,6 +777,16 @@ export {
   shouldEmitMergeConflictInsteadOfReplan,
   type EnsureMergeConflictSignalResult,
 } from "./merge-conflict-signal.js";
+export {
+  STALE_DELIVERY_PROVIDER,
+  buildStaleDeliveryEnvelope,
+  ensureStaleDeliveryHealSignal,
+  routeStaleReviewHeal,
+  shouldHealOpenDeliveryInsteadOfReplan,
+  staleDeliveryExternalId,
+  type EnsureStaleDeliverySignalResult,
+  type StaleReviewHealRoute,
+} from "./stale-delivery-heal-signal.js";
 export { ingestSonarFitness } from "./sonar-fitness.js";
 export { callSonarTool, type SonarToolName } from "./sonarqube-mcp.js";
 export {
