@@ -405,6 +405,7 @@ export {
   type SpendLicense,
 } from "./spend-license.js";
 export {
+  DIRTY_PR_HEAL_GRACE_MS,
   SHIP_GATE_HEAL_MARKER,
   STALE_REVIEW_AFTER_CI_TIMEOUT_MS,
   buildShipGateHealTitle,
@@ -412,7 +413,9 @@ export {
   isShipGateHealTitle,
   openTaskCountsAsBusyForBacklog,
   shipGateMergeMode,
+  shouldInspectDeliveryPrForUnattendedHeal,
   shouldRequestChangesForStaleCiTimeoutReview,
+  shouldRetireObsoleteShipGateHeal,
   type EnsureShipGateHealResult,
   type ShipGateMergeMode,
 } from "./ship-gate-heal.js";

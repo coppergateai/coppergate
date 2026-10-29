@@ -25,13 +25,16 @@ import {
 } from "./task-transitions.js";
 
 export {
+  DIRTY_PR_HEAL_GRACE_MS,
   SHIP_GATE_HEAL_MARKER,
   STALE_REVIEW_AFTER_CI_TIMEOUT_MS,
   buildShipGateHealTitle,
   isShipGateHealTitle,
   openTaskCountsAsBusyForBacklog,
   shipGateMergeMode,
+  shouldInspectDeliveryPrForUnattendedHeal,
   shouldRequestChangesForStaleCiTimeoutReview,
+  shouldRetireObsoleteShipGateHeal,
   type ShipGateMergeMode,
 } from "./ship-gate-heal-policy.js";
 

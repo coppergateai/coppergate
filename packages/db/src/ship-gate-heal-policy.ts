@@ -60,6 +60,13 @@ export function openTaskCountsAsBusyForBacklog(input: {
 /** Stale non-accept-ready review after CI timeout — free the board. */
 export const STALE_REVIEW_AFTER_CI_TIMEOUT_MS = 30 * 60_000;
 
+/**
+ * Dirty / salvageable delivery PRs should heal without waiting the full
+ * WAITING_CI timeout (default 6h) — otherwise Arena looks “stuck” and asks
+ * a human (AG-035).
+ */
+export const DIRTY_PR_HEAL_GRACE_MS = 15 * 60_000;
+
 export function shouldRequestChangesForStaleCiTimeoutReview(input: {
   taskStatus: string;
   acceptReady: boolean;
@@ -74,4 +81,41 @@ export function shouldRequestChangesForStaleCiTimeoutReview(input: {
   const stale = input.staleMs ?? STALE_REVIEW_AFTER_CI_TIMEOUT_MS;
   const now = input.nowMs ?? Date.now();
   return now - input.taskUpdatedAt.getTime() >= stale;
+}
+
+/** True when an open delivery has been WAITING_CI / REVIEW long enough to poll PR merge state. */
+export function shouldInspectDeliveryPrForUnattendedHeal(input: {
+  taskStatus: string;
+  acceptReady: boolean;
+  taskUpdatedAt: Date;
+  nowMs?: number;
+  graceMs?: number;
+}): boolean {
+  if (input.acceptReady) return false;
+  if (
+    input.taskStatus !== "WAITING_CI" &&
+    input.taskStatus !== "REVIEW_REQUIRED"
+  ) {
+    return false;
+  }
+  const grace = input.graceMs ?? DIRTY_PR_HEAL_GRACE_MS;
+  const now = input.nowMs ?? Date.now();
+  return now - input.taskUpdatedAt.getTime() >= grace;
+}
+
+/**
+ * Tip already green (or heal PR closed/merged) → retire open `[ship-gate]`
+ * REVIEW/WAITING work so Mission Control stops asking a human.
+ */
+export function shouldRetireObsoleteShipGateHeal(input: {
+  taskTitle: string | null | undefined;
+  tipKind?: "green" | "red" | "pending" | null;
+  prOpen?: boolean | null;
+  prMerged?: boolean | null;
+}): boolean {
+  if (!isShipGateHealTitle(input.taskTitle)) return false;
+  if (input.tipKind === "green") return true;
+  if (input.prMerged === true) return true;
+  if (input.prOpen === false) return true;
+  return false;
 }
