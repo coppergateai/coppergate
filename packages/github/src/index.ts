@@ -85,6 +85,7 @@ export {
   commitCheckSuitesShipGate,
   countOpenShipRollbackPrs,
   fetchCommitCheckEvidence,
+  fetchCheckRunAnnotationSnippet,
   getRepoDefaultBranchHead,
   mapCheckRunPayload,
   mapCheckSuitePayload,

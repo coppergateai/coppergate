@@ -12,7 +12,7 @@ Continuous maintainer tick path that turns **FAILED run / tip CI evidence** into
 ## Sources
 
 1. Recent **FAILED** `agent_runs` for the project (`errorCode`, `errorMessage`, task title, headSha).
-2. Soft: primary repo **default-branch tip** check evidence via GitHub API (failed / timed_out).
+2. Soft: primary repo **default-branch tip** check evidence via GitHub API (failed / timed_out), with **check-run annotation** snippets when available (CI log scan fallback to check name + SHA).
 
 ## Noise (never become Open rows)
 
