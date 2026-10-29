@@ -942,11 +942,16 @@ export async function startTournamentFanout(
     db,
     input.workspaceId,
   );
+  // Honor explicit n; otherwise keep existing arena width (do not force solo).
+  const existingArena = await getArenaForProject(db, {
+    workspaceId: input.workspaceId,
+    projectId: task.projectId,
+  });
   const desiredN = Math.max(
     1,
     Math.min(
       MAX_TOURNAMENT_FANOUT,
-      input.n ?? 1,
+      input.n ?? existingArena?.defaultContenderN ?? 1,
     ),
   );
   const { arena } = await ensureArenaForProject(db, {
