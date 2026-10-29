@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { MarkdownProse } from "@/components/markdown-prose";
 import styles from "../shared/catalog.module.css";
 
 export type SkillRow = {
@@ -541,7 +542,10 @@ export function SkillsShell({
 
               <section className={styles.section}>
                 <h3 className={styles.sectionLabel}>Procedure</h3>
-                <pre className={styles.bodyBlock}>{selected.bodyMarkdown}</pre>
+                <MarkdownProse
+                  className={styles.bodyProse}
+                  markdown={selected.bodyMarkdown}
+                />
               </section>
 
               <section className={styles.section}>

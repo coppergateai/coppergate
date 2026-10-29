@@ -18,6 +18,7 @@ describe("system skills (self-pilot roles)", () => {
       "design-audit",
       "security-asvs",
       "agent-reliability",
+      "open-program",
     ]) {
       assert.ok(keys.has(k), `missing skill ${k}`);
     }
@@ -35,6 +36,9 @@ describe("system skills (self-pilot roles)", () => {
 
   it("wires role skills onto bounded profiles", () => {
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.proposer?.includes("product-cpo"));
+    assert.ok(DEFAULT_PROFILE_SKILL_KEYS.proposer?.includes("open-program"));
+    assert.ok(DEFAULT_PROFILE_SKILL_KEYS.release?.includes("open-program"));
+    assert.ok(DEFAULT_PROFILE_SKILL_KEYS.triager?.includes("open-program"));
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.engineer?.includes("designer-ux"));
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.engineer?.includes("landing-cro"));
     assert.ok(DEFAULT_PROFILE_SKILL_KEYS.docs?.includes("seo-growth"));
