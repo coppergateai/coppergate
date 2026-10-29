@@ -140,6 +140,9 @@ Date: 2026-10-24
 ## Cycle 20
 - **Stale delivery heal (AG-033)**: `waiting_ci_timeout` + open non-dirty PR → `stale_delivery` same-head heal (not NEEDS_REPLAN); merge-state API fail still prefers heal when PR number is known
 
+## Cycle 21
+- **Ship-gate heal-only merge (AG-034)**: tip `default_branch_ci_red` still auto-merges `[ship-gate]` heal PRs (`shipGateMergeMode=heal_only`); product merges stay halted — closes AG-031 enqueue→never-merge deadlock (ACPP dogfood 2026-10-29)
+
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly

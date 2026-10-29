@@ -6,6 +6,7 @@ import {
   buildShipGateHealTitle,
   isShipGateHealTitle,
   openTaskCountsAsBusyForBacklog,
+  shipGateMergeMode,
   shouldRequestChangesForStaleCiTimeoutReview,
 } from "./ship-gate-heal-policy.js";
 
@@ -18,6 +19,29 @@ describe("ship-gate-heal (AG-031)", () => {
     );
     assert.equal(isShipGateHealTitle("AG-018: Contender N pin"), false);
     assert.equal(isShipGateHealTitle(null), false);
+  });
+
+  it("AG-034: tip red allows heal-only merge; pending/rollback halt", () => {
+    assert.equal(
+      shipGateMergeMode({ tipKind: "green", openRollbacks: 0 }),
+      "all",
+    );
+    assert.equal(
+      shipGateMergeMode({ tipKind: "red", openRollbacks: 0 }),
+      "heal_only",
+    );
+    assert.equal(
+      shipGateMergeMode({ tipKind: "pending", openRollbacks: 0 }),
+      "halt",
+    );
+    assert.equal(
+      shipGateMergeMode({ tipKind: "red", openRollbacks: 1 }),
+      "halt",
+    );
+    assert.equal(
+      shipGateMergeMode({ tipKind: "green", openRollbacks: 1 }),
+      "halt",
+    );
   });
 
   it("builds title with short sha", () => {

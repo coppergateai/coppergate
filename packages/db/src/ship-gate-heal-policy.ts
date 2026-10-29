@@ -13,6 +13,26 @@ export function isShipGateHealTitle(
   return title.toLowerCase().includes(SHIP_GATE_HEAL_MARKER);
 }
 
+/**
+ * Auto-merge posture while the default-branch ship gate is evaluated.
+ *
+ * - `all` — tip green, no open rollback: normal product merges
+ * - `heal_only` — tip red: land `[ship-gate]` heal PRs only (AG-034). Without
+ *   this, AG-031 enqueue deadlocks (heal PR green but merge never runs).
+ * - `halt` — tip pending or open ship-rollback: merge nothing
+ */
+export type ShipGateMergeMode = "all" | "heal_only" | "halt";
+
+export function shipGateMergeMode(input: {
+  tipKind: "green" | "red" | "pending";
+  openRollbacks: number;
+}): ShipGateMergeMode {
+  if (input.openRollbacks > 0) return "halt";
+  if (input.tipKind === "green") return "all";
+  if (input.tipKind === "red") return "heal_only";
+  return "halt";
+}
+
 /** Build a stable heal title for a tip SHA (dedupe by marker + short sha). */
 export function buildShipGateHealTitle(headSha: string): string {
   const short = headSha.trim().slice(0, 8) || "unknown";

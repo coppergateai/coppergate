@@ -30,7 +30,9 @@ export {
   buildShipGateHealTitle,
   isShipGateHealTitle,
   openTaskCountsAsBusyForBacklog,
+  shipGateMergeMode,
   shouldRequestChangesForStaleCiTimeoutReview,
+  type ShipGateMergeMode,
 } from "./ship-gate-heal-policy.js";
 
 const OPEN_HEAL_STATUSES = [

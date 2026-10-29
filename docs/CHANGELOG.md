@@ -9,6 +9,7 @@
 
 ### Features
 
+- AG-034: Ship-gate heal-only merge — while tip is `default_branch_ci_red`, product auto-merge stays halted but `[ship-gate]` heal PRs still merge (`shipGateMergeMode=heal_only`), closing the AG-031 enqueue→never-merge deadlock. See `docs/ship-gate-self-heal.md`.
 - AG-033: `stale_delivery` signal — open (non-dirty) delivery PRs after `waiting_ci_timeout` arm a same-head fixer instead of `NEEDS_REPLAN`; dirty stays AG-032; replan only when no healable PR. See `docs/stale-delivery-heal.md`.
 - AG-032: `merge_conflict` signal — dirty delivery PRs arm a fixer task to rebase the same head instead of AG-031 `request_changes` → NEEDS_REPLAN. See `docs/merge-conflict-signal.md`.
 - AG-031: Ship-gate tip-red self-heal — when auto-merge halts on `default_branch_ci_red`, maintainer enqueues a `[ship-gate]` tip-CI fix task (spend-licensed reliability, not freestyle invent); stale `waiting_ci_timeout` REVIEW no longer freezes continuous backlog. See `docs/ship-gate-self-heal.md`.
