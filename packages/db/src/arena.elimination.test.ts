@@ -200,23 +200,34 @@ describe("elimination + kill-switch (TASK051/052)", { skip: !url }, () => {
       taskId,
       runId: b!.id,
       kind: "validation_report",
-      body: { passed: true },
-      meta: { passed: true },
+      body: { passed: true, source: "fixture" },
+      meta: { passed: true, summary: "ok" },
     });
+    // P-142 — winner must cite CI/validation + tests (or coverage/e2e) or both
+    // runs score 0 and lex UUID pick makes loser debit non-deterministic.
     await createArtifact(db, {
       workspaceId,
       projectId,
       taskId,
       runId: b!.id,
       kind: "diff_summary",
-      body: { files: 1 },
+      body: {
+        filesChanged: ["src/app.ts", "src/app.test.ts", "src/lib/util.ts"],
+        additions: 80,
+      },
+      meta: { summary: "diff" },
     });
 
-    await scoreAndResolveTournament(db, {
+    const resolved = await scoreAndResolveTournament(db, {
       workspaceId,
       tournamentId: tournament.id,
       actor,
     });
+    assert.equal(
+      resolved.winnerRunId,
+      b!.id,
+      "evidence-backed contender must win so loser debit is deterministic",
+    );
 
     const pool = await listContendersForArena(db, {
       workspaceId,

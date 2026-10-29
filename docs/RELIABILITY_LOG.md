@@ -118,6 +118,10 @@ Date: 2026-10-24
 - `budgets.test.ts` — llm_tokens once-per-runId (needs `DATABASE_URL`)
 - DB claim/execute suites need `DATABASE_URL`
 
+## Cycle 16
+- **Elimination debit determinism (P-142)**: `arena.elimination.test.ts` fixtures must cite validation + tests evidence for the intended winner; vibes-only zero scores made UUID lex pick the “winner” and left losers `ACTIVE`, redding `main` and freezing ship gate (`default_branch_ci_red`)
+- **Process**: prefer PR → green `check` before `main`; do not stack UI commits onto a red tip
+
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly
