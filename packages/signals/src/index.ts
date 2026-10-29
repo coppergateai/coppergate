@@ -32,7 +32,9 @@ export {
   verifyHmacSha256,
 } from "./verify.js";
 export {
+  FLAKE_COOLDOWN_WINDOW_MS,
   detectFlakePattern,
+  shouldSuppressFlakeRetry,
   type FlakeObservation,
 } from "./flake.js";
 export { JiraSignalAdapter } from "./jira.js";

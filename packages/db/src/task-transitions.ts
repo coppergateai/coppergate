@@ -544,6 +544,39 @@ export async function retryFailedTask(
     );
   }
 
+  // AG-021 — refuse Retry while the linked CI check is oscillating.
+  try {
+    const { getSignalEventForTask } = await import("./signals.js");
+    const {
+      checkNameFromCiFailureTitle,
+      evaluateCiFlakeCooldown,
+    } = await import("./flake-cooldown.js");
+    const signal = await getSignalEventForTask(
+      db,
+      input.workspaceId,
+      task.id,
+    );
+    if (signal?.provider === "ci_failure") {
+      const checkName = checkNameFromCiFailureTitle(signal.title);
+      if (checkName) {
+        const cool = await evaluateCiFlakeCooldown(db, {
+          workspaceId: input.workspaceId,
+          projectId: task.projectId,
+          checkName,
+        });
+        if (cool.suppress) {
+          throw new TaskTransitionError(
+            "policy",
+            `flake_cooldown: check “${checkName}” is oscillating — wait before Retry (${cool.reason ?? "flake_pattern"})`,
+          );
+        }
+      }
+    }
+  } catch (err) {
+    if (err instanceof TaskTransitionError) throw err;
+    /* signal lookup optional — never block unrelated retries */
+  }
+
   await assertQueuePolicies(db, input.workspaceId, task);
 
   const nextAttempt = task.attemptCount + 1;

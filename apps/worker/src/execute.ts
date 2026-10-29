@@ -29,8 +29,10 @@ import {
   buildDeliveryCheckpoint,
   buildDeliveryReport,
   buildDiffSummary,
+  checkNameFromCiFailureTitle,
   createArtifact,
   effectivePlan,
+  evaluateCiFlakeCooldown,
   getArenaForProject,
   getContenderById,
   getDeliveryCheckpoint,
@@ -249,6 +251,58 @@ export async function executeClaimedRun(
     await safeTaskTransition(db, task, "FAILED", workerId, log);
     await maybeResolveTournamentAfterRun(db, run, workerId, log);
     return "failed";
+  }
+
+  // AG-021 — flake cooldown: do not spend Retry cycles on oscillating checks.
+  try {
+    const signal = await getSignalEventForTask(
+      db,
+      run.workspaceId,
+      task.id,
+    );
+    if (signal?.provider === "ci_failure") {
+      const checkName = checkNameFromCiFailureTitle(signal.title);
+      if (checkName) {
+        const cool = await evaluateCiFlakeCooldown(db, {
+          workspaceId: run.workspaceId,
+          projectId: run.projectId,
+          checkName,
+        });
+        if (cool.suppress) {
+          const message = `flake_cooldown: check “${checkName}” oscillating — ${cool.reason ?? "wait before Retry"}`;
+          await markRunFailed(db, {
+            runId: run.id,
+            workerId,
+            errorCode: "flake_cooldown",
+            errorMessage: message.slice(0, 500),
+          });
+          await appendRunEvent(db, {
+            runId: run.id,
+            workspaceId: run.workspaceId,
+            kind: "progress",
+            payload: {
+              code: "flake_cooldown",
+              message,
+              checkName,
+              reason: cool.reason ?? null,
+            },
+          });
+          await safeTaskTransition(db, task, "FAILED", workerId, log);
+          await maybeResolveTournamentAfterRun(db, run, workerId, log);
+          log.info("flake cooldown skipped agent work", {
+            runId: run.id,
+            checkName,
+            reason: cool.reason ?? null,
+          });
+          return "failed";
+        }
+      }
+    }
+  } catch (err) {
+    log.warn("flake cooldown check skipped", {
+      runId: run.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 
   if (task.status === "QUEUED") {

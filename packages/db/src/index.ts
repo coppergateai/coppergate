@@ -684,6 +684,15 @@ export {
   type FileWriteCheckpointEntry,
 } from "./file-write-checkpoint.js";
 export {
+  CI_CHECK_OBSERVATION_KIND,
+  FLAKE_COOLDOWN_WINDOW_MS,
+  checkNameFromCiFailureTitle,
+  evaluateCiFlakeCooldown,
+  listCiCheckObservations,
+  recordCiCheckObservation,
+  type CiCheckObservationBody,
+} from "./flake-cooldown.js";
+export {
   CredentialError,
   createLlmByok,
   getActiveLlmByok,
