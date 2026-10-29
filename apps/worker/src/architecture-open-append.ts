@@ -1,9 +1,8 @@
 /**
- * Append Open Program rows to the project-bound architecture markdown (AG-037).
- * Uses project architectureRepo/paths — not env-only Done writeback.
+ * Append Open Program rows to the project-bound architecture markdown.
+ * Used by bug scout (AG-037) and design scout (AG-040).
  */
 import type { OpenProgramRowAppend } from "@coppergate/db";
-import { appendBugScoutOpenRowsToMarkdown } from "@coppergate/db";
 import { getRepoFile, updateRepoFile } from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
 
@@ -14,7 +13,12 @@ export async function appendArchitectureOpenRows(
     architectureRepo: string;
     architecturePaths: string;
     rows: OpenProgramRowAppend[];
-    /** Prefer first path that already has content; default first path. */
+    appendMarkdown: (
+      markdown: string,
+      rows: OpenProgramRowAppend[],
+    ) => { content: string; changed: boolean };
+    /** Commit message subject fragment, e.g. bug-scout / design-scout. */
+    commitKind: string;
     allowDefaultBranchWrite?: boolean;
   },
 ): Promise<{ path: string; ids: string[] } | null> {
@@ -32,6 +36,7 @@ export async function appendArchitectureOpenRows(
 
   const allowDefaultBranchWrite = input.allowDefaultBranchWrite !== false;
   const ids = input.rows.map((r) => r.id).join(", ");
+  const kind = input.commitKind.trim() || "scout";
 
   for (const path of paths) {
     try {
@@ -43,10 +48,7 @@ export async function appendArchitectureOpenRows(
       });
       if (!file) continue;
 
-      const { content, changed } = appendBugScoutOpenRowsToMarkdown(
-        file.content,
-        input.rows,
-      );
+      const { content, changed } = input.appendMarkdown(file.content, input.rows);
       if (!changed) continue;
 
       await updateRepoFile({
@@ -56,14 +58,19 @@ export async function appendArchitectureOpenRows(
         path,
         content,
         sha: file.sha,
-        message: `chore(architecture): bug-scout open ${ids}`,
+        message: `chore(architecture): ${kind} open ${ids}`,
         allowDefaultBranchWrite,
       });
-      log.info("architecture open append", { path, ids: input.rows.map((r) => r.id) });
+      log.info("architecture open append", {
+        path,
+        kind,
+        ids: input.rows.map((r) => r.id),
+      });
       return { path, ids: input.rows.map((r) => r.id) };
     } catch (err) {
       log.warn("architecture open append failed", {
         path,
+        kind,
         error: err instanceof Error ? err.message : String(err),
       });
     }
