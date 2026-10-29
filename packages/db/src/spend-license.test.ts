@@ -5,6 +5,10 @@ import {
   openIdFromTaskTitle,
   SpendLicenseError,
 } from "./spend-license.js";
+import {
+  buildShipGateHealTitle,
+  isShipGateHealTitle,
+} from "./ship-gate-heal-policy.js";
 
 describe("spend-license", () => {
   it("openIdFromTaskTitle extracts program IDs", () => {
@@ -53,5 +57,11 @@ describe("spend-license", () => {
       }).openId,
       null,
     );
+  });
+
+  it("AG-031 ship-gate heal titles are recognized without Open ID", () => {
+    const title = buildShipGateHealTitle("ff6f41e6");
+    assert.equal(isShipGateHealTitle(title), true);
+    assert.equal(openIdFromTaskTitle(title), null);
   });
 });

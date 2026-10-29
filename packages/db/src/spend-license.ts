@@ -12,6 +12,7 @@ import {
 } from "./architecture-backlog.js";
 import type { Database } from "./client.js";
 import { projects } from "./schema.js";
+import { isShipGateHealTitle } from "./ship-gate-heal-policy.js";
 
 export class SpendLicenseError extends Error {
   readonly code: "missing_open_id" | "program_required";
@@ -124,7 +125,8 @@ export async function assertSpendLicenseForTask(
   );
   const openId = openIdFromTaskTitle(input.taskTitle);
 
-  if (programBound && !openId) {
+  // AG-031: system `[ship-gate]` tip-CI heal is reliability spend, not freestyle invent.
+  if (programBound && !openId && !isShipGateHealTitle(input.taskTitle)) {
     throw new SpendLicenseError(
       "missing_open_id",
       "No Open ID — Arena cannot spend without an Open Program line",

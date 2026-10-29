@@ -6,8 +6,8 @@ import {
 } from "./ci-evidence.js";
 
 describe("scoreCiChecks", () => {
-  it("defaults required names to test", () => {
-    assert.deepEqual(resolveRequiredCheckNames({}), ["test"]);
+  it("defaults required names to check", () => {
+    assert.deepEqual(resolveRequiredCheckNames({}), ["check"]);
     assert.deepEqual(
       resolveRequiredCheckNames({ CI_REQUIRED_CHECK_NAMES: "test,lint" }),
       ["test", "lint"],

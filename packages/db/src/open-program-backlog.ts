@@ -206,8 +206,9 @@ export async function getWorkspaceOpenProgramBacklog(
       if (!md.trim()) {
         sourceCache.set(key, {
           rows: [],
-          fetchError:
-            "Could not load Open Program markdown — check architecture bind and token.",
+          fetchError: opts?.architectureToken
+            ? "Could not load Open Program markdown — check repo access for the GitHub App and the bound path."
+            : "Could not load Open Program markdown — install the GitHub App (or make the architecture repo public).",
         });
       } else {
         sourceCache.set(key, {
@@ -233,29 +234,8 @@ export async function getWorkspaceOpenProgramBacklog(
   for (const b of bound) {
     const key = programKey(b.architectureRepo, b.architecturePaths);
     const source = sourceCache.get(key)!;
-    if (source.fetchError && source.rows.length === 0) {
-      // Surface one synthetic bind error row per program+project for empty fetch.
-      const errKey = `${key}::fetch-error::${b.projectId}`;
-      if (!byItemKey.has(errKey)) {
-        byItemKey.set(errKey, {
-          key: errKey,
-          id: "—",
-          title: "Open Program unavailable",
-          notes: source.fetchError,
-          section: null,
-          programStatus: "open",
-          status: "open",
-          architectureRepo: b.architectureRepo,
-          architecturePaths: b.architecturePaths,
-          projectId: b.projectId,
-          projectName: b.projectName,
-          taskId: null,
-          taskStatus: null,
-          fetchError: source.fetchError,
-        });
-      }
-      continue;
-    }
+    // Fetch failures stay on program.fetchError — no synthetic placeholder rows.
+    if (source.fetchError && source.rows.length === 0) continue;
 
     for (const row of source.rows) {
       const itemKey = `${key}::${row.id}`;
@@ -293,7 +273,6 @@ export async function getWorkspaceOpenProgramBacklog(
   }
 
   const items = [...byItemKey.values()]
-    .filter((i) => i.id !== "—" || i.fetchError)
     .sort((a, b) => {
       const rank = (s: OpenProgramEffectiveStatus) =>
         s === "in_flight" ? 0 : s === "open" ? 1 : 2;

@@ -26,11 +26,17 @@ The **needs attention** metric omits arena agent counts during crisis so the sum
 
 When panels are empty, copy reflects the real blocker (budget paused, crisis active, missing budget cap, or idle pipeline) instead of a generic Open Program ID message.
 
+### Open Program replan idle (AG-015)
+
+When maintainer replan skips with `no_architecture_open_id` or `architecture_ids_in_flight`, Mission Control surfaces **`replan_idle`** attention (normal priority, backlog CTA) — not high-priority **`replan_failed`** fire. The status line and attention panel title use calm Open Program idle copy. Activity groups the same skips as **neutral** outcomes with idle titles.
+
 ## Testing
 
 - `packages/db/src/mission-control.test.ts` — attention sort ranks.
+- `packages/db/src/mission-control-replan.test.ts` — architecture idle skip copy and attention shape.
 - `packages/db/src/maintainer.quota.test.ts` — provider quota → `capacityCrisis` and lead row.
 - `apps/web/src/lib/mission-control-view.test.ts` — honest attention totals and empty copy.
+- `apps/web/src/app/workspaces/[id]/activity/events.test.ts` — AG-015 neutral replan skip grouping.
 
 ## Change history
 

@@ -21,6 +21,7 @@ type ContenderRun = {
   prUrl: string | null;
   prNumber: number | null;
   errorCode: string | null;
+  errorMessage?: string | null;
   tournamentResult?: string | null;
   updatedAt: string;
   activityHint?: string | null;
@@ -237,9 +238,12 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
     return `Failed · budget spent · ${run.errorCode?.replace(/_/g, " ") ?? run.status}`;
   }
   if (run.errorCode === "pr_closed") return "PR closed — terminal";
+  if (run.errorCode === "waiting_ci_timeout") {
+    return run.errorMessage?.trim() || "WAITING_CI timed out — Accept stayed closed";
+  }
   if (run.errorCode) return run.errorCode.replace(/_/g, " ");
   if (
-    state === "running" &&
+    (state === "running" || state === "awaitingCi") &&
     typeof run.activityHint === "string" &&
     run.activityHint.trim()
   ) {
@@ -659,8 +663,10 @@ export function ArenaSpectacle({
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>No projects armed</p>
             <p className={styles.emptyBody}>
-              No Open ID, no spend. Bind a repo and an Open Program path, then
-              Resume — Arena reserves only against program lines.
+              No Open ID, no spend. Bind a repo and an Open Program path on
+              project Configuration (#open-program-bind), then Resume — Arena
+              reserves only against program lines.{" "}
+              <a href="/docs/open-program-runtime">Open Program Runtime docs</a>
             </p>
           </div>
         ) : (

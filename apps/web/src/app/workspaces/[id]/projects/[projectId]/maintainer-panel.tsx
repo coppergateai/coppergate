@@ -38,6 +38,8 @@ type Policy = {
   autoQueueReplanTasks?: boolean;
   releaseTagStyle?: string;
   maxTournamentN?: number;
+  architectureRepo?: string | null;
+  architecturePaths?: string | null;
 };
 
 type Props = {
@@ -73,6 +75,11 @@ export function MaintainerPanel({
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [budgetDollars, setBudgetDollars] = useState("5");
+  const [architectureRepo, setArchitectureRepo] = useState("");
+  const [architecturePaths, setArchitecturePaths] = useState(
+    "docs/OPEN_PROGRAM.md",
+  );
+  const [bindStatus, setBindStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -95,6 +102,10 @@ export function MaintainerPanel({
       setPolicy(body.policy);
       setBudgetDollars(
         String((body.policy.monthlyBudgetMicros / 1_000_000).toFixed(2)),
+      );
+      setArchitectureRepo(body.policy.architectureRepo ?? "");
+      setArchitecturePaths(
+        body.policy.architecturePaths ?? "docs/OPEN_PROGRAM.md",
       );
     }
     if (body.metrics) setMetrics(body.metrics);
@@ -221,6 +232,129 @@ export function MaintainerPanel({
         </p>
       ) : null}
       {error ? <p className={styles.error}>{error}</p> : null}
+
+      <div id="open-program-bind" className={styles.bindBlock}>
+        <h3 className={styles.sectionLabel}>Open Program bind</h3>
+        <p className={styles.sectionLede}>
+          Point this project at an architecture repo and Open Program path.
+          Agents may spend only against Open IDs when bound.{" "}
+          <a href="/docs/open-program-runtime">Open Program Runtime docs</a>
+        </p>
+        <div className={styles.btnRow}>
+          <label className={styles.field}>
+            Architecture repo
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="owner/name"
+              value={architectureRepo}
+              disabled={!isOwner || pending}
+              onChange={(e) => setArchitectureRepo(e.target.value)}
+            />
+          </label>
+          <label className={styles.field}>
+            Program path(s)
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="docs/OPEN_PROGRAM.md"
+              value={architecturePaths}
+              disabled={!isOwner || pending}
+              onChange={(e) => setArchitecturePaths(e.target.value)}
+            />
+          </label>
+        </div>
+        {isOwner ? (
+          <div className={styles.btnRow}>
+            <button
+              type="button"
+              className={styles.primaryBtn}
+              disabled={pending}
+              onClick={() => {
+                void (async () => {
+                  setBindStatus(null);
+                  await post("update", {
+                    policy: {
+                      architectureRepo,
+                      architecturePaths,
+                    },
+                  });
+                  setBindStatus("Saved bind");
+                })();
+              }}
+            >
+              Save bind
+            </button>
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              disabled={pending}
+              onClick={() => {
+                void (async () => {
+                  setPending(true);
+                  setError(null);
+                  setBindStatus(null);
+                  try {
+                    const res = await fetch(
+                      `/api/projects/${projectId}/maintainer`,
+                      {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          workspaceId,
+                          action: "validate_open_program",
+                          policy: {
+                            architectureRepo,
+                            architecturePaths,
+                          },
+                        }),
+                      },
+                    );
+                    const body = (await res.json()) as {
+                      error?: { message?: string };
+                      openCount?: number;
+                      doneCount?: number;
+                      sampleIds?: string[];
+                    };
+                    if (!res.ok) {
+                      throw new Error(
+                        body.error?.message ?? "Validate failed",
+                      );
+                    }
+                    setBindStatus(
+                      `Parsed ${body.openCount ?? 0} Open · ${body.doneCount ?? 0} Done` +
+                        (body.sampleIds?.length
+                          ? ` (${body.sampleIds.slice(0, 4).join(", ")}…)`
+                          : ""),
+                    );
+                  } catch (err) {
+                    setError(
+                      err instanceof Error ? err.message : "Validate failed",
+                    );
+                  } finally {
+                    setPending(false);
+                  }
+                })();
+              }}
+            >
+              Validate Open IDs
+            </button>
+          </div>
+        ) : null}
+        {bindStatus ? (
+          <p className={styles.hint} role="status">
+            {bindStatus}
+          </p>
+        ) : null}
+        {!architectureRepo ? (
+          <p className={styles.hint}>
+            Unbound — Arena will not invent freestyle work. Bind a program or
+            see{" "}
+            <a href="/docs/open-program-runtime">/docs/open-program-runtime</a>.
+          </p>
+        ) : null}
+      </div>
 
       <div className={styles.btnRow}>
         <label className={styles.field}>

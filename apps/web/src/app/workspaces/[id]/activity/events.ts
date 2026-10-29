@@ -3,6 +3,13 @@
  * Summaries and outcomes are derived only from stored meta — never invented.
  */
 
+import {
+  isReplanArchitectureIdleReason,
+  isReplanQueueArchitectureIdleMeta,
+  replanArchitectureIdleCopy,
+  replanSkipReasonFromMeta,
+} from "@/lib/replan-architecture-idle";
+
 export type ActivityCategory =
   | "execution"
   | "decision"
@@ -586,6 +593,26 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     category: "decision",
     outcome: "review",
   },
+  "ship_gate.heal_enqueued": {
+    title: "Ship-gate heal enqueued",
+    category: "decision",
+    outcome: "review",
+    summary: (m) => str(m, "title") ?? str(m, "headSha"),
+  },
+  "review.stale_ci_timeout_replan": {
+    title: "Stale CI timeout → replan",
+    category: "decision",
+    outcome: "review",
+  },
+  "review.stale_ci_timeout_heal": {
+    title: "Stale CI timeout → same-head heal",
+    category: "decision",
+    outcome: "review",
+    summary: (m) => {
+      const pr = m?.prNumber;
+      return typeof pr === "number" ? `PR #${pr}` : null;
+    },
+  },
   "fitness.score": {
     title: "Fitness scored",
     category: "decision",
@@ -825,28 +852,73 @@ function isConcurrencyThrottleError(err: string): boolean {
   );
 }
 
+function replanArchitectureIdleTitle(
+  meta: Record<string, unknown> | null,
+): string | null {
+  const skipReason = replanSkipReasonFromMeta(meta);
+  if (skipReason && isReplanArchitectureIdleReason(skipReason)) {
+    const n = Array.isArray(meta?.excludeIds)
+      ? meta.excludeIds.filter((x): x is string => typeof x === "string").length
+      : null;
+    return replanArchitectureIdleCopy(skipReason, { inFlightCount: n }).title;
+  }
+  if (isReplanQueueArchitectureIdleMeta(meta)) {
+    const reason =
+      str(meta, "reason") ?? str(meta, "error") ?? "no_architecture_open_id";
+    return replanArchitectureIdleCopy(reason).title;
+  }
+  return null;
+}
+
 function replanQueueTitle(meta: Record<string, unknown> | null): string {
+  const idleTitle = replanArchitectureIdleTitle(meta);
+  if (idleTitle) return idleTitle;
   const err = str(meta, "error");
   if (err && isConcurrencyThrottleError(err)) return "Waiting on capacity";
   return "Replan queue failed";
 }
 
 function replanQueueOutcome(meta: Record<string, unknown> | null): ActivityOutcome {
+  if (replanArchitectureIdleTitle(meta)) return "neutral";
   const err = str(meta, "error");
   if (err && isConcurrencyThrottleError(err)) return "review";
   return "failed";
 }
 
+function replanEventTitle(
+  action: string,
+  meta: Record<string, unknown> | null,
+): string {
+  if (action === "maintainer.replan") {
+    const idleTitle = replanArchitectureIdleTitle(meta);
+    if (idleTitle) return idleTitle;
+  }
+  return humanTitle(action);
+}
+
+function replanEventOutcome(
+  action: string,
+  meta: Record<string, unknown> | null,
+): ActivityOutcome {
+  if (action === "maintainer.replan" && replanArchitectureIdleTitle(meta)) {
+    return "neutral";
+  }
+  return outcomeFor(action);
+}
+
 function annotate(event: ActivityEvent, count = 1): ActivityChildEvent {
   const isMergeAttempt = event.action === "merge.attempt";
   const isReplanQueue = event.action === "maintainer.replan_queue_failed";
+  const isReplan = event.action === "maintainer.replan";
   return {
     ...event,
     title: isMergeAttempt
       ? mergeAttemptTitle(event.meta)
       : isReplanQueue
         ? replanQueueTitle(event.meta)
-        : humanTitle(event.action),
+        : isReplan
+          ? replanEventTitle(event.action, event.meta)
+          : humanTitle(event.action),
     summary: summaryFor(event.action, event.meta, count),
     technicalLabel: technicalLabel(event.action),
     category: categoryFor(event.action),
@@ -854,7 +926,9 @@ function annotate(event: ActivityEvent, count = 1): ActivityChildEvent {
       ? mergeAttemptOutcome(event.meta)
       : isReplanQueue
         ? replanQueueOutcome(event.meta)
-        : outcomeFor(event.action),
+        : isReplan
+          ? replanEventOutcome(event.action, event.meta)
+          : outcomeFor(event.action),
   };
 }
 

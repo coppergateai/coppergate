@@ -405,6 +405,18 @@ export {
   type SpendLicense,
 } from "./spend-license.js";
 export {
+  SHIP_GATE_HEAL_MARKER,
+  STALE_REVIEW_AFTER_CI_TIMEOUT_MS,
+  buildShipGateHealTitle,
+  ensureShipGateHealTask,
+  isShipGateHealTitle,
+  openTaskCountsAsBusyForBacklog,
+  shipGateMergeMode,
+  shouldRequestChangesForStaleCiTimeoutReview,
+  type EnsureShipGateHealResult,
+  type ShipGateMergeMode,
+} from "./ship-gate-heal.js";
+export {
   SHIP_RECEIPT_KIND,
   buildShipReceipt,
   getShipReceiptForTask,
@@ -413,6 +425,14 @@ export {
   resolveHumanTouchCount,
   type ShipReceiptBody,
 } from "./ship-receipt.js";
+export {
+  OPP_PROTOCOL_VERSION,
+  auditOppVerifyAfterAccept,
+  projectShipReceiptToOpp,
+  verifyShipReceiptWithOpp,
+  type OppShipReceiptVerifyBody,
+  type OppVerifyAuditMeta,
+} from "./ship-receipt-opp.js";
 export {
   formatCommunityIssueBody,
   isCommunityScoutDue,
@@ -582,15 +602,32 @@ export {
 export {
   getRunCiFitness,
   ingestCiEvidence,
+  listRunCiCheckHistory,
   listRunCiChecks,
   resolveRequiredCheckNames,
   runCiAcceptReady,
   runHasBlockingCi,
   scoreCiChecks,
+  type CiCheckScore,
   type CiEvidenceInput,
   type RunCiCheckSummary,
   type RunCiFitness,
 } from "./ci-evidence.js";
+export {
+  CI_WAITING_COPY,
+  classifyCiWaiting,
+  detectRequiredCheckFlake,
+  missingRequiredCheckNames,
+  waitingCiTimeoutMessage,
+  type CiCheckHistoryEntry,
+  type CiWaitingKind,
+} from "./ci-waiting-honesty.js";
+export {
+  listWaitingCiRunsForPr,
+  resolveWaitingCiForPrOutcome,
+  resolveWaitingCiRunsForPr,
+  type PrCiOutcome,
+} from "./waiting-ci-pr.js";
 export {
   buildDeliveryCheckpoint,
   buildDeliveryReport,
@@ -637,6 +674,12 @@ export {
   DEFAULT_DELIVERY_SHARE_TTL_MS,
 } from "./share-reports.js";
 export {
+  createShipReceiptShareToken,
+  getPublicShipReceiptShare,
+  toPublicShipReceipt,
+  type PublicShipReceipt,
+} from "./ship-receipt-share.js";
+export {
   countAcceptedPrsForWorkspace,
   getProjectCostExplorer,
   getRetentionSnapshot,
@@ -658,6 +701,14 @@ export {
   type MissionControlExecution,
   type WorkspaceMissionControl,
 } from "./mission-control.js";
+export {
+  REPLAN_ARCHITECTURE_IDLE_REASONS,
+  isReplanArchitectureIdleReason,
+  isReplanQueueArchitectureIdleMeta,
+  missionControlReplanIdleItem,
+  replanArchitectureIdleCopy,
+  replanSkipReasonFromMeta,
+} from "./mission-control-replan.js";
 export {
   getRunEvidenceBundle,
   getTaskEvidenceBundle,
@@ -727,6 +778,25 @@ export {
   upsertAutoArmRule,
   type SignalEnvelopeInput,
 } from "./signals.js";
+export {
+  MERGE_CONFLICT_PROVIDER,
+  buildMergeConflictEnvelope,
+  ensureMergeConflictSignal,
+  isMergeConflictDirty,
+  mergeConflictExternalId,
+  shouldEmitMergeConflictInsteadOfReplan,
+  type EnsureMergeConflictSignalResult,
+} from "./merge-conflict-signal.js";
+export {
+  STALE_DELIVERY_PROVIDER,
+  buildStaleDeliveryEnvelope,
+  ensureStaleDeliveryHealSignal,
+  routeStaleReviewHeal,
+  shouldHealOpenDeliveryInsteadOfReplan,
+  staleDeliveryExternalId,
+  type EnsureStaleDeliverySignalResult,
+  type StaleReviewHealRoute,
+} from "./stale-delivery-heal-signal.js";
 export { ingestSonarFitness } from "./sonar-fitness.js";
 export { callSonarTool, type SonarToolName } from "./sonarqube-mcp.js";
 export {

@@ -114,9 +114,34 @@ Date: 2026-10-24
 - `runs.reaper-policy.test.ts` — reclaim parse + WAITING_CI timeout env
 - `runs.claim.test.ts` — soft-cancel reaper → CANCELLED (needs `DATABASE_URL`)
 - `ci-evidence.score.test.ts` — required-missing helpers ≠ accept-ready
+- `ci-waiting-honesty.test.ts` — AG-017 required-missing vs flake copy + timeout messages
 - `ci-evidence.test.ts` — WAITING_CI status alone not accept-ready (needs `DATABASE_URL`)
 - `budgets.test.ts` — llm_tokens once-per-runId (needs `DATABASE_URL`)
 - DB claim/execute suites need `DATABASE_URL`
+
+## Cycle 16
+- **Elimination debit determinism (P-142)**: `arena.elimination.test.ts` fixtures must cite validation + tests evidence for the intended winner; vibes-only zero scores made UUID lex pick the “winner” and left losers `ACTIVE`, redding `main` and freezing ship gate (`default_branch_ci_red`)
+- **Process**: prefer PR → green `check` before `main`; do not stack UI commits onto a red tip
+
+## Cycle 17
+- **WAITING_CI PR outcome**: merged/closed PR leaves WAITING_CI via refresh + `pull_request` webhook (merged → REVIEW_REQUIRED; closed-unmerged → FAILED) — stops orphan AG-style stalls after ship
+- **Cancelled ≠ block accept**: incomplete/`cancelled` checks ignored for `blocksAccept`; only `failure`/`timed_out` block
+- **Ship gate positive-green tip**: halt unless required context completed success; pending/cancelled tip → `default_branch_ci_pending` (vs `default_branch_ci_red`); Mission Control `ship_gate_halted` + ~15m audit rate-limit
+- **CI required name default**: `CI_REQUIRED_CHECK_NAMES` default `"check"` (matches workflow job id); stop vacuous `no_required_checks` while required names are configured
+- **Install id hygiene**: non-numeric GitHub install ids fail closed with reconnect messaging; health-scan flag + OPS_RUNBOOK recovery
+- **Dogfood N=1**: coppergate self-pilot `maxTournamentN` / `defaultContenderN` = 1 (stabilize + ensure/spawn honor solo; duel remains explicit N≥2)
+
+## Cycle 18
+- **Ship-gate self-heal (AG-031)**: tip `default_branch_ci_red` enqueues `[ship-gate]` heal task (not audit-only halt); stale `waiting_ci_timeout` REVIEW excluded from continuous-backlog busy count + request_changes after ~30m — prevents dogfood deadlock when tip is red or one review never accepts
+
+## Cycle 19
+- **Merge conflict signal (AG-032)**: dirty open delivery PR → `merge_conflict` ingest + auto-arm (same head rebase) instead of abandoning the PR via NEEDS_REPLAN; AG-031 replan remains only when no healable PR
+
+## Cycle 20
+- **Stale delivery heal (AG-033)**: `waiting_ci_timeout` + open non-dirty PR → `stale_delivery` same-head heal (not NEEDS_REPLAN); merge-state API fail still prefers heal when PR number is known
+
+## Cycle 21
+- **Ship-gate heal-only merge (AG-034)**: tip `default_branch_ci_red` still auto-merges `[ship-gate]` heal PRs (`shipGateMergeMode=heal_only`); product merges stay halted — closes AG-031 enqueue→never-merge deadlock (ACPP dogfood 2026-10-29)
 
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)

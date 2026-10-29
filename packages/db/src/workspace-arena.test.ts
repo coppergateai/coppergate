@@ -30,6 +30,7 @@ function runStub(
     prUrl: null,
     prNumber: null,
     errorCode: null,
+    errorMessage: null,
     tournamentResult: null,
     updatedAt: new Date().toISOString(),
     activityHint: null,

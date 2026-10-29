@@ -17,6 +17,12 @@ import {
   sortMissionControlAttention,
   type MissionControlAttentionItem,
 } from "./mission-control-attention.js";
+import {
+  isReplanArchitectureIdleReason,
+  isReplanQueueArchitectureIdleMeta,
+  missionControlReplanIdleItem,
+  replanSkipReasonFromMeta,
+} from "./mission-control-replan.js";
 
 export type {
   MissionControlAttentionItem,
@@ -335,6 +341,53 @@ export async function getWorkspaceMissionControl(
       });
     }
 
+    const replanSkips = recentAudit.filter(
+      (e) => e.action === "maintainer.replan",
+    );
+    const seenReplanIdleProjects = new Set<string>();
+    for (const ev of replanSkips) {
+      let meta: Record<string, unknown> | null = null;
+      if (ev.meta) {
+        try {
+          meta = JSON.parse(ev.meta) as Record<string, unknown>;
+        } catch {
+          meta = null;
+        }
+      }
+      const reason = replanSkipReasonFromMeta(meta);
+      if (!reason || !isReplanArchitectureIdleReason(reason)) continue;
+
+      let projectId: string | null = null;
+      let projectName: string | null = null;
+      if (meta) {
+        projectId =
+          typeof meta.projectId === "string" ? meta.projectId : null;
+        projectName =
+          typeof meta.projectName === "string" ? meta.projectName : null;
+      }
+      const dedupeKey = projectId ?? ev.id;
+      if (seenReplanIdleProjects.has(dedupeKey)) continue;
+      seenReplanIdleProjects.add(dedupeKey);
+      if (seenReplanIdleProjects.size > 3) break;
+
+      const projectLabel =
+        projectName ??
+        (projectId
+          ? (arena.projects.find((p) => p.projectId === projectId)
+              ?.projectName ?? null)
+          : null);
+      attention.push(
+        missionControlReplanIdleItem({
+          dedupeKey,
+          workspaceId,
+          projectId,
+          reason,
+          projectLabel,
+          excludeIds: meta?.excludeIds,
+        }),
+      );
+    }
+
     const replanFails = recentAudit.filter(
       (e) => e.action === "maintainer.replan_queue_failed",
     );
@@ -343,13 +396,10 @@ export async function getWorkspaceMissionControl(
       let projectId: string | null = null;
       let projectName: string | null = null;
       let error: string | null = null;
+      let meta: Record<string, unknown> | null = null;
       if (ev.meta) {
         try {
-          const meta = JSON.parse(ev.meta) as {
-            projectId?: string;
-            projectName?: string;
-            error?: string;
-          };
+          meta = JSON.parse(ev.meta) as Record<string, unknown>;
           projectId =
             typeof meta.projectId === "string" ? meta.projectId : null;
           projectName =
@@ -359,6 +409,7 @@ export async function getWorkspaceMissionControl(
           /* ignore */
         }
       }
+      if (isReplanQueueArchitectureIdleMeta(meta)) continue;
       const dedupeKey = projectId ?? ev.id;
       if (seenReplanProjects.has(dedupeKey)) continue;
       seenReplanProjects.add(dedupeKey);
@@ -440,6 +491,52 @@ export async function getWorkspaceMissionControl(
           : `/workspaces/${workspaceId}/activity`,
         priority: "high",
         ctaLabel: "Fix merge rights",
+      });
+    }
+
+    // One calm row per project when auto-merge ship gate is halted (tip CI).
+    const shipGateHalts = recentAudit
+      .filter((e) => e.action === "merge.halted_ci_red")
+      .slice(0, 8);
+    const seenShipGate = new Set<string>();
+    for (const ev of shipGateHalts) {
+      let projectId: string | null = null;
+      let reason: string | null = null;
+      let cta: string | null = null;
+      if (ev.meta) {
+        try {
+          const meta = JSON.parse(ev.meta) as {
+            projectId?: string;
+            reason?: string;
+            cta?: string;
+          };
+          projectId =
+            typeof meta.projectId === "string" ? meta.projectId : null;
+          reason = typeof meta.reason === "string" ? meta.reason : null;
+          cta = typeof meta.cta === "string" ? meta.cta : null;
+        } catch {
+          projectId = null;
+        }
+      }
+      const dedupeKey = projectId ?? ev.id;
+      if (seenShipGate.has(dedupeKey)) continue;
+      seenShipGate.add(dedupeKey);
+      const pending = reason === "default_branch_ci_pending";
+      attention.push({
+        id: `ship-gate-${dedupeKey}`,
+        kind: "ship_gate_halted",
+        title: pending
+          ? "Auto-merge waiting on tip CI"
+          : "Auto-merge halted — tip CI red",
+        detail: (cta ?? "Fix default-branch CI before auto-merge resumes").slice(
+          0,
+          140,
+        ),
+        href: projectId
+          ? `/workspaces/${workspaceId}/projects/${projectId}`
+          : `/workspaces/${workspaceId}/activity`,
+        priority: "high",
+        ctaLabel: "Fix main CI",
       });
     }
   }

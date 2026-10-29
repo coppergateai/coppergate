@@ -121,7 +121,7 @@ export function BacklogShell({
   return (
     <main className={styles.main}>
       <header className={styles.head}>
-        <p className={styles.eyebrow}>{workspaceName}</p>
+        <p className={styles.eyebrow}>Open Program · {workspaceName}</p>
         <div className={styles.titleRow}>
           <h1 className={styles.title}>Backlog</h1>
           <nav className={styles.headLinks} aria-label="Related">
@@ -193,16 +193,21 @@ export function BacklogShell({
             title="No Open Program bound"
             body={
               initial.unboundProjectCount > 0
-                ? "Bind architectureRepo and architecturePaths on a project’s Configuration to load spendable backlog rows."
+                ? "Bind architectureRepo and architecturePaths on a project’s Configuration (Open Program bind) to load spendable backlog rows."
                 : "Create a project and bind an Open Program path to see backlog items here."
             }
             action={
-              <Link
-                href={`/workspaces/${workspaceId}/projects`}
-                className={styles.linkCta}
-              >
-                Open Projects →
-              </Link>
+              <span className={styles.linkCtaRow}>
+                <Link
+                  href={`/workspaces/${workspaceId}/projects`}
+                  className={styles.linkCta}
+                >
+                  Open Projects →
+                </Link>
+                <Link href="/docs/open-program-runtime" className={styles.linkCta}>
+                  Open Program docs →
+                </Link>
+              </span>
             }
           />
         </div>
@@ -265,8 +270,18 @@ export function BacklogShell({
           <div className={styles.body}>
             {visible.length === 0 ? (
               <EmptyState
-                title="Nothing in this filter"
-                body="Try All, or another project chip."
+                title={
+                  counts.all === 0
+                    ? "Open Program rows unavailable"
+                    : "Nothing in this filter"
+                }
+                body={
+                  counts.all === 0
+                    ? fetchErrors.length > 0
+                      ? "GitHub could not return the bound markdown. Confirm the App can read those repos, or that the paths are public."
+                      : "The bound files have no Open/Done program IDs yet."
+                    : "Try All, or another project chip."
+                }
               />
             ) : (
               grouped.map(([section, rows]) => (

@@ -142,7 +142,11 @@ function buildGates(input: {
         ? "passed"
         : ci.checks.length === 0
           ? "pending"
-          : "n/a";
+          : ci.waitingKind === "required_missing" ||
+              ci.waitingKind === "flake" ||
+              ci.waitingKind === "awaiting"
+            ? "pending"
+            : "n/a";
 
   const validationStatus: EvidenceGateStatus =
     deliveryObj?.validationPassed === true
@@ -175,13 +179,18 @@ function buildGates(input: {
       id: "ci",
       label: "CI / checks",
       status: ciStatus,
-      detail: ci.blocking
-        ? "Blocking check failed — Accept stays closed"
-        : ci.awaitingLive && !ci.passed
-          ? "Awaiting live CI evidence on the PR head"
-          : ci.passed
-            ? "Required checks passed"
-            : "No CI evidence attached yet",
+      detail:
+        run.errorCode === "waiting_ci_timeout" && run.errorMessage
+          ? run.errorMessage
+          : ci.waitingDetail
+            ? ci.waitingDetail
+            : ci.blocking
+              ? "Blocking check failed — Accept stays closed"
+              : ci.awaitingLive && !ci.passed
+                ? "Awaiting live CI evidence on the PR head"
+                : ci.passed
+                  ? "Required checks passed"
+                  : "No CI evidence attached yet",
       hard: true,
     },
     {
@@ -403,6 +412,7 @@ export async function listProjectEvidenceDeliveries(
     updatedAt: string;
     runId: string | null;
     acceptReady: boolean | null;
+    ciWaitingHint: string | null;
     winnerRunId: string | null;
     isSurvivor: boolean;
   }>
@@ -441,6 +451,7 @@ export async function listProjectEvidenceDeliveries(
     updatedAt: string;
     runId: string | null;
     acceptReady: boolean | null;
+    ciWaitingHint: string | null;
     winnerRunId: string | null;
     isSurvivor: boolean;
   }> = [];
@@ -448,12 +459,14 @@ export async function listProjectEvidenceDeliveries(
   for (const t of rows) {
     let runId: string | null = null;
     let acceptReady: boolean | null = null;
+    let ciWaitingHint: string | null = null;
     let winnerRunId: string | null = null;
     let isSurvivor = false;
     if (t.status === "REVIEW_REQUIRED" || t.status === "WAITING_CI") {
       const bundle = await getTaskEvidenceBundle(db, workspaceId, t.id);
       runId = bundle?.selectedRunId ?? null;
       acceptReady = bundle?.selected?.acceptReady ?? null;
+      ciWaitingHint = bundle?.selected?.ci.waitingDetail ?? null;
       winnerRunId = bundle?.winnerRunId ?? null;
       isSurvivor = Boolean(
         winnerRunId && runId && winnerRunId === runId,
@@ -467,6 +480,7 @@ export async function listProjectEvidenceDeliveries(
       updatedAt: t.updatedAt.toISOString(),
       runId,
       acceptReady,
+      ciWaitingHint,
       winnerRunId,
       isSurvivor,
     });

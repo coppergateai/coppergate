@@ -146,6 +146,8 @@ export function MissionControl({ data, recentEvents }: Props) {
             ? `/workspaces/${data.workspaceId}/arena`
             : `/workspaces/${data.workspaceId}/inbox`;
 
+  const replanIdleItems = attention.filter((a) => a.kind === "replan_idle");
+
   const statusLine = (() => {
     if (budgetPaused) {
       return "Budget envelope paused — executions are frozen until you raise the cap.";
@@ -168,6 +170,12 @@ export function MissionControl({ data, recentEvents }: Props) {
     if (needsAttention && hasHighAttention) {
       return `${attention.length} item${attention.length === 1 ? "" : "s"} ${attention.length === 1 ? "needs" : "need"} your review.`;
     }
+    if (replanIdleItems.length > 0 && !hasHighAttention) {
+      if (replanIdleItems.length === 1) {
+        return replanIdleItems[0]!.detail;
+      }
+      return "Open Program backlog is idle — finish in-flight IDs or reopen a row on the bound program.";
+    }
     if (needsAttention) {
       return "Queue is throttled on capacity — wait or pause Arena.";
     }
@@ -177,7 +185,10 @@ export function MissionControl({ data, recentEvents }: Props) {
   const arenaItems = attention.filter((a) => a.kind === "arena_failed");
   const replanItems = attention.filter((a) => a.kind === "replan_failed");
   const otherAttention = attention.filter(
-    (a) => a.kind !== "arena_failed" && a.kind !== "replan_failed",
+    (a) =>
+      a.kind !== "arena_failed" &&
+      a.kind !== "replan_failed" &&
+      a.kind !== "replan_idle",
   );
   const attentionRows: typeof attention = [];
   if (arenaItems.length > 1) {
@@ -249,12 +260,23 @@ export function MissionControl({ data, recentEvents }: Props) {
       }),
     );
   }
+  attentionRows.push(...replanIdleItems);
   attentionRows.push(
     ...otherAttention.map((item) => ({
       ...item,
       detail: humanizeOpsDetail(item.detail),
     })),
   );
+
+  const attentionSectionTitle = (() => {
+    if (attentionRows.length === 0) return "Needs your attention";
+    const allNormal = attentionRows.every((a) => a.priority === "normal");
+    if (allNormal && attentionRows.some((a) => a.kind === "replan_idle")) {
+      return "Open Program idle";
+    }
+    if (allNormal) return "Waiting on capacity";
+    return "Needs your attention";
+  })();
 
   return (
     <main className={styles.main}>
@@ -415,10 +437,7 @@ export function MissionControl({ data, recentEvents }: Props) {
           >
             <div className={styles.panelHead}>
               <h2 id="attention-heading" className={styles.sectionTitle}>
-                {attentionRows.length > 0 &&
-                attentionRows.every((a) => a.priority === "normal")
-                  ? "Waiting on capacity"
-                  : "Needs your attention"}
+                {attentionSectionTitle}
               </h2>
               <p className={styles.sectionMeta}>
                 {attentionRows.length} pending

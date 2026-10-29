@@ -286,6 +286,34 @@ describe("activity events", () => {
     );
   });
 
+  it("AG-015: architecture replan skips are neutral idle, not failed replan", () => {
+    const groups = groupActivityEvents([
+      evt({
+        id: "skip1",
+        action: "maintainer.replan",
+        meta: { skipped: true, reason: "no_architecture_open_id" },
+      }),
+    ]);
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0]!.outcome, "neutral");
+    assert.match(groups[0]!.title, /Open Program idle/i);
+    assert.doesNotMatch(groups[0]!.title, /failed/i);
+
+    const inflight = groupActivityEvents([
+      evt({
+        id: "skip2",
+        action: "maintainer.replan",
+        meta: {
+          skipped: true,
+          reason: "architecture_ids_in_flight",
+          excludeIds: ["AG-010"],
+        },
+      }),
+    ]);
+    assert.equal(inflight[0]!.outcome, "neutral");
+    assert.match(inflight[0]!.title, /in flight/i);
+  });
+
   it("softens concurrency replan queue failures to waiting-on-capacity", () => {
     const groups = groupActivityEvents([
       evt({

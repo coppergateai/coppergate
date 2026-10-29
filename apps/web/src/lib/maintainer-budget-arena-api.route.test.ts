@@ -27,6 +27,43 @@ describe("SEC-020 maintainer / budget / arena API CSRF", () => {
     assert.equal(res.status, 403);
   });
 
+  it("POST maintainer validate_open_program rejects without Origin (P-105)", async () => {
+    const { POST } = await import(
+      "../app/api/projects/[id]/maintainer/route.js"
+    );
+    const res = await POST(
+      new Request("http://localhost:3000/api/projects/p1/maintainer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId: "w1",
+          action: "validate_open_program",
+          policy: {
+            architectureRepo: "coppergateai/acpp",
+            architecturePaths: "docs/OPEN_PROGRAM.md",
+          },
+        }),
+      }),
+      routeCtx("p1"),
+    );
+    assert.equal(res.status, 403);
+  });
+
+  it("POST ship receipt share rejects without Origin (P-106)", async () => {
+    const { POST } = await import(
+      "../app/api/tasks/[id]/receipt/share/route.js"
+    );
+    const res = await POST(
+      new Request("http://localhost:3000/api/tasks/t1/receipt/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: "w1", projectId: "p1" }),
+      }),
+      routeCtx("t1"),
+    );
+    assert.equal(res.status, 403);
+  });
+
   it("PUT project budget rejects without Origin", async () => {
     const { PUT } = await import("../app/api/projects/[id]/budget/route.js");
     const res = await PUT(
