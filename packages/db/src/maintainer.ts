@@ -70,11 +70,12 @@ import {
 import { getProjectForWorkspace } from "./projects.js";
 import { maintainerContenderPinN } from "./maintainer-contender-pin.js";
 import { openTaskCountsAsBusyForBacklog } from "./ship-gate-heal-policy.js";
-import { fetchArchitectureBacklogMarkdown } from "./architecture-program-fetch.js";
+import { fetchArchitectureBacklogMarkdownResult } from "./architecture-program-fetch.js";
 
 export {
   DEFAULT_ARCHITECTURE_PATHS,
   fetchArchitectureBacklogMarkdown,
+  fetchArchitectureBacklogMarkdownResult,
 } from "./architecture-program-fetch.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
@@ -2361,15 +2362,28 @@ export async function runVisionReplan(
   }
 
   const stamp = new Date().toISOString().slice(0, 10);
-  const roadmapMd =
+  let roadmapMd =
     input.roadmapMarkdown?.trim() ||
     process.env.ARCHITECTURE_BACKLOG_MD?.trim() ||
-    (await fetchArchitectureBacklogMarkdown({
+    "";
+  let architectureFetchFailure: {
+    code: string;
+    message: string;
+    repo?: string;
+    paths?: string[];
+    httpStatus?: number;
+  } | null = null;
+  if (!roadmapMd) {
+    const fetched = await fetchArchitectureBacklogMarkdownResult({
       token: input.architectureToken,
       repo: policy.architectureRepo,
       paths: policy.architecturePaths,
-    })) ||
-    "";
+    });
+    roadmapMd = fetched.markdown;
+    if (!fetched.ok && fetched.failure) {
+      architectureFetchFailure = fetched.failure;
+    }
+  }
   const excludeIds = await listInFlightArchitectureIds(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
@@ -2380,9 +2394,11 @@ export async function runVisionReplan(
     { excludeIds },
   );
   // No architecture Open ID → do not invent scaffold/generic ship tasks.
+  // AG-020: fetch failure is distinct from an honestly empty Open Program.
   if (!archTask) {
-    const reason =
-      excludeIds.length > 0
+    const reason = architectureFetchFailure
+      ? "architecture_fetch_failed"
+      : excludeIds.length > 0
         ? "architecture_ids_in_flight"
         : "no_architecture_open_id";
     await recordMaintainerEvent(db, {
@@ -2397,6 +2413,9 @@ export async function runVisionReplan(
         skipped: true,
         reason,
         excludeIds,
+        ...(architectureFetchFailure
+          ? { architectureFetch: architectureFetchFailure }
+          : {}),
       },
     });
     await recordAuditEvent(db, {
@@ -2414,6 +2433,9 @@ export async function runVisionReplan(
         skipped: true,
         reason,
         excludeIds,
+        ...(architectureFetchFailure
+          ? { architectureFetch: architectureFetchFailure }
+          : {}),
       },
     });
     await db

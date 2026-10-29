@@ -15,6 +15,10 @@ describe("mission-control-replan (AG-015)", () => {
       isReplanArchitectureIdleReason("architecture_ids_in_flight"),
       true,
     );
+    assert.equal(
+      isReplanArchitectureIdleReason("architecture_fetch_failed"),
+      true,
+    );
     assert.equal(isReplanArchitectureIdleReason("non_primary_project"), false);
   });
 
@@ -46,6 +50,13 @@ describe("mission-control-replan (AG-015)", () => {
     });
     assert.match(inflight.title, /in flight/i);
     assert.match(inflight.detail, /2 architecture IDs/);
+
+    const fetchFail = replanArchitectureIdleCopy("architecture_fetch_failed", {
+      projectLabel: "coppergate",
+    });
+    assert.match(fetchFail.title, /bind/i);
+    assert.match(fetchFail.detail, /re-bind/i);
+    assert.equal(fetchFail.ctaLabel, "Open Settings");
   });
 
   it("missionControlReplanIdleItem is normal priority replan_idle", () => {
@@ -59,6 +70,15 @@ describe("mission-control-replan (AG-015)", () => {
     assert.equal(row.kind, "replan_idle");
     assert.equal(row.priority, "normal");
     assert.match(row.href, /\/workspaces\/ws1\/backlog/);
+
+    const bind = missionControlReplanIdleItem({
+      dedupeKey: "p2",
+      workspaceId: "ws1",
+      projectId: "p2",
+      reason: "architecture_fetch_failed",
+    });
+    assert.match(bind.href, /\/workspaces\/ws1\/projects\/p2/);
+    assert.equal(bind.ctaLabel, "Open Settings");
   });
 
   it("isReplanQueueArchitectureIdleMeta filters queue_failed noise", () => {

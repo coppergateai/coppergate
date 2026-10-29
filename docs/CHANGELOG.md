@@ -10,6 +10,7 @@
 
 ### Features
 
+- AG-020: Architecture fetch fail-closed — bad token / 404 Open Program markdown skips invent with `architecture_fetch_failed` and a Mission Control tip to re-bind Settings. See `docs/architecture-fetch-fail-closed.md`.
 - AG-014: Mid-run file-write checkpoint — after each sandbox write, persist `file_write_checkpoint`; on reclaim restore bodies and skip identical OpenAI-compatible rewrites. See `docs/file-write-checkpoint.md`.
 - AG-035: Unattended board drain — retire obsolete `[ship-gate]` when tip is green / PR closed; dirty delivery PRs get `merge_conflict` after ~15m (no 6h wait) and free parent concurrency; signal arm survives min_human/approve races. See `docs/ship-receipts/AG-035.md`.
 - SEC-036: **Prod / default-branch write policy gate** — refuse merge-to-default, GitHub Release, default-branch Contents writes, and sandbox production deploy commands unless explicit policy flags (`mergeEnabled`, `autoRelease`, `prodWritesEnabled`). See `docs/prod-write-policy-gate.md`.

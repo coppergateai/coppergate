@@ -1,9 +1,10 @@
 import type { MissionControlAttentionItem } from "./mission-control-attention.js";
 
-/** Maintainer replan skips — expected idle, not ops failure (AG-015). */
+/** Maintainer replan skips — expected idle, not ops failure (AG-015 / AG-020). */
 export const REPLAN_ARCHITECTURE_IDLE_REASONS = new Set([
   "no_architecture_open_id",
   "architecture_ids_in_flight",
+  "architecture_fetch_failed",
 ]);
 
 export function isReplanArchitectureIdleReason(
@@ -62,6 +63,14 @@ export function replanArchitectureIdleCopy(
       ctaLabel: "View backlog",
     };
   }
+  if (reason === "architecture_fetch_failed") {
+    return {
+      title: `Open Program bind${projectSuffix}`,
+      detail:
+        "Architecture markdown fetch failed (bad token or missing path) — re-bind architectureRepo / architecturePaths in project Settings. No invent until the program loads.",
+      ctaLabel: "Open Settings",
+    };
+  }
   return {
     title: `Open Program idle${projectSuffix}`,
     detail:
@@ -85,9 +94,14 @@ export function missionControlReplanIdleItem(input: {
     projectLabel: input.projectLabel,
     inFlightCount: excludeIds.length > 0 ? excludeIds.length : null,
   });
-  const href = input.projectId
+  const settingsHref = input.projectId
+    ? `/workspaces/${input.workspaceId}/projects/${input.projectId}`
+    : `/workspaces/${input.workspaceId}/backlog`;
+  const backlogHref = input.projectId
     ? `/workspaces/${input.workspaceId}/backlog`
     : `/workspaces/${input.workspaceId}/backlog`;
+  const href =
+    input.reason === "architecture_fetch_failed" ? settingsHref : backlogHref;
   return {
     id: `replan-idle-${input.dedupeKey}`,
     kind: "replan_idle",
