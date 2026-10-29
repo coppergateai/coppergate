@@ -109,6 +109,18 @@ function eventMessage(event: RunEvent): string {
         return `Cursor harness · native_openai demoted — ${(demoted as { reason: string }).reason}`;
       }
     }
+    if (obj.code === "provider_spend_debited") {
+      const role =
+        obj.providerRole === "fallback" ? "Fallback" : "Primary";
+      const provider =
+        typeof obj.provider === "string" ? obj.provider : "provider";
+      const model = typeof obj.model === "string" ? obj.model : "model";
+      const micros =
+        typeof obj.costMicros === "number" ? obj.costMicros : null;
+      const cost =
+        micros != null && micros > 0 ? ` · ${formatUsd(micros)}` : "";
+      return `${role} LLM debit — ${provider}/${model}${cost}`;
+    }
     if (obj.code === "provider_failover") {
       const reason =
         typeof obj.reason === "string" ? obj.reason.trim() : "";

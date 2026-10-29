@@ -14,8 +14,13 @@ import {
 } from "@coppergate/agents";
 import {
   appendRunEvent,
-  appendUsageEvent,
+  applyAgentCompletionToLedger,
+  applyAgentCostEventToLedger,
   applyTaskTransition,
+  createRunProviderSpendLedger,
+  markProviderFailoverInLedger,
+  persistRunLlmSpendFromLedger,
+  totalRunSpendMicros,
   assertSecondaryRepoAllowed,
   assertSufficientBudget,
   attachSandboxToRun,
@@ -204,8 +209,7 @@ export async function executeClaimedRun(
 ): Promise<"review_required" | "failed" | "cancelled" | "validation_failed"> {
   const { run, workerId, log, leaseMs } = input;
   const agent = input.agent ?? new FakeCodingAgent();
-  let usageProvider = "fake";
-  let usageModel = "fake-coding-agent-v1";
+  const spendLedger = createRunProviderSpendLedger();
 
   const task = await getTaskById(db, run.taskId);
   if (!task) {
@@ -265,6 +269,11 @@ export async function executeClaimedRun(
     ReturnType<typeof runStackValidation>
   > | null = null;
   let actualCost = 0;
+  const spendPhase = (): "primary" | "fallback" =>
+    sawProviderFailover ? "fallback" : "primary";
+  const syncActualCost = () => {
+    actualCost = totalRunSpendMicros(spendLedger);
+  };
 
   let strategy = "balanced";
   let strategyContext: string | undefined;
@@ -712,18 +721,12 @@ export async function executeClaimedRun(
         });
 
         if (event.kind === "cost" && event.payload?.costMicros != null) {
-          actualCost = Number(event.payload.costMicros) || actualCost;
-        }
-        if (event.payload) {
-          const p = event.payload;
-          if (typeof p.provider === "string" && p.provider) {
-            usageProvider = p.provider;
-          } else if (typeof p.harness === "string" && p.harness) {
-            usageProvider = p.harness;
-          }
-          if (typeof p.model === "string" && p.model) {
-            usageModel = p.model;
-          }
+          applyAgentCostEventToLedger(
+            spendLedger,
+            event.payload,
+            spendPhase(),
+          );
+          syncActualCost();
         }
 
         if (
@@ -731,6 +734,7 @@ export async function executeClaimedRun(
           event.payload?.code === "provider_failover"
         ) {
           sawProviderFailover = true;
+          markProviderFailoverInLedger(spendLedger);
           log.info("provider failover engaged", {
             runId: run.id,
             reason:
@@ -762,7 +766,12 @@ export async function executeClaimedRun(
           isFakeCompletionPayload(event.payload)
         ) {
           completion = event.payload;
-          actualCost = event.payload.actualCostMicros || actualCost;
+          applyAgentCompletionToLedger(
+            spendLedger,
+            event.payload as Record<string, unknown>,
+            spendPhase(),
+          );
+          syncActualCost();
           // Successful secondary run after quota — do not treat primary quota as terminal.
           if (sawProviderFailover && lastAgentErrorCode === "provider_quota") {
             lastAgentErrorCode = null;
@@ -1397,16 +1406,13 @@ export async function executeClaimedRun(
     }).catch(() => undefined);
 
     if (actualCost > 0) {
-      await appendUsageEvent(db, {
+      await persistRunLlmSpendFromLedger(db, {
         workspaceId: run.workspaceId,
         projectId: run.projectId,
         taskId: task.id,
         runId: run.id,
-        kind: "llm_tokens",
-        costMicros: actualCost,
-        quantity: String(completion.estimatedTokens),
-        provider: usageProvider,
-        model: usageModel,
+        ledger: spendLedger,
+        actor: `worker:${workerId}`,
       });
     }
 
@@ -1670,16 +1676,13 @@ export async function executeClaimedRun(
   }
 
   if (actualCost > 0) {
-    await appendUsageEvent(db, {
+    await persistRunLlmSpendFromLedger(db, {
       workspaceId: run.workspaceId,
       projectId: run.projectId,
       taskId: task.id,
       runId: run.id,
-      kind: "llm_tokens",
-      costMicros: actualCost,
-      quantity: String(completion.estimatedTokens),
-      provider: usageProvider,
-      model: usageModel,
+      ledger: spendLedger,
+      actor: `worker:${workerId}`,
     });
   }
 

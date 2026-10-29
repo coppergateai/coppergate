@@ -89,6 +89,27 @@ describe("activity events", () => {
     assert.ok(groups.some((g) => g.action === "task.enqueue"));
   });
 
+  it("summarizes run LLM debit with provider and model", () => {
+    assert.match(
+      summaryFor("run.llm_debit", {
+        providerRole: "fallback",
+        provider: "cursor_local",
+        model: "composer",
+        costMicros: 250_000,
+      }) ?? "",
+      /Fallback cursor_local\/composer/,
+    );
+    assert.match(
+      summaryFor("run.llm_debit", {
+        providerRole: "primary",
+        provider: "openai_compatible",
+        model: "gpt-4o-mini",
+        costMicros: 50_000,
+      }) ?? "",
+      /Primary openai_compatible/,
+    );
+  });
+
   it("summarizes contender debit and elimination from meta", () => {
     assert.match(
       summaryFor("contender.debit", {

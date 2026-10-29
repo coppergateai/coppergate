@@ -60,7 +60,7 @@ Date: 2026-10-24
 ## Cycle 9
 - **Malformed LLM JSON**: chat completion body parse failures retry with backoff (same bound as 429/5xx)
 - **Duplicate FILE paths**: fail closed (`duplicate_file_path`) — refuse ambiguous last-write-wins completions
-- **Usage idempotency**: `appendUsageEvent(llm_tokens)` returns existing row for the same `runId` (no double-bill on resume)
+- **Usage idempotency**: legacy `llm_tokens` dedupes once per `runId`; AG-016 adds distinct primary/fallback rows per run with per-role dedupe (failover doubles spend honestly)
 
 ## Cycle 10
 - **WAITING_CI promote**: `ciSatisfied` (!blocking && passed) drives `WAITING_CI → REVIEW_REQUIRED`; `acceptReady` stays false until promoted (fixes dead promote path after Cycle 8)
@@ -121,7 +121,7 @@ Date: 2026-10-24
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly
-- Failover doubles spend only on thrown provider failures; operators should size fallback model cost intentionally
+- Failover doubles spend when both providers bill (AG-016 debits primary + fallback separately; size fallback model cost intentionally)
 - Prompt isolation is defense-in-depth, not a guarantee against model compliance failures
 - llm_tokens dedupe is application-level (race of two concurrent inserts for same runId still possible without a unique index)
 - Delivery still uses a single capped lease renew (multi-file slow GitHub can race reaper before checkpoint)
