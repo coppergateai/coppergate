@@ -4,6 +4,7 @@
 
 ### Fixes
 
+- AG-018: Maintainer vision replan re-pins `defaultContenderN` to `maxTournamentN` so spawn/invent cannot drift duel width above policy (N=1 dogfood respected). See `docs/maintainer-contender-pin.md`.
 - GitHub PR delivery batches all files into a single Git Data API commit (no more N Contents-API commits with the same message).
 - Peer-only arena contenders: tournaments are same-role strategy peers (no Fixer×QA / Engineer×Reviewer duels). Spawn matrix picks primary role; meta-tournament flips strategy on the champion key; sticky cross-role pools cleared on spawn/fan-out.
 

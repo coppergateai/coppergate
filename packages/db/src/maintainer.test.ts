@@ -26,6 +26,10 @@ import {
   shouldRollbackProfileForFitness,
   taskMatchesPathAllowlist,
 } from "./maintainer.js";
+import {
+  defaultContenderNWithinMaintainerPolicy,
+  maintainerContenderPinN,
+} from "./maintainer-contender-pin.js";
 import { shouldRollMonthlyPeriod } from "./budgets.js";
 
 describe("maintainer rollup (P-145)", () => {
@@ -72,6 +76,12 @@ describe("maintainer rollup (P-145)", () => {
 });
 
 describe("maintainer policy", () => {
+  it("AG-018: defaultContenderN pin tracks maxTournamentN", () => {
+    assert.equal(maintainerContenderPinN(2), 2);
+    assert.equal(defaultContenderNWithinMaintainerPolicy(2, 2), true);
+    assert.equal(defaultContenderNWithinMaintainerPolicy(3, 2), false);
+  });
+
   it("parses defaults when raw is null", () => {
     const p = parseMaintainerPolicy(null);
     assert.equal(p.enabled, false);
