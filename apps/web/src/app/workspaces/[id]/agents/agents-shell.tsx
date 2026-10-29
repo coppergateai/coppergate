@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { MarkdownProse } from "@/components/markdown-prose";
 import styles from "../shared/catalog.module.css";
 
 export type AgentProfileStatsView = {
@@ -843,9 +844,10 @@ export function AgentsShell({
                             </span>
                           </button>
                           {open && skill ? (
-                            <pre className={styles.bodyBlock}>
-                              {skill.bodyMarkdown}
-                            </pre>
+                            <MarkdownProse
+                              className={styles.bodyProse}
+                              markdown={skill.bodyMarkdown}
+                            />
                           ) : null}
                           {open && !skill ? (
                             <p className={styles.note}>
