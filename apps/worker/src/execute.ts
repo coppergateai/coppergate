@@ -85,6 +85,7 @@ import {
   type SandboxManager,
 } from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
+import { shouldSkipPrReviewGithubPost } from "./pr-review-checkpoint.js";
 import {
   assertDeliverySecretsRefused,
   assertLockfileSyncedWithPackageJson,
@@ -1451,26 +1452,65 @@ export async function executeClaimedRun(
       deliveryMode === "http"
         ? `https://github.com/${repo.owner}/${repo.repo}/pull/${prNumber}`
         : `https://github.com/${repo.owner}/${repo.repo}/pull/${prNumber}`;
+    const reviewBranch = `review/pr-${prNumber}`;
+    const reviewHeadSha = run.baseSha;
     const reviewBody =
       (typeof completion.reviewBody === "string" &&
         completion.reviewBody.trim()) ||
       `## Coppergate review\n\nAutomated review for task \`${task.id}\` / run \`${run.id}\`.\n`;
 
-    {
-      const cancelled = await honorCancelIfRequested(
-        "Run cancelled before PR review post",
-      );
-      if (cancelled) return cancelled;
-    }
+    // F4: resume skips GitHub COMMENT when delivery_checkpoint already exists.
+    const existingReviewCheckpoint = await getDeliveryCheckpoint(
+      db,
+      run.workspaceId,
+      run.id,
+    );
+    const skipReviewPost = shouldSkipPrReviewGithubPost(
+      existingReviewCheckpoint,
+      prNumber,
+    );
 
-    if (deliveryMode === "http" && authToken) {
-      await submitPullRequestReview({
-        token: authToken,
-        owner: repo.owner,
-        repo: repo.repo,
+    if (!skipReviewPost) {
+      {
+        const cancelled = await honorCancelIfRequested(
+          "Run cancelled before PR review post",
+        );
+        if (cancelled) return cancelled;
+      }
+
+      if (deliveryMode === "http" && authToken) {
+        await submitPullRequestReview({
+          token: authToken,
+          owner: repo.owner,
+          repo: repo.repo,
+          prNumber,
+          body: reviewBody,
+          event: "COMMENT",
+        });
+      }
+
+      // Checkpoint immediately after side effect — reaper recovers VALIDATING.
+      await persistDeliveryCheckpoint(db, {
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        taskId: task.id,
+        runId: run.id,
+        checkpoint: buildDeliveryCheckpoint({
+          taskId: task.id,
+          runId: run.id,
+          prUrl,
+          prNumber,
+          branchName: reviewBranch,
+          headSha: reviewHeadSha,
+          actualCostMicros: actualCost,
+          awaitLiveCi: false,
+          previewUrl: null,
+        }),
+      });
+    } else {
+      log.info("pr review checkpoint resume — skipping GitHub COMMENT", {
+        runId: run.id,
         prNumber,
-        body: reviewBody,
-        event: "COMMENT",
       });
     }
 
@@ -1479,13 +1519,15 @@ export async function executeClaimedRun(
       workspaceId: run.workspaceId,
       kind: "evidence",
       payload: {
-        message:
-          deliveryMode === "http" && authToken
+        message: skipReviewPost
+          ? "PR review resumed from delivery_checkpoint"
+          : deliveryMode === "http" && authToken
             ? "PR review comment posted"
             : "PR review prepared (fake delivery — no GitHub POST)",
         prUrl,
         prNumber,
         reviewMode: true,
+        resumedFromCheckpoint: skipReviewPost,
         repo: `${repo.owner}/${repo.repo}`,
       },
     });
@@ -1496,8 +1538,8 @@ export async function executeClaimedRun(
       taskId: task.id,
       runId: run.id,
       diff: buildDiffSummary({
-        branchName: `review/pr-${prNumber}`,
-        headSha: run.baseSha,
+        branchName: reviewBranch,
+        headSha: reviewHeadSha,
         baseSha: run.baseSha,
         filesChanged: [],
         notes: ["PR review — no code delivery"],
@@ -1507,8 +1549,8 @@ export async function executeClaimedRun(
         runId: run.id,
         prUrl,
         prNumber,
-        branchName: `review/pr-${prNumber}`,
-        headSha: run.baseSha,
+        branchName: reviewBranch,
+        headSha: reviewHeadSha,
         actualCostMicros: actualCost,
         validationPassed: true,
         filesChanged: [],
@@ -1532,8 +1574,8 @@ export async function executeClaimedRun(
     const awaiting = await markRunAwaitingReview(db, {
       runId: run.id,
       workerId,
-      branchName: `review/pr-${prNumber}`,
-      headSha: run.baseSha,
+      branchName: reviewBranch,
+      headSha: reviewHeadSha,
       prNumber,
       prUrl,
       actualCostMicros: actualCost,

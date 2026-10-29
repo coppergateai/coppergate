@@ -154,4 +154,4 @@ Date: 2026-10-24
 - Prompt isolation is defense-in-depth, not a guarantee against model compliance failures
 - ~~llm_tokens dedupe is application-level (race of two concurrent inserts for same runId still possible without a unique index)~~ — closed by `usage_events_llm_tokens_run_role_uidx` + `llm_provider_role` (F2)
 - Delivery still uses a single capped lease renew (multi-file slow GitHub can race reaper before checkpoint)
-- PR-review path has no durable checkpoint — crash after GitHub POST can FAIL a landed review
+- ~~PR-review path has no durable checkpoint — crash after GitHub POST can FAIL a landed review~~ — closed by F4 (`docs/pr-review-checkpoint.md`); residual POST→checkpoint race may duplicate one COMMENT
