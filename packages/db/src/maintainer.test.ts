@@ -7,6 +7,9 @@ import {
   LEAN_ARENA_PROFILE_KEYS,
   LEAN_ROSTER_AVAILABLE_MICROS,
   MIN_REPLAN_AVAILABLE_MICROS,
+  REPLAN_LEAN_BUDGET_MICROS,
+  VISION_REPLAN_ARENA_PROFILE_KEYS,
+  maxAutoQueueForReplan,
   buildMaintainerReleaseTag,
   computeBudgetBurnRatio,
   countVerifiedMergesFromMaintainerEvents,
@@ -97,16 +100,42 @@ describe("maintainer policy", () => {
     assert.equal(p.releaseTagStyle, "daily");
   });
 
-  it("uses engineer peer roster for arena seating (catalog ≠ contenders)", () => {
+  it("AG-025: lean roster under $1; vision replan keys at or above", () => {
     assert.deepEqual(
-      rosterKeysForAvailableBudget(LEAN_ROSTER_AVAILABLE_MICROS - 1),
+      rosterKeysForAvailableBudget(REPLAN_LEAN_BUDGET_MICROS - 1),
       [...LEAN_ARENA_PROFILE_KEYS],
     );
     assert.deepEqual(
-      rosterKeysForAvailableBudget(LEAN_ROSTER_AVAILABLE_MICROS),
-      [...LEAN_ARENA_PROFILE_KEYS],
+      rosterKeysForAvailableBudget(REPLAN_LEAN_BUDGET_MICROS),
+      [...VISION_REPLAN_ARENA_PROFILE_KEYS],
     );
     assert.deepEqual(LEAN_ARENA_PROFILE_KEYS, ["engineer"]);
+  });
+
+  it("AG-025: maxAutoQueue forced to 1 under $1 available", () => {
+    assert.equal(
+      maxAutoQueueForReplan({
+        availableMicros: REPLAN_LEAN_BUDGET_MICROS - 1,
+        policyMaxAutoQueuePerReplan: 4,
+      }),
+      1,
+    );
+    assert.equal(
+      maxAutoQueueForReplan({
+        availableMicros: REPLAN_LEAN_BUDGET_MICROS - 1,
+        policyMaxAutoQueuePerReplan: 4,
+        override: 3,
+      }),
+      1,
+    );
+    assert.equal(
+      maxAutoQueueForReplan({
+        availableMicros: REPLAN_LEAN_BUDGET_MICROS,
+        policyMaxAutoQueuePerReplan: 4,
+      }),
+      4,
+    );
+    assert.equal(REPLAN_LEAN_BUDGET_MICROS, 1_000_000);
   });
 
   it("refills backlog when idle under budget (continuous)", () => {
