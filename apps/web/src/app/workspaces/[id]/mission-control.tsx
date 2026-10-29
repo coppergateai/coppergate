@@ -147,6 +147,9 @@ export function MissionControl({ data, recentEvents }: Props) {
             : `/workspaces/${data.workspaceId}/inbox`;
 
   const replanIdleItems = attention.filter((a) => a.kind === "replan_idle");
+  const architectureFetchItems = attention.filter(
+    (a) => a.kind === "architecture_fetch_failed",
+  );
 
   const statusLine = (() => {
     if (budgetPaused) {
@@ -170,6 +173,9 @@ export function MissionControl({ data, recentEvents }: Props) {
     if (needsAttention && hasHighAttention) {
       return `${attention.length} item${attention.length === 1 ? "" : "s"} ${attention.length === 1 ? "needs" : "need"} your review.`;
     }
+    if (architectureFetchItems.length > 0 && !hasHighAttention) {
+      return architectureFetchItems[0]!.detail;
+    }
     if (replanIdleItems.length > 0 && !hasHighAttention) {
       if (replanIdleItems.length === 1) {
         return replanIdleItems[0]!.detail;
@@ -188,7 +194,8 @@ export function MissionControl({ data, recentEvents }: Props) {
     (a) =>
       a.kind !== "arena_failed" &&
       a.kind !== "replan_failed" &&
-      a.kind !== "replan_idle",
+      a.kind !== "replan_idle" &&
+      a.kind !== "architecture_fetch_failed",
   );
   const attentionRows: typeof attention = [];
   if (arenaItems.length > 1) {
@@ -260,6 +267,7 @@ export function MissionControl({ data, recentEvents }: Props) {
       }),
     );
   }
+  attentionRows.push(...architectureFetchItems);
   attentionRows.push(...replanIdleItems);
   attentionRows.push(
     ...otherAttention.map((item) => ({

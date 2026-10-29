@@ -318,7 +318,7 @@ importers:
         specifier: ^9.27.0
         version: 9.39.5
       tsx:
-        specifier: ^4.19.4
+        specifier: ^4.23.15
         version: 4.23.15
       typescript:
         specifier: ^5.8.3

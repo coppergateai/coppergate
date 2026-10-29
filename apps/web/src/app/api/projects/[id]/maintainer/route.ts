@@ -3,7 +3,8 @@ import {
   DEFAULT_MONTHLY_BUDGET_MICROS,
   disableMaintainerMode,
   enableMaintainerMode,
-  fetchArchitectureBacklogMarkdown,
+  describeArchitectureFetchFailure,
+  fetchArchitectureProgram,
   getMaintainerMetrics,
   getProjectForWorkspace,
   parseArchitectureProgramRows,
@@ -138,14 +139,21 @@ export async function POST(request: Request, context: RouteContext) {
       if (!architecturePaths) {
         throw new ApiError("bad_request", "architecturePaths required");
       }
-      const md = await fetchArchitectureBacklogMarkdown({
+      const fetched = await fetchArchitectureProgram({
         repo: architectureRepo,
         paths: architecturePaths,
       });
+      if (!fetched.ok) {
+        throw new ApiError(
+          "bad_request",
+          describeArchitectureFetchFailure(fetched),
+        );
+      }
+      const md = fetched.markdown;
       if (!md.trim()) {
         throw new ApiError(
           "bad_request",
-          "Could not fetch Open Program markdown (404/empty). Check repo, path, and token.",
+          "Could not fetch Open Program markdown (empty). Re-bind Program path and token.",
         );
       }
       const rows = parseArchitectureProgramRows(md);

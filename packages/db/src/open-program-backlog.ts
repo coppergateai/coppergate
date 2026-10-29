@@ -10,7 +10,8 @@ import {
   type ArchitectureProgramRow,
 } from "./architecture-backlog.js";
 import {
-  fetchArchitectureBacklogMarkdown,
+  describeArchitectureFetchFailure,
+  fetchArchitectureProgram,
   listInFlightArchitectureIds,
   parseMaintainerPolicy,
 } from "./maintainer.js";
@@ -198,21 +199,25 @@ export async function getWorkspaceOpenProgramBacklog(
     const key = programKey(b.architectureRepo, b.architecturePaths);
     if (sourceCache.has(key)) continue;
     try {
-      const md = await fetchArchitectureBacklogMarkdown({
+      const fetched = await fetchArchitectureProgram({
         token: opts?.architectureToken,
         repo: b.architectureRepo,
         paths: b.architecturePaths,
       });
-      if (!md.trim()) {
+      if (!fetched.ok) {
         sourceCache.set(key, {
           rows: [],
-          fetchError: opts?.architectureToken
-            ? "Could not load Open Program markdown — check repo access for the GitHub App and the bound path."
-            : "Could not load Open Program markdown — install the GitHub App (or make the architecture repo public).",
+          fetchError: describeArchitectureFetchFailure(fetched),
+        });
+      } else if (!fetched.markdown.trim()) {
+        sourceCache.set(key, {
+          rows: [],
+          fetchError:
+            "Could not load Open Program markdown — bound path was empty. Re-bind Program path(s) on Configuration.",
         });
       } else {
         sourceCache.set(key, {
-          rows: parseArchitectureProgramRows(md),
+          rows: parseArchitectureProgramRows(fetched.markdown),
           fetchError: null,
         });
       }

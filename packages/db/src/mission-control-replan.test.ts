@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  isReplanArchitectureFetchFailedReason,
   isReplanArchitectureIdleReason,
   isReplanQueueArchitectureIdleMeta,
+  missionControlArchitectureFetchFailedItem,
   missionControlReplanIdleItem,
   replanArchitectureIdleCopy,
   replanSkipReasonFromMeta,
@@ -59,6 +61,22 @@ describe("mission-control-replan (AG-015)", () => {
     assert.equal(row.kind, "replan_idle");
     assert.equal(row.priority, "normal");
     assert.match(row.href, /\/workspaces\/ws1\/backlog/);
+  });
+
+  it("architecture fetch failed surfaces re-bind Program path (AG-020)", () => {
+    assert.equal(isReplanArchitectureFetchFailedReason("architecture_fetch_failed"), true);
+    assert.equal(isReplanArchitectureFetchFailedReason("no_architecture_open_id"), false);
+    const row = missionControlArchitectureFetchFailedItem({
+      dedupeKey: "p1",
+      workspaceId: "ws1",
+      projectId: "p1",
+      projectLabel: "Primary",
+      fetchError: "bad_token",
+    });
+    assert.equal(row.kind, "architecture_fetch_failed");
+    assert.match(row.detail, /will not invent/i);
+    assert.match(row.href, /tab=configuration#open-program-bind/);
+    assert.equal(row.ctaLabel, "Re-bind Program path");
   });
 
   it("isReplanQueueArchitectureIdleMeta filters queue_failed noise", () => {

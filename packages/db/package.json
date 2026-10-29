@@ -15,7 +15,6 @@
     "lint": "eslint .",
     "test": "node --import tsx --test $(find src -name '*.test.ts')",
     "generate": "drizzle-kit generate",
-
     "migrate": "tsx src/migrate.ts",
     "migrate:down": "tsx src/migrate-down.ts",
     "prepare": "tsc -p tsconfig.json"
@@ -32,7 +31,7 @@
     "@types/node": "^22.15.21",
     "drizzle-kit": "^0.31.1",
     "eslint": "^9.27.0",
-    "tsx": "^4.19.4",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.3"
   }
 }

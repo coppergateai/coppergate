@@ -18,8 +18,10 @@ import {
   type MissionControlAttentionItem,
 } from "./mission-control-attention.js";
 import {
+  isReplanArchitectureFetchFailedReason,
   isReplanArchitectureIdleReason,
   isReplanQueueArchitectureIdleMeta,
+  missionControlArchitectureFetchFailedItem,
   missionControlReplanIdleItem,
   replanSkipReasonFromMeta,
 } from "./mission-control-replan.js";
@@ -345,6 +347,7 @@ export async function getWorkspaceMissionControl(
       (e) => e.action === "maintainer.replan",
     );
     const seenReplanIdleProjects = new Set<string>();
+    const seenArchitectureFetchProjects = new Set<string>();
     for (const ev of replanSkips) {
       let meta: Record<string, unknown> | null = null;
       if (ev.meta) {
@@ -355,6 +358,40 @@ export async function getWorkspaceMissionControl(
         }
       }
       const reason = replanSkipReasonFromMeta(meta);
+      if (reason && isReplanArchitectureFetchFailedReason(reason)) {
+        let projectId: string | null = null;
+        let projectName: string | null = null;
+        if (meta) {
+          projectId =
+            typeof meta.projectId === "string" ? meta.projectId : null;
+          projectName =
+            typeof meta.projectName === "string" ? meta.projectName : null;
+        }
+        const dedupeKey = projectId ?? ev.id;
+        if (seenArchitectureFetchProjects.has(dedupeKey)) continue;
+        seenArchitectureFetchProjects.add(dedupeKey);
+        if (seenArchitectureFetchProjects.size > 3) break;
+        const projectLabel =
+          projectName ??
+          (projectId
+            ? (arena.projects.find((p) => p.projectId === projectId)
+                ?.projectName ?? null)
+            : null);
+        const fetchError =
+          meta && typeof meta.fetchError === "string"
+            ? meta.fetchError
+            : null;
+        attention.push(
+          missionControlArchitectureFetchFailedItem({
+            dedupeKey,
+            workspaceId,
+            projectId,
+            projectLabel,
+            fetchError,
+          }),
+        );
+        continue;
+      }
       if (!reason || !isReplanArchitectureIdleReason(reason)) continue;
 
       let projectId: string | null = null;

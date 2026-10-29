@@ -69,11 +69,18 @@ import {
 } from "./architecture-backlog.js";
 import { getProjectForWorkspace } from "./projects.js";
 import { openTaskCountsAsBusyForBacklog } from "./ship-gate-heal-policy.js";
-import { fetchArchitectureBacklogMarkdown } from "./architecture-program-fetch.js";
+import {
+  fetchArchitectureBacklogMarkdown,
+  fetchArchitectureProgram,
+} from "./architecture-program-fetch.js";
 
 export {
   DEFAULT_ARCHITECTURE_PATHS,
+  describeArchitectureFetchFailure,
   fetchArchitectureBacklogMarkdown,
+  fetchArchitectureProgram,
+  type ArchitectureFetchErrorCode,
+  type ArchitectureProgramFetchResult,
 } from "./architecture-program-fetch.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
@@ -2342,15 +2349,72 @@ export async function runVisionReplan(
   }
 
   const stamp = new Date().toISOString().slice(0, 10);
-  const roadmapMd =
-    input.roadmapMarkdown?.trim() ||
-    process.env.ARCHITECTURE_BACKLOG_MD?.trim() ||
-    (await fetchArchitectureBacklogMarkdown({
+  const programBound = Boolean(policy.architectureRepo?.trim());
+  let roadmapMd = "";
+  if (input.roadmapMarkdown?.trim()) {
+    roadmapMd = input.roadmapMarkdown.trim();
+  } else if (programBound) {
+    const fetchResult = await fetchArchitectureProgram({
       token: input.architectureToken,
       repo: policy.architectureRepo,
       paths: policy.architecturePaths,
-    })) ||
-    "";
+    });
+    if (!fetchResult.ok) {
+      const reason = "architecture_fetch_failed";
+      await recordMaintainerEvent(db, {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        kind: "replan",
+        payload: {
+          briefId: brief.id,
+          taskCount: 0,
+          queued: 0,
+          autoQueue,
+          skipped: true,
+          reason,
+          fetchError: fetchResult.error,
+          fetchDetail: fetchResult.detail,
+          architectureRepo: policy.architectureRepo,
+          architecturePaths: policy.architecturePaths,
+        },
+      });
+      await recordAuditEvent(db, {
+        workspaceId: input.workspaceId,
+        actor: input.actor,
+        action: "maintainer.replan",
+        targetType: "project",
+        targetId: input.projectId,
+        meta: {
+          projectId: input.projectId,
+          projectName: project?.name ?? null,
+          briefId: brief.id,
+          taskCount: 0,
+          queued: 0,
+          skipped: true,
+          reason,
+          fetchError: fetchResult.error,
+          fetchDetail: fetchResult.detail,
+          architectureRepo: policy.architectureRepo,
+          architecturePaths: policy.architecturePaths,
+        },
+      });
+      await db
+        .update(projects)
+        .set({ lastVisionReplanAt: new Date(), updatedAt: new Date() })
+        .where(eq(projects.id, input.projectId));
+      return { taskCount: 0, queued: 0 };
+    }
+    roadmapMd = fetchResult.markdown;
+  } else {
+    roadmapMd =
+      process.env.ARCHITECTURE_BACKLOG_MD?.trim() ||
+      (await fetchArchitectureBacklogMarkdown({
+        token: input.architectureToken,
+        repo: policy.architectureRepo,
+        paths: policy.architecturePaths,
+      })) ||
+      "";
+  }
   const excludeIds = await listInFlightArchitectureIds(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
