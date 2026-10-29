@@ -87,6 +87,11 @@ import {
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
 import { shouldSkipPrReviewGithubPost } from "./pr-review-checkpoint.js";
 import {
+  deliveryHeartbeatIntervalMs,
+  resolveDeliveryLeaseMs,
+  shouldRenewDeliveryHeartbeat,
+} from "./delivery-lease.js";
+import {
   assertDeliverySecretsRefused,
   assertLockfileSyncedWithPackageJson,
   assertProductDeliveryPaths,
@@ -535,11 +540,20 @@ export async function executeClaimedRun(
       }
     });
   }, heartbeatMs);
+  // F3: delivery heartbeat handle (started just before GitHub deliver).
+  let deliveryHeartbeat: ReturnType<typeof setInterval> | null = null;
+  const stopDeliveryHeartbeat = () => {
+    if (deliveryHeartbeat) {
+      clearInterval(deliveryHeartbeat);
+      deliveryHeartbeat = null;
+    }
+  };
 
   const finishCancelled = async (
     reason: string,
   ): Promise<"cancelled"> => {
     clearInterval(heartbeat);
+    stopDeliveryHeartbeat();
     try {
       await markRunCancelled(db, {
         runId: run.id,
@@ -1308,13 +1322,48 @@ export async function executeClaimedRun(
     if (cancelled) return cancelled;
   }
 
-  // Stop heartbeat before delivery — hung GitHub calls must not renew forever
-  // or VALIDATING holds concurrency slots indefinitely.
+  // F3: stop agent heartbeat; renew through deliver→checkpoint with a scaled
+  // lease + wall-capped delivery heartbeat (hung GitHub must not pin forever).
   clearInterval(heartbeat);
-  const deliveryLeaseMs = Math.max(leaseMs, 5 * 60_000);
+  const deliveryFileCount = Math.max(
+    1,
+    completion?.filesChanged?.length ?? 1,
+  );
+  const deliveryLeaseMs = resolveDeliveryLeaseMs({
+    leaseMs,
+    fileCount: deliveryFileCount,
+  });
+  const deliveryStartedAtMs = Date.now();
+  deliveryHeartbeat = setInterval(() => {
+    if (
+      !shouldRenewDeliveryHeartbeat({
+        deliveryStartedAtMs,
+        nowMs: Date.now(),
+      })
+    ) {
+      stopDeliveryHeartbeat();
+      log.warn("delivery lease heartbeat wall reached; stopping renewals", {
+        runId: run.id,
+        fileCount: deliveryFileCount,
+        deliveryLeaseMs,
+      });
+      return;
+    }
+    void renewRunLease(db, run.id, workerId, deliveryLeaseMs).catch((err) => {
+      if (err instanceof RunError && err.code === "cancelled") {
+        sawCancel = true;
+        abortController.abort();
+      } else if (err instanceof RunError && err.code === "not_owner") {
+        lostOwnership = true;
+        abortController.abort();
+      }
+    });
+  }, deliveryHeartbeatIntervalMs(deliveryLeaseMs));
+
   try {
     await renewRunLease(db, run.id, workerId, deliveryLeaseMs);
   } catch (err) {
+    stopDeliveryHeartbeat();
     if (err instanceof RunError && err.code === "cancelled") {
       return finishCancelled("Run cancelled before delivery lease renew");
     }
@@ -1612,6 +1661,7 @@ export async function executeClaimedRun(
       });
     }
 
+    stopDeliveryHeartbeat();
     await setTaskPrUrl(db, task.id, prUrl);
     await maybeResolveTournamentAfterRun(db, run, workerId, log);
     return "review_required";
@@ -1695,6 +1745,8 @@ export async function executeClaimedRun(
       }),
     });
   }
+  // Durable checkpoint exists — delivery side effects are recoverable; stop renewals.
+  stopDeliveryHeartbeat();
 
   // Leave VALIDATING immediately — minimizes validating_lease_expired after ship.
   const awaiting = awaitLiveCi
@@ -1975,6 +2027,7 @@ export async function executeClaimedRun(
   }
   } finally {
     clearInterval(heartbeat);
+    stopDeliveryHeartbeat();
   }
 }
 
