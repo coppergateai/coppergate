@@ -24,7 +24,7 @@ export const SYSTEM_SKILL_SEEDS = [
       "",
       "## Hard rules",
       "- Prefer a PR into `main`; wait for the required `check` job to go green before merge.",
-      "- Never land or stack unrelated commits while tip `check` is red — auto-merge freezes on `default_branch_ci_red`.",
+      "- Never land or stack unrelated commits while tip `check` is red — product auto-merge freezes on `default_branch_ci_red` (heal-only `[ship-gate]` merges still run).",
       "- Tasks titled with `[ship-gate]` are tip-CI heal only: make required `check` green on the default branch; no unrelated product scope in the same PR.",
       "- `merge_conflict` heal tasks: rebase the cited open PR head onto the default branch, resolve conflicts, push the **same head** — do not open a parallel PR.",
       "- Do not force-push `main`/`master`.",

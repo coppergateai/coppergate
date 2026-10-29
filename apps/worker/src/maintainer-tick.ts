@@ -8,6 +8,7 @@ import {
   getInstallationForWorkspace,
   getProjectForWorkspace,
   isMergeProtectionBlock,
+  isShipGateHealTitle,
   isTransientNotMergeable,
   listAutoMergeCandidates,
   listMaintainerProjects,
@@ -16,11 +17,13 @@ import {
   reconcileStaleEstimateReserves,
   recordAuditEvent,
   recordMaintainerReleaseOutcome,
+  shipGateMergeMode,
   shouldEmitMergeConflictInsteadOfReplan,
   shouldRunMaintainerRelease,
   tickMaintainerProject,
   type Database,
   type GithubInstallation,
+  type ShipGateMergeMode,
 } from "@coppergate/db";
 import {
   commitCheckSuitesShipGate,
@@ -191,8 +194,10 @@ export async function runMaintainerSchedulerTick(
     const [owner, name] = bound.repository.baseRepoFullName.split("/");
     if (!owner || !name) continue;
 
-    // Halt ship while tip CI is not positively green or a rollback PR is open.
-    // Prevents merge→red→orphan-revert storms when post-merge checks fail.
+    // Ship gate: tip not green / open rollback → halt product merges.
+    // AG-034: tip red still lands `[ship-gate]` heal PRs (heal-only) so AG-031
+    // enqueue cannot deadlock waiting for a human merge.
+    let mergeMode: ShipGateMergeMode = "all";
     if (policy.shipRollbackOnCiFail) {
       try {
         const openRollbacks = await countOpenShipRollbackPrs({
@@ -213,8 +218,11 @@ export async function runMaintainerSchedulerTick(
               sha: head.sha,
             })
           : ({ kind: "pending" } as const);
-        const tipBlocked = tip.kind !== "green";
-        if (openRollbacks > 0 || tipBlocked) {
+        mergeMode = shipGateMergeMode({
+          tipKind: tip.kind,
+          openRollbacks,
+        });
+        if (mergeMode !== "all") {
           const reason =
             openRollbacks > 0
               ? "open_ship_rollback"
@@ -224,6 +232,7 @@ export async function runMaintainerSchedulerTick(
           log.info("auto-merge halted — ship gate", {
             projectId: tick.projectId,
             reason,
+            mergeMode,
             openRollbacks,
             tipKind: tip.kind,
             headSha: head?.sha?.slice(0, 8),
@@ -238,6 +247,7 @@ export async function runMaintainerSchedulerTick(
               meta: {
                 projectId: tick.projectId,
                 reason,
+                mergeMode,
                 openRollbacks,
                 tipKind: tip.kind,
                 headSha: head?.sha ?? null,
@@ -247,7 +257,7 @@ export async function runMaintainerSchedulerTick(
                     ? "Merge or close the open ship-rollback PR, then fix default-branch CI"
                     : tip.kind === "pending"
                       ? "Wait for default-branch CI to finish green before auto-merge resumes"
-                      : "Fix default-branch CI before Coppergate auto-merge resumes",
+                      : "Product merges halted; `[ship-gate]` heal PRs still auto-merge until tip is green",
               },
             });
           }
@@ -275,7 +285,9 @@ export async function runMaintainerSchedulerTick(
               });
             }
           }
-          continue;
+          if (mergeMode === "halt") {
+            continue;
+          }
         }
       } catch (err) {
         log.warn("ship gate check failed — skipping auto-merge this tick", {
@@ -286,35 +298,48 @@ export async function runMaintainerSchedulerTick(
       }
     }
 
-    try {
-      const stale = await healStaleReviewsOrEmitConflict(db, log, {
-        workspaceId: tick.workspaceId,
-        projectId: tick.projectId,
-        owner,
-        repo: name,
-        token,
-        actor,
-      });
-      if (
-        stale.conflictSignals ||
-        stale.deliveryHeals ||
-        stale.replanned
-      ) {
-        log.info("stale review heal", {
+    if (mergeMode === "all") {
+      try {
+        const stale = await healStaleReviewsOrEmitConflict(db, log, {
+          workspaceId: tick.workspaceId,
           projectId: tick.projectId,
-          conflictSignals: stale.conflictSignals,
-          deliveryHeals: stale.deliveryHeals,
-          replanned: stale.replanned,
+          owner,
+          repo: name,
+          token,
+          actor,
+        });
+        if (
+          stale.conflictSignals ||
+          stale.deliveryHeals ||
+          stale.replanned
+        ) {
+          log.info("stale review heal", {
+            projectId: tick.projectId,
+            conflictSignals: stale.conflictSignals,
+            deliveryHeals: stale.deliveryHeals,
+            replanned: stale.replanned,
+          });
+        }
+      } catch (err) {
+        log.warn("stale review heal failed", {
+          projectId: tick.projectId,
+          error: err instanceof Error ? err.message : String(err),
         });
       }
-    } catch (err) {
-      log.warn("stale review heal failed", {
-        projectId: tick.projectId,
-        error: err instanceof Error ? err.message : String(err),
-      });
     }
 
-    const candidates = await listAutoMergeCandidates(db, tick.projectId);
+    const allCandidates = await listAutoMergeCandidates(db, tick.projectId);
+    const candidates =
+      mergeMode === "heal_only"
+        ? allCandidates.filter((c) => isShipGateHealTitle(c.task.title))
+        : allCandidates;
+    if (mergeMode === "heal_only") {
+      log.info("ship-gate heal-only merge pass", {
+        projectId: tick.projectId,
+        healCandidates: candidates.length,
+        skippedProduct: allCandidates.length - candidates.length,
+      });
+    }
     const mergedTitles: string[] = [];
 
     for (const c of candidates) {
@@ -349,6 +374,7 @@ export async function runMaintainerSchedulerTick(
             message: result.message,
             maintainer: true,
             blocked,
+            shipGateHealOnly: mergeMode === "heal_only",
             cta: blocked
               ? "Fix GitHub branch protection / CODEOWNERS so the Coppergate App can merge, then clear merge.blocked"
               : undefined,
@@ -356,7 +382,9 @@ export async function runMaintainerSchedulerTick(
         });
         if (result.merged) {
           merged += 1;
-          mergedTitles.push(c.task.title);
+          if (mergeMode === "all") {
+            mergedTitles.push(c.task.title);
+          }
           try {
             await writeArchitectureTaskDone(log, {
               token,

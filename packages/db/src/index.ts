@@ -411,8 +411,10 @@ export {
   ensureShipGateHealTask,
   isShipGateHealTitle,
   openTaskCountsAsBusyForBacklog,
+  shipGateMergeMode,
   shouldRequestChangesForStaleCiTimeoutReview,
   type EnsureShipGateHealResult,
+  type ShipGateMergeMode,
 } from "./ship-gate-heal.js";
 export {
   SHIP_RECEIPT_KIND,
