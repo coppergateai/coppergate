@@ -582,15 +582,26 @@ export {
 export {
   getRunCiFitness,
   ingestCiEvidence,
+  listRunCiCheckHistory,
   listRunCiChecks,
   resolveRequiredCheckNames,
   runCiAcceptReady,
   runHasBlockingCi,
   scoreCiChecks,
+  type CiCheckScore,
   type CiEvidenceInput,
   type RunCiCheckSummary,
   type RunCiFitness,
 } from "./ci-evidence.js";
+export {
+  CI_WAITING_COPY,
+  classifyCiWaiting,
+  detectRequiredCheckFlake,
+  missingRequiredCheckNames,
+  waitingCiTimeoutMessage,
+  type CiCheckHistoryEntry,
+  type CiWaitingKind,
+} from "./ci-waiting-honesty.js";
 export {
   buildDeliveryCheckpoint,
   buildDeliveryReport,

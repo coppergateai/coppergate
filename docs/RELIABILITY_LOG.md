@@ -114,6 +114,7 @@ Date: 2026-10-24
 - `runs.reaper-policy.test.ts` — reclaim parse + WAITING_CI timeout env
 - `runs.claim.test.ts` — soft-cancel reaper → CANCELLED (needs `DATABASE_URL`)
 - `ci-evidence.score.test.ts` — required-missing helpers ≠ accept-ready
+- `ci-waiting-honesty.test.ts` — AG-017 required-missing vs flake copy + timeout messages
 - `ci-evidence.test.ts` — WAITING_CI status alone not accept-ready (needs `DATABASE_URL`)
 - `budgets.test.ts` — llm_tokens once-per-runId (needs `DATABASE_URL`)
 - DB claim/execute suites need `DATABASE_URL`
