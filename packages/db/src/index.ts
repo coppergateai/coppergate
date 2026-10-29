@@ -499,6 +499,7 @@ export {
   clearMergeBlockedForProject,
   DEFAULT_ARCHITECTURE_PATHS,
   fetchArchitectureBacklogMarkdown,
+  fetchArchitectureBacklogMarkdownResult,
   listInFlightArchitectureIds,
   requeueOrphanQueuedTasks,
   shouldReplanVision,
