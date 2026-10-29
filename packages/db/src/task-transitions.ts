@@ -23,6 +23,7 @@ import {
   resolveWorkspacePlanLimits,
 } from "./plan-policy.js";
 import { enqueueAgentRun, listRunsForTask } from "./runs.js";
+import { selectAutoAcceptRun } from "./run-selection.js";
 import { fetchArchitectureBacklogMarkdown } from "./architecture-program-fetch.js";
 import { persistShipReceipt } from "./ship-receipt.js";
 import { auditOppVerifyAfterAccept } from "./ship-receipt-opp.js";
@@ -677,33 +678,41 @@ export async function decideTaskReview(
 
   if (input.decision === "accept") {
     const runs = await listRunsForTask(db, input.workspaceId, task.id);
-    const latest = runs[0];
-    if (latest) {
-      if (latest.status === "WAITING_CI") {
-        throw new TaskTransitionError(
-          "policy",
-          "Cannot accept: latest run is still WAITING_CI",
-        );
-      }
-      const fitness = await getRunCiFitness(db, latest.id);
-      if (fitness.blocking || latest.errorCode === "ci_failed") {
-        throw new TaskTransitionError(
-          "policy",
-          "Cannot accept: CI checks failed on the latest run",
-        );
-      }
-      if (fitness.awaitingLive && !fitness.passed) {
-        throw new TaskTransitionError(
-          "policy",
-          "Cannot accept: awaiting live CI evidence on the latest run",
-        );
-      }
-      if (!fitness.acceptReady) {
-        throw new TaskTransitionError(
-          "policy",
-          "Cannot accept: CI fitness is not accept-ready",
-        );
-      }
+    // Prefer tournament WINNER (or same-PR fan-out) over newest-created run —
+    // a later WAITING_CI peer must not block Accept of a green winner (F13).
+    const selected = selectAutoAcceptRun(runs);
+    if (!selected) {
+      throw new TaskTransitionError(
+        "policy",
+        runs.length === 0
+          ? "Cannot accept: no agent run for this task"
+          : "Cannot accept: no eligible delivery run (tournament needs a WINNER)",
+      );
+    }
+    if (selected.status === "WAITING_CI") {
+      throw new TaskTransitionError(
+        "policy",
+        "Cannot accept: delivery run is still WAITING_CI",
+      );
+    }
+    const fitness = await getRunCiFitness(db, selected.id);
+    if (fitness.blocking || selected.errorCode === "ci_failed") {
+      throw new TaskTransitionError(
+        "policy",
+        "Cannot accept: CI checks failed on the delivery run",
+      );
+    }
+    if (fitness.awaitingLive && !fitness.passed) {
+      throw new TaskTransitionError(
+        "policy",
+        "Cannot accept: awaiting live CI evidence on the delivery run",
+      );
+    }
+    if (!fitness.acceptReady) {
+      throw new TaskTransitionError(
+        "policy",
+        "Cannot accept: CI fitness is not accept-ready",
+      );
     }
 
     const accepted = await applyTaskTransition(db, {
@@ -728,7 +737,7 @@ export async function decideTaskReview(
       action: "task.review.accept",
       targetType: "task",
       targetId: task.id,
-      meta: { note: input.note ?? null, runId: latest?.id ?? null },
+      meta: { note: input.note ?? null, runId: selected.id },
     });
 
     try {
@@ -736,7 +745,7 @@ export async function decideTaskReview(
         workspaceId: input.workspaceId,
         task: done.task,
         actor: input.actor,
-        runId: latest?.id ?? null,
+        runId: selected.id,
       });
       await recordAuditEvent(db, {
         workspaceId: input.workspaceId,
@@ -807,7 +816,7 @@ export async function decideTaskReview(
       await resolvePendingApproval(db, {
         workspaceId: input.workspaceId,
         targetType: "run_review",
-        targetId: latest?.id ?? task.id,
+        targetId: selected.id,
         decision: "approved",
         actor: input.actor,
         decisionNote: input.note ?? "accepted",
