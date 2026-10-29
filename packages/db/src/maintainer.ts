@@ -68,10 +68,7 @@ import {
   pickNextArchitectureTask,
 } from "./architecture-backlog.js";
 import { getProjectForWorkspace } from "./projects.js";
-import {
-  openTaskCountsAsBusyForBacklog,
-  shouldRequestChangesForStaleCiTimeoutReview,
-} from "./ship-gate-heal-policy.js";
+import { openTaskCountsAsBusyForBacklog } from "./ship-gate-heal-policy.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
@@ -250,7 +247,14 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   designScoutAutoImportMax: 0,
   shipRollbackOnCiFail: true,
   coordinatedMultiRepo: false,
-  allowedSignalProviders: ["*", "ci_failure", "sentry", "dependabot", "codeql"],
+  allowedSignalProviders: [
+    "*",
+    "ci_failure",
+    "merge_conflict",
+    "sentry",
+    "dependabot",
+    "codeql",
+  ],
   pathAllowlist: [],
   /** Self-pilot default fan-out width (1). Raise to 2 for Community duel. */
   maxTournamentN: 1,
@@ -1698,88 +1702,52 @@ export async function tickMaintainerProject(
           continue;
         }
         const runs = await listRunsForTask(db, input.workspaceId, task.id);
-        const hitTimeout = runs.some(
-          (r) => r.errorCode === "waiting_ci_timeout",
-        );
         const candidate = selectAutoAcceptRun(runs);
-        if (candidate) {
-          const fitness = await getRunCiFitness(db, candidate.id);
-          if (fitness.acceptReady) {
-            try {
-              if (
-                task.status === "WAITING_CI" &&
-                candidate.status === "REVIEW_REQUIRED"
-              ) {
-                await applyTaskTransition(db, {
-                  workspaceId: input.workspaceId,
-                  taskId: task.id,
-                  toStatus: "REVIEW_REQUIRED",
-                  actor,
-                  reason: "run accept-ready — sync task out of WAITING_CI",
-                });
-              }
-              await decideTaskReview(db, {
-                workspaceId: input.workspaceId,
-                taskId: task.id,
-                actor,
-                decision: "accept",
-                note: "maintainer auto-accept (winner + CI green)",
-              });
-              result.autoAccepted += 1;
-              result.autoMergedCandidates.push({
-                taskId: task.id,
-                prNumber: candidate.prNumber ?? null,
-                runId: candidate.id,
-              });
-              await recordMaintainerEvent(db, {
-                workspaceId: input.workspaceId,
-                projectId: input.projectId,
-                kind: "auto_accept",
-                payload: {
-                  taskId: task.id,
-                  runId: candidate.id,
-                  prNumber: candidate.prNumber,
-                  tournamentResult: candidate.tournamentResult,
-                },
-              });
-            } catch (err) {
-              result.errors.push(
-                `auto_accept ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
-              );
-            }
-            continue;
-          }
-        }
+        if (!candidate) continue;
+        const fitness = await getRunCiFitness(db, candidate.id);
+        if (!fitness.acceptReady) continue;
 
-        // AG-031: waiting_ci_timeout REVIEW that never became accept-ready
-        // must not freeze the unattended loop — request changes after grace.
-        if (
-          shouldRequestChangesForStaleCiTimeoutReview({
-            taskStatus: task.status,
-            acceptReady: false,
-            hasWaitingCiTimeout: hitTimeout,
-            taskUpdatedAt: task.updatedAt,
-          })
-        ) {
-          try {
-            await decideTaskReview(db, {
+        try {
+          if (
+            task.status === "WAITING_CI" &&
+            candidate.status === "REVIEW_REQUIRED"
+          ) {
+            await applyTaskTransition(db, {
               workspaceId: input.workspaceId,
               taskId: task.id,
+              toStatus: "REVIEW_REQUIRED",
               actor,
-              decision: "request_changes",
-              note: "unattended: waiting_ci_timeout without accept-ready — free board for ship-gate / replan",
+              reason: "run accept-ready — sync task out of WAITING_CI",
             });
-            await recordMaintainerEvent(db, {
-              workspaceId: input.workspaceId,
-              projectId: input.projectId,
-              kind: "stale_ci_timeout_replan",
-              payload: { taskId: task.id, runId: candidate?.id ?? null },
-            });
-          } catch (err) {
-            result.errors.push(
-              `stale_review ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
-            );
           }
+          await decideTaskReview(db, {
+            workspaceId: input.workspaceId,
+            taskId: task.id,
+            actor,
+            decision: "accept",
+            note: "maintainer auto-accept (winner + CI green)",
+          });
+          result.autoAccepted += 1;
+          result.autoMergedCandidates.push({
+            taskId: task.id,
+            prNumber: candidate.prNumber ?? null,
+            runId: candidate.id,
+          });
+          await recordMaintainerEvent(db, {
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            kind: "auto_accept",
+            payload: {
+              taskId: task.id,
+              runId: candidate.id,
+              prNumber: candidate.prNumber,
+              tournamentResult: candidate.tournamentResult,
+            },
+          });
+        } catch (err) {
+          result.errors.push(
+            `auto_accept ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
     } catch (err) {

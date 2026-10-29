@@ -20,6 +20,7 @@ Providers shipped:
 | `fake` | N |
 | `sonar` | O0 |
 | `ci_failure` | R0 |
+| `merge_conflict` | AG-032 — dirty delivery PR → rebase same head (not NEEDS_REPLAN) |
 | `circleci` / `buildkite` / `jenkins` / `bitbucket` | R1 / W (→ same CI envelope) |
 | `jira` / `linear` / `azure_boards` / `asana` / `clickup` | Q0–Q1 |
 | `sentry` / `datadog` / `bugsnag` | P |

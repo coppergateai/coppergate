@@ -59,11 +59,18 @@ export async function listOpenPulls(input: {
   }));
 }
 
-/** Light PR state for WAITING_CI recovery (merged vs closed-unmerged). */
+/** Light PR state for WAITING_CI recovery + merge-conflict heal (AG-032). */
 export type GithubPullMergeState = {
   number: number;
   state: string;
   merged: boolean;
+  /** null while GitHub is still computing mergeability. */
+  mergeable: boolean | null;
+  /** clean | dirty | unstable | blocked | unknown | … */
+  mergeableState: string | null;
+  headRef: string | null;
+  headSha: string | null;
+  baseRef: string | null;
 };
 
 export async function getPullRequestMergeState(input: {
@@ -90,11 +97,21 @@ export async function getPullRequestMergeState(input: {
     number: number;
     state: string;
     merged?: boolean;
+    mergeable?: boolean | null;
+    mergeable_state?: string | null;
+    head?: { ref?: string; sha?: string };
+    base?: { ref?: string };
   };
   return {
     number: pr.number,
     state: pr.state,
     merged: pr.merged === true,
+    mergeable: typeof pr.mergeable === "boolean" ? pr.mergeable : null,
+    mergeableState:
+      typeof pr.mergeable_state === "string" ? pr.mergeable_state : null,
+    headRef: pr.head?.ref ?? null,
+    headSha: pr.head?.sha ?? null,
+    baseRef: pr.base?.ref ?? null,
   };
 }
 

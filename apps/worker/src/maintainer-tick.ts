@@ -3,10 +3,12 @@
  */
 import {
   buildMaintainerReleaseTag,
+  ensureMergeConflictSignal,
   ensureShipGateHealTask,
   getInstallationForWorkspace,
   getProjectForWorkspace,
   isMergeProtectionBlock,
+  isTransientNotMergeable,
   listAutoMergeCandidates,
   listMaintainerProjects,
   markAutoMerged,
@@ -14,6 +16,7 @@ import {
   reconcileStaleEstimateReserves,
   recordAuditEvent,
   recordMaintainerReleaseOutcome,
+  shouldEmitMergeConflictInsteadOfReplan,
   shouldRunMaintainerRelease,
   tickMaintainerProject,
   type Database,
@@ -24,6 +27,7 @@ import {
   countOpenShipRollbackPrs,
   buildMaintainerReleaseRequest,
   createGithubRelease,
+  getPullRequestMergeState,
   getRepoDefaultBranchHead,
   mergePullRequest,
 } from "@coppergate/github";
@@ -33,6 +37,7 @@ import { runCommunityScoutForProject } from "./community-scout-tick.js";
 import { runDesignScoutForProject } from "./design-scout-tick.js";
 import { refreshPendingCiEvidence } from "./refresh-ci-evidence.js";
 import { maybeShipRollbackForProject } from "./ship-rollback.js";
+import { healStaleReviewsOrEmitConflict } from "./stale-review-heal.js";
 
 export type ResolveInstallationToken = (
   db: Database,
@@ -281,6 +286,29 @@ export async function runMaintainerSchedulerTick(
       }
     }
 
+    try {
+      const stale = await healStaleReviewsOrEmitConflict(db, log, {
+        workspaceId: tick.workspaceId,
+        projectId: tick.projectId,
+        owner,
+        repo: name,
+        token,
+        actor,
+      });
+      if (stale.conflictSignals || stale.replanned) {
+        log.info("stale review heal", {
+          projectId: tick.projectId,
+          conflictSignals: stale.conflictSignals,
+          replanned: stale.replanned,
+        });
+      }
+    } catch (err) {
+      log.warn("stale review heal failed", {
+        projectId: tick.projectId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     const candidates = await listAutoMergeCandidates(db, tick.projectId);
     const mergedTitles: string[] = [];
 
@@ -342,6 +370,48 @@ export async function runMaintainerSchedulerTick(
             prNumber: c.prNumber,
             message: result.message.slice(0, 160),
           });
+        } else if (isTransientNotMergeable(result.message)) {
+          try {
+            const pr = await getPullRequestMergeState({
+              token,
+              owner,
+              repo: name,
+              prNumber: c.prNumber,
+            });
+            if (
+              shouldEmitMergeConflictInsteadOfReplan({
+                prOpen: pr.state === "open" && !pr.merged,
+                merged: pr.merged,
+                mergeable: pr.mergeable,
+                mergeableState: pr.mergeableState,
+              })
+            ) {
+              const signal = await ensureMergeConflictSignal(db, {
+                workspaceId: tick.workspaceId,
+                projectId: tick.projectId,
+                actor,
+                owner,
+                repo: name,
+                prNumber: c.prNumber,
+                headRef: pr.headRef,
+                headSha: pr.headSha,
+                baseRef: pr.baseRef,
+                parentTitle: c.task.title,
+              });
+              log.info("merge_conflict signal after not-mergeable", {
+                projectId: tick.projectId,
+                prNumber: c.prNumber,
+                ingested: signal.ingested,
+                duplicate: signal.duplicate,
+                armed: signal.armed,
+              });
+            }
+          } catch (err) {
+            log.warn("merge_conflict emit after not-mergeable failed", {
+              prNumber: c.prNumber,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
         }
       } catch (err) {
         log.warn("maintainer auto-merge failed", {

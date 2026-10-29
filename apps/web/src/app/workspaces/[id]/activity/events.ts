@@ -599,6 +599,11 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     outcome: "review",
     summary: (m) => str(m, "title") ?? str(m, "headSha"),
   },
+  "review.stale_ci_timeout_replan": {
+    title: "Stale CI timeout → replan",
+    category: "decision",
+    outcome: "review",
+  },
   "fitness.score": {
     title: "Fitness scored",
     category: "decision",
