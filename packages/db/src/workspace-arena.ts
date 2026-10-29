@@ -10,6 +10,10 @@ import { startProjectArena, stopProjectArena } from "./maintainer.js";
 import { listAgentProfiles } from "./profiles.js";
 import { listProjectsForWorkspace } from "./projects.js";
 import { getRunCiFitness } from "./ci-evidence.js";
+import {
+  docsDriftAttentionForRuns,
+  type DocsDriftOptionalAttention,
+} from "./docs-drift-attention.js";
 import { latestRunProgressHints, mergeRunActivityLine } from "./run-event-hints.js";
 import {
   agentRuns,
@@ -37,6 +41,8 @@ export type WorkspaceArenaContenderRun = {
   updatedAt: string;
   /** Latest coding-path / failover honesty from run progress events (AG-013). */
   activityHint: string | null;
+  /** AG-022 — advisory docs drift (does not inflate needsAttention). */
+  optionalAttention: DocsDriftOptionalAttention | null;
 };
 
 /** Parent task closed — leftover FAILED/REVIEW runs must not scream Needs attention. */
@@ -126,6 +132,8 @@ export type WorkspaceArenaSummary = {
   awaitingCi: number;
   needsAttention: number;
   idle: number;
+  /** AG-022 — docs drift advisories on live deliveries. */
+  optionalAttention: number;
 };
 
 export type WorkspaceArenaSnapshot = {
@@ -220,6 +228,7 @@ function deriveSummary(
     awaitingCi: 0,
     needsAttention: 0,
     idle: 0,
+    optionalAttention: 0,
   };
   for (const lane of lanes) {
     const arenaLive = isLiveArenaStatus(lane.arenaStatus);
@@ -232,6 +241,7 @@ function deriveSummary(
         { arenaLive, contenderStatus: c.status },
       );
       summary[bucket] += 1;
+      if (c.latestRun?.optionalAttention) summary.optionalAttention += 1;
     }
   }
   return summary;
@@ -306,16 +316,43 @@ async function latestRunsByContender(
       tournamentResult: row.tournamentResult ?? null,
       updatedAt: row.updatedAt.toISOString(),
       activityHint: null,
+      optionalAttention: null,
     });
   }
 
   const runIds = [...new Set([...map.values()].map((r) => r.id))];
   const hints = await latestRunProgressHints(db, runIds);
+  const driftByRun = await docsDriftAttentionForRuns(db, workspaceId, runIds);
   for (const entry of map.values()) {
     const hint = hints.get(entry.id);
+    const driftFromArtifact = driftByRun.get(entry.id) ?? null;
+    const driftFromProgress =
+      hint?.optionalAttentionLine != null
+        ? ({
+            kind: "docs_drift" as const,
+            message: hint.optionalAttentionLine,
+            apiPaths: [],
+          } satisfies DocsDriftOptionalAttention)
+        : null;
+    entry.optionalAttention = driftFromProgress ?? driftFromArtifact;
+
+    const runtimeBucket = classifyContenderRuntime(entry, 1, {
+      arenaLive: true,
+    });
     if (hint) {
-      const line = mergeRunActivityLine("", hint, "running");
-      entry.activityHint = line || hint.codingPathLine || hint.failoverLine;
+      const line = mergeRunActivityLine("", hint, runtimeBucket);
+      entry.activityHint =
+        line ||
+        hint.codingPathLine ||
+        hint.failoverLine ||
+        hint.optionalAttentionLine;
+    }
+    if (
+      !entry.activityHint &&
+      entry.optionalAttention &&
+      (runtimeBucket === "awaitingCi" || runtimeBucket === "idle")
+    ) {
+      entry.activityHint = entry.optionalAttention.message;
     }
     if (
       (entry.status === "WAITING_CI" || entry.status === "VALIDATING") &&
