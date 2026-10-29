@@ -1049,7 +1049,7 @@ export const maintainerEvents = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    /** tick | auto_accept | auto_merge | release | self_improve | meta_tournament | replan | triage | community | design_scout */
+    /** tick | auto_accept | auto_merge | release | self_improve | meta_tournament | replan | triage | community | design_scout | bug_scout */
     kind: text("kind").notNull(),
     payload: text("payload").notNull().default("{}"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -1282,6 +1282,8 @@ export type MaintainerEventKind =
   | "replan"
   | "triage"
   | "community"
+  | "design_scout"
+  | "bug_scout"
   | "period_roll";
 
 export type ArenaStatus = "ARMED" | "RUNNING" | "KILLED" | "PAUSED";

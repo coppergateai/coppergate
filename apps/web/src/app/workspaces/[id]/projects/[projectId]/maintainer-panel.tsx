@@ -35,6 +35,10 @@ type Policy = {
   communityScout?: boolean;
   communityScoutIntervalHours?: number;
   communityScoutMaxPerRun?: number;
+  bugScout?: boolean;
+  bugScoutIntervalHours?: number;
+  bugScoutMaxPerRun?: number;
+  bugScoutLookbackHours?: number;
   autoQueueReplanTasks?: boolean;
   releaseTagStyle?: string;
   maxTournamentN?: number;
@@ -459,7 +463,32 @@ export function MaintainerPanel({
                   : `Every ${policy.communityScoutIntervalHours ?? 8}h · max ${policy.communityScoutMaxPerRun ?? 2}/run`}
               </dd>
             </div>
+            <div>
+              <dt>Bug scout</dt>
+              <dd>
+                {policy.bugScout
+                  ? `Every ${policy.bugScoutIntervalHours ?? 12}h · max ${policy.bugScoutMaxPerRun ?? 2}/run · lookback ${policy.bugScoutLookbackHours ?? 48}h`
+                  : "Off"}
+              </dd>
+            </div>
           </dl>
+          {isOwner ? (
+            <div className={styles.btnRow}>
+              <label className={styles.field}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(policy.bugScout)}
+                  disabled={pending}
+                  onChange={(e) => {
+                    void post("update", {
+                      policy: { bugScout: e.target.checked },
+                    });
+                  }}
+                />{" "}
+                Bug scout → Open Program rows (AG-037)
+              </label>
+            </div>
+          ) : null}
         </details>
       ) : null}
 

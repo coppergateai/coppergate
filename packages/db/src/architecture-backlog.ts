@@ -265,6 +265,113 @@ export function extractArchitectureIdFromTitle(
 }
 
 /**
+ * Next free program ID for `prefix` (default AG), zero-padded to at least 3 digits.
+ * Scans all `PREFIX-NN` occurrences in the markdown (Open and Done).
+ */
+export function nextArchitectureId(
+  markdown: string,
+  prefix = "AG",
+): string {
+  const p = prefix.trim().toUpperCase() || "AG";
+  const re = new RegExp(`\\b${p}-(\\d{2,4})\\b`, "gi");
+  let max = 0;
+  let width = 3;
+  for (const m of markdown.matchAll(re)) {
+    const n = Number.parseInt(m[1]!, 10);
+    if (!Number.isFinite(n)) continue;
+    if (n > max) {
+      max = n;
+      width = Math.max(3, m[1]!.length);
+    }
+  }
+  const next = max + 1;
+  return `${p}-${String(next).padStart(width, "0")}`;
+}
+
+export type OpenProgramRowAppend = {
+  id: string;
+  title: string;
+  notes: string;
+};
+
+const BUG_SCOUT_SECTION = "## Bug scout (continuous)";
+
+/**
+ * Append Open table rows under `## Bug scout (continuous)` (creates section if missing).
+ */
+export function appendOpenProgramRows(
+  markdown: string,
+  rows: OpenProgramRowAppend[],
+  opts?: { sectionHeading?: string },
+): { content: string; changed: boolean } {
+  if (rows.length === 0) return { content: markdown, changed: false };
+
+  const heading = opts?.sectionHeading?.trim() || BUG_SCOUT_SECTION;
+  const tableLines = rows.map(
+    (r) =>
+      `| Open | ${r.id} | ${r.title.replace(/\|/g, "/").slice(0, 120)} | ${r.notes.replace(/\|/g, "/").slice(0, 400)} |`,
+  );
+
+  const lines = markdown.split(/\r?\n/);
+  const headingIdx = lines.findIndex((l) => l.trim() === heading);
+  if (headingIdx < 0) {
+    const block = [
+      "",
+      heading,
+      "",
+      "| Status | ID | Title | Notes |",
+      "| --- | --- | --- | --- |",
+      ...tableLines,
+      "",
+    ];
+    const content = `${markdown.replace(/\s*$/, "")}\n${block.join("\n")}`;
+    return { content, changed: true };
+  }
+
+  // Find end of existing table under the heading (or insert after heading).
+  let insertAt = headingIdx + 1;
+  let sawTable = false;
+  for (let i = headingIdx + 1; i < lines.length; i++) {
+    const t = lines[i]!.trim();
+    if (/^#{2,3}\s+/.test(t)) {
+      insertAt = i;
+      break;
+    }
+    if (/^\|\s*Status\s*\|/i.test(t) || /^\|\s*:?-{3,}/.test(t)) {
+      sawTable = true;
+      insertAt = i + 1;
+      continue;
+    }
+    if (sawTable && t.startsWith("|")) {
+      insertAt = i + 1;
+      continue;
+    }
+    if (sawTable && t === "") {
+      insertAt = i;
+      break;
+    }
+    if (!sawTable && t === "") {
+      insertAt = i + 1;
+      continue;
+    }
+    if (!sawTable) {
+      insertAt = i;
+      break;
+    }
+  }
+
+  const toInsert = sawTable
+    ? tableLines
+    : [
+        "| Status | ID | Title | Notes |",
+        "| --- | --- | --- | --- |",
+        ...tableLines,
+      ];
+  const out = [...lines.slice(0, insertAt), ...toInsert, ...lines.slice(insertAt)];
+  return { content: out.join("\n"), changed: true };
+}
+
+/**
  * Flip Open → Done for a table/checklist row containing the architecture ID.
  * Returns unchanged content when the ID is absent.
  */

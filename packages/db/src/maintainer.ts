@@ -208,6 +208,15 @@ export type MaintainerPolicy = {
    * After design scout creates issues, auto-import up to N (0 = create-only).
    */
   designScoutAutoImportMax: number;
+  /**
+   * Periodically scan FAILED runs + CI log evidence and append Open rows
+   * to the bound Open Program markdown (AG-037).
+   */
+  bugScout: boolean;
+  bugScoutIntervalHours: number;
+  bugScoutMaxPerRun: number;
+  /** How far back to scan FAILED runs for bug evidence. */
+  bugScoutLookbackHours: number;
   /** When true, open a revert PR if a recent auto-merge's checks go red. */
   shipRollbackOnCiFail: boolean;
   /** When true, enable multi-repo + coordinated PRs for product stacks. */
@@ -253,6 +262,10 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   designScoutMaxPerRun: 2,
   designScoutBaseUrl: null,
   designScoutAutoImportMax: 0,
+  bugScout: false,
+  bugScoutIntervalHours: 12,
+  bugScoutMaxPerRun: 2,
+  bugScoutLookbackHours: 48,
   shipRollbackOnCiFail: true,
   coordinatedMultiRepo: false,
   allowedSignalProviders: [
@@ -432,6 +445,24 @@ export function parseMaintainerPolicy(
         v.designScoutAutoImportMax >= 0
           ? Math.min(5, Math.floor(v.designScoutAutoImportMax))
           : DEFAULT_MAINTAINER_POLICY.designScoutAutoImportMax,
+      bugScout:
+        typeof v.bugScout === "boolean"
+          ? v.bugScout
+          : DEFAULT_MAINTAINER_POLICY.bugScout,
+      bugScoutIntervalHours:
+        typeof v.bugScoutIntervalHours === "number" &&
+        v.bugScoutIntervalHours >= 1
+          ? Math.min(168, Math.floor(v.bugScoutIntervalHours))
+          : DEFAULT_MAINTAINER_POLICY.bugScoutIntervalHours,
+      bugScoutMaxPerRun:
+        typeof v.bugScoutMaxPerRun === "number" && v.bugScoutMaxPerRun >= 0
+          ? Math.min(5, Math.floor(v.bugScoutMaxPerRun))
+          : DEFAULT_MAINTAINER_POLICY.bugScoutMaxPerRun,
+      bugScoutLookbackHours:
+        typeof v.bugScoutLookbackHours === "number" &&
+        v.bugScoutLookbackHours >= 1
+          ? Math.min(168, Math.floor(v.bugScoutLookbackHours))
+          : DEFAULT_MAINTAINER_POLICY.bugScoutLookbackHours,
       shipRollbackOnCiFail:
         typeof v.shipRollbackOnCiFail === "boolean"
           ? v.shipRollbackOnCiFail

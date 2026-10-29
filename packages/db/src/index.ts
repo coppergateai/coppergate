@@ -393,16 +393,38 @@ export {
   type WorkspaceSpendSummary,
 } from "./budgets.js";
 export {
+  appendOpenProgramRows,
   architectureIdsFromTitles,
   parseArchitectureOpenTasks,
   parseArchitectureProgramRows,
   extractArchitectureIdFromTitle,
   isToyArchitectureTitle,
   markArchitectureIdDoneInMarkdown,
+  nextArchitectureId,
   pickNextArchitectureTask,
   type ArchitectureOpenTask,
   type ArchitectureProgramRow,
+  type OpenProgramRowAppend,
 } from "./architecture-backlog.js";
+export {
+  BUG_SCOUT_NOISE_ERROR_CODES,
+  BUG_SCOUT_SECTION_HEADING,
+  appendBugScoutOpenRowsToMarkdown,
+  bugScoutFingerprint,
+  collectBugEvidenceFromCiLogs,
+  collectBugEvidenceFromRuns,
+  extractBugScoutFingerprints,
+  isBugScoutDue,
+  isBugScoutNoise,
+  listRecentFailedRunsForBugScout,
+  proposeBugOpenRows,
+  recordBugScoutEvent,
+  type BugEvidence,
+  type BugOpenCandidate,
+  type BugRunEvidenceInput,
+  type BugScoutFailedRunRow,
+  type CiLogEvidenceInput,
+} from "./bug-scout.js";
 export {
   applyOpenProgramRuntimeStatus,
   getWorkspaceOpenProgramBacklog,

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  appendOpenProgramRows,
   architectureIdsFromTitles,
   extractArchitectureIdFromTitle,
   markArchitectureIdDoneInMarkdown,
+  nextArchitectureId,
   parseArchitectureOpenTasks,
   parseArchitectureProgramRows,
   pickNextArchitectureTask,
@@ -86,5 +88,15 @@ describe("architecture-backlog", () => {
     assert.equal(changed, true);
     assert.match(content, /\|\s*Done\s*\|/);
     assert.equal(extractArchitectureIdFromTitle("P-007: Refresh models"), "P-007");
+  });
+
+  it("nextArchitectureId and appendOpenProgramRows", () => {
+    assert.equal(nextArchitectureId("| Open | AG-009 | x | y |", "AG"), "AG-010");
+    const { content, changed } = appendOpenProgramRows("# Doc\n", [
+      { id: "AG-010", title: "Bug fix", notes: "evidence" },
+    ]);
+    assert.equal(changed, true);
+    assert.match(content, /## Bug scout \(continuous\)/);
+    assert.match(content, /\| Open \| AG-010 \| Bug fix \| evidence \|/);
   });
 });
