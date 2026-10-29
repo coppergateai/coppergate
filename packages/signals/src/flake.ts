@@ -12,10 +12,10 @@ export type FlakeObservation = {
 
 export function detectFlakePattern(
   history: FlakeObservation[],
-  opts?: { windowMs?: number; name?: string },
+  opts?: { windowMs?: number; name?: string; nowMs?: number },
 ): { flaky: boolean; reason?: string } {
   const windowMs = opts?.windowMs ?? 30 * 60_000;
-  const now = Date.now();
+  const now = opts?.nowMs ?? Date.now();
   const relevant = history
     .filter((h) => (!opts?.name || h.name === opts.name) && now - h.at <= windowMs)
     .sort((a, b) => a.at - b.at);
