@@ -436,6 +436,12 @@ export {
   type DesignShotMetrics,
 } from "./design-scout.js";
 export {
+  defaultContenderNWithinMaintainerPolicy,
+  maintainerContenderPinN,
+  MAINTAINER_TOURNAMENT_N_CAP,
+  peerSeatCountForSpawn,
+} from "./maintainer-contender-pin.js";
+export {
   DEFAULT_MAINTAINER_POLICY,
   DEFAULT_MONTHLY_BUDGET_MICROS,
   DEFAULT_PRODUCT_ALLOWED_PATHS,

@@ -6,7 +6,6 @@ import {
   ensureArenaForProject,
   ensurePeerContenderSeats,
   isContenderStrategy,
-  MIN_DUEL_CONTENDERS,
   type ContenderStrategy,
 } from "./arena.js";
 import {
@@ -14,6 +13,7 @@ import {
   strategiesForDuel,
   type PeerContenderStrategy,
 } from "./contender-peers.js";
+import { peerSeatCountForSpawn } from "./maintainer-contender-pin.js";
 import { getLlmByokById } from "./credentials.js";
 import {
   agentProfiles,
@@ -733,6 +733,8 @@ export async function applySpawnProfilesToArena(
     profileKeys: string[];
     /** Peer seat count; defaults to max(arena.defaultContenderN, MIN_DUEL). */
     seatCount?: number;
+    /** Maintainer maxTournamentN cap — replan must not drift above this (AG-018). */
+    policyMaxContenderN?: number;
     /** Explicit strategies for peer seats (meta duel). */
     strategies?: ContenderStrategy[];
     /**
@@ -758,23 +760,17 @@ export async function applySpawnProfilesToArena(
     ? preferredRaw
     : "balanced";
 
-  const requestedSeats = Math.max(
-    MIN_DUEL_CONTENDERS,
-    arenaDefaultN(input.seatCount),
-  );
   const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
-    defaultContenderN: requestedSeats,
-    contenderCount: requestedSeats,
   });
 
-  const seatCount = Math.max(
-    MIN_DUEL_CONTENDERS,
-    input.seatCount ??
-      Math.max(arena.defaultContenderN, MIN_DUEL_CONTENDERS),
-  );
+  const seatCount = peerSeatCountForSpawn({
+    seatCount: input.seatCount,
+    arenaDefaultContenderN: arena.defaultContenderN,
+    policyMaxContenderN: input.policyMaxContenderN,
+  });
   const strategies: ContenderStrategy[] =
     input.strategies && input.strategies.length > 0
       ? input.strategies.map((s) =>
@@ -805,11 +801,4 @@ export async function applySpawnProfilesToArena(
       projectId: input.projectId,
     },
   });
-}
-
-function arenaDefaultN(seatCount: number | undefined): number {
-  if (seatCount != null && Number.isFinite(seatCount) && seatCount >= 1) {
-    return Math.floor(seatCount);
-  }
-  return MIN_DUEL_CONTENDERS;
 }

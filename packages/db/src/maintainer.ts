@@ -68,6 +68,7 @@ import {
   pickNextArchitectureTask,
 } from "./architecture-backlog.js";
 import { getProjectForWorkspace } from "./projects.js";
+import { maintainerContenderPinN } from "./maintainer-contender-pin.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
@@ -697,7 +698,7 @@ export async function enableMaintainerMode(
     actor: input.actor,
   });
 
-  const duelN = Math.max(1, Math.min(3, policy.maxTournamentN));
+  const duelN = maintainerContenderPinN(policy.maxTournamentN);
   const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
@@ -988,7 +989,7 @@ export async function startProjectArena(
   // Peer seats only — FULL_ARENA_PROFILE_KEYS is catalog, not contender width.
   const rosterKeys = rosterKeysForAvailableBudget(Number.POSITIVE_INFINITY);
   const startPolicy = parseMaintainerPolicy(project.maintainerPolicyJson);
-  const duelN = Math.max(1, Math.min(3, startPolicy.maxTournamentN));
+  const duelN = maintainerContenderPinN(startPolicy.maxTournamentN);
   let { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
@@ -1004,6 +1005,7 @@ export async function startProjectArena(
       actor: input.actor,
       profileKeys: rosterKeys,
       seatCount: duelN,
+      policyMaxContenderN: duelN,
     });
   } catch {
     // spawn best-effort — tick continues
@@ -2122,23 +2124,39 @@ export async function maybeSelfImproveProfile(
         /* allow meta when spend unknown */
       }
       if (availableMicros >= LEAN_ROSTER_AVAILABLE_MICROS) {
+      const [projRow] = await db
+        .select({ maintainerPolicyJson: projects.maintainerPolicyJson })
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, input.projectId),
+            eq(projects.workspaceId, input.workspaceId),
+          ),
+        )
+        .limit(1);
+      const metaPinN = maintainerContenderPinN(
+        parseMaintainerPolicy(projRow?.maintainerPolicyJson).maxTournamentN,
+      );
+      const metaSeats = Math.min(2, metaPinN);
+      if (metaSeats >= 2) {
       await applySpawnProfilesToArena(db, {
         workspaceId: input.workspaceId,
         projectId: input.projectId,
         actor: input.actor,
         profileKeys: [base.key],
-        seatCount: 2,
+        seatCount: metaSeats,
         strategies: [championStrategy, flip],
+        policyMaxContenderN: metaPinN,
       });
       // Meta duel = champion vs strategy peer (N=2), not a solo pin.
       const arenaRow = await getArenaForProject(db, {
         workspaceId: input.workspaceId,
         projectId: input.projectId,
       });
-      if (arenaRow && arenaRow.defaultContenderN < 2) {
+      if (arenaRow && arenaRow.defaultContenderN !== metaSeats) {
         await db
           .update(arenas)
-          .set({ defaultContenderN: 2, updatedAt: new Date() })
+          .set({ defaultContenderN: metaSeats, updatedAt: new Date() })
           .where(eq(arenas.id, arenaRow.id));
       }
       changed = true;
@@ -2167,6 +2185,7 @@ export async function maybeSelfImproveProfile(
           applied: true,
         },
       });
+      }
       }
     }
   }
@@ -2426,9 +2445,8 @@ export async function runVisionReplan(
         ),
       )
       .limit(1);
-    const pinN = Math.max(
-      1,
-      Math.min(3, parseMaintainerPolicy(proj?.maintainerPolicyJson).maxTournamentN),
+    const pinN = maintainerContenderPinN(
+      parseMaintainerPolicy(proj?.maintainerPolicyJson).maxTournamentN,
     );
     await applySpawnProfilesToArena(db, {
       workspaceId: input.workspaceId,
@@ -2436,6 +2454,7 @@ export async function runVisionReplan(
       actor: input.actor,
       profileKeys: rosterKeysForAvailableBudget(Number.POSITIVE_INFINITY),
       seatCount: pinN,
+      policyMaxContenderN: pinN,
     });
     const arena = await getArenaForProject(db, {
       workspaceId: input.workspaceId,
