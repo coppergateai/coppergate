@@ -193,16 +193,21 @@ export function BacklogShell({
             title="No Open Program bound"
             body={
               initial.unboundProjectCount > 0
-                ? "Bind architectureRepo and architecturePaths on a project’s Configuration to load spendable backlog rows."
+                ? "Bind architectureRepo and architecturePaths on a project’s Configuration (Open Program bind) to load spendable backlog rows."
                 : "Create a project and bind an Open Program path to see backlog items here."
             }
             action={
-              <Link
-                href={`/workspaces/${workspaceId}/projects`}
-                className={styles.linkCta}
-              >
-                Open Projects →
-              </Link>
+              <span className={styles.linkCtaRow}>
+                <Link
+                  href={`/workspaces/${workspaceId}/projects`}
+                  className={styles.linkCta}
+                >
+                  Open Projects →
+                </Link>
+                <Link href="/docs/open-program-runtime" className={styles.linkCta}>
+                  Open Program docs →
+                </Link>
+              </span>
             }
           />
         </div>

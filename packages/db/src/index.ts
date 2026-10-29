@@ -654,6 +654,12 @@ export {
   DEFAULT_DELIVERY_SHARE_TTL_MS,
 } from "./share-reports.js";
 export {
+  createShipReceiptShareToken,
+  getPublicShipReceiptShare,
+  toPublicShipReceipt,
+  type PublicShipReceipt,
+} from "./ship-receipt-share.js";
+export {
   countAcceptedPrsForWorkspace,
   getProjectCostExplorer,
   getRetentionSnapshot,
