@@ -9,6 +9,7 @@
 
 ### Features
 
+- AG-031: Ship-gate tip-red self-heal — when auto-merge halts on `default_branch_ci_red`, maintainer enqueues a `[ship-gate]` tip-CI fix task (spend-licensed reliability, not freestyle invent); stale `waiting_ci_timeout` REVIEW no longer freezes continuous backlog. See `docs/ship-gate-self-heal.md`.
 - AG-017: WAITING_CI required-check honesty — when `CI_REQUIRED_CHECK_NAMES` never arrive (or flake), Evidence Center and Arena explain required-missing vs flake; reaper timeout messages stay fail-closed (no fake Accept-ready). See `docs/waiting-ci-required-check-honesty.md`.
 - AG-015: Mission Control replan skip reasons (`no_architecture_open_id`, `architecture_ids_in_flight`) surface as calm Open Program idle attention — not `replan_failed` ops fire. See `docs/mission-control-crisis.md`.
 - P-142: Critic fitness cites evidence refs — non-zero fitness requires cited CI/validation + tests(/coverage/e2e) artifact ids; vibes-only promote blocked (`vibes_only_blocked`). See `docs/critic-fitness-evidence-refs.md`.

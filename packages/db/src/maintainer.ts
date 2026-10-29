@@ -68,6 +68,10 @@ import {
   pickNextArchitectureTask,
 } from "./architecture-backlog.js";
 import { getProjectForWorkspace } from "./projects.js";
+import {
+  openTaskCountsAsBusyForBacklog,
+  shouldRequestChangesForStaleCiTimeoutReview,
+} from "./ship-gate-heal-policy.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
@@ -1694,52 +1698,88 @@ export async function tickMaintainerProject(
           continue;
         }
         const runs = await listRunsForTask(db, input.workspaceId, task.id);
+        const hitTimeout = runs.some(
+          (r) => r.errorCode === "waiting_ci_timeout",
+        );
         const candidate = selectAutoAcceptRun(runs);
-        if (!candidate) continue;
-        const fitness = await getRunCiFitness(db, candidate.id);
-        if (!fitness.acceptReady) continue;
+        if (candidate) {
+          const fitness = await getRunCiFitness(db, candidate.id);
+          if (fitness.acceptReady) {
+            try {
+              if (
+                task.status === "WAITING_CI" &&
+                candidate.status === "REVIEW_REQUIRED"
+              ) {
+                await applyTaskTransition(db, {
+                  workspaceId: input.workspaceId,
+                  taskId: task.id,
+                  toStatus: "REVIEW_REQUIRED",
+                  actor,
+                  reason: "run accept-ready — sync task out of WAITING_CI",
+                });
+              }
+              await decideTaskReview(db, {
+                workspaceId: input.workspaceId,
+                taskId: task.id,
+                actor,
+                decision: "accept",
+                note: "maintainer auto-accept (winner + CI green)",
+              });
+              result.autoAccepted += 1;
+              result.autoMergedCandidates.push({
+                taskId: task.id,
+                prNumber: candidate.prNumber ?? null,
+                runId: candidate.id,
+              });
+              await recordMaintainerEvent(db, {
+                workspaceId: input.workspaceId,
+                projectId: input.projectId,
+                kind: "auto_accept",
+                payload: {
+                  taskId: task.id,
+                  runId: candidate.id,
+                  prNumber: candidate.prNumber,
+                  tournamentResult: candidate.tournamentResult,
+                },
+              });
+            } catch (err) {
+              result.errors.push(
+                `auto_accept ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+            continue;
+          }
+        }
 
-        try {
-          if (
-            task.status === "WAITING_CI" &&
-            candidate.status === "REVIEW_REQUIRED"
-          ) {
-            await applyTaskTransition(db, {
+        // AG-031: waiting_ci_timeout REVIEW that never became accept-ready
+        // must not freeze the unattended loop — request changes after grace.
+        if (
+          shouldRequestChangesForStaleCiTimeoutReview({
+            taskStatus: task.status,
+            acceptReady: false,
+            hasWaitingCiTimeout: hitTimeout,
+            taskUpdatedAt: task.updatedAt,
+          })
+        ) {
+          try {
+            await decideTaskReview(db, {
               workspaceId: input.workspaceId,
               taskId: task.id,
-              toStatus: "REVIEW_REQUIRED",
               actor,
-              reason: "run accept-ready — sync task out of WAITING_CI",
+              decision: "request_changes",
+              note: "unattended: waiting_ci_timeout without accept-ready — free board for ship-gate / replan",
             });
+            await recordMaintainerEvent(db, {
+              workspaceId: input.workspaceId,
+              projectId: input.projectId,
+              kind: "stale_ci_timeout_replan",
+              payload: { taskId: task.id, runId: candidate?.id ?? null },
+            });
+          } catch (err) {
+            result.errors.push(
+              `stale_review ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
+            );
           }
-          await decideTaskReview(db, {
-            workspaceId: input.workspaceId,
-            taskId: task.id,
-            actor,
-            decision: "accept",
-            note: "maintainer auto-accept (winner + CI green)",
-          });
-          result.autoAccepted += 1;
-          result.autoMergedCandidates.push({
-            taskId: task.id,
-            prNumber: candidate.prNumber ?? null,
-            runId: candidate.id,
-          });
-          await recordMaintainerEvent(db, {
-            workspaceId: input.workspaceId,
-            projectId: input.projectId,
-            kind: "auto_accept",
-            payload: {
-              taskId: task.id,
-              runId: candidate.id,
-              prNumber: candidate.prNumber,
-              tournamentResult: candidate.tournamentResult,
-            },
-          });
-        } catch (err) {
-          result.errors.push(
-            `auto_accept ${task.id}: ${err instanceof Error ? err.message : String(err)}`,
-          );
         }
       }
     } catch (err) {
@@ -1765,9 +1805,11 @@ export async function tickMaintainerProject(
     }
   }
 
-  // Vision replan — continuous backlog refills when the board is idle under budget
+  // Vision replan — continuous backlog refills when the board is idle under budget.
+  // Stale REVIEW_REQUIRED after waiting_ci_timeout (not accept-ready) does not
+  // count as busy — otherwise one timed-out review deadlocks replan (AG-031).
   const openRows = await db
-    .select({ id: tasks.id })
+    .select()
     .from(tasks)
     .where(
       and(
@@ -1777,11 +1819,42 @@ export async function tickMaintainerProject(
       ),
     )
     .limit(50);
+  let busyOpenCount = 0;
+  for (const openTask of openRows) {
+    if (openTask.status !== "REVIEW_REQUIRED") {
+      busyOpenCount += 1;
+      continue;
+    }
+    const runs = await listRunsForTask(db, input.workspaceId, openTask.id);
+    const hitTimeout = runs.some((r) => r.errorCode === "waiting_ci_timeout");
+    if (!hitTimeout) {
+      busyOpenCount += 1;
+      continue;
+    }
+    const candidate = selectAutoAcceptRun(runs);
+    let acceptReady = false;
+    if (candidate) {
+      try {
+        acceptReady = (await getRunCiFitness(db, candidate.id)).acceptReady;
+      } catch {
+        acceptReady = false;
+      }
+    }
+    if (
+      openTaskCountsAsBusyForBacklog({
+        status: openTask.status,
+        hasWaitingCiTimeout: hitTimeout,
+        acceptReady,
+      })
+    ) {
+      busyOpenCount += 1;
+    }
+  }
   const due = shouldReplanVision({
     lastVisionReplanAt: project.lastVisionReplanAt,
     replanIntervalDays: policy.replanIntervalDays,
     continuousBacklog: policy.continuousBacklog,
-    openWorkCount: openRows.length,
+    openWorkCount: busyOpenCount,
     availableMicros: spend.availableMicros,
   });
   if (due) {

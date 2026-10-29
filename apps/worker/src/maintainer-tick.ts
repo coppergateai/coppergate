@@ -3,6 +3,7 @@
  */
 import {
   buildMaintainerReleaseTag,
+  ensureShipGateHealTask,
   getInstallationForWorkspace,
   getProjectForWorkspace,
   isMergeProtectionBlock,
@@ -244,6 +245,30 @@ export async function runMaintainerSchedulerTick(
                       : "Fix default-branch CI before Coppergate auto-merge resumes",
               },
             });
+          }
+          // AG-031: tip red must enqueue heal work — halt alone deadlocks dogfood.
+          if (tip.kind === "red" && head?.sha) {
+            try {
+              const heal = await ensureShipGateHealTask(db, {
+                workspaceId: tick.workspaceId,
+                projectId: tick.projectId,
+                actor,
+                headSha: head.sha,
+                defaultBranch: head.defaultBranch,
+              });
+              log.info("ship-gate heal ensured", {
+                projectId: tick.projectId,
+                created: heal.created,
+                queued: heal.queued,
+                taskId: heal.taskId,
+                skippedReason: heal.skippedReason,
+              });
+            } catch (err) {
+              log.warn("ship-gate heal enqueue failed", {
+                projectId: tick.projectId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
           }
           continue;
         }

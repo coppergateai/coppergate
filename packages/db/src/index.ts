@@ -405,6 +405,16 @@ export {
   type SpendLicense,
 } from "./spend-license.js";
 export {
+  SHIP_GATE_HEAL_MARKER,
+  STALE_REVIEW_AFTER_CI_TIMEOUT_MS,
+  buildShipGateHealTitle,
+  ensureShipGateHealTask,
+  isShipGateHealTitle,
+  openTaskCountsAsBusyForBacklog,
+  shouldRequestChangesForStaleCiTimeoutReview,
+  type EnsureShipGateHealResult,
+} from "./ship-gate-heal.js";
+export {
   SHIP_RECEIPT_KIND,
   buildShipReceipt,
   getShipReceiptForTask,
