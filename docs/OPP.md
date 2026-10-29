@@ -11,9 +11,21 @@ Coppergate remains the **selection runtime**. Bind OPP (or any) Open Program via
 
 Validate Open IDs in-product, then Arena Spend License refuses invent-without-program. Accept emits a Ship Receipt; public-safe share is P-106.
 
-## Accept → verify (RT-010 / RT-020)
+## Accept → verify (RT-010 / RT-020 / RT-030)
 
 Set `OPP_API_URL` (default unset = skip; Community `https://api.opp.coppergate.ai`). After Accept, Coppergate persists a Ship Receipt, projects it (`projectShipReceiptToOpp`), and when `OPP_API_URL` is set calls `@coppergate/opp-client` → `verifyReceipt`. Result is audited as `task.ship_receipt.opp_verify` and **never** rolls back Accept.
+
+| Env | Purpose |
+| --- | --- |
+| `OPP_API_URL` | Hosted or local OPP base URL — see [`.env.example`](../.env.example) |
+| unset | Skip verify (`opp_api_url_unset` audit) |
+
+```bash
+# Prove Community API from this monorepo (RT-030)
+pnpm smoke:opp-hosted
+# or
+OPP_API_URL=https://api.opp.coppergate.ai pnpm smoke:opp-hosted
+```
 
 Full operator runbook: [`../../opp/docs/protocol/accept-verify-runbook.md`](../../opp/docs/protocol/accept-verify-runbook.md) · projection: [`../../opp/docs/protocol/coppergate-runtime.md`](../../opp/docs/protocol/coppergate-runtime.md).
 
