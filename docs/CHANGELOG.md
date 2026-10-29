@@ -12,6 +12,7 @@
 
 ### Features
 
+- AG-024: Dual-workspace spend isolation — Coppergate and kprompt envelopes never share debit; every `estimate_reserve` and usage append asserts `workspaceId` against the project (and task) before ledger write. See `docs/dual-workspace-spend-isolation.md`.
 - AG-023: Regression bisect hard timeout — `planRegressionBisect` budget honored on sandbox exec via `execRegressionBisectPlan` + `hardDeadlineMs`; signal body hints for good/bad/repro. See `docs/regression-bisect-timeout.md`.
 - AG-040: Design scout → Open Program rows — opt-in `designScout` Playwright overflow findings append `| Open | P-N |` under Design scout section (fp dedup); Settings toggle; GH issues remain optional. See `docs/design-scout-open-program.md`.
 - AG-037: Continuous bug scout → Open Program rows — opt-in `bugScout` maintainer policy scans FAILED runs + tip CI evidence (check-run annotations when present), appends `| Open | AG-N |` under Bug scout section (fingerprint dedup; skips ship-gate/merge_conflict/stale_delivery). See `docs/bug-scout-open-program.md`.
