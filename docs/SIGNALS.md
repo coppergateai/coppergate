@@ -55,6 +55,8 @@ Rules match `provider` (`*` ok), `minSeverity`, optional label/path filters. Mat
 
 GitHub `check_run` failures that do **not** attach to an existing Coppergate run are ingested as `ci_failure` signals for workspaces owning that repo (TASK088).
 
+**Vercel deploy-fail:** GitHub classic `status` events whose context is Vercel (`Vercel`, `Vercel – Production`, …) and state is `failure`/`error`, when they do **not** attach to an existing run, are also ingested as `ci_failure` (provider tag `vercel`) and auto-armed with `fixer` + `engineer`. Redeploy is **not** an L3 Vercel API call — Accept → merge → Vercel Git integration rebuilds the tip.
+
 ## Sonar fitness
 
 Sonar webhooks with `headSha`/`revision` + quality gate status also attach a validation artifact (`sonar-quality-gate-v1`) used by the rules critic (TASK069).
@@ -64,7 +66,7 @@ Sonar webhooks with `headSha`/`revision` + quality gate status also attach a val
 | Loop | Status | Operator focus |
 |---|---|---|
 | **GitHub issue → task → PR** | Primary commercial wedge | Project **Issues** panel; PR body `Closes #N` |
-| **CI-fail → fix arena → PR** | Secondary depth | Default auto-arm for `ci_failure`; GitHub check_run reverse path |
+| **CI-fail → fix arena → PR** | Secondary depth | Default auto-arm for `ci_failure`; GitHub check_run + Vercel `status` reverse path |
 | **Sentry → fix arena → PR** | Secondary depth | Webhook `sentry` + auto-arm ≥`high`; outbound comment when configured |
 
 Jira/Linear/Sonar/… remain available but are **expand-on-pull** — see [EXPAND_PULL.md](./EXPAND_PULL.md).

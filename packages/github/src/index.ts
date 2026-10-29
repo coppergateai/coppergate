@@ -88,6 +88,7 @@ export {
   mapCheckRunPayload,
   mapCheckSuitePayload,
   mapCommitStatusPayload,
+  isVercelCommitStatusContext,
   scoreTipCheckSuites,
   type CheckSuitePayload,
   type CheckRunConclusion,
