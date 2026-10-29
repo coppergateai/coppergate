@@ -593,6 +593,12 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     category: "decision",
     outcome: "review",
   },
+  "ship_gate.heal_enqueued": {
+    title: "Ship-gate heal enqueued",
+    category: "decision",
+    outcome: "review",
+    summary: (m) => str(m, "title") ?? str(m, "headSha"),
+  },
   "fitness.score": {
     title: "Fitness scored",
     category: "decision",

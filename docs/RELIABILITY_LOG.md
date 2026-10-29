@@ -131,6 +131,9 @@ Date: 2026-10-24
 - **Install id hygiene**: non-numeric GitHub install ids fail closed with reconnect messaging; health-scan flag + OPS_RUNBOOK recovery
 - **Dogfood N=1**: coppergate self-pilot `maxTournamentN` / `defaultContenderN` = 1 (stabilize + ensure/spawn honor solo; duel remains explicit N≥2)
 
+## Cycle 18
+- **Ship-gate self-heal (AG-031)**: tip `default_branch_ci_red` enqueues `[ship-gate]` heal task (not audit-only halt); stale `waiting_ci_timeout` REVIEW excluded from continuous-backlog busy count + request_changes after ~30m — prevents dogfood deadlock when tip is red or one review never accepts
+
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly
