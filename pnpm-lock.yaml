@@ -289,6 +289,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@coppergate/opp-client':
+        specifier: workspace:*
+        version: link:../opp-client
       '@coppergate/sandbox':
         specifier: workspace:*
         version: link:../sandbox
