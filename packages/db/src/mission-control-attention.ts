@@ -6,6 +6,8 @@ export type MissionControlAttentionKind =
   | "review_required"
   | "arena_failed"
   | "replan_failed"
+  /** Expected Open Program idle — not a maintainer failure (AG-015). */
+  | "replan_idle"
   | "merge_blocked"
   | "concurrency";
 
