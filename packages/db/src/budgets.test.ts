@@ -361,7 +361,7 @@ describe("workspace pooled budgets", { skip: !url }, () => {
     await assertSufficientBudget(db, workspaceId, projectA, 10_000);
   });
 
-  it("dedupes llm_tokens usage once per runId", async () => {
+  it("dedupes legacy llm_tokens usage once per runId", async () => {
     const runId = crypto.randomUUID();
     const first = await appendUsageEvent(db, {
       workspaceId,
@@ -381,5 +381,51 @@ describe("workspace pooled budgets", { skip: !url }, () => {
     });
     assert.equal(second.id, first.id);
     assert.equal(second.costMicros, 1_000);
+  });
+
+  it("debits primary and fallback llm_tokens separately on failover (AG-016)", async () => {
+    const beforeA = await getProjectSpendSummary(db, workspaceId, projectA);
+    const runId = crypto.randomUUID();
+    const primary = await appendUsageEvent(db, {
+      workspaceId,
+      projectId: projectA,
+      runId,
+      kind: "llm_tokens",
+      costMicros: 1_000,
+      quantity: "100",
+      provider: "openai_compatible",
+      model: "gpt-4o-mini",
+      meta: { providerRole: "primary", failover: true },
+    });
+    const fallback = await appendUsageEvent(db, {
+      workspaceId,
+      projectId: projectA,
+      runId,
+      kind: "llm_tokens",
+      costMicros: 2_000,
+      quantity: "200",
+      provider: "cursor_local",
+      model: "composer",
+      meta: { providerRole: "fallback", failover: true },
+    });
+    assert.notEqual(fallback.id, primary.id);
+    assert.equal(fallback.costMicros, 2_000);
+
+    const retryPrimary = await appendUsageEvent(db, {
+      workspaceId,
+      projectId: projectA,
+      runId,
+      kind: "llm_tokens",
+      costMicros: 9_000,
+      quantity: "900",
+      meta: { providerRole: "primary" },
+    });
+    assert.equal(retryPrimary.id, primary.id);
+    assert.equal(retryPrimary.costMicros, 1_000);
+
+    const afterA = await getProjectSpendSummary(db, workspaceId, projectA);
+    const delta =
+      (afterA.projectSpentMicros ?? 0) - (beforeA.projectSpentMicros ?? 0);
+    assert.equal(delta, 3_000);
   });
 });

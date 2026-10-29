@@ -10,6 +10,10 @@ import {
   type UsageEvent,
   type UsageKind,
 } from "./schema.js";
+import {
+  llmUsageProviderRoleFromMeta,
+  llmUsageRolesDedupe,
+} from "./llm-usage-meta.js";
 
 const ACTIVE_RESERVE_RUN_STATUSES = [
   "QUEUED",
@@ -585,9 +589,10 @@ export async function appendUsageEvent(
     meta?: unknown;
   },
 ): Promise<UsageEvent> {
-  // llm_tokens is once-per-run — resume/retry must not double-bill spend.
+  // llm_tokens idempotency: once per run for legacy rows; AG-016 primary + fallback debited separately.
   if (input.kind === "llm_tokens" && input.runId) {
-    const [existing] = await db
+    const incomingRole = llmUsageProviderRoleFromMeta(input.meta);
+    const existingRows = await db
       .select()
       .from(usageEvents)
       .where(
@@ -595,9 +600,13 @@ export async function appendUsageEvent(
           eq(usageEvents.runId, input.runId),
           eq(usageEvents.kind, "llm_tokens"),
         ),
-      )
-      .limit(1);
-    if (existing) return existing;
+      );
+    for (const existing of existingRows) {
+      const existingRole = llmUsageProviderRoleFromMeta(existing.meta);
+      if (llmUsageRolesDedupe(existingRole, incomingRole)) {
+        return existing;
+      }
+    }
   }
 
   const [row] = await db

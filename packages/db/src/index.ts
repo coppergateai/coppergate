@@ -355,6 +355,23 @@ export {
   type ListInboxApprovalsOptions,
 } from "./approvals.js";
 export {
+  applyAgentCompletionToLedger,
+  applyAgentCostEventToLedger,
+  buildLlmUsageDebits,
+  createRunProviderSpendLedger,
+  markProviderFailoverInLedger,
+  persistRunLlmSpendFromLedger,
+  totalRunSpendMicros,
+  type LlmUsageDebit,
+  type ProviderSpendRole,
+  type RunProviderSpendLedger,
+} from "./provider-failover-spend.js";
+export {
+  llmUsageProviderRoleFromMeta,
+  llmUsageRolesDedupe,
+  type LlmUsageProviderRole,
+} from "./llm-usage-meta.js";
+export {
   BudgetError,
   appendUsageEvent,
   assertSufficientBudget,
