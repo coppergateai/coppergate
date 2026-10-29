@@ -10,6 +10,7 @@ const DEFAULT_SIGNAL_PROVIDERS_LIST = [
   "*",
   "ci_failure",
   "merge_conflict",
+  "stale_delivery",
   "sentry",
   "dependabot",
   "codeql",

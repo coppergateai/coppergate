@@ -604,6 +604,15 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     category: "decision",
     outcome: "review",
   },
+  "review.stale_ci_timeout_heal": {
+    title: "Stale CI timeout → same-head heal",
+    category: "decision",
+    outcome: "review",
+    summary: (m) => {
+      const pr = m?.prNumber;
+      return typeof pr === "number" ? `PR #${pr}` : null;
+    },
+  },
   "fitness.score": {
     title: "Fitness scored",
     category: "decision",
