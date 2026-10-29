@@ -21,7 +21,8 @@
     "prepare": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@coppergate/scm": "workspace:*"
+    "@coppergate/scm": "workspace:*",
+    "@coppergate/signals": "workspace:*"
   },
   "devDependencies": {
     "@coppergate/eslint-config": "workspace:*",

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { assertSandboxCommandArgs } from "./command-policy.js";
 import { buildDockerSandboxSpec } from "./docker-spec.js";
+import { resolveSandboxExecTimeoutMs } from "./exec-timeout.js";
 import {
   DEFAULT_LIMITS,
   SandboxPolicyError,
@@ -36,7 +37,7 @@ export class DockerSandboxManager implements SandboxManager {
       /** Inject for tests. */
       dockerExec?: (
         args: string[],
-        options?: { timeoutMs?: number },
+        options?: { timeoutMs?: number; hardDeadlineMs?: number },
       ) => Promise<ExecResult>;
     },
   ) {}
@@ -111,7 +112,7 @@ export class DockerSandboxManager implements SandboxManager {
   async exec(
     sandbox: SandboxHandle,
     command: string[],
-    options?: { timeoutMs?: number },
+    options?: { timeoutMs?: number; hardDeadlineMs?: number },
   ): Promise<ExecResult> {
     const active = this.requireActive(sandbox.id);
     if (!command.length) {
@@ -152,9 +153,12 @@ export class DockerSandboxManager implements SandboxManager {
       ...command,
     ];
 
-    const timeoutMs = options?.timeoutMs ?? DEFAULT_LIMITS.wallClockMs;
+    const timeoutMs = resolveSandboxExecTimeoutMs(options);
     if (this.options?.dockerExec) {
-      return this.options.dockerExec(dockerArgs, { timeoutMs });
+      return this.options.dockerExec(dockerArgs, {
+        timeoutMs,
+        hardDeadlineMs: options?.hardDeadlineMs,
+      });
     }
     return runHostCommand(["docker", ...dockerArgs], timeoutMs);
   }

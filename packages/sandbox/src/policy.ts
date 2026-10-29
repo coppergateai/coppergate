@@ -42,7 +42,8 @@ export class SandboxPolicyError extends Error {
     | "forbidden_mount"
     | "privileged"
     | "invalid"
-    | "destroyed";
+    | "destroyed"
+    | "timeout";
 
   constructor(code: SandboxPolicyError["code"], message: string) {
     super(message);

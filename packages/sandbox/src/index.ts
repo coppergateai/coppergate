@@ -37,3 +37,12 @@ export {
 export { LocalSandboxManager } from "./local.js";
 export { DockerSandboxManager } from "./docker.js";
 export { assertSandboxCommandArgs } from "./command-policy.js";
+export {
+  resolveSandboxExecTimeoutMs,
+  type SandboxExecTimeoutOptions,
+} from "./exec-timeout.js";
+export {
+  execRegressionBisectPlan,
+  type RegressionBisectExecResult,
+  type RegressionBisectExecStep,
+} from "./bisect-exec.js";

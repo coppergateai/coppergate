@@ -12,6 +12,7 @@
 
 ### Features
 
+- AG-023: Regression bisect hard timeout — `planRegressionBisect` budget honored on sandbox exec via `execRegressionBisectPlan` + `hardDeadlineMs`; signal body hints for good/bad/repro. See `docs/regression-bisect-timeout.md`.
 - AG-040: Design scout → Open Program rows — opt-in `designScout` Playwright overflow findings append `| Open | P-N |` under Design scout section (fp dedup); Settings toggle; GH issues remain optional. See `docs/design-scout-open-program.md`.
 - AG-037: Continuous bug scout → Open Program rows — opt-in `bugScout` maintainer policy scans FAILED runs + tip CI evidence, appends `| Open | AG-N |` under Bug scout section (fingerprint dedup; skips ship-gate/merge_conflict/stale_delivery). See `docs/bug-scout-open-program.md`.
 - AG-036: Behind delivery auto-update — accept-ready + strict-behind PRs get GitHub `update-branch` (board drain + auto-merge path); update conflict arms `merge_conflict`; Arena labels REVIEW as Awaiting merge. See `docs/behind-delivery-update.md`.

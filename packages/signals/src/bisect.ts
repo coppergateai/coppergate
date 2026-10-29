@@ -45,6 +45,49 @@ export function planRegressionBisect(input: {
   };
 }
 
+/** Split repro command into argv (no shell — sandbox blocks `sh -c`). */
+export function parseReproCommandArgv(reproCommand: string): string[] {
+  const trimmed = reproCommand.trim();
+  if (!trimmed) return ["false"];
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  return parts.length > 0 ? parts : ["false"];
+}
+
+/** Parse optional bisect hints from a CI-failure style signal body. */
+export function parseRegressionBisectHints(body: string): {
+  goodSha: string | null;
+  badSha: string | null;
+  reproCommand: string | null;
+} {
+  const goodSha =
+    body.match(/^good:\s*([0-9a-f]{7,40})/im)?.[1]?.trim() ?? null;
+  const badSha =
+    body.match(/^bad:\s*([0-9a-f]{7,40})/im)?.[1]?.trim() ??
+    body.match(/^head:\s*([0-9a-f]{7,40})/im)?.[1]?.trim() ??
+    null;
+  const reproCommand =
+    body.match(/^repro:\s*(.+)$/im)?.[1]?.trim().slice(0, 2000) ?? null;
+  return { goodSha, badSha, reproCommand };
+}
+
+/** Build a plan from signal body + optional last-green SHA override. */
+export function planRegressionBisectFromSignal(input: {
+  body: string;
+  goodSha?: string | null;
+  timeoutMs?: number;
+}): BisectPlan | null {
+  const hints = parseRegressionBisectHints(input.body);
+  const good = input.goodSha?.trim() || hints.goodSha;
+  const bad = hints.badSha;
+  if (!bad) return null;
+  return planRegressionBisect({
+    goodSha: good,
+    badSha: bad,
+    reproCommand: hints.reproCommand,
+    timeoutMs: input.timeoutMs,
+  });
+}
+
 /** Midpoint SHA placeholder list for Fake/sandbox harness (deterministic). */
 export function fakeBisectSteps(plan: BisectPlan): BisectStep[] {
   const steps: BisectStep[] = [];

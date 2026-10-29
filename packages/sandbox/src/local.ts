@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { assertSandboxCommandArgs } from "./command-policy.js";
+import { resolveSandboxExecTimeoutMs } from "./exec-timeout.js";
 import { DEFAULT_LIMITS, SandboxPolicyError } from "./policy.js";
 import type {
   CreateSandboxInput,
@@ -167,7 +168,7 @@ export class LocalSandboxManager implements SandboxManager {
   async exec(
     sandbox: SandboxHandle,
     command: string[],
-    options?: { timeoutMs?: number },
+    options?: { timeoutMs?: number; hardDeadlineMs?: number },
   ): Promise<ExecResult> {
     const active = this.requireActive(sandbox.id);
     if (!command.length) {
@@ -178,7 +179,7 @@ export class LocalSandboxManager implements SandboxManager {
       prodWritesEnabled: active.prodWritesEnabled,
     });
 
-    const timeoutMs = options?.timeoutMs ?? DEFAULT_LIMITS.wallClockMs;
+    const timeoutMs = resolveSandboxExecTimeoutMs(options);
     return runCommand(command, active.workdir, timeoutMs);
   }
 
