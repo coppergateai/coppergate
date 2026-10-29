@@ -19,7 +19,7 @@ import {
   type GithubInstallation,
 } from "@coppergate/db";
 import {
-  commitCheckSuitesFailed,
+  commitCheckSuitesShipGate,
   countOpenShipRollbackPrs,
   buildMaintainerReleaseRequest,
   createGithubRelease,
@@ -37,6 +37,25 @@ export type ResolveInstallationToken = (
   db: Database,
   installation: GithubInstallation,
 ) => Promise<string>;
+
+/** Dedupe ship-gate audit spam (Mission Control reads latest halt). */
+const SHIP_GATE_AUDIT_MIN_MS = 15 * 60_000;
+const lastShipGateAuditAt = new Map<string, number>();
+
+function shouldRecordShipGateAudit(
+  projectId: string,
+  reason: string,
+  nowMs: number = Date.now(),
+): boolean {
+  const key = `${projectId}:${reason}`;
+  const prev = lastShipGateAuditAt.get(key) ?? 0;
+  if (nowMs - prev < SHIP_GATE_AUDIT_MIN_MS) return false;
+  lastShipGateAuditAt.set(key, nowMs);
+  return true;
+}
+
+/** Exported for unit tests. */
+export { shouldRecordShipGateAudit, SHIP_GATE_AUDIT_MIN_MS };
 
 export async function runMaintainerSchedulerTick(
   db: Database,
@@ -166,7 +185,7 @@ export async function runMaintainerSchedulerTick(
     const [owner, name] = bound.repository.baseRepoFullName.split("/");
     if (!owner || !name) continue;
 
-    // Halt ship while default-branch CI is red or a rollback PR is still open.
+    // Halt ship while tip CI is not positively green or a rollback PR is open.
     // Prevents merge→red→orphan-revert storms when post-merge checks fail.
     if (policy.shipRollbackOnCiFail) {
       try {
@@ -180,41 +199,52 @@ export async function runMaintainerSchedulerTick(
           owner,
           repo: name,
         });
-        const headFailed = head
-          ? await commitCheckSuitesFailed({
+        const tip = head
+          ? await commitCheckSuitesShipGate({
               token,
               owner,
               repo: name,
               sha: head.sha,
             })
-          : false;
-        if (openRollbacks > 0 || headFailed) {
+          : ({ kind: "pending" } as const);
+        const tipBlocked = tip.kind !== "green";
+        if (openRollbacks > 0 || tipBlocked) {
           const reason =
-            openRollbacks > 0 ? "open_ship_rollback" : "default_branch_ci_red";
+            openRollbacks > 0
+              ? "open_ship_rollback"
+              : tip.kind === "red"
+                ? "default_branch_ci_red"
+                : "default_branch_ci_pending";
           log.info("auto-merge halted — ship gate", {
             projectId: tick.projectId,
             reason,
             openRollbacks,
+            tipKind: tip.kind,
             headSha: head?.sha?.slice(0, 8),
           });
-          await recordAuditEvent(db, {
-            workspaceId: tick.workspaceId,
-            actor,
-            action: "merge.halted_ci_red",
-            targetType: "project",
-            targetId: tick.projectId,
-            meta: {
-              projectId: tick.projectId,
-              reason,
-              openRollbacks,
-              headSha: head?.sha ?? null,
-              defaultBranch: head?.defaultBranch ?? null,
-              cta:
-                openRollbacks > 0
-                  ? "Merge or close the open ship-rollback PR, then fix default-branch CI"
-                  : "Fix default-branch CI before Coppergate auto-merge resumes",
-            },
-          });
+          if (shouldRecordShipGateAudit(tick.projectId, reason)) {
+            await recordAuditEvent(db, {
+              workspaceId: tick.workspaceId,
+              actor,
+              action: "merge.halted_ci_red",
+              targetType: "project",
+              targetId: tick.projectId,
+              meta: {
+                projectId: tick.projectId,
+                reason,
+                openRollbacks,
+                tipKind: tip.kind,
+                headSha: head?.sha ?? null,
+                defaultBranch: head?.defaultBranch ?? null,
+                cta:
+                  openRollbacks > 0
+                    ? "Merge or close the open ship-rollback PR, then fix default-branch CI"
+                    : tip.kind === "pending"
+                      ? "Wait for default-branch CI to finish green before auto-merge resumes"
+                      : "Fix default-branch CI before Coppergate auto-merge resumes",
+              },
+            });
+          }
           continue;
         }
       } catch (err) {

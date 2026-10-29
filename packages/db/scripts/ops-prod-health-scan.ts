@@ -13,10 +13,16 @@ import {
   agentRuns,
   arenas,
   budgets,
+  githubInstallations,
   projects,
   tasks,
   workspaces,
 } from "../src/schema.ts";
+
+/** GitHub App install ids must be numeric — stubs never mint tokens. */
+function isNumericGithubInstallId(id: string): boolean {
+  return /^\d+$/.test(id.trim());
+}
 
 const HOT = ["QUEUED", "RUNNING", "VALIDATING", "WAITING_CI"] as const;
 const OPEN_TASK = [
@@ -239,6 +245,27 @@ async function scanWorkspace(label: string, workspaceId: string) {
     }
   }
 
+  const installs = await db
+    .select({
+      id: githubInstallations.id,
+      githubInstallationId: githubInstallations.githubInstallationId,
+      status: githubInstallations.status,
+    })
+    .from(githubInstallations)
+    .where(eq(githubInstallations.workspaceId, workspaceId));
+  const badInstallIds = installs.filter(
+    (i) =>
+      i.status === "active" &&
+      !isNumericGithubInstallId(i.githubInstallationId),
+  );
+  if (badInstallIds.length) {
+    issues.push(
+      `non-numeric GitHub install id(s): ${badInstallIds
+        .map((i) => i.githubInstallationId)
+        .join(", ")} — reconnect the GitHub App`,
+    );
+  }
+
   return {
     label,
     workspace: ws,
@@ -268,6 +295,12 @@ async function scanWorkspace(label: string, workspaceId: string) {
       ageMin: Math.round((Date.now() - new Date(t.updatedAt).getTime()) / 60000),
     })),
     orphanReserves,
+    githubInstallations: installs.map((i) => ({
+      id: i.id,
+      githubInstallationId: i.githubInstallationId,
+      status: i.status,
+      numericId: isNumericGithubInstallId(i.githubInstallationId),
+    })),
     issues,
   };
 }

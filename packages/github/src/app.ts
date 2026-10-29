@@ -69,7 +69,7 @@ export async function createInstallationAccessToken(
   const id = installationId.trim();
   if (!isGithubNumericInstallationId(id)) {
     throw new Error(
-      `GitHub installation token failed (invalid_id: non-numeric)`,
+      `GitHub installation token failed (invalid_id: non-numeric) — reconnect the GitHub App (stub ids like inst-* / gitlab-user:* cannot mint tokens)`,
     );
   }
   const res = await fetchImpl(

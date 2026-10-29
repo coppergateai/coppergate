@@ -8,6 +8,7 @@ import {
   mapCheckRunPayload,
   mapCheckSuitePayload,
   mapCommitStatusPayload,
+  scoreTipCheckSuites,
 } from "./checks.js";
 
 describe("CI check mapping", () => {
@@ -38,6 +39,20 @@ describe("CI check mapping", () => {
     });
     assert.equal(ev.passed, false);
     assert.equal(ev.blocksAccept, true);
+  });
+
+  it("does not treat cancelled as accept-blocking (cancel-in-progress)", () => {
+    const ev = mapCheckRunPayload({
+      check_run: {
+        id: 3,
+        name: "check",
+        status: "completed",
+        conclusion: "cancelled",
+        head_sha: "cab",
+      },
+    });
+    assert.equal(ev.passed, false);
+    assert.equal(ev.blocksAccept, false);
   });
 
   it("maps check_suite timeout as blocking", () => {
@@ -168,6 +183,32 @@ describe("CI check mapping", () => {
         fetchImpl,
       }),
       3,
+    );
+  });
+
+  it("scores tip suites: positive green required; cancelled-only is pending", () => {
+    assert.equal(scoreTipCheckSuites([]).kind, "pending");
+    assert.equal(
+      scoreTipCheckSuites([{ status: "in_progress", conclusion: null }]).kind,
+      "pending",
+    );
+    assert.equal(
+      scoreTipCheckSuites([
+        { status: "completed", conclusion: "cancelled" },
+      ]).kind,
+      "pending",
+    );
+    assert.equal(
+      scoreTipCheckSuites([{ status: "completed", conclusion: "success" }])
+        .kind,
+      "green",
+    );
+    assert.equal(
+      scoreTipCheckSuites([
+        { status: "completed", conclusion: "success" },
+        { status: "completed", conclusion: "failure" },
+      ]).kind,
+      "red",
     );
   });
 });

@@ -603,6 +603,12 @@ export {
   type CiWaitingKind,
 } from "./ci-waiting-honesty.js";
 export {
+  listWaitingCiRunsForPr,
+  resolveWaitingCiForPrOutcome,
+  resolveWaitingCiRunsForPr,
+  type PrCiOutcome,
+} from "./waiting-ci-pr.js";
+export {
   buildDeliveryCheckpoint,
   buildDeliveryReport,
   buildDiffSummary,

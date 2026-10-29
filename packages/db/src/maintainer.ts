@@ -248,8 +248,8 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   coordinatedMultiRepo: false,
   allowedSignalProviders: ["*", "ci_failure", "sentry", "dependabot", "codeql"],
   pathAllowlist: [],
-  /** Community duel width — keep aligned with plan maxTournamentFanout (2). */
-  maxTournamentN: 2,
+  /** Self-pilot default fan-out width (1). Raise to 2 for Community duel. */
+  maxTournamentN: 1,
   visionBriefId: null,
   replanIntervalDays: 7,
   autoQueueReplanTasks: true,

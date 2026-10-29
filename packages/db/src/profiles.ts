@@ -6,7 +6,6 @@ import {
   ensureArenaForProject,
   ensurePeerContenderSeats,
   isContenderStrategy,
-  MIN_DUEL_CONTENDERS,
   type ContenderStrategy,
 } from "./arena.js";
 import {
@@ -758,10 +757,8 @@ export async function applySpawnProfilesToArena(
     ? preferredRaw
     : "balanced";
 
-  const requestedSeats = Math.max(
-    MIN_DUEL_CONTENDERS,
-    arenaDefaultN(input.seatCount),
-  );
+  // Honor solo N=1 (self-pilot). Callers that want a duel pass seatCount ≥ 2.
+  const requestedSeats = Math.max(1, arenaDefaultN(input.seatCount));
   const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
@@ -771,9 +768,8 @@ export async function applySpawnProfilesToArena(
   });
 
   const seatCount = Math.max(
-    MIN_DUEL_CONTENDERS,
-    input.seatCount ??
-      Math.max(arena.defaultContenderN, MIN_DUEL_CONTENDERS),
+    1,
+    input.seatCount ?? Math.max(1, arena.defaultContenderN),
   );
   const strategies: ContenderStrategy[] =
     input.strategies && input.strategies.length > 0
@@ -811,5 +807,5 @@ function arenaDefaultN(seatCount: number | undefined): number {
   if (seatCount != null && Number.isFinite(seatCount) && seatCount >= 1) {
     return Math.floor(seatCount);
   }
-  return MIN_DUEL_CONTENDERS;
+  return 1;
 }

@@ -35,6 +35,10 @@ describe("mission-control attention (P-101)", () => {
       missionControlAttentionKindRank("merge_blocked") <
         missionControlAttentionKindRank("approval"),
     );
+    assert.equal(
+      missionControlAttentionKindRank("ship_gate_halted"),
+      missionControlAttentionKindRank("merge_blocked"),
+    );
   });
 
   it("sortMissionControlAttention leads with concurrency then provider_quota", () => {
