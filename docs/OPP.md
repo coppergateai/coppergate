@@ -20,12 +20,21 @@ Set `OPP_API_URL` (default unset = skip; Community `https://api.opp.coppergate.a
 | `OPP_API_URL` | Hosted or local OPP base URL — see [`.env.example`](../.env.example) |
 | unset | Skip verify (`opp_api_url_unset` audit) |
 
+**Production (RT-040):** set on both hosts so Accept (web) and auto-accept (worker) verify:
+
+| Host | Where |
+| --- | --- |
+| Vercel `coppergate` | Production + Preview env `OPP_API_URL=https://api.opp.coppergate.ai` |
+| Fly `coppergate-worker` | Secret + `fly.toml` `[env]` |
+
 ```bash
 # Prove Community API from this monorepo (RT-030)
 pnpm smoke:opp-hosted
 # or
 OPP_API_URL=https://api.opp.coppergate.ai pnpm smoke:opp-hosted
 ```
+
+After a production Accept, audit `task.ship_receipt.opp_verify` should show `{ ok: true, openId }` (or a structured deny reason) — not `opp_api_url_unset`.
 
 Full operator runbook: [`../../opp/docs/protocol/accept-verify-runbook.md`](../../opp/docs/protocol/accept-verify-runbook.md) · projection: [`../../opp/docs/protocol/coppergate-runtime.md`](../../opp/docs/protocol/coppergate-runtime.md).
 
