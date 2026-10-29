@@ -199,6 +199,7 @@ export async function runMaintainerSchedulerTick(
     // AG-034: tip red still lands `[ship-gate]` heal PRs (heal-only) so AG-031
     // enqueue cannot deadlock waiting for a human merge.
     let mergeMode: ShipGateMergeMode = "all";
+    let tipKind: "green" | "red" | "pending" | null = null;
     if (policy.shipRollbackOnCiFail) {
       try {
         const openRollbacks = await countOpenShipRollbackPrs({
@@ -219,6 +220,7 @@ export async function runMaintainerSchedulerTick(
               sha: head.sha,
             })
           : ({ kind: "pending" } as const);
+        tipKind = tip.kind;
         mergeMode = shipGateMergeMode({
           tipKind: tip.kind,
           openRollbacks,
@@ -286,9 +288,6 @@ export async function runMaintainerSchedulerTick(
               });
             }
           }
-          if (mergeMode === "halt") {
-            continue;
-          }
         }
       } catch (err) {
         log.warn("ship gate check failed — skipping auto-merge this tick", {
@@ -299,34 +298,40 @@ export async function runMaintainerSchedulerTick(
       }
     }
 
-    if (mergeMode === "all") {
-      try {
-        const stale = await healStaleReviewsOrEmitConflict(db, log, {
-          workspaceId: tick.workspaceId,
+    // AG-035: board drain runs even while product merges are halted (tip pending/red).
+    try {
+      const stale = await healStaleReviewsOrEmitConflict(db, log, {
+        workspaceId: tick.workspaceId,
+        projectId: tick.projectId,
+        owner,
+        repo: name,
+        token,
+        actor,
+        tipKind,
+      });
+      if (
+        stale.conflictSignals ||
+        stale.deliveryHeals ||
+        stale.replanned ||
+        stale.retiredShipGates
+      ) {
+        log.info("stale review heal", {
           projectId: tick.projectId,
-          owner,
-          repo: name,
-          token,
-          actor,
-        });
-        if (
-          stale.conflictSignals ||
-          stale.deliveryHeals ||
-          stale.replanned
-        ) {
-          log.info("stale review heal", {
-            projectId: tick.projectId,
-            conflictSignals: stale.conflictSignals,
-            deliveryHeals: stale.deliveryHeals,
-            replanned: stale.replanned,
-          });
-        }
-      } catch (err) {
-        log.warn("stale review heal failed", {
-          projectId: tick.projectId,
-          error: err instanceof Error ? err.message : String(err),
+          conflictSignals: stale.conflictSignals,
+          deliveryHeals: stale.deliveryHeals,
+          replanned: stale.replanned,
+          retiredShipGates: stale.retiredShipGates,
         });
       }
+    } catch (err) {
+      log.warn("stale review heal failed", {
+        projectId: tick.projectId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    if (mergeMode === "halt") {
+      continue;
     }
 
     const allCandidates = await listAutoMergeCandidates(db, tick.projectId);

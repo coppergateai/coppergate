@@ -143,6 +143,9 @@ Date: 2026-10-24
 ## Cycle 21
 - **Ship-gate heal-only merge (AG-034)**: tip `default_branch_ci_red` still auto-merges `[ship-gate]` heal PRs (`shipGateMergeMode=heal_only`); product merges stay halted — closes AG-031 enqueue→never-merge deadlock (ACPP dogfood 2026-10-29)
 
+## Cycle 22
+- **Unattended board drain (AG-035)**: obsolete `[ship-gate]` retires when tip green; dirty WAITING_CI → `merge_conflict` after ~15m (not 6h); parent concurrency freed; `armSignalEvent` race `QUEUED→QUEUED` no longer fails the signal
+
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly

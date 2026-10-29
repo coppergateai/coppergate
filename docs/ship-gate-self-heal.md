@@ -16,9 +16,10 @@ A third deadlock: a single `REVIEW_REQUIRED` task stuck after `waiting_ci_timeou
    - Auto submit + approve so Arena can claim it
    - Goal/acceptance: make required `check` green on the default branch; no unrelated product scope
 2. **Heal-only merge (AG-034)** — While tip is `red` and no ship-rollback PR is open, auto-merge still runs for candidates whose task title contains `[ship-gate]`. Product merges stay halted. Policy: `shipGateMergeMode` → `heal_only` | `halt` | `all`.
-3. **Spend license** — `[ship-gate]` titles are allowed without an Open Program ID (system reliability, not freestyle invent). PR hygiene skill still forbids stacking product work while tip is red.
-4. **Stale review** — After ~30m, non-accept-ready `REVIEW_REQUIRED` with a `waiting_ci_timeout` run gets `request_changes` so the board frees.
-5. **Backlog idle** — Those same stale reviews do **not** count toward continuous-backlog `openWorkCount`.
+3. **Unattended board drain (AG-035)** — Board heal runs even while tip is pending/red. Obsolete `[ship-gate]` (tip green or PR closed) auto-retires. Dirty open deliveries emit `merge_conflict` after ~15m and free parent concurrency — no human Accept/Dismiss.
+4. **Spend license** — `[ship-gate]` titles are allowed without an Open Program ID (system reliability, not freestyle invent). PR hygiene skill still forbids stacking product work while tip is red.
+5. **Stale review** — After ~30m, non-accept-ready `REVIEW_REQUIRED` with a `waiting_ci_timeout` run gets `request_changes` so the board frees.
+6. **Backlog idle** — Those same stale reviews do **not** count toward continuous-backlog `openWorkCount`.
 
 ## Non-goals
 

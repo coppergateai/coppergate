@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  DIRTY_PR_HEAL_GRACE_MS,
   SHIP_GATE_HEAL_MARKER,
   STALE_REVIEW_AFTER_CI_TIMEOUT_MS,
   buildShipGateHealTitle,
   isShipGateHealTitle,
   openTaskCountsAsBusyForBacklog,
   shipGateMergeMode,
+  shouldInspectDeliveryPrForUnattendedHeal,
   shouldRequestChangesForStaleCiTimeoutReview,
+  shouldRetireObsoleteShipGateHeal,
 } from "./ship-gate-heal-policy.js";
 
 describe("ship-gate-heal (AG-031)", () => {
@@ -41,6 +44,52 @@ describe("ship-gate-heal (AG-031)", () => {
     assert.equal(
       shipGateMergeMode({ tipKind: "green", openRollbacks: 1 }),
       "halt",
+    );
+  });
+
+  it("AG-035: inspect dirty deliveries after grace; retire obsolete ship-gate", () => {
+    const now = Date.UTC(2026, 9, 29, 12, 0);
+    const fresh = new Date(now - 60_000);
+    const ripe = new Date(now - DIRTY_PR_HEAL_GRACE_MS - 1);
+    assert.equal(
+      shouldInspectDeliveryPrForUnattendedHeal({
+        taskStatus: "WAITING_CI",
+        acceptReady: false,
+        taskUpdatedAt: fresh,
+        nowMs: now,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldInspectDeliveryPrForUnattendedHeal({
+        taskStatus: "WAITING_CI",
+        acceptReady: false,
+        taskUpdatedAt: ripe,
+        nowMs: now,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldRetireObsoleteShipGateHeal({
+        taskTitle: buildShipGateHealTitle("abcd1234"),
+        tipKind: "green",
+      }),
+      true,
+    );
+    assert.equal(
+      shouldRetireObsoleteShipGateHeal({
+        taskTitle: buildShipGateHealTitle("abcd1234"),
+        tipKind: "red",
+        prOpen: false,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldRetireObsoleteShipGateHeal({
+        taskTitle: "AG-019: noise floor",
+        tipKind: "green",
+      }),
+      false,
     );
   });
 
