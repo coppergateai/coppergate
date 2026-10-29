@@ -70,10 +70,7 @@ import {
 import { getProjectForWorkspace } from "./projects.js";
 import { maintainerContenderPinN } from "./maintainer-contender-pin.js";
 import { openTaskCountsAsBusyForBacklog } from "./ship-gate-heal-policy.js";
-import {
-  fetchArchitectureBacklogMarkdown,
-  fetchArchitectureBacklogMarkdownResult,
-} from "./architecture-program-fetch.js";
+import { fetchArchitectureBacklogMarkdownResult } from "./architecture-program-fetch.js";
 
 export {
   DEFAULT_ARCHITECTURE_PATHS,
