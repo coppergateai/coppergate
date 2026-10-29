@@ -79,6 +79,7 @@ export class LocalSandboxManager implements SandboxManager {
       createdAt: new Date(),
       runtime: "local",
       cloneMode,
+      prodWritesEnabled: input.prodWritesEnabled === true,
       destroyed: false,
     };
     this.active.set(id, handle);
@@ -173,7 +174,9 @@ export class LocalSandboxManager implements SandboxManager {
       throw new SandboxPolicyError("invalid", "command required");
     }
 
-    assertSandboxCommandArgs(command);
+    assertSandboxCommandArgs(command, {
+      prodWritesEnabled: active.prodWritesEnabled,
+    });
 
     const timeoutMs = options?.timeoutMs ?? DEFAULT_LIMITS.wallClockMs;
     return runCommand(command, active.workdir, timeoutMs);

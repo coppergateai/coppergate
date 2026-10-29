@@ -55,6 +55,7 @@ export async function writeArchitectureTaskDone(
         content,
         sha: file.sha,
         message: `chore(architecture): mark ${id} Done (merged PR #${input.prNumber})`,
+        allowDefaultBranchWrite: true,
       });
       log.info("architecture writeback", { id, path, prNumber: input.prNumber });
       return { id, path };
