@@ -26,6 +26,18 @@ function runProgressHintFromPayload(
       failoverLine: null,
     };
   }
+  if (code === "provider_spend_debited") {
+    const role =
+      payload.providerRole === "fallback" ? "Fallback" : "Primary";
+    const provider =
+      typeof payload.provider === "string" ? payload.provider : "provider";
+    const model =
+      typeof payload.model === "string" ? payload.model : "model";
+    return {
+      codingPathLine: `${role} LLM debit — ${provider}/${model}`,
+      failoverLine: null,
+    };
+  }
   if (code === "provider_failover") {
     const reason =
       typeof payload.reason === "string" ? payload.reason.trim() : "";

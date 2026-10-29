@@ -500,6 +500,31 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     category: "execution",
     outcome: "neutral",
   },
+  "run.llm_debit": {
+    title: "LLM spend debited",
+    category: "execution",
+    outcome: "neutral",
+    summary: (m, count) => {
+      if (count > 1) {
+        return `${count} provider debits recorded for this run (failover may apply).`;
+      }
+      const role =
+        str(m, "providerRole") === "fallback" ? "Fallback" : "Primary";
+      const provider = str(m, "provider");
+      const model = str(m, "model");
+      const cost = num(m, "costMicros");
+      const costUsd =
+        cost != null ? `$${(cost / 1_000_000).toFixed(4)}` : null;
+      const who =
+        provider && model
+          ? `${provider}/${model}`
+          : provider ?? model ?? "LLM provider";
+      if (costUsd) {
+        return `${role} ${who} — ${costUsd} debited from workspace budget.`;
+      }
+      return `${role} ${who} debited from workspace budget.`;
+    },
+  },
   "signal.ingest": {
     title: "Signal ingested",
     category: "agent",
