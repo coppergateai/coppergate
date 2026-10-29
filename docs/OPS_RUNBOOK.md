@@ -26,10 +26,23 @@
 - Worker idle poll: `pollMs` (default 1s). On loop errors, exponential backoff up to 30s before the next iteration.
 - Do not tight-loop claim on persistent DB errors; restart the process after fixing connectivity.
 
+## Non-numeric GitHub installation id
+
+Symptom: worker logs `invalid_id: non-numeric` / CI evidence refresh never advances; health scan flags `non-numeric GitHub install id(s)`.
+
+Cause: `github_installations.github_installation_id` holds a stub (`inst-*`, `gitlab-user:*`, etc.) instead of the numeric GitHub App install id. Token minting fail-closes and skips forever.
+
+Fix:
+
+1. Confirm the live org/user App install id (`gh api orgs/<org>/installations` or GitHub → Settings → Applications).
+2. Rebind via `packages/db/scripts/link-coppergate-install.ts` (or reconnect GitHub in Settings) so the row uses the numeric id and a fresh sealed token.
+3. Re-run `ops-prod-health-scan.ts` — the install should report `numericId: true`.
+
 ## Recovery checklist
 
 - [ ] Postgres reachable (`DATABASE_URL`)
 - [ ] Migrations applied (`pnpm db:migrate`)
 - [ ] Worker process up
 - [ ] GitHub App / webhook secret configured (for real delivery)
+- [ ] Numeric GitHub App installation id (not `inst-*` stubs)
 - [ ] Project budget active and sufficient

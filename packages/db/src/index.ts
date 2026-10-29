@@ -603,6 +603,12 @@ export {
   type CiWaitingKind,
 } from "./ci-waiting-honesty.js";
 export {
+  listWaitingCiRunsForPr,
+  resolveWaitingCiForPrOutcome,
+  resolveWaitingCiRunsForPr,
+  type PrCiOutcome,
+} from "./waiting-ci-pr.js";
+export {
   buildDeliveryCheckpoint,
   buildDeliveryReport,
   buildDiffSummary,
@@ -647,6 +653,12 @@ export {
   revokeDeliveryShareToken,
   DEFAULT_DELIVERY_SHARE_TTL_MS,
 } from "./share-reports.js";
+export {
+  createShipReceiptShareToken,
+  getPublicShipReceiptShare,
+  toPublicShipReceipt,
+  type PublicShipReceipt,
+} from "./ship-receipt-share.js";
 export {
   countAcceptedPrsForWorkspace,
   getProjectCostExplorer,

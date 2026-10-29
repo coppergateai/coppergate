@@ -26,7 +26,7 @@ const TEST_DEFAULTS: MaintainerPolicy = {
   coordinatedMultiRepo: false,
   allowedSignalProviders: ["*", "ci_failure", "sentry", "dependabot", "codeql"],
   pathAllowlist: [],
-  maxTournamentN: 2,
+  maxTournamentN: 1,
   visionBriefId: null,
   replanIntervalDays: 7,
   autoQueueReplanTasks: true,

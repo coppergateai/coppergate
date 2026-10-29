@@ -9,6 +9,8 @@ export type MissionControlAttentionKind =
   /** Expected Open Program idle — not a maintainer failure (AG-015). */
   | "replan_idle"
   | "merge_blocked"
+  /** Default-branch CI ship gate — auto-merge halted until tip is green. */
+  | "ship_gate_halted"
   | "concurrency";
 
 export type MissionControlAttentionItem = {
@@ -31,6 +33,8 @@ export function missionControlAttentionKindRank(
     case "provider_quota":
       return 1;
     case "merge_blocked":
+      return 2;
+    case "ship_gate_halted":
       return 2;
     default:
       return 3;

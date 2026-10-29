@@ -59,6 +59,45 @@ export async function listOpenPulls(input: {
   }));
 }
 
+/** Light PR state for WAITING_CI recovery (merged vs closed-unmerged). */
+export type GithubPullMergeState = {
+  number: number;
+  state: string;
+  merged: boolean;
+};
+
+export async function getPullRequestMergeState(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  prNumber: number;
+  fetchImpl?: typeof fetch;
+}): Promise<GithubPullMergeState> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const headers = {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${input.token}`,
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  const prRes = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/pulls/${input.prNumber}`,
+    { headers },
+  );
+  if (!prRes.ok) {
+    throw new Error(`getPullRequestMergeState failed (${prRes.status})`);
+  }
+  const pr = (await prRes.json()) as {
+    number: number;
+    state: string;
+    merged?: boolean;
+  };
+  return {
+    number: pr.number,
+    state: pr.state,
+    merged: pr.merged === true,
+  };
+}
+
 export async function getPullRequestContext(input: {
   token: string;
   owner: string;

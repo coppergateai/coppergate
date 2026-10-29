@@ -123,6 +123,14 @@ Date: 2026-10-24
 - **Elimination debit determinism (P-142)**: `arena.elimination.test.ts` fixtures must cite validation + tests evidence for the intended winner; vibes-only zero scores made UUID lex pick the “winner” and left losers `ACTIVE`, redding `main` and freezing ship gate (`default_branch_ci_red`)
 - **Process**: prefer PR → green `check` before `main`; do not stack UI commits onto a red tip
 
+## Cycle 17
+- **WAITING_CI PR outcome**: merged/closed PR leaves WAITING_CI via refresh + `pull_request` webhook (merged → REVIEW_REQUIRED; closed-unmerged → FAILED) — stops orphan AG-style stalls after ship
+- **Cancelled ≠ block accept**: incomplete/`cancelled` checks ignored for `blocksAccept`; only `failure`/`timed_out` block
+- **Ship gate positive-green tip**: halt unless required context completed success; pending/cancelled tip → `default_branch_ci_pending` (vs `default_branch_ci_red`); Mission Control `ship_gate_halted` + ~15m audit rate-limit
+- **CI required name default**: `CI_REQUIRED_CHECK_NAMES` default `"check"` (matches workflow job id); stop vacuous `no_required_checks` while required names are configured
+- **Install id hygiene**: non-numeric GitHub install ids fail closed with reconnect messaging; health-scan flag + OPS_RUNBOOK recovery
+- **Dogfood N=1**: coppergate self-pilot `maxTournamentN` / `defaultContenderN` = 1 (stabilize + ensure/spawn honor solo; duel remains explicit N≥2)
+
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly
