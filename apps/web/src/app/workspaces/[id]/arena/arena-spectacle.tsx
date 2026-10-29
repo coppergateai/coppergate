@@ -260,6 +260,9 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
   }
   const title = displayTaskTitle(run.taskTitle, 72);
   if (state === "idle") {
+    if (run.optionalAttention?.kind === "docs_drift") {
+      return run.optionalAttention.message;
+    }
     // Quiet historical terminals — do not surface old error codes as live status.
     if (c.budgetMicrosRemaining <= 0) return "Standing by · budget spent";
     if (title) return `Last · ${title}`;
@@ -280,10 +283,7 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
   ) {
     return run.activityHint;
   }
-  if (
-    run.optionalAttention?.kind === "docs_drift" &&
-    (state === "awaitingCi" || state === "idle")
-  ) {
+  if (run.optionalAttention?.kind === "docs_drift" && state === "awaitingCi") {
     return run.optionalAttention.message;
   }
   if (title) {
