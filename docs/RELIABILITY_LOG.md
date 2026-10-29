@@ -134,6 +134,9 @@ Date: 2026-10-24
 ## Cycle 18
 - **Ship-gate self-heal (AG-031)**: tip `default_branch_ci_red` enqueues `[ship-gate]` heal task (not audit-only halt); stale `waiting_ci_timeout` REVIEW excluded from continuous-backlog busy count + request_changes after ~30m — prevents dogfood deadlock when tip is red or one review never accepts
 
+## Cycle 19
+- **Merge conflict signal (AG-032)**: dirty open delivery PR → `merge_conflict` ingest + auto-arm (same head rebase) instead of abandoning the PR via NEEDS_REPLAN; AG-031 replan remains only when no healable PR
+
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly

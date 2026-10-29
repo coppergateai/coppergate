@@ -768,6 +768,15 @@ export {
   upsertAutoArmRule,
   type SignalEnvelopeInput,
 } from "./signals.js";
+export {
+  MERGE_CONFLICT_PROVIDER,
+  buildMergeConflictEnvelope,
+  ensureMergeConflictSignal,
+  isMergeConflictDirty,
+  mergeConflictExternalId,
+  shouldEmitMergeConflictInsteadOfReplan,
+  type EnsureMergeConflictSignalResult,
+} from "./merge-conflict-signal.js";
 export { ingestSonarFitness } from "./sonar-fitness.js";
 export { callSonarTool, type SonarToolName } from "./sonarqube-mcp.js";
 export {

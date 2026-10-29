@@ -9,6 +9,7 @@ import type { MaintainerPolicy } from "./maintainer.js";
 const DEFAULT_SIGNAL_PROVIDERS_LIST = [
   "*",
   "ci_failure",
+  "merge_conflict",
   "sentry",
   "dependabot",
   "codeql",
