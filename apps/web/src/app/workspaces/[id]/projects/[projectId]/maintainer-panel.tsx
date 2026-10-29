@@ -39,6 +39,9 @@ type Policy = {
   bugScoutIntervalHours?: number;
   bugScoutMaxPerRun?: number;
   bugScoutLookbackHours?: number;
+  designScout?: boolean;
+  designScoutIntervalHours?: number;
+  designScoutMaxPerRun?: number;
   autoQueueReplanTasks?: boolean;
   releaseTagStyle?: string;
   maxTournamentN?: number;
@@ -471,6 +474,14 @@ export function MaintainerPanel({
                   : "Off"}
               </dd>
             </div>
+            <div>
+              <dt>Design scout</dt>
+              <dd>
+                {policy.designScout
+                  ? `Every ${policy.designScoutIntervalHours ?? 24}h · max ${policy.designScoutMaxPerRun ?? 2}/run`
+                  : "Off"}
+              </dd>
+            </div>
           </dl>
           {isOwner ? (
             <div className={styles.btnRow}>
@@ -486,6 +497,19 @@ export function MaintainerPanel({
                   }}
                 />{" "}
                 Bug scout → Open Program rows (AG-037)
+              </label>
+              <label className={styles.field}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(policy.designScout)}
+                  disabled={pending}
+                  onChange={(e) => {
+                    void post("update", {
+                      policy: { designScout: e.target.checked },
+                    });
+                  }}
+                />{" "}
+                Design scout → screens + Open Program rows (AG-040)
               </label>
             </div>
           ) : null}

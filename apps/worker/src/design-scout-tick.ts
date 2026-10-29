@@ -1,13 +1,15 @@
 /**
- * Design scout: screenshot target URLs → open design/ux GitHub issues.
+ * Design scout (AG-040): screenshot routes → Open Program rows (+ optional GH issues).
  */
 import {
+  appendDesignScoutOpenRowsToMarkdown,
   getProjectSpendSummary,
   importGithubIssueAsTask,
   isDesignScoutDue,
   listReposForProject,
   parseMaintainerPolicy,
   proposeDesignIssues,
+  proposeDesignOpenRows,
   recordDesignScoutEvent,
   resolveDesignScoutRoutes,
   submitTaskForApproval,
@@ -16,10 +18,12 @@ import {
 } from "@coppergate/db";
 import {
   createIssue,
+  getRepoFile,
   listOpenIssues,
   putRepoBinaryFile,
 } from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
+import { appendArchitectureOpenRows } from "./architecture-open-append.js";
 import { captureDesignScoutShots } from "./design-scout-capture.js";
 
 const DEFAULT_BASE_URL = "https://www.coppergate.ai";
@@ -167,6 +171,61 @@ export async function runDesignScoutForProject(
     return { created: 0, skipped: "list_issues_failed" };
   }
 
+  // AG-040: append Open Program rows when project is program-bound.
+  const architectureRepo = policy.architectureRepo?.trim() || null;
+  const architecturePaths = policy.architecturePaths?.trim() || null;
+  let openProgramIds: string[] = [];
+  let openProgramPath: string | null = null;
+
+  if (architectureRepo && architecturePaths) {
+    const [archOwner, archName] = architectureRepo.split("/");
+    const primaryPath = architecturePaths.split(",")[0]?.trim();
+    if (archOwner && archName && primaryPath) {
+      let markdown = "";
+      try {
+        const file = await getRepoFile({
+          token: input.token,
+          owner: archOwner,
+          repo: archName,
+          path: primaryPath,
+        });
+        markdown = file?.content ?? "";
+      } catch (err) {
+        log.warn("design scout architecture fetch failed", {
+          projectId: input.project.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      if (markdown.trim()) {
+        const openRows = proposeDesignOpenRows({
+          markdown,
+          shots: capture.shots,
+          max: policy.designScoutMaxPerRun,
+        });
+        if (openRows.length > 0) {
+          const written = await appendArchitectureOpenRows(log, {
+            token: input.token,
+            architectureRepo,
+            architecturePaths,
+            rows: openRows,
+            appendMarkdown: appendDesignScoutOpenRowsToMarkdown,
+            commitKind: "design-scout",
+            allowDefaultBranchWrite: true,
+          });
+          if (written) {
+            openProgramIds = written.ids;
+            openProgramPath = written.path;
+            log.info("design scout wrote open rows", {
+              projectId: input.project.id,
+              ids: written.ids,
+              path: written.path,
+            });
+          }
+        }
+      }
+    }
+  }
+
   const candidates = proposeDesignIssues({
     shots: capture.shots,
     openIssues,
@@ -248,6 +307,8 @@ export async function runDesignScoutForProject(
         htmlUrl,
         title,
       })),
+      openProgram: openProgramIds.map((id) => ({ id })),
+      openProgramPath,
       imported,
       shots: capture.shots.length,
       skippedAuthRoutes: capture.skippedAuthRoutes,
@@ -257,14 +318,18 @@ export async function runDesignScoutForProject(
     },
   });
 
-  if (created.length) {
-    log.info("design scout created issues", {
+  if (created.length || openProgramIds.length) {
+    log.info("design scout created findings", {
       projectId: input.project.id,
-      count: created.length,
+      issues: created.length,
+      openProgramIds,
       imported: imported.length,
-      issues: created.map((c) => c.htmlUrl),
+      issueUrls: created.map((c) => c.htmlUrl),
     });
   }
 
-  return { created: created.length, skipped: null };
+  return {
+    created: created.length + openProgramIds.length,
+    skipped: null,
+  };
 }

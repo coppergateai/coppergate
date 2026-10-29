@@ -2,6 +2,7 @@
  * Bug scout (AG-037): FAILED runs + tip CI failures → Open Program rows.
  */
 import {
+  appendBugScoutOpenRowsToMarkdown,
   collectBugEvidenceFromCiLogs,
   collectBugEvidenceFromRuns,
   getProjectSpendSummary,
@@ -213,6 +214,8 @@ export async function runBugScoutForProject(
     architectureRepo,
     architecturePaths,
     rows: candidates,
+    appendMarkdown: appendBugScoutOpenRowsToMarkdown,
+    commitKind: "bug-scout",
     allowDefaultBranchWrite: true,
   });
 
