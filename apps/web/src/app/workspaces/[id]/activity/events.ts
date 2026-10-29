@@ -271,6 +271,9 @@ const ACTION_DEFS: Record<string, ActionDef> = {
         if (reason === "no_architecture_open_id") {
           return "Skipped — no open architecture ID to invent from.";
         }
+        if (reason === "architecture_fetch_failed") {
+          return "Skipped — could not load bound Open Program markdown (re-bind Program path / token).";
+        }
         if (reason === "non_primary_project") {
           return "Skipped — non-primary project stays quiet.";
         }

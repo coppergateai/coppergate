@@ -8,6 +8,8 @@ export type MissionControlAttentionKind =
   | "replan_failed"
   /** Expected Open Program idle — not a maintainer failure (AG-015). */
   | "replan_idle"
+  /** Bound program markdown unreachable — no invent (AG-020). */
+  | "architecture_fetch_failed"
   | "merge_blocked"
   /** Default-branch CI ship gate — auto-merge halted until tip is green. */
   | "ship_gate_halted"

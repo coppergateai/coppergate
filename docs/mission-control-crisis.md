@@ -30,6 +30,8 @@ When panels are empty, copy reflects the real blocker (budget paused, crisis act
 
 When maintainer replan skips with `no_architecture_open_id` or `architecture_ids_in_flight`, Mission Control surfaces **`replan_idle`** attention (normal priority, backlog CTA) — not high-priority **`replan_failed`** fire. The status line and attention panel title use calm Open Program idle copy. Activity groups the same skips as **neutral** outcomes with idle titles.
 
+When replan skips with **`architecture_fetch_failed`** (bad GitHub token or missing Program path markdown), Mission Control surfaces **`architecture_fetch_failed`** attention with a **Re-bind Program path** CTA to Configuration — maintainer does not invent from vision or env markdown (AG-020). See `docs/architecture-fetch-fail-closed.md`.
+
 ## Testing
 
 - `packages/db/src/mission-control.test.ts` — attention sort ranks.
