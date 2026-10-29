@@ -14,9 +14,11 @@ import {
 } from "@coppergate/github";
 import {
   ensureDefaultAutoArmRule,
+  evaluateCiFlakeCooldown,
   findWorkspacesForRepo,
   ingestCiEvidence,
   ingestSignal,
+  recordCiCheckObservation,
   recordWebhookDelivery,
   resolveWaitingCiRunsForPr,
   setInstallationStatusByGithubId,
@@ -151,6 +153,25 @@ export async function POST(request: Request) {
         ? `${stub.note}; attached to run ${ingested.runId}`
         : stub.note;
 
+      // AG-021 — record check outcomes (pass + fail) for flake cooldown history.
+      if (evidence.repoFullName && evidence.name) {
+        const obsTargets = await findWorkspacesForRepo(
+          db,
+          evidence.repoFullName,
+        );
+        for (const t of obsTargets) {
+          await recordCiCheckObservation(db, {
+            workspaceId: t.workspaceId,
+            projectId: t.projectId,
+            name: evidence.name,
+            conclusion: evidence.conclusion,
+            passed: evidence.passed,
+            repoFullName: evidence.repoFullName,
+            headSha: evidence.headSha,
+          }).catch(() => undefined);
+        }
+      }
+
       // TASK088 — CI failure → Signal → optional fix arena (when no matching run).
       if (
         !ingested.attached &&
@@ -163,6 +184,16 @@ export async function POST(request: Request) {
           evidence.repoFullName,
         );
         for (const t of targets) {
+          // AG-021 — do not thrash Retry/arm while check is oscillating.
+          const cool = await evaluateCiFlakeCooldown(db, {
+            workspaceId: t.workspaceId,
+            projectId: t.projectId,
+            checkName: evidence.name,
+          });
+          if (cool.suppress) {
+            note = `${note}; flake_cooldown skipped arm (${cool.reason ?? evidence.name})`;
+            continue;
+          }
           await ensureDefaultAutoArmRule(db, {
             workspaceId: t.workspaceId,
             provider: "ci_failure",
@@ -212,6 +243,24 @@ export async function POST(request: Request) {
 
       // Deploy-fail reverse path — Vercel classic commit status (no matching run).
       // Redeploy happens via Accept → merge → Vercel Git integration (not L3 API).
+      if (evidence.repoFullName && evidence.name) {
+        const obsTargets = await findWorkspacesForRepo(
+          db,
+          evidence.repoFullName,
+        );
+        for (const t of obsTargets) {
+          await recordCiCheckObservation(db, {
+            workspaceId: t.workspaceId,
+            projectId: t.projectId,
+            name: evidence.name,
+            conclusion: evidence.conclusion,
+            passed: evidence.passed,
+            repoFullName: evidence.repoFullName,
+            headSha: evidence.headSha,
+          }).catch(() => undefined);
+        }
+      }
+
       if (
         !ingested.attached &&
         evidence.blocksAccept &&
@@ -224,6 +273,15 @@ export async function POST(request: Request) {
           evidence.repoFullName,
         );
         for (const t of targets) {
+          const cool = await evaluateCiFlakeCooldown(db, {
+            workspaceId: t.workspaceId,
+            projectId: t.projectId,
+            checkName: evidence.name,
+          });
+          if (cool.suppress) {
+            note = `${note}; flake_cooldown skipped arm (${cool.reason ?? evidence.name})`;
+            continue;
+          }
           await ensureDefaultAutoArmRule(db, {
             workspaceId: t.workspaceId,
             provider: "ci_failure",

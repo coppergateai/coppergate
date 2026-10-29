@@ -10,6 +10,7 @@
 
 ### Features
 
+- AG-021: Flake cooldown wire — `detectFlakePattern` gates `ci_failure` auto-arm, Evidence Retry, and worker execute so oscillating checks do not thrash spend. See `docs/flake-cooldown.md`.
 - AG-020: Architecture fetch fail-closed — bad token / 404 Open Program markdown skips invent with `architecture_fetch_failed` and a Mission Control tip to re-bind Settings. See `docs/architecture-fetch-fail-closed.md`.
 - AG-014: Mid-run file-write checkpoint — after each sandbox write, persist `file_write_checkpoint`; on reclaim restore bodies and skip identical OpenAI-compatible rewrites. See `docs/file-write-checkpoint.md`.
 - AG-035: Unattended board drain — retire obsolete `[ship-gate]` when tip is green / PR closed; dirty delivery PRs get `merge_conflict` after ~15m (no 6h wait) and free parent concurrency; signal arm survives min_human/approve races. See `docs/ship-receipts/AG-035.md`.
