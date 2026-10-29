@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import type { Database } from "./client.js";
 import { auditEvents, type AuditEvent } from "./schema.js";
 
@@ -29,6 +29,30 @@ export async function listAuditEventsForWorkspace(
     .where(and(...conditions))
     .orderBy(desc(auditEvents.createdAt))
     .limit(limit);
+}
+
+/** Newest audit timestamp for a task target and action set (AG-021 cooldown). */
+export async function latestAuditAtForTaskTarget(
+  db: Database,
+  workspaceId: string,
+  taskId: string,
+  actions: readonly string[],
+): Promise<Date | null> {
+  if (actions.length === 0) return null;
+  const [row] = await db
+    .select({ createdAt: auditEvents.createdAt })
+    .from(auditEvents)
+    .where(
+      and(
+        eq(auditEvents.workspaceId, workspaceId),
+        eq(auditEvents.targetType, "task"),
+        eq(auditEvents.targetId, taskId),
+        inArray(auditEvents.action, [...actions]),
+      ),
+    )
+    .orderBy(desc(auditEvents.createdAt))
+    .limit(1);
+  return row?.createdAt ?? null;
 }
 
 export async function countAuditEventsForWorkspace(

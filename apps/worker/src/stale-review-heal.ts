@@ -1,5 +1,5 @@
 /**
- * AG-031 / AG-032 / AG-033 / AG-035 — unattended board drain:
+ * AG-021 / AG-031 / AG-032 / AG-033 / AG-035 — unattended board drain:
  * - obsolete [ship-gate] when tip green / PR closed → request_changes
  * - dirty open PR (after short grace) → merge_conflict (no 6h wait)
  * - other open PR after waiting_ci_timeout → stale_delivery heal
@@ -11,8 +11,12 @@ import {
   decideTaskReview,
   ensureMergeConflictSignal,
   ensureStaleDeliveryHealSignal,
+  evaluateFlakeRetryDeferral,
+  FLAKE_RETRY_COOLDOWN_ACTIONS,
   getRunCiFitness,
   isShipGateHealTitle,
+  latestAuditAtForTaskTarget,
+  listRunCiCheckHistory,
   listRunsForTask,
   recordAuditEvent,
   routeStaleReviewHeal,
@@ -44,11 +48,13 @@ export async function healStaleReviewsOrEmitConflict(
   deliveryHeals: number;
   replanned: number;
   retiredShipGates: number;
+  flakeCooldownSkipped: number;
 }> {
   let conflictSignals = 0;
   let deliveryHeals = 0;
   let replanned = 0;
   let retiredShipGates = 0;
+  let flakeCooldownSkipped = 0;
 
   const pending = await db
     .select()
@@ -254,6 +260,31 @@ export async function healStaleReviewsOrEmitConflict(
       continue;
     }
 
+    if (candidate?.id) {
+      const history = await listRunCiCheckHistory(db, candidate.id);
+      const lastRetryOrHeal = await latestAuditAtForTaskTarget(
+        db,
+        input.workspaceId,
+        task.id,
+        FLAKE_RETRY_COOLDOWN_ACTIONS,
+      );
+      const flakeDefer = evaluateFlakeRetryDeferral({
+        checkHistory: history,
+        lastRetryOrHealAt: lastRetryOrHeal,
+      });
+      if (flakeDefer.defer) {
+        flakeCooldownSkipped += 1;
+        log.info("flake cooldown — skip unattended heal/replan", {
+          projectId: input.projectId,
+          taskId: task.id,
+          runId: candidate.id,
+          reason: flakeDefer.reason,
+          retryAfterMs: flakeDefer.retryAfterMs,
+        });
+        continue;
+      }
+    }
+
     if (prNumber != null && prNumber > 0) {
       try {
         if (mergeStateError) throw new Error(mergeStateError);
@@ -411,5 +442,11 @@ export async function healStaleReviewsOrEmitConflict(
     }
   }
 
-  return { conflictSignals, deliveryHeals, replanned, retiredShipGates };
+  return {
+    conflictSignals,
+    deliveryHeals,
+    replanned,
+    retiredShipGates,
+    flakeCooldownSkipped,
+  };
 }
