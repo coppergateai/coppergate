@@ -622,6 +622,14 @@ export {
   type RunProgressHint,
 } from "./run-event-hints.js";
 export {
+  docsDriftAttentionForRuns,
+  docsDriftProgressPayload,
+  evaluateDocsDriftAttention,
+  filesChangedFromDeliveryBody,
+  latestDeliveryFilesForRuns,
+  type DocsDriftOptionalAttention,
+} from "./docs-drift-attention.js";
+export {
   containsSecretMaterial,
   redactPayload,
   redactString,

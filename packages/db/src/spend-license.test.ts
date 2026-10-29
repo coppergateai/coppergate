@@ -64,4 +64,11 @@ describe("spend-license", () => {
     assert.equal(isShipGateHealTitle(title), true);
     assert.equal(openIdFromTaskTitle(title), null);
   });
+
+  it("AG-022 docs drift advisory does not carry an Open ID bypass", () => {
+    assert.equal(
+      openIdFromTaskTitle("Docs drift · API paths changed without docs"),
+      null,
+    );
+  });
 });

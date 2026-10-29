@@ -27,6 +27,11 @@ type ContenderRun = {
   tournamentResult?: string | null;
   updatedAt: string;
   activityHint?: string | null;
+  optionalAttention?: {
+    kind: "docs_drift";
+    message: string;
+    apiPaths: string[];
+  } | null;
 };
 
 const STALE_FAILURE_MS = 2 * 60 * 60 * 1000;
@@ -86,6 +91,7 @@ type Summary = {
   awaitingCi: number;
   needsAttention: number;
   idle: number;
+  optionalAttention?: number;
 };
 
 type Snapshot = {
@@ -254,6 +260,9 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
   }
   const title = displayTaskTitle(run.taskTitle, 72);
   if (state === "idle") {
+    if (run.optionalAttention?.kind === "docs_drift") {
+      return run.optionalAttention.message;
+    }
     // Quiet historical terminals — do not surface old error codes as live status.
     if (c.budgetMicrosRemaining <= 0) return "Standing by · budget spent";
     if (title) return `Last · ${title}`;
@@ -273,6 +282,9 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
     run.activityHint.trim()
   ) {
     return run.activityHint;
+  }
+  if (run.optionalAttention?.kind === "docs_drift" && state === "awaitingCi") {
+    return run.optionalAttention.message;
   }
   if (title) {
     if (state === "running") return title;
@@ -384,6 +396,7 @@ export function ArenaSpectacle({
         awaitingCi: 0,
         needsAttention: 0,
         idle: 0,
+        optionalAttention: 0,
       },
       syncedAt: data.syncedAt ?? new Date().toISOString(),
       projects: (data.projects ?? []).map((lane) => ({
@@ -569,6 +582,7 @@ export function ArenaSpectacle({
     awaitingCi: 0,
     needsAttention: 0,
     idle: 0,
+    optionalAttention: 0,
   };
 
   function toggleExpand(projectId: string) {
@@ -682,6 +696,14 @@ export function ArenaSpectacle({
           <p className={styles.summaryItem}>
             <strong className={styles.summaryIdle}>{summary.idle}</strong> idle
           </p>
+          {(summary.optionalAttention ?? 0) > 0 ? (
+            <p className={styles.summaryItem}>
+              <strong className={styles.summaryWaiting}>
+                {summary.optionalAttention}
+              </strong>{" "}
+              docs advisory
+            </p>
+          ) : null}
         </section>
 
         {loading ? (
