@@ -39,6 +39,7 @@ import {
 import { resolveDefaultBranchMergeFlag } from "@coppergate/scm";
 import type { Logger } from "@coppergate/telemetry";
 import { writeArchitectureTaskDone } from "./architecture-writeback.js";
+import { runBugScoutForProject } from "./bug-scout-tick.js";
 import { runCommunityScoutForProject } from "./community-scout-tick.js";
 import { runDesignScoutForProject } from "./design-scout-tick.js";
 import { refreshPendingCiEvidence } from "./refresh-ci-evidence.js";
@@ -166,6 +167,19 @@ export async function runMaintainerSchedulerTick(
       });
     } catch (err) {
       log.warn("design scout failed", {
+        projectId: tick.projectId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    try {
+      await runBugScoutForProject(db, log, {
+        workspaceId: tick.workspaceId,
+        project: bound.project,
+        token,
+      });
+    } catch (err) {
+      log.warn("bug scout failed", {
         projectId: tick.projectId,
         error: err instanceof Error ? err.message : String(err),
       });

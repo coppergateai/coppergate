@@ -217,6 +217,18 @@ export async function POST(request: Request, context: RouteContext) {
           ...(typeof patch.communityReplies === "boolean"
             ? { communityReplies: patch.communityReplies }
             : {}),
+          ...(typeof patch.bugScout === "boolean"
+            ? { bugScout: patch.bugScout }
+            : {}),
+          ...(typeof patch.bugScoutIntervalHours === "number"
+            ? { bugScoutIntervalHours: patch.bugScoutIntervalHours }
+            : {}),
+          ...(typeof patch.bugScoutMaxPerRun === "number"
+            ? { bugScoutMaxPerRun: patch.bugScoutMaxPerRun }
+            : {}),
+          ...(typeof patch.bugScoutLookbackHours === "number"
+            ? { bugScoutLookbackHours: patch.bugScoutLookbackHours }
+            : {}),
           ...(architectureRepo !== undefined ? { architectureRepo } : {}),
           ...(architecturePaths !== undefined ? { architecturePaths } : {}),
           // Preserve current enabled flag unless an explicit boolean is patched.

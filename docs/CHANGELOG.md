@@ -10,6 +10,7 @@
 
 ### Features
 
+- AG-037: Continuous bug scout → Open Program rows — opt-in `bugScout` maintainer policy scans FAILED runs + tip CI evidence, appends `| Open | AG-N |` under Bug scout section (fingerprint dedup; skips ship-gate/merge_conflict/stale_delivery). See `docs/bug-scout-open-program.md`.
 - AG-036: Behind delivery auto-update — accept-ready + strict-behind PRs get GitHub `update-branch` (board drain + auto-merge path); update conflict arms `merge_conflict`; Arena labels REVIEW as Awaiting merge. See `docs/behind-delivery-update.md`.
 - AG-021: Flake cooldown wire — `detectFlakePattern` gates `ci_failure` auto-arm, Evidence Retry, and worker execute so oscillating checks do not thrash spend. See `docs/flake-cooldown.md`.
 - AG-020: Architecture fetch fail-closed — bad token / 404 Open Program markdown skips invent with `architecture_fetch_failed` and a Mission Control tip to re-bind Settings. See `docs/architecture-fetch-fail-closed.md`.
