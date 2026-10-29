@@ -77,7 +77,7 @@ describe("maintainer policy", () => {
     assert.equal(p.enabled, false);
     assert.equal(p.monthlyBudgetMicros, DEFAULT_MONTHLY_BUDGET_MICROS);
     assert.equal(DEFAULT_MONTHLY_BUDGET_MICROS, 8_000_000);
-    assert.equal(p.maxTournamentN, 2);
+    assert.equal(p.maxTournamentN, 1);
     assert.equal(p.autoMerge, true);
     assert.equal(p.autoRelease, false);
     assert.equal(DEFAULT_MAINTAINER_POLICY.autoRelease, false);
