@@ -424,6 +424,14 @@ export {
   type ShipReceiptBody,
 } from "./ship-receipt.js";
 export {
+  OPP_PROTOCOL_VERSION,
+  auditOppVerifyAfterAccept,
+  projectShipReceiptToOpp,
+  verifyShipReceiptWithOpp,
+  type OppShipReceiptVerifyBody,
+  type OppVerifyAuditMeta,
+} from "./ship-receipt-opp.js";
+export {
   formatCommunityIssueBody,
   isCommunityScoutDue,
   proposeCommunityIssues,

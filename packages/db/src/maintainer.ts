@@ -69,6 +69,12 @@ import {
 } from "./architecture-backlog.js";
 import { getProjectForWorkspace } from "./projects.js";
 import { openTaskCountsAsBusyForBacklog } from "./ship-gate-heal-policy.js";
+import { fetchArchitectureBacklogMarkdown } from "./architecture-program-fetch.js";
+
+export {
+  DEFAULT_ARCHITECTURE_PATHS,
+  fetchArchitectureBacklogMarkdown,
+} from "./architecture-program-fetch.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
@@ -3054,10 +3060,6 @@ export async function markAutoMerged(
   });
 }
 
-/** Default architecture markdown paths (primary-capable Open IDs first). */
-export const DEFAULT_ARCHITECTURE_PATHS =
-  "PROVIDER-TASKS.md,RUNTIME-TASKS.md,AGENT-TASKS.md,APP-TASKS.md,WEBSITE-TASKS.md,CONTENT-PLAN.md";
-
 /**
  * Architecture IDs already represented by open board work (workspace-wide),
  * recently completed/failed work (cooldown), or open Coppergate PRs.
@@ -3157,84 +3159,6 @@ export async function listInFlightArchitectureIds(
   }
 
   return [...ids];
-}
-
-/**
- * Best-effort load of architecture Open tasks from GitHub.
- * Prefer per-project MaintainerPolicy.architectureRepo / architecturePaths,
- * then ARCHITECTURE_REPO / ARCHITECTURE_PATHS env, then kprompt defaults.
- */
-export async function fetchArchitectureBacklogMarkdown(
-  tokenOrOpts?:
-    | string
-    | null
-    | {
-        token?: string | null;
-        repo?: string | null;
-        paths?: string | null;
-      },
-): Promise<string> {
-  const opts =
-    typeof tokenOrOpts === "string" || tokenOrOpts == null
-      ? { token: tokenOrOpts }
-      : tokenOrOpts;
-  const token =
-    opts.token?.trim() ||
-    process.env.ARCHITECTURE_GITHUB_TOKEN?.trim() ||
-    process.env.GITHUB_TOKEN?.trim() ||
-    process.env.GH_TOKEN?.trim() ||
-    null;
-
-  const repo =
-    opts.repo?.trim() ||
-    process.env.ARCHITECTURE_REPO?.trim() ||
-    "kprompt/kprompt-architecture";
-  const [owner, name] = repo.split("/");
-  if (!owner || !name) return "";
-
-  const paths = (
-    opts.paths?.trim() ||
-    process.env.ARCHITECTURE_PATHS?.trim() ||
-    DEFAULT_ARCHITECTURE_PATHS
-  )
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .slice(0, 8);
-
-  const chunks: string[] = [];
-  for (const path of paths) {
-    try {
-      const headers: Record<string, string> = {
-        Accept: "application/vnd.github+json",
-        "User-Agent": "coppergate-maintainer",
-        "X-GitHub-Api-Version": "2022-11-28",
-      };
-      // Public Open Program repos work without a token; private need install/PAT.
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(
-        `https://api.github.com/repos/${owner}/${name}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`,
-        { headers },
-      );
-      if (!res.ok) continue;
-      const body = (await res.json()) as {
-        type?: string;
-        encoding?: string;
-        content?: string;
-      };
-      if (body.type !== "file" || !body.content) continue;
-      const text =
-        body.encoding === "base64"
-          ? Buffer.from(body.content.replace(/\n/g, ""), "base64").toString(
-              "utf8",
-            )
-          : body.content;
-      chunks.push(`# ${path}\n${text}`);
-    } catch {
-      /* ignore per-file errors */
-    }
-  }
-  return chunks.join("\n\n");
 }
 
 /** Clear sticky merge_blocked so a PR can be retried after GitHub rights change. */
