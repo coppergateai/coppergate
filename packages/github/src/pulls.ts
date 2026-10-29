@@ -176,6 +176,61 @@ export async function getPullRequestContext(input: {
   };
 }
 
+/**
+ * AG-036 — update a behind PR head onto its base (GitHub "Update branch").
+ * 202 → updated; 422 with conflict → caller should arm merge_conflict Fixer.
+ */
+export async function updatePullRequestBranch(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  prNumber: number;
+  expectedHeadSha?: string | null;
+  fetchImpl?: typeof fetch;
+}): Promise<{
+  updated: boolean;
+  conflict: boolean;
+  message: string;
+}> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const body: { expected_head_sha?: string } = {};
+  const sha = input.expectedHeadSha?.trim();
+  if (sha) body.expected_head_sha = sha;
+  const res = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/update-branch`,
+    {
+      method: "PUT",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${input.token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  const text = await res.text().catch(() => "");
+  let message = text.slice(0, 300);
+  try {
+    const json = JSON.parse(text) as { message?: string };
+    if (typeof json.message === "string") message = json.message;
+  } catch {
+    /* plain text */
+  }
+  if (res.status === 202 || res.status === 200) {
+    return { updated: true, conflict: false, message: message || "updated" };
+  }
+  const lower = message.toLowerCase();
+  const conflict =
+    res.status === 422 &&
+    (lower.includes("conflict") || lower.includes("merge conflict"));
+  return {
+    updated: false,
+    conflict,
+    message: message || `update-branch failed (${res.status})`,
+  };
+}
+
 export async function submitPullRequestReview(input: {
   token: string;
   owner: string;

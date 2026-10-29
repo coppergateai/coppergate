@@ -27,6 +27,16 @@ export function isMergeConflictDirty(input: {
 }
 
 /**
+ * AG-036 — branch is behind base (strict up-to-date) but not conflicted.
+ * Needs update-branch, not a conflict Fixer (unless update-branch returns 422).
+ */
+export function isBehindMergeState(input: {
+  mergeableState?: string | null;
+}): boolean {
+  return (input.mergeableState ?? "").toLowerCase() === "behind";
+}
+
+/**
  * Prefer conflict heal signal over AG-031 request_changes → NEEDS_REPLAN
  * when the delivery PR is still open and dirty.
  */

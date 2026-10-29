@@ -169,13 +169,18 @@ function classifyRuntime(
   return "idle";
 }
 
-function runtimeLabel(state: RuntimeState, eliminated?: boolean): string {
+function runtimeLabel(
+  state: RuntimeState,
+  eliminated?: boolean,
+  runStatus?: string | null,
+): string {
   if (eliminated) return "Eliminated";
   switch (state) {
     case "running":
       return "Running";
     case "awaitingCi":
-      return "Awaiting CI";
+      // AG-036 honesty: REVIEW_REQUIRED is merge/Accept wait, not CI.
+      return runStatus === "REVIEW_REQUIRED" ? "Awaiting merge" : "Awaiting CI";
     case "needsAttention":
       return "Needs attention";
     default:
@@ -225,7 +230,16 @@ function projectStatusLabel(lane: ProjectLane): string {
   if (lane.arenaStatus === "PAUSED") return "Paused";
   if (lane.arenaStatus === "KILLED") return "Stopped";
   const runtime = projectRuntime(lane);
-  if (runtime === "awaitingCi") return "Awaiting CI";
+  if (runtime === "awaitingCi") {
+    const arenaLive = isLiveStatus(lane.arenaStatus);
+    const hot = lane.contenders.filter(
+      (c) => classifyRuntime(c, arenaLive) === "awaitingCi",
+    );
+    const allReview =
+      hot.length > 0 &&
+      hot.every((c) => c.latestRun?.status === "REVIEW_REQUIRED");
+    return allReview ? "Awaiting merge" : "Awaiting CI";
+  }
   if (runtime === "needsAttention") return "Needs attention";
   if (runtime === "running") return "Running";
   if (isLiveStatus(lane.arenaStatus)) return "Live";
@@ -262,7 +276,11 @@ function activityLine(c: ContenderView, state: RuntimeState): string {
   }
   if (title) {
     if (state === "running") return title;
-    if (state === "awaitingCi") return `Awaiting validation · ${title}`;
+    if (state === "awaitingCi") {
+      return run.status === "REVIEW_REQUIRED"
+        ? `Awaiting merge · ${title}`
+        : `Awaiting validation · ${title}`;
+    }
     return title;
   }
   return run.status.replace(/_/g, " ");
@@ -904,7 +922,11 @@ export function ArenaSpectacle({
                                     ? "Winner"
                                     : result === "LOSER"
                                       ? "Loser"
-                                      : runtimeLabel(state)}
+                                      : runtimeLabel(
+                                          state,
+                                          false,
+                                          c.latestRun?.status,
+                                        )}
                                 </span>
                               </div>
                               {hot ? (
@@ -1086,6 +1108,7 @@ export function ArenaSpectacle({
           statusLabel={runtimeLabel(
             selectedAgent.state,
             selectedAgent.eliminated,
+            selectedAgent.contender.latestRun?.status,
           )}
           statusBadgeClass={TONE[selectedAgent.state].badge ?? ""}
           eliminated={selectedAgent.eliminated}

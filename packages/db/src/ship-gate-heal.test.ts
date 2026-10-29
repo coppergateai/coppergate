@@ -47,7 +47,7 @@ describe("ship-gate-heal (AG-031)", () => {
     );
   });
 
-  it("AG-035: inspect dirty deliveries after grace; retire obsolete ship-gate", () => {
+  it("AG-035/036: inspect deliveries after grace (incl. acceptReady); retire obsolete ship-gate", () => {
     const now = Date.UTC(2026, 9, 29, 12, 0);
     const fresh = new Date(now - 60_000);
     const ripe = new Date(now - DIRTY_PR_HEAL_GRACE_MS - 1);
@@ -64,6 +64,16 @@ describe("ship-gate-heal (AG-031)", () => {
       shouldInspectDeliveryPrForUnattendedHeal({
         taskStatus: "WAITING_CI",
         acceptReady: false,
+        taskUpdatedAt: ripe,
+        nowMs: now,
+      }),
+      true,
+    );
+    // AG-036: green CI must not skip merge-state salvage (behind/dirty).
+    assert.equal(
+      shouldInspectDeliveryPrForUnattendedHeal({
+        taskStatus: "REVIEW_REQUIRED",
+        acceptReady: true,
         taskUpdatedAt: ripe,
         nowMs: now,
       }),

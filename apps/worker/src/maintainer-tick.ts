@@ -7,6 +7,7 @@ import {
   ensureShipGateHealTask,
   getInstallationForWorkspace,
   getProjectForWorkspace,
+  isBehindMergeState,
   isMergeProtectionBlock,
   isShipGateHealTitle,
   isTransientNotMergeable,
@@ -33,6 +34,7 @@ import {
   getPullRequestMergeState,
   getRepoDefaultBranchHead,
   mergePullRequest,
+  updatePullRequestBranch,
 } from "@coppergate/github";
 import { resolveDefaultBranchMergeFlag } from "@coppergate/scm";
 import type { Logger } from "@coppergate/telemetry";
@@ -312,6 +314,7 @@ export async function runMaintainerSchedulerTick(
       if (
         stale.conflictSignals ||
         stale.deliveryHeals ||
+        stale.branchUpdates ||
         stale.replanned ||
         stale.retiredShipGates
       ) {
@@ -319,6 +322,7 @@ export async function runMaintainerSchedulerTick(
           projectId: tick.projectId,
           conflictSignals: stale.conflictSignals,
           deliveryHeals: stale.deliveryHeals,
+          branchUpdates: stale.branchUpdates,
           replanned: stale.replanned,
           retiredShipGates: stale.retiredShipGates,
         });
@@ -422,9 +426,65 @@ export async function runMaintainerSchedulerTick(
               repo: name,
               prNumber: c.prNumber,
             });
-            if (
+            const prOpen = pr.state === "open" && !pr.merged;
+            // AG-036: behind → update-branch; conflict → merge_conflict Fixer.
+            if (prOpen && isBehindMergeState({ mergeableState: pr.mergeableState })) {
+              const upd = await updatePullRequestBranch({
+                token,
+                owner,
+                repo: name,
+                prNumber: c.prNumber,
+                expectedHeadSha: pr.headSha,
+              });
+              await recordAuditEvent(db, {
+                workspaceId: tick.workspaceId,
+                actor,
+                action: upd.updated
+                  ? "merge.branch_updated"
+                  : "merge.branch_update_failed",
+                targetType: "merge",
+                targetId: c.task.id,
+                meta: {
+                  projectId: tick.projectId,
+                  prNumber: c.prNumber,
+                  updated: upd.updated,
+                  conflict: upd.conflict,
+                  message: upd.message.slice(0, 200),
+                },
+              });
+              if (upd.updated) {
+                log.info("update-branch after not-mergeable behind", {
+                  projectId: tick.projectId,
+                  prNumber: c.prNumber,
+                });
+              } else if (upd.conflict) {
+                const signal = await ensureMergeConflictSignal(db, {
+                  workspaceId: tick.workspaceId,
+                  projectId: tick.projectId,
+                  actor,
+                  owner,
+                  repo: name,
+                  prNumber: c.prNumber,
+                  headRef: pr.headRef,
+                  headSha: pr.headSha,
+                  baseRef: pr.baseRef,
+                  parentTitle: c.task.title,
+                });
+                log.info("merge_conflict after update-branch conflict", {
+                  projectId: tick.projectId,
+                  prNumber: c.prNumber,
+                  armed: signal.armed,
+                });
+              } else {
+                log.warn("update-branch failed after not-mergeable", {
+                  projectId: tick.projectId,
+                  prNumber: c.prNumber,
+                  message: upd.message.slice(0, 160),
+                });
+              }
+            } else if (
               shouldEmitMergeConflictInsteadOfReplan({
-                prOpen: pr.state === "open" && !pr.merged,
+                prOpen,
                 merged: pr.merged,
                 mergeable: pr.mergeable,
                 mergeableState: pr.mergeableState,

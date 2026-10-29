@@ -145,6 +145,7 @@ Date: 2026-10-24
 
 ## Cycle 22
 - **Unattended board drain (AG-035)**: obsolete `[ship-gate]` retires when tip green; dirty WAITING_CI → `merge_conflict` after ~15m (not 6h); parent concurrency freed; `armSignalEvent` race `QUEUED→QUEUED` no longer fails the signal
+- **Behind delivery auto-update (AG-036)**: accept-ready no longer skips PR inspect; `behind` → `update-branch`; conflict → `merge_conflict`; Arena REVIEW_REQUIRED labeled Awaiting merge (not Awaiting CI)
 
 ## Remaining risks
 - Agent planning itself remains single-shot (no mid-LLM step checkpoints)

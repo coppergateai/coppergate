@@ -10,6 +10,7 @@
 
 ### Features
 
+- AG-036: Behind delivery auto-update — accept-ready + strict-behind PRs get GitHub `update-branch` (board drain + auto-merge path); update conflict arms `merge_conflict`; Arena labels REVIEW as Awaiting merge. See `docs/behind-delivery-update.md`.
 - AG-021: Flake cooldown wire — `detectFlakePattern` gates `ci_failure` auto-arm, Evidence Retry, and worker execute so oscillating checks do not thrash spend. See `docs/flake-cooldown.md`.
 - AG-020: Architecture fetch fail-closed — bad token / 404 Open Program markdown skips invent with `architecture_fetch_failed` and a Mission Control tip to re-bind Settings. See `docs/architecture-fetch-fail-closed.md`.
 - AG-014: Mid-run file-write checkpoint — after each sandbox write, persist `file_write_checkpoint`; on reclaim restore bodies and skip identical OpenAI-compatible rewrites. See `docs/file-write-checkpoint.md`.
