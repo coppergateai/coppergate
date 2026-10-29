@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { listOpenPulls, submitPullRequestReview } from "./pulls.js";
+import {
+  getPullRequestMergeState,
+  listOpenPulls,
+  submitPullRequestReview,
+} from "./pulls.js";
 
 describe("listOpenPulls", () => {
   it("maps open pull payloads", async () => {
@@ -28,6 +32,36 @@ describe("listOpenPulls", () => {
     assert.equal(pulls[0]!.number, 42);
     assert.equal(pulls[0]!.headRef, "fix-auth");
     assert.equal(pulls[0]!.baseRef, "main");
+  });
+});
+
+describe("getPullRequestMergeState", () => {
+  it("maps mergeable + mergeable_state for conflict heal", async () => {
+    const state = await getPullRequestMergeState({
+      token: "t",
+      owner: "acme",
+      repo: "app",
+      prNumber: 190,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            number: 190,
+            state: "open",
+            merged: false,
+            mergeable: false,
+            mergeable_state: "dirty",
+            head: { ref: "coppergate/ag-018", sha: "abc123" },
+            base: { ref: "main" },
+          }),
+          { status: 200 },
+        ),
+    });
+    assert.equal(state.number, 190);
+    assert.equal(state.mergeable, false);
+    assert.equal(state.mergeableState, "dirty");
+    assert.equal(state.headRef, "coppergate/ag-018");
+    assert.equal(state.headSha, "abc123");
+    assert.equal(state.baseRef, "main");
   });
 });
 

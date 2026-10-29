@@ -8,6 +8,7 @@ import {
   type ReviewDecision,
 } from "@coppergate/db";
 import { mergePullRequest } from "@coppergate/github";
+import { resolveDefaultBranchMergeFlag } from "@coppergate/scm";
 import { ApiError } from "@coppergate/errors";
 import { requireUser } from "@/lib/auth";
 import { requireCsrf } from "@/lib/csrf";
@@ -134,6 +135,11 @@ export async function POST(request: Request, context: RouteContext) {
                 owner,
                 repo: name,
                 prNumber,
+                allowDefaultBranchWrite: resolveDefaultBranchMergeFlag({
+                  mergeEnabled: bound.project.mergeEnabled,
+                  via: "accept",
+                  autonomyLevel: bound.project.autonomyLevel,
+                }),
               });
               merge.merged = merged.merged;
               merge.message = merged.message;

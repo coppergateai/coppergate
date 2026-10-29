@@ -100,6 +100,7 @@ export class DockerSandboxManager implements SandboxManager {
       createdAt: new Date(),
       runtime: "docker-gvisor",
       cloneMode,
+      prodWritesEnabled: input.prodWritesEnabled === true,
       destroyed: false,
       image: spec.image,
     };
@@ -116,7 +117,9 @@ export class DockerSandboxManager implements SandboxManager {
     if (!command.length) {
       throw new SandboxPolicyError("invalid", "command required");
     }
-    assertSandboxCommandArgs(command);
+    assertSandboxCommandArgs(command, {
+      prodWritesEnabled: active.prodWritesEnabled,
+    });
 
     const spec = buildDockerSandboxSpec({
       image: active.image,

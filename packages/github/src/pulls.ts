@@ -59,6 +59,62 @@ export async function listOpenPulls(input: {
   }));
 }
 
+/** Light PR state for WAITING_CI recovery + merge-conflict heal (AG-032). */
+export type GithubPullMergeState = {
+  number: number;
+  state: string;
+  merged: boolean;
+  /** null while GitHub is still computing mergeability. */
+  mergeable: boolean | null;
+  /** clean | dirty | unstable | blocked | unknown | … */
+  mergeableState: string | null;
+  headRef: string | null;
+  headSha: string | null;
+  baseRef: string | null;
+};
+
+export async function getPullRequestMergeState(input: {
+  token: string;
+  owner: string;
+  repo: string;
+  prNumber: number;
+  fetchImpl?: typeof fetch;
+}): Promise<GithubPullMergeState> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const headers = {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${input.token}`,
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  const prRes = await fetchImpl(
+    `https://api.github.com/repos/${input.owner}/${input.repo}/pulls/${input.prNumber}`,
+    { headers },
+  );
+  if (!prRes.ok) {
+    throw new Error(`getPullRequestMergeState failed (${prRes.status})`);
+  }
+  const pr = (await prRes.json()) as {
+    number: number;
+    state: string;
+    merged?: boolean;
+    mergeable?: boolean | null;
+    mergeable_state?: string | null;
+    head?: { ref?: string; sha?: string };
+    base?: { ref?: string };
+  };
+  return {
+    number: pr.number,
+    state: pr.state,
+    merged: pr.merged === true,
+    mergeable: typeof pr.mergeable === "boolean" ? pr.mergeable : null,
+    mergeableState:
+      typeof pr.mergeable_state === "string" ? pr.mergeable_state : null,
+    headRef: pr.head?.ref ?? null,
+    headSha: pr.head?.sha ?? null,
+    baseRef: pr.base?.ref ?? null,
+  };
+}
+
 export async function getPullRequestContext(input: {
   token: string;
   owner: string;

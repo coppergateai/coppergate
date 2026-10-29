@@ -59,10 +59,12 @@ export {
 } from "./contents.js";
 export {
   getPullRequestContext,
+  getPullRequestMergeState,
   listOpenPulls,
   submitPullRequestReview,
   type GithubPullContext,
   type GithubPullFileSummary,
+  type GithubPullMergeState,
   type GithubPullSummary,
 } from "./pulls.js";
 
@@ -79,14 +81,18 @@ export {
 } from "./delivery.js";
 export {
   commitCheckSuitesFailed,
+  commitCheckSuitesShipGate,
   countOpenShipRollbackPrs,
   fetchCommitCheckEvidence,
   getRepoDefaultBranchHead,
   mapCheckRunPayload,
   mapCheckSuitePayload,
   mapCommitStatusPayload,
+  isVercelCommitStatusContext,
+  scoreTipCheckSuites,
   type CheckSuitePayload,
   type CheckRunConclusion,
   type NormalizedCheckEvidence,
+  type TipCiShipGate,
 } from "./checks.js";
 export { detectGithubRepoStack } from "./stack.js";

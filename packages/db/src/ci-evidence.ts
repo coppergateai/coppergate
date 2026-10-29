@@ -400,11 +400,11 @@ export async function listRunCiCheckHistory(
   return out;
 }
 
-/** Parse CI_REQUIRED_CHECK_NAMES (default: branch-protection "test"). */
+/** Parse CI_REQUIRED_CHECK_NAMES (default: Actions job id "check"). */
 export function resolveRequiredCheckNames(
   env: Record<string, string | undefined> = process.env,
 ): string[] {
-  return (env.CI_REQUIRED_CHECK_NAMES ?? "test")
+  return (env.CI_REQUIRED_CHECK_NAMES ?? "check")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);

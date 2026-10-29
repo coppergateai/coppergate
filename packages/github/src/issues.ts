@@ -1,3 +1,5 @@
+import { assertDefaultBranchMergeAllowed } from "@coppergate/scm";
+
 export type GithubIssueSummary = {
   number: number;
   title: string;
@@ -116,8 +118,22 @@ export async function mergePullRequest(input: {
   owner: string;
   repo: string;
   prNumber: number;
+  /** SEC-036 — must be true (mergeEnabled + path) before any merge API call. */
+  allowDefaultBranchWrite: boolean;
   fetchImpl?: typeof fetch;
 }): Promise<{ merged: boolean; sha: string | null; message: string }> {
+  try {
+    assertDefaultBranchMergeAllowed({
+      allowDefaultBranchWrite: input.allowDefaultBranchWrite,
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Refusing merge to default branch without explicit policy flag";
+    return { merged: false, sha: null, message };
+  }
+
   const fetchImpl = input.fetchImpl ?? fetch;
   const res = await fetchImpl(
     `https://api.github.com/repos/${input.owner}/${input.repo}/pulls/${input.prNumber}/merge`,

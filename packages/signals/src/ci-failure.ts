@@ -9,7 +9,8 @@ export type CiFailureInput = {
     | "buildkite"
     | "jenkins"
     | "bitbucket"
-    | "azure_devops";
+    | "azure_devops"
+    | "vercel";
   externalId: string;
   name: string;
   conclusion: string | null;
@@ -88,6 +89,7 @@ export class CiFailureSignalAdapter implements SignalAdapter {
         parsed.ciProvider === "jenkins" ||
         parsed.ciProvider === "bitbucket" ||
         parsed.ciProvider === "azure_devops" ||
+        parsed.ciProvider === "vercel" ||
         parsed.ciProvider === "github"
           ? parsed.ciProvider
           : "github",

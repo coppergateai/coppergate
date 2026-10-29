@@ -21,6 +21,7 @@
     "prepare": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@coppergate/opp-client": "workspace:*",
     "@coppergate/sandbox": "workspace:*",
     "drizzle-orm": "^0.43.1",
     "postgres": "^3.4.5"

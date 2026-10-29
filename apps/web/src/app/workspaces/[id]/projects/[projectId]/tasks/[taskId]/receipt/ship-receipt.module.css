@@ -180,6 +180,19 @@
   margin-top: 1.35rem;
 }
 
+.shareRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.shareStatus {
+  font-size: 0.8rem;
+  color: var(--mute);
+}
+
 .primary,
 .ghost {
   display: inline-flex;
@@ -190,6 +203,8 @@
   font-weight: 550;
   text-decoration: none;
   border-radius: var(--radius-sm, 8px);
+  font: inherit;
+  cursor: pointer;
 }
 
 .primary {

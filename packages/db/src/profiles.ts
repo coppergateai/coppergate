@@ -172,6 +172,8 @@ export const DEFAULT_SPAWN_MATRIX: Record<string, string[]> = {
   fake: ["fixer"],
   sonar: ["fixer", "security"],
   ci_failure: ["fixer", "engineer"],
+  merge_conflict: ["fixer", "engineer"],
+  stale_delivery: ["fixer", "engineer"],
   sentry: ["fixer"],
   datadog: ["fixer"],
   jira: ["engineer", "proposer"],

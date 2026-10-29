@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { MarkdownProse } from "@/components/markdown-prose";
 import styles from "../shared/catalog.module.css";
 
 export type ToolRow = {
@@ -10,6 +11,8 @@ export type ToolRow = {
   title: string;
   kind: "core" | "mcp" | "alias" | "custom";
   description: string;
+  /** ToolRuntime can invoke when connection + grant exist (system catalog). */
+  invokable: boolean;
   /** true when this is a workspace_tool_defs row */
   workspaceOwned: boolean;
   targetToken: string | null;
@@ -694,7 +697,7 @@ export function ToolsShell({
               </div>
               <div className={styles.field}>
                 <label className={styles.fieldLabel} htmlFor="tool-desc">
-                  Description
+                  Description (markdown)
                 </label>
                 <textarea
                   id="tool-desc"
@@ -704,6 +707,7 @@ export function ToolsShell({
                     setForm((f) => ({ ...f, description: e.target.value }))
                   }
                   disabled={pending}
+                  placeholder="# Title&#10;&#10;When to use: …&#10;&#10;## Focus&#10;- …&#10;&#10;## Hard rules&#10;- …"
                 />
               </div>
               <div className={styles.field}>
@@ -806,6 +810,11 @@ export function ToolsShell({
                   <div className={styles.chipRow}>
                     <span className={styles.chip}>{selected.kind}</span>
                     <span className={styles.chip}>{sourceLabel(selected)}</span>
+                    {selected.invokable ? (
+                      <span className={styles.chip}>invokable</span>
+                    ) : selected.kind === "custom" ? (
+                      <span className={styles.chip}>policy-only</span>
+                    ) : null}
                     <span className={styles.chip}>
                       {selected.agents.length} agent
                       {selected.agents.length === 1 ? "" : "s"}
@@ -839,7 +848,17 @@ export function ToolsShell({
 
               <section className={styles.section}>
                 <h3 className={styles.sectionLabel}>What it does</h3>
-                <p className={styles.bodyBlock}>{selected.description}</p>
+                <MarkdownProse
+                  className={styles.bodyProse}
+                  markdown={selected.description}
+                />
+                {selected.invokable ? (
+                  <p className={styles.honesty} style={{ marginTop: "0.55rem" }}>
+                    Invokable via ToolRuntime when a matching MCP connection is
+                    enabled and this token (or a broader mcp:… grant) is on the
+                    profile. Counts toward the per-run invoke budget.
+                  </p>
+                ) : null}
                 {selected.kind === "custom" && selected.workspaceOwned ? (
                   <p className={styles.honesty} style={{ marginTop: "0.55rem" }}>
                     Catalog / policy token — no new harness capability.

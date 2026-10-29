@@ -1,7 +1,9 @@
 /**
  * Recover missed GitHub check_run / status webhooks so auto-accept can proceed.
  * After a short grace, empty check lists become vacuous "no required checks" evidence
- * so WAITING_CI can promote and free concurrency slots on repos without CI.
+ * so WAITING_CI can promote and free concurrency slots on repos without CI —
+ * but only when no required check names are configured (see resolveRequiredCheckNames).
+ * Merged/closed PRs leave WAITING_CI immediately (no vacuous spam).
  */
 import { and, eq, inArray } from "drizzle-orm";
 import {
@@ -11,11 +13,16 @@ import {
   ingestCiEvidence,
   listMaintainerProjects,
   listRunsForTask,
+  resolveRequiredCheckNames,
+  resolveWaitingCiForPrOutcome,
   selectCiRefreshRun,
   tasks,
   type Database,
 } from "@coppergate/db";
-import { fetchCommitCheckEvidence } from "@coppergate/github";
+import {
+  fetchCommitCheckEvidence,
+  getPullRequestMergeState,
+} from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
 import type { ResolveInstallationToken } from "./maintainer-tick.js";
 
@@ -99,6 +106,39 @@ export async function refreshPendingCiEvidence(
 
       refreshed += 1;
       try {
+        // Merged/closed delivery PR → leave WAITING_CI (do not vacuous-poll forever).
+        if (
+          candidate.status === "WAITING_CI" &&
+          candidate.prNumber != null &&
+          candidate.prNumber > 0
+        ) {
+          try {
+            const pr = await getPullRequestMergeState({
+              token,
+              owner,
+              repo: name,
+              prNumber: candidate.prNumber,
+            });
+            if (pr.merged || pr.state === "closed") {
+              await resolveWaitingCiForPrOutcome(db, {
+                workspaceId: project.workspaceId,
+                runId: candidate.id,
+                outcome: pr.merged ? "merged" : "closed_unmerged",
+                actor: "system:ci-refresh",
+              });
+              attached += 1;
+              continue;
+            }
+          } catch (err) {
+            log.warn("ci refresh PR state failed", {
+              projectId: project.id,
+              taskId: task.id,
+              prNumber: candidate.prNumber,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+
         const evidence = await fetchCommitCheckEvidence({
           token,
           owner,
@@ -107,7 +147,11 @@ export async function refreshPendingCiEvidence(
         });
 
         if (evidence.length === 0) {
+          const requiredNames = resolveRequiredCheckNames();
+          // Do not attach vacuous success while required contexts are configured —
+          // that never satisfies scoreCiChecks and only spams artifacts.
           if (
+            requiredNames.length === 0 &&
             pastVacuousGrace(candidate.finishedAt, nowMs) &&
             !fitness.ciSatisfied
           ) {

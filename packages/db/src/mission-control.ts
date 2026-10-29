@@ -493,6 +493,52 @@ export async function getWorkspaceMissionControl(
         ctaLabel: "Fix merge rights",
       });
     }
+
+    // One calm row per project when auto-merge ship gate is halted (tip CI).
+    const shipGateHalts = recentAudit
+      .filter((e) => e.action === "merge.halted_ci_red")
+      .slice(0, 8);
+    const seenShipGate = new Set<string>();
+    for (const ev of shipGateHalts) {
+      let projectId: string | null = null;
+      let reason: string | null = null;
+      let cta: string | null = null;
+      if (ev.meta) {
+        try {
+          const meta = JSON.parse(ev.meta) as {
+            projectId?: string;
+            reason?: string;
+            cta?: string;
+          };
+          projectId =
+            typeof meta.projectId === "string" ? meta.projectId : null;
+          reason = typeof meta.reason === "string" ? meta.reason : null;
+          cta = typeof meta.cta === "string" ? meta.cta : null;
+        } catch {
+          projectId = null;
+        }
+      }
+      const dedupeKey = projectId ?? ev.id;
+      if (seenShipGate.has(dedupeKey)) continue;
+      seenShipGate.add(dedupeKey);
+      const pending = reason === "default_branch_ci_pending";
+      attention.push({
+        id: `ship-gate-${dedupeKey}`,
+        kind: "ship_gate_halted",
+        title: pending
+          ? "Auto-merge waiting on tip CI"
+          : "Auto-merge halted — tip CI red",
+        detail: (cta ?? "Fix default-branch CI before auto-merge resumes").slice(
+          0,
+          140,
+        ),
+        href: projectId
+          ? `/workspaces/${workspaceId}/projects/${projectId}`
+          : `/workspaces/${workspaceId}/activity`,
+        priority: "high",
+        ctaLabel: "Fix main CI",
+      });
+    }
   }
 
   sortMissionControlAttention(attention);

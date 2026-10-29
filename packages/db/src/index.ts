@@ -405,6 +405,21 @@ export {
   type SpendLicense,
 } from "./spend-license.js";
 export {
+  DIRTY_PR_HEAL_GRACE_MS,
+  SHIP_GATE_HEAL_MARKER,
+  STALE_REVIEW_AFTER_CI_TIMEOUT_MS,
+  buildShipGateHealTitle,
+  ensureShipGateHealTask,
+  isShipGateHealTitle,
+  openTaskCountsAsBusyForBacklog,
+  shipGateMergeMode,
+  shouldInspectDeliveryPrForUnattendedHeal,
+  shouldRequestChangesForStaleCiTimeoutReview,
+  shouldRetireObsoleteShipGateHeal,
+  type EnsureShipGateHealResult,
+  type ShipGateMergeMode,
+} from "./ship-gate-heal.js";
+export {
   SHIP_RECEIPT_KIND,
   buildShipReceipt,
   getShipReceiptForTask,
@@ -413,6 +428,14 @@ export {
   resolveHumanTouchCount,
   type ShipReceiptBody,
 } from "./ship-receipt.js";
+export {
+  OPP_PROTOCOL_VERSION,
+  auditOppVerifyAfterAccept,
+  projectShipReceiptToOpp,
+  verifyShipReceiptWithOpp,
+  type OppShipReceiptVerifyBody,
+  type OppVerifyAuditMeta,
+} from "./ship-receipt-opp.js";
 export {
   formatCommunityIssueBody,
   isCommunityScoutDue,
@@ -609,6 +632,12 @@ export {
   type CiWaitingKind,
 } from "./ci-waiting-honesty.js";
 export {
+  listWaitingCiRunsForPr,
+  resolveWaitingCiForPrOutcome,
+  resolveWaitingCiRunsForPr,
+  type PrCiOutcome,
+} from "./waiting-ci-pr.js";
+export {
   buildDeliveryCheckpoint,
   buildDeliveryReport,
   buildDiffSummary,
@@ -653,6 +682,12 @@ export {
   revokeDeliveryShareToken,
   DEFAULT_DELIVERY_SHARE_TTL_MS,
 } from "./share-reports.js";
+export {
+  createShipReceiptShareToken,
+  getPublicShipReceiptShare,
+  toPublicShipReceipt,
+  type PublicShipReceipt,
+} from "./ship-receipt-share.js";
 export {
   countAcceptedPrsForWorkspace,
   getProjectCostExplorer,
@@ -752,6 +787,25 @@ export {
   upsertAutoArmRule,
   type SignalEnvelopeInput,
 } from "./signals.js";
+export {
+  MERGE_CONFLICT_PROVIDER,
+  buildMergeConflictEnvelope,
+  ensureMergeConflictSignal,
+  isMergeConflictDirty,
+  mergeConflictExternalId,
+  shouldEmitMergeConflictInsteadOfReplan,
+  type EnsureMergeConflictSignalResult,
+} from "./merge-conflict-signal.js";
+export {
+  STALE_DELIVERY_PROVIDER,
+  buildStaleDeliveryEnvelope,
+  ensureStaleDeliveryHealSignal,
+  routeStaleReviewHeal,
+  shouldHealOpenDeliveryInsteadOfReplan,
+  staleDeliveryExternalId,
+  type EnsureStaleDeliverySignalResult,
+  type StaleReviewHealRoute,
+} from "./stale-delivery-heal-signal.js";
 export { ingestSonarFitness } from "./sonar-fitness.js";
 export { callSonarTool, type SonarToolName } from "./sonarqube-mcp.js";
 export {

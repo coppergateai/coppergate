@@ -663,8 +663,10 @@ export function ArenaSpectacle({
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>No projects armed</p>
             <p className={styles.emptyBody}>
-              No Open ID, no spend. Bind a repo and an Open Program path, then
-              Resume — Arena reserves only against program lines.
+              No Open ID, no spend. Bind a repo and an Open Program path on
+              project Configuration (#open-program-bind), then Resume — Arena
+              reserves only against program lines.{" "}
+              <a href="/docs/open-program-runtime">Open Program Runtime docs</a>
             </p>
           </div>
         ) : (

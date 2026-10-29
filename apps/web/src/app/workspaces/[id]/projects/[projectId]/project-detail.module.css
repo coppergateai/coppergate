@@ -472,6 +472,26 @@
   accent-color: var(--copper);
 }
 
+.bindBlock {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 0 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.bindBlock .sectionLabel {
+  margin-bottom: 0.35rem;
+}
+
+.bindBlock .field {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.bindBlock .input {
+  width: 100%;
+  min-width: 0;
+}
+
 .sectionLede {
   margin: 0 0 1rem;
   max-width: 42rem;
