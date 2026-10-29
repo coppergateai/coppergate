@@ -4,6 +4,7 @@
 
 ### Fixes
 
+- F4: PR-review durable `delivery_checkpoint` immediately after GitHub COMMENT — reclaim recovers to REVIEW_REQUIRED and skips duplicate POST. See `docs/pr-review-checkpoint.md`.
 - F2: `llm_tokens` spend idempotency — `usage_events.llm_provider_role` + unique `(run_id, role)` index so concurrent primary/fallback debits cannot double-count; `appendUsageEvent` recovers on unique races.
 - AG-018: Maintainer vision replan re-pins `defaultContenderN` to `maxTournamentN` so spawn/invent cannot drift duel width above policy (N=1 dogfood respected). See `docs/maintainer-contender-pin.md`.
 - GitHub PR delivery batches all files into a single Git Data API commit (no more N Contents-API commits with the same message).
