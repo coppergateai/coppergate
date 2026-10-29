@@ -17,6 +17,12 @@ import {
   sortMissionControlAttention,
   type MissionControlAttentionItem,
 } from "./mission-control-attention.js";
+import {
+  isReplanArchitectureIdleReason,
+  isReplanQueueArchitectureIdleMeta,
+  missionControlReplanIdleItem,
+  replanSkipReasonFromMeta,
+} from "./mission-control-replan.js";
 
 export type {
   MissionControlAttentionItem,
@@ -335,6 +341,53 @@ export async function getWorkspaceMissionControl(
       });
     }
 
+    const replanSkips = recentAudit.filter(
+      (e) => e.action === "maintainer.replan",
+    );
+    const seenReplanIdleProjects = new Set<string>();
+    for (const ev of replanSkips) {
+      let meta: Record<string, unknown> | null = null;
+      if (ev.meta) {
+        try {
+          meta = JSON.parse(ev.meta) as Record<string, unknown>;
+        } catch {
+          meta = null;
+        }
+      }
+      const reason = replanSkipReasonFromMeta(meta);
+      if (!reason || !isReplanArchitectureIdleReason(reason)) continue;
+
+      let projectId: string | null = null;
+      let projectName: string | null = null;
+      if (meta) {
+        projectId =
+          typeof meta.projectId === "string" ? meta.projectId : null;
+        projectName =
+          typeof meta.projectName === "string" ? meta.projectName : null;
+      }
+      const dedupeKey = projectId ?? ev.id;
+      if (seenReplanIdleProjects.has(dedupeKey)) continue;
+      seenReplanIdleProjects.add(dedupeKey);
+      if (seenReplanIdleProjects.size > 3) break;
+
+      const projectLabel =
+        projectName ??
+        (projectId
+          ? (arena.projects.find((p) => p.projectId === projectId)
+              ?.projectName ?? null)
+          : null);
+      attention.push(
+        missionControlReplanIdleItem({
+          dedupeKey,
+          workspaceId,
+          projectId,
+          reason,
+          projectLabel,
+          excludeIds: meta?.excludeIds,
+        }),
+      );
+    }
+
     const replanFails = recentAudit.filter(
       (e) => e.action === "maintainer.replan_queue_failed",
     );
@@ -343,13 +396,10 @@ export async function getWorkspaceMissionControl(
       let projectId: string | null = null;
       let projectName: string | null = null;
       let error: string | null = null;
+      let meta: Record<string, unknown> | null = null;
       if (ev.meta) {
         try {
-          const meta = JSON.parse(ev.meta) as {
-            projectId?: string;
-            projectName?: string;
-            error?: string;
-          };
+          meta = JSON.parse(ev.meta) as Record<string, unknown>;
           projectId =
             typeof meta.projectId === "string" ? meta.projectId : null;
           projectName =
@@ -359,6 +409,7 @@ export async function getWorkspaceMissionControl(
           /* ignore */
         }
       }
+      if (isReplanQueueArchitectureIdleMeta(meta)) continue;
       const dedupeKey = projectId ?? ev.id;
       if (seenReplanProjects.has(dedupeKey)) continue;
       seenReplanProjects.add(dedupeKey);

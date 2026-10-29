@@ -9,6 +9,7 @@
 
 ### Features
 
+- AG-015: Mission Control replan skip reasons (`no_architecture_open_id`, `architecture_ids_in_flight`) surface as calm Open Program idle attention — not `replan_failed` ops fire. See `docs/mission-control-crisis.md`.
 - P-142: Critic fitness cites evidence refs — non-zero fitness requires cited CI/validation + tests(/coverage/e2e) artifact ids; vibes-only promote blocked (`vibes_only_blocked`). See `docs/critic-fitness-evidence-refs.md`.
 - P-140: Arena efficiency payoff UX — board strip + agent cards + inspector show `e · f · spend` (`e=f/spend^α`), CI fail ⇒ e=0 copy, and winner promote reason. See `docs/arena-efficiency-payoff.md`.
 - Claude Code (Agent SDK) coding harness — `ClaudeCodeCodingAgent` via `@anthropic-ai/claude-agent-sdk`, BYOK vendor `claude_code`, harness kind `claude_code`, env `ANTHROPIC_API_KEY` / `CLAUDE_CODE_MODEL`. Prefer Cursor when both exist; Claude Code is OpenAI failover when Cursor is absent. See `docs/HARNESS.md`.

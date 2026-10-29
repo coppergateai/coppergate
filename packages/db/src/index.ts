@@ -659,6 +659,14 @@ export {
   type WorkspaceMissionControl,
 } from "./mission-control.js";
 export {
+  REPLAN_ARCHITECTURE_IDLE_REASONS,
+  isReplanArchitectureIdleReason,
+  isReplanQueueArchitectureIdleMeta,
+  missionControlReplanIdleItem,
+  replanArchitectureIdleCopy,
+  replanSkipReasonFromMeta,
+} from "./mission-control-replan.js";
+export {
   getRunEvidenceBundle,
   getTaskEvidenceBundle,
   listProjectEvidenceDeliveries,
