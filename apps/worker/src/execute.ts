@@ -4,6 +4,8 @@ import {
   isFakeCompletionPayload,
   isLlmProviderQuotaError,
   isStubOrToyDelivery,
+  resolveSafeWorkdirPath,
+  restoreFileWritesToWorkdir,
   runStackValidation,
   runToolPreflight,
   strategyGuidance,
@@ -32,6 +34,7 @@ import {
   getArenaForProject,
   getContenderById,
   getDeliveryCheckpoint,
+  getFileWriteCheckpoint,
   getEffectiveAgentProfile,
   getProjectForWorkspace,
   getSignalEventForTask,
@@ -47,12 +50,14 @@ import {
   markRunValidating,
   markRunWaitingCi,
   maybeScoreAndResolveTournament,
+  mergeFileWriteCheckpoint,
   notifyWorkspace,
   parseJsonArray,
   parseSkillKeysJson,
   pauseArenaForProviderQuota,
   persistDeliveryArtifacts,
   persistDeliveryCheckpoint,
+  persistFileWriteCheckpoint,
   persistReviewFindings,
   renewRunLease,
   RunError,
@@ -61,8 +66,10 @@ import {
   withTemperamentGuidance,
   type AgentRun,
   type Database,
+  type FileWriteCheckpointBody,
   type Task,
 } from "@coppergate/db";
+import { readFile } from "node:fs/promises";
 import {
   getPullRequestContext,
   submitPullRequestReview,
@@ -665,6 +672,52 @@ export async function executeClaimedRun(
         }
       }
 
+      // AG-014: restore mid-run file writes before agent so reclaim does not
+      // start from an empty sandbox and blindly replay the same writes.
+      let fileWriteCheckpoint: FileWriteCheckpointBody | null = null;
+      try {
+        fileWriteCheckpoint = await getFileWriteCheckpoint(
+          db,
+          run.workspaceId,
+          run.id,
+        );
+        if (
+          fileWriteCheckpoint &&
+          sandbox?.workdir &&
+          !isPrReview
+        ) {
+          const restorable = fileWriteCheckpoint.files
+            .filter(
+              (f): f is { path: string; contentSha256: string; content: string } =>
+                typeof f.content === "string",
+            )
+            .map((f) => ({ path: f.path, content: f.content }));
+          if (restorable.length > 0) {
+            const { restored } = await restoreFileWritesToWorkdir(
+              sandbox.workdir,
+              restorable,
+            );
+            if (restored.length > 0) {
+              await appendRunEvent(db, {
+                runId: run.id,
+                workspaceId: run.workspaceId,
+                kind: "progress",
+                payload: {
+                  code: "file_write_checkpoint_restored",
+                  message: `Restored ${restored.length} file(s) from cancel/reclaim checkpoint`,
+                  paths: restored.slice(0, 40),
+                },
+              });
+            }
+          }
+        }
+      } catch (err) {
+        log.warn("file write checkpoint restore skipped", {
+          runId: run.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
       for await (const event of agent.run({
         runId: run.id,
         taskId: task.id,
@@ -696,6 +749,10 @@ export async function executeClaimedRun(
             ? toolInvoker
             : undefined,
         maxToolInvokes: 4,
+        completedWritePaths: fileWriteCheckpoint?.files.map((f) => ({
+          path: f.path,
+          contentSha256: f.contentSha256,
+        })),
       })) {
         if (lostOwnership || abortController.signal.aborted) {
           break;
@@ -725,6 +782,43 @@ export async function executeClaimedRun(
             ...(event.payload ?? {}),
           },
         });
+
+        // AG-014: durable mid-run write checkpoint after each successful sandbox write.
+        if (
+          event.kind === "file" &&
+          event.payload?.action === "write" &&
+          typeof event.payload.path === "string" &&
+          sandbox?.workdir
+        ) {
+          const rel = event.payload.path;
+          const abs = resolveSafeWorkdirPath(sandbox.workdir, rel);
+          if (abs) {
+            try {
+              const content = await readFile(abs, "utf8");
+              fileWriteCheckpoint = mergeFileWriteCheckpoint(
+                fileWriteCheckpoint,
+                {
+                  runId: run.id,
+                  taskId: task.id,
+                  writes: [{ path: rel, content }],
+                },
+              );
+              await persistFileWriteCheckpoint(db, {
+                workspaceId: run.workspaceId,
+                projectId: run.projectId,
+                taskId: task.id,
+                runId: run.id,
+                checkpoint: fileWriteCheckpoint,
+              });
+            } catch (err) {
+              log.warn("file write checkpoint persist skipped", {
+                runId: run.id,
+                path: rel,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+        }
 
         if (event.kind === "cost" && event.payload?.costMicros != null) {
           applyAgentCostEventToLedger(
