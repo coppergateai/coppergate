@@ -509,11 +509,10 @@ export async function executeClaimedRun(
               : `coppergate://project/${run.projectId}`;
           const baseSha =
             deliveryResolved?.baseSha || run.baseSha || "unknown";
-          const arenaRow = await getArenaForProject(
-            db,
-            run.workspaceId,
-            run.projectId,
-          );
+          const arenaRow = await getArenaForProject(db, {
+            workspaceId: run.workspaceId,
+            projectId: run.projectId,
+          });
           sandbox = await sandboxManager.create({
             runId: run.id,
             workspaceId: run.workspaceId,
