@@ -219,6 +219,66 @@ describe("activity events", () => {
     assert.ok(groups.some((g) => g.action === "task.enqueue"));
   });
 
+  it("AG-019: pure not-ready merge storms use last outcome only", () => {
+    const projectId = "proj-ship";
+    const groups = groupActivityEvents([
+      evt({
+        id: "n1",
+        action: "merge.attempt",
+        targetType: "merge",
+        targetId: "t1",
+        createdAt: "2026-10-25T07:00:00.000Z",
+        meta: {
+          projectId,
+          merged: false,
+          message: "Pull Request is not mergeable",
+        },
+      }),
+      evt({
+        id: "x",
+        action: "task.done",
+        createdAt: "2026-10-25T07:00:01.000Z",
+      }),
+      evt({
+        id: "n2",
+        action: "merge.attempt",
+        targetType: "merge",
+        targetId: "t2",
+        createdAt: "2026-10-25T07:00:02.000Z",
+        meta: {
+          projectId,
+          merged: false,
+          message: "Pull Request is not mergeable (checks pending)",
+        },
+      }),
+    ]);
+    const merge = groups.find((g) => g.action === "merge.attempt");
+    assert.ok(merge);
+    assert.equal(merge.count, 2);
+    assert.equal(merge.title, "Merge not ready");
+    assert.equal(merge.outcome, "review");
+    assert.match(merge.summary ?? "", /checks pending/);
+    assert.doesNotMatch(merge.summary ?? "", /2 not mergeable/);
+    assert.match(merge.technicalLabel, /×2/);
+  });
+
+  it("keeps separate merge.attempt buckets per project", () => {
+    const groups = groupActivityEvents([
+      evt({
+        id: "a",
+        action: "merge.attempt",
+        meta: { projectId: "p1", merged: false, message: "not mergeable a" },
+      }),
+      evt({
+        id: "b",
+        action: "merge.attempt",
+        meta: { projectId: "p2", merged: false, message: "not mergeable b" },
+      }),
+    ]);
+    const merges = groups.filter((g) => g.action === "merge.attempt");
+    assert.equal(merges.length, 2);
+  });
+
   it("collapses interleaved arena control into one group", () => {
     const groups = groupActivityEvents([
       evt({
