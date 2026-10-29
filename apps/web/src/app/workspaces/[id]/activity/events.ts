@@ -8,7 +8,7 @@ import {
   isReplanQueueArchitectureIdleMeta,
   replanArchitectureIdleCopy,
   replanSkipReasonFromMeta,
-} from "@coppergate/db";
+} from "@/lib/replan-architecture-idle";
 
 export type ActivityCategory =
   | "execution"
