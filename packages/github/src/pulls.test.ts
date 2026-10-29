@@ -4,6 +4,7 @@ import {
   getPullRequestMergeState,
   listOpenPulls,
   submitPullRequestReview,
+  updatePullRequestBranch,
 } from "./pulls.js";
 
 describe("listOpenPulls", () => {
@@ -62,6 +63,46 @@ describe("getPullRequestMergeState", () => {
     assert.equal(state.headRef, "coppergate/ag-018");
     assert.equal(state.headSha, "abc123");
     assert.equal(state.baseRef, "main");
+  });
+});
+
+describe("updatePullRequestBranch (AG-036)", () => {
+  it("maps 202 as updated", async () => {
+    const result = await updatePullRequestBranch({
+      token: "t",
+      owner: "acme",
+      repo: "app",
+      prNumber: 9,
+      expectedHeadSha: "abc",
+      fetchImpl: async (_url, init) => {
+        assert.equal(init?.method, "PUT");
+        const body = JSON.parse(String(init?.body)) as {
+          expected_head_sha?: string;
+        };
+        assert.equal(body.expected_head_sha, "abc");
+        return new Response(JSON.stringify({ message: "Updating" }), {
+          status: 202,
+        });
+      },
+    });
+    assert.equal(result.updated, true);
+    assert.equal(result.conflict, false);
+  });
+
+  it("maps 422 conflict", async () => {
+    const result = await updatePullRequestBranch({
+      token: "t",
+      owner: "acme",
+      repo: "app",
+      prNumber: 9,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({ message: "merge conflict between base and head" }),
+          { status: 422 },
+        ),
+    });
+    assert.equal(result.updated, false);
+    assert.equal(result.conflict, true);
   });
 });
 

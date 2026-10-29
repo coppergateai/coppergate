@@ -62,6 +62,7 @@ export {
   getPullRequestMergeState,
   listOpenPulls,
   submitPullRequestReview,
+  updatePullRequestBranch,
   type GithubPullContext,
   type GithubPullFileSummary,
   type GithubPullMergeState,

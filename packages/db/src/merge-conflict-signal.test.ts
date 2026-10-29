@@ -3,12 +3,26 @@ import { describe, it } from "node:test";
 import {
   MERGE_CONFLICT_PROVIDER,
   buildMergeConflictEnvelope,
+  isBehindMergeState,
   isMergeConflictDirty,
   mergeConflictExternalId,
   shouldEmitMergeConflictInsteadOfReplan,
 } from "./merge-conflict-signal.js";
 
 describe("merge-conflict-signal (AG-032)", () => {
+  it("AG-036: behind is not dirty", () => {
+    assert.equal(isBehindMergeState({ mergeableState: "behind" }), true);
+    assert.equal(isBehindMergeState({ mergeableState: "dirty" }), false);
+    assert.equal(
+      isMergeConflictDirty({
+        prOpen: true,
+        mergeable: true,
+        mergeableState: "behind",
+      }),
+      false,
+    );
+  });
+
   it("detects dirty mergeable_state", () => {
     assert.equal(
       isMergeConflictDirty({

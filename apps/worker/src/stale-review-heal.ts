@@ -1,7 +1,8 @@
 /**
- * AG-031 / AG-032 / AG-033 / AG-035 — unattended board drain:
+ * AG-031 / AG-032 / AG-033 / AG-035 / AG-036 — unattended board drain:
  * - obsolete [ship-gate] when tip green / PR closed → request_changes
  * - dirty open PR (after short grace) → merge_conflict (no 6h wait)
+ * - behind open PR → GitHub update-branch (strict up-to-date); conflict → merge_conflict
  * - other open PR after waiting_ci_timeout → stale_delivery heal
  * - otherwise request_changes → NEEDS_REPLAN
  */
@@ -12,6 +13,7 @@ import {
   ensureMergeConflictSignal,
   ensureStaleDeliveryHealSignal,
   getRunCiFitness,
+  isBehindMergeState,
   isShipGateHealTitle,
   listRunsForTask,
   recordAuditEvent,
@@ -23,7 +25,10 @@ import {
   tasks,
   type Database,
 } from "@coppergate/db";
-import { getPullRequestMergeState } from "@coppergate/github";
+import {
+  getPullRequestMergeState,
+  updatePullRequestBranch,
+} from "@coppergate/github";
 import type { Logger } from "@coppergate/telemetry";
 
 export async function healStaleReviewsOrEmitConflict(
@@ -42,11 +47,13 @@ export async function healStaleReviewsOrEmitConflict(
 ): Promise<{
   conflictSignals: number;
   deliveryHeals: number;
+  branchUpdates: number;
   replanned: number;
   retiredShipGates: number;
 }> {
   let conflictSignals = 0;
   let deliveryHeals = 0;
+  let branchUpdates = 0;
   let replanned = 0;
   let retiredShipGates = 0;
 
@@ -158,7 +165,7 @@ export async function healStaleReviewsOrEmitConflict(
       continue;
     }
 
-    // AG-035: dirty / closed delivery — heal or replan without waiting_ci_timeout.
+    // AG-035/036: dirty / behind / closed delivery — heal without waiting_ci_timeout.
     if (inspectPr && prNumber != null && mergeStateError == null) {
       const route = routeStaleReviewHeal({
         hasPrNumber: true,
@@ -216,6 +223,102 @@ export async function healStaleReviewsOrEmitConflict(
           armed: signal.armed,
           signalId: signal.signalId,
         });
+        continue;
+      }
+      // AG-036: behind + strict protection → update-branch (no human Update click).
+      if (
+        Boolean(prOpen) &&
+        !prMerged &&
+        isBehindMergeState({ mergeableState })
+      ) {
+        try {
+          const upd = await updatePullRequestBranch({
+            token: input.token,
+            owner: input.owner,
+            repo: input.repo,
+            prNumber,
+            expectedHeadSha: headSha,
+          });
+          if (upd.updated) {
+            branchUpdates += 1;
+            await recordAuditEvent(db, {
+              workspaceId: input.workspaceId,
+              actor: input.actor,
+              action: "merge.branch_updated",
+              targetType: "task",
+              targetId: task.id,
+              meta: {
+                projectId: input.projectId,
+                prNumber,
+                message: upd.message.slice(0, 200),
+              },
+            });
+            log.info("update-branch for behind delivery", {
+              projectId: input.projectId,
+              taskId: task.id,
+              prNumber,
+            });
+            continue;
+          }
+          if (upd.conflict) {
+            const signal = await ensureMergeConflictSignal(db, {
+              workspaceId: input.workspaceId,
+              projectId: input.projectId,
+              actor: input.actor,
+              owner: input.owner,
+              repo: input.repo,
+              prNumber,
+              headRef,
+              headSha,
+              baseRef,
+              parentTitle: task.title,
+            });
+            conflictSignals += 1;
+            try {
+              if (task.status === "WAITING_CI") {
+                await applyTaskTransition(db, {
+                  workspaceId: input.workspaceId,
+                  taskId: task.id,
+                  actor: input.actor,
+                  toStatus: "FAILED",
+                  reason:
+                    "unattended: update-branch conflict — merge_conflict heal takes concurrency",
+                });
+              } else if (task.status === "REVIEW_REQUIRED") {
+                await decideTaskReview(db, {
+                  workspaceId: input.workspaceId,
+                  taskId: task.id,
+                  actor: input.actor,
+                  decision: "request_changes",
+                  note: "unattended: update-branch conflict — merge_conflict heal owns the board",
+                });
+              }
+            } catch (err) {
+              log.warn("behind→dirty parent free failed", {
+                taskId: task.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+            log.info("merge_conflict after update-branch conflict", {
+              projectId: input.projectId,
+              taskId: task.id,
+              prNumber,
+              armed: signal.armed,
+            });
+            continue;
+          }
+          log.warn("update-branch failed for behind delivery", {
+            taskId: task.id,
+            prNumber,
+            message: upd.message.slice(0, 160),
+          });
+        } catch (err) {
+          log.warn("update-branch threw for behind delivery", {
+            taskId: task.id,
+            prNumber,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
         continue;
       }
       if (route === "replan" && (prOpen === false || prMerged === true)) {
@@ -411,5 +514,11 @@ export async function healStaleReviewsOrEmitConflict(
     }
   }
 
-  return { conflictSignals, deliveryHeals, replanned, retiredShipGates };
+  return {
+    conflictSignals,
+    deliveryHeals,
+    branchUpdates,
+    replanned,
+    retiredShipGates,
+  };
 }

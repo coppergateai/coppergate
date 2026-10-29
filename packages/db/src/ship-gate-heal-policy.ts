@@ -83,7 +83,13 @@ export function shouldRequestChangesForStaleCiTimeoutReview(input: {
   return now - input.taskUpdatedAt.getTime() >= stale;
 }
 
-/** True when an open delivery has been WAITING_CI / REVIEW long enough to poll PR merge state. */
+/**
+ * True when an open delivery has been WAITING_CI / REVIEW long enough to poll
+ * PR merge state.
+ *
+ * AG-036: still inspect when `acceptReady` — green CI + behind/dirty otherwise
+ * stalls forever (strict branch protection; auto-merge cannot land).
+ */
 export function shouldInspectDeliveryPrForUnattendedHeal(input: {
   taskStatus: string;
   acceptReady: boolean;
@@ -91,7 +97,8 @@ export function shouldInspectDeliveryPrForUnattendedHeal(input: {
   nowMs?: number;
   graceMs?: number;
 }): boolean {
-  if (input.acceptReady) return false;
+  // acceptReady no longer skips — behind/dirty salvage still needs a poll.
+  void input.acceptReady;
   if (
     input.taskStatus !== "WAITING_CI" &&
     input.taskStatus !== "REVIEW_REQUIRED"

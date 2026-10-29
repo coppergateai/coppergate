@@ -833,6 +833,7 @@ export {
   MERGE_CONFLICT_PROVIDER,
   buildMergeConflictEnvelope,
   ensureMergeConflictSignal,
+  isBehindMergeState,
   isMergeConflictDirty,
   mergeConflictExternalId,
   shouldEmitMergeConflictInsteadOfReplan,
