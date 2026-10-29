@@ -152,6 +152,6 @@ Date: 2026-10-24
 - Concurrent editor sessions have overwritten reliability files mid-work — prefer committing these paths promptly
 - Failover doubles spend when both providers bill (AG-016 debits primary + fallback separately; size fallback model cost intentionally)
 - Prompt isolation is defense-in-depth, not a guarantee against model compliance failures
-- llm_tokens dedupe is application-level (race of two concurrent inserts for same runId still possible without a unique index)
+- ~~llm_tokens dedupe is application-level (race of two concurrent inserts for same runId still possible without a unique index)~~ — closed by `usage_events_llm_tokens_run_role_uidx` + `llm_provider_role` (F2)
 - Delivery still uses a single capped lease renew (multi-file slow GitHub can race reaper before checkpoint)
 - PR-review path has no durable checkpoint — crash after GitHub POST can FAIL a landed review

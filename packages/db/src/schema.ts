@@ -648,12 +648,22 @@ export const usageEvents = pgTable(
     provider: text("provider"),
     model: text("model"),
     meta: text("meta"),
+    /**
+     * Denormalized AG-016 role for llm_tokens idempotency:
+     * primary | fallback | legacy. Null for non-llm kinds.
+     */
+    llmProviderRole: text("llm_provider_role"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
     index("usage_events_project_created_idx").on(t.projectId, t.createdAt),
+    uniqueIndex("usage_events_llm_tokens_run_role_uidx")
+      .on(t.runId, t.llmProviderRole)
+      .where(
+        sql`${t.kind} = 'llm_tokens' AND ${t.runId} IS NOT NULL AND ${t.llmProviderRole} IS NOT NULL`,
+      ),
   ],
 );
 
