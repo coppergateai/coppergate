@@ -13,6 +13,7 @@ import {
   strategiesForDuel,
   type PeerContenderStrategy,
 } from "./contender-peers.js";
+import { peerSeatCountForSpawn } from "./maintainer-contender-pin.js";
 import { getLlmByokById } from "./credentials.js";
 import {
   agentProfiles,
@@ -734,6 +735,8 @@ export async function applySpawnProfilesToArena(
     profileKeys: string[];
     /** Peer seat count; defaults to max(arena.defaultContenderN, MIN_DUEL). */
     seatCount?: number;
+    /** Maintainer maxTournamentN cap — replan must not drift above this (AG-018). */
+    policyMaxContenderN?: number;
     /** Explicit strategies for peer seats (meta duel). */
     strategies?: ContenderStrategy[];
     /**
@@ -759,20 +762,17 @@ export async function applySpawnProfilesToArena(
     ? preferredRaw
     : "balanced";
 
-  // Honor solo N=1 (self-pilot). Callers that want a duel pass seatCount ≥ 2.
-  const requestedSeats = Math.max(1, arenaDefaultN(input.seatCount));
   const { arena } = await ensureArenaForProject(db, {
     workspaceId: input.workspaceId,
     projectId: input.projectId,
     actor: input.actor,
-    defaultContenderN: requestedSeats,
-    contenderCount: requestedSeats,
   });
 
-  const seatCount = Math.max(
-    1,
-    input.seatCount ?? Math.max(1, arena.defaultContenderN),
-  );
+  const seatCount = peerSeatCountForSpawn({
+    seatCount: input.seatCount,
+    arenaDefaultContenderN: arena.defaultContenderN,
+    policyMaxContenderN: input.policyMaxContenderN,
+  });
   const strategies: ContenderStrategy[] =
     input.strategies && input.strategies.length > 0
       ? input.strategies.map((s) =>
@@ -803,11 +803,4 @@ export async function applySpawnProfilesToArena(
       projectId: input.projectId,
     },
   });
-}
-
-function arenaDefaultN(seatCount: number | undefined): number {
-  if (seatCount != null && Number.isFinite(seatCount) && seatCount >= 1) {
-    return Math.floor(seatCount);
-  }
-  return 1;
 }
