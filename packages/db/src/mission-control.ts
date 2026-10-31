@@ -316,6 +316,28 @@ export async function getWorkspaceMissionControl(
   // keep Mission Control focused on Pause/quota + real human gates.
   if (!capacityCrisis) {
     const failedLanes = arena.projects.filter(laneNeedsAttention).slice(0, 4);
+    const seenDocsDrift = new Set<string>();
+    for (const lane of arena.projects) {
+      for (const c of lane.contenders) {
+        const att = c.latestRun?.optionalAttention;
+        if (!att || att.kind !== "docs_drift") continue;
+        const runId = c.latestRun?.id;
+        if (!runId || seenDocsDrift.has(runId)) continue;
+        seenDocsDrift.add(runId);
+        if (seenDocsDrift.size > 4) break;
+        attention.push({
+          id: `docs-drift-${runId}`,
+          kind: "docs_drift",
+          title: `Docs drift · ${lane.projectName}`,
+          detail: att.message,
+          href: `/workspaces/${workspaceId}/arena?focus=${encodeURIComponent(lane.projectId)}`,
+          priority: "normal",
+          ctaLabel: "Open Arena",
+        });
+      }
+      if (seenDocsDrift.size > 4) break;
+    }
+
     for (const lane of failedLanes) {
       const arenaLive = isLiveArenaStatus(lane.arenaStatus);
       const hotCount = lane.contenders.filter(

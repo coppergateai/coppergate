@@ -1,6 +1,6 @@
 /**
  * Arena hygiene helpers (TASK092 docs drift, TASK093 stale PR sweeper).
- * Pure heuristics — wire into worker/cron later.
+ * Pure heuristics — AG-022 wires docs drift into Arena optional attention via @coppergate/db.
  */
 
 export type PathChange = { path: string; status?: string };

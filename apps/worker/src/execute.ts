@@ -60,6 +60,8 @@ import {
   persistDeliveryArtifacts,
   persistDeliveryCheckpoint,
   persistFileWriteCheckpoint,
+  evaluateDocsDriftAttention,
+  docsDriftProgressPayload,
   persistReviewFindings,
   renewRunLease,
   RunError,
@@ -1848,6 +1850,16 @@ export async function executeClaimedRun(
       previewError,
     }),
   });
+
+  const docsDrift = evaluateDocsDriftAttention(filesChanged);
+  if (docsDrift) {
+    await appendRunEvent(db, {
+      runId: run.id,
+      workspaceId: run.workspaceId,
+      kind: "progress",
+      payload: docsDriftProgressPayload(docsDrift),
+    });
+  }
 
   // TASK042 — independent reviewer findings (never auto-merges).
   await persistReviewFindings(db, {
