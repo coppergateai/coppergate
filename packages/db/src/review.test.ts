@@ -3,23 +3,25 @@ import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import {
   approveBrief,
-  approveTask,
   closeDb,
   createBriefDraft,
   createDb,
   createProjectWithRepo,
+  createTournament,
   createWorkspaceWithOwner,
   connectRepository,
   decideTaskReview,
+  enableMaintainerMode,
+  enqueueAgentRun,
   generateProjectPlan,
+  getArenaForProject,
   getTaskById,
   insertTestUser,
   setProjectBudget,
-  submitTaskForApproval,
+  TaskTransitionError,
   upsertGithubInstallation,
-  applyTaskTransition,
 } from "./index.js";
-import { projects, tasks } from "./schema.js";
+import { agentRuns, projects, tasks } from "./schema.js";
 
 const url = process.env.DATABASE_URL;
 
@@ -28,7 +30,6 @@ describe("task review decisions", { skip: !url }, () => {
   let workspaceId = "";
   let projectId = "";
   let actor = "";
-  let taskId = "";
 
   before(async () => {
     const stamp = Date.now();
@@ -97,18 +98,25 @@ describe("task review decisions", { skip: !url }, () => {
       briefId: draft.id,
       actor,
     });
+  });
+
+  after(async () => {
+    await closeDb(db);
+  });
+
+  async function seedReviewTask(key: string): Promise<string> {
     const plan = await generateProjectPlan(db, {
       workspaceId,
       projectId,
       actor,
       milestones: [
         {
-          title: "M",
+          title: `M-${key}`,
           description: "",
           tasks: [
             {
-              key: "t1",
-              title: "Review task",
+              key,
+              title: `Review ${key}`,
               goal: "g",
               scope: "s",
               allowedPaths: ["app/page.tsx"],
@@ -122,38 +130,80 @@ describe("task review decisions", { skip: !url }, () => {
         },
       ],
     });
-    taskId = plan.milestones[0]!.tasks[0]!.task.id;
-    await submitTaskForApproval(db, { workspaceId, taskId, actor });
-    await approveTask(db, { workspaceId, taskId, actor });
-    // Fast-forward to REVIEW_REQUIRED
-    await applyTaskTransition(db, {
+    const taskId = plan.milestones[0]!.tasks[0]!.task.id;
+    // Force REVIEW_REQUIRED without approve→enqueue (approve creates a run).
+    await db
+      .update(tasks)
+      .set({ status: "REVIEW_REQUIRED", updatedAt: new Date() })
+      .where(eq(tasks.id, taskId));
+    return taskId;
+  }
+
+  async function attachAcceptableRun(
+    taskId: string,
+    opts?: {
+      idempotencyKey?: string;
+      tournamentId?: string | null;
+      tournamentResult?: string | null;
+      status?: string;
+      prNumber?: number;
+      createdAtOffsetMs?: number;
+    },
+  ) {
+    const { run } = await enqueueAgentRun(db, {
       workspaceId,
+      projectId,
       taskId,
-      actor,
-      toStatus: "RUNNING",
-      reason: "test",
+      idempotencyKey:
+        opts?.idempotencyKey ?? `rev-run-${taskId}-${Date.now()}-${Math.random()}`,
+      tournamentId: opts?.tournamentId ?? null,
     });
-    await applyTaskTransition(db, {
-      workspaceId,
-      taskId,
-      actor,
-      toStatus: "VALIDATING",
-      reason: "test",
-    });
-    await applyTaskTransition(db, {
-      workspaceId,
-      taskId,
-      actor,
-      toStatus: "REVIEW_REQUIRED",
-      reason: "test",
-    });
+    const createdAt =
+      opts?.createdAtOffsetMs != null
+        ? new Date(Date.now() + opts.createdAtOffsetMs)
+        : undefined;
+    await db
+      .update(agentRuns)
+      .set({
+        status: opts?.status ?? "REVIEW_REQUIRED",
+        tournamentId: opts?.tournamentId ?? null,
+        tournamentResult: opts?.tournamentResult ?? null,
+        prNumber: opts?.prNumber ?? 42,
+        prUrl: `https://example.com/pr/${opts?.prNumber ?? 42}`,
+        headSha: "a".repeat(40),
+        leaseOwner: null,
+        leaseUntil: null,
+        ...(createdAt ? { createdAt } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(agentRuns.id, run.id));
+    return run.id;
+  }
+
+  it("F1: accept without an agent run fails closed", async () => {
+    const taskId = await seedReviewTask(`t-norun-${Date.now()}`);
+    await assert.rejects(
+      () =>
+        decideTaskReview(db, {
+          workspaceId,
+          taskId,
+          actor,
+          decision: "accept",
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof TaskTransitionError);
+        assert.equal(err.code, "policy");
+        assert.match(err.message, /no agent run/i);
+        return true;
+      },
+    );
+    const task = await getTaskById(db, taskId);
+    assert.equal(task?.status, "REVIEW_REQUIRED");
   });
 
-  after(async () => {
-    await closeDb(db);
-  });
-
-  it("accept moves task to DONE", async () => {
+  it("accept with eligible run moves task to DONE", async () => {
+    const taskId = await seedReviewTask(`t-ok-${Date.now()}`);
+    await attachAcceptableRun(taskId);
     const result = await decideTaskReview(db, {
       workspaceId,
       taskId,
@@ -166,39 +216,86 @@ describe("task review decisions", { skip: !url }, () => {
     assert.equal(task?.status, "DONE");
   });
 
-  it("reject from REVIEW_REQUIRED goes FAILED", async () => {
-    // Reset another path: create fresh task
-    const plan = await generateProjectPlan(db, {
+  it("F13: accept uses WINNER even when a later peer is WAITING_CI", async () => {
+    const taskId = await seedReviewTask(`t-win-${Date.now()}`);
+    // tournamentResult WINNER is enough for selection; later WAITING_CI must not win by createdAt.
+    await attachAcceptableRun(taskId, {
+      idempotencyKey: `winner-${taskId}`,
+      tournamentResult: "WINNER",
+      status: "REVIEW_REQUIRED",
+      prNumber: 101,
+      createdAtOffsetMs: -60_000,
+    });
+    await attachAcceptableRun(taskId, {
+      idempotencyKey: `later-${taskId}`,
+      tournamentResult: null,
+      status: "WAITING_CI",
+      prNumber: 102,
+      createdAtOffsetMs: 0,
+    });
+
+    const result = await decideTaskReview(db, {
+      workspaceId,
+      taskId,
+      actor,
+      decision: "accept",
+      note: "winner green",
+    });
+    assert.equal(result.task.status, "DONE");
+  });
+
+  it("F13: competing tournament without WINNER cannot accept", async () => {
+    const taskId = await seedReviewTask(`t-nowin-${Date.now()}`);
+    await enableMaintainerMode(db, {
       workspaceId,
       projectId,
       actor,
-      milestones: [
-        {
-          title: "M2",
-          description: "",
-          tasks: [
-            {
-              key: "t2",
-              title: "Reject me",
-              goal: "g",
-              scope: "s",
-              allowedPaths: [],
-              acceptanceCriteria: ["ok"],
-              estimateMicros: 1000,
-              estimateComplexity: "S",
-              dependsOn: [],
-              priority: 1,
-            },
-          ],
-        },
-      ],
+      policy: { autoMerge: false, autoQueueReplanTasks: false, selfImprove: false },
     });
-    const tid = plan.milestones[0]!.tasks[0]!.task.id;
-    await db
-      .update(tasks)
-      .set({ status: "REVIEW_REQUIRED", updatedAt: new Date() })
-      .where(eq(tasks.id, tid));
+    const arena = await getArenaForProject(db, { workspaceId, projectId });
+    assert.ok(arena);
+    const tournament = await createTournament(db, {
+      workspaceId,
+      projectId,
+      arenaId: arena.id,
+      taskId,
+      n: 2,
+      actor,
+    });
+    await attachAcceptableRun(taskId, {
+      idempotencyKey: `a-${taskId}`,
+      tournamentId: tournament.id,
+      tournamentResult: "LOSER",
+      status: "REVIEW_REQUIRED",
+      prNumber: 201,
+    });
+    await attachAcceptableRun(taskId, {
+      idempotencyKey: `b-${taskId}`,
+      tournamentId: tournament.id,
+      tournamentResult: null,
+      status: "REVIEW_REQUIRED",
+      prNumber: 202,
+    });
 
+    await assert.rejects(
+      () =>
+        decideTaskReview(db, {
+          workspaceId,
+          taskId,
+          actor,
+          decision: "accept",
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof TaskTransitionError);
+        assert.equal(err.code, "policy");
+        assert.match(err.message, /WINNER/i);
+        return true;
+      },
+    );
+  });
+
+  it("reject from REVIEW_REQUIRED goes FAILED", async () => {
+    const tid = await seedReviewTask(`t-rej-${Date.now()}`);
     const result = await decideTaskReview(db, {
       workspaceId,
       taskId: tid,
@@ -210,37 +307,7 @@ describe("task review decisions", { skip: !url }, () => {
   });
 
   it("request_changes goes NEEDS_REPLAN", async () => {
-    const plan = await generateProjectPlan(db, {
-      workspaceId,
-      projectId,
-      actor,
-      milestones: [
-        {
-          title: "M3",
-          description: "",
-          tasks: [
-            {
-              key: "t3",
-              title: "Changes",
-              goal: "g",
-              scope: "s",
-              allowedPaths: [],
-              acceptanceCriteria: ["ok"],
-              estimateMicros: 1000,
-              estimateComplexity: "S",
-              dependsOn: [],
-              priority: 1,
-            },
-          ],
-        },
-      ],
-    });
-    const tid = plan.milestones[0]!.tasks[0]!.task.id;
-    await db
-      .update(tasks)
-      .set({ status: "REVIEW_REQUIRED", updatedAt: new Date() })
-      .where(eq(tasks.id, tid));
-
+    const tid = await seedReviewTask(`t-chg-${Date.now()}`);
     const result = await decideTaskReview(db, {
       workspaceId,
       taskId: tid,
