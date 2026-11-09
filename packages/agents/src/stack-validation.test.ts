@@ -171,6 +171,8 @@ describe("runStackValidation", () => {
       ),
     );
     assert.ok(report.checks.some((c) => c.name === "go_test" && c.passed));
+    // Modules prefetched (fetch-only egress step) before the offline go test.
+    assert.deepEqual(calls[0], ["go", "mod", "download"]);
   });
 
   it("fails go stack when go test exits non-zero", async () => {

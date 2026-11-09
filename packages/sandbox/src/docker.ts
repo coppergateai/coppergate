@@ -22,7 +22,59 @@ import type {
   SandboxManager,
 } from "./types.js";
 
-type ActiveSandbox = SandboxHandle & { destroyed: boolean; image: string };
+type ActiveSandbox = SandboxHandle & {
+  destroyed: boolean;
+  image: string;
+  /** Host dir mounted at /cache (Go/npm/pnpm caches across execs). */
+  cacheDir: string;
+};
+
+/**
+ * Fetch-only commands that get registry egress (`--network=bridge`). Exact
+ * argv match: they download packages but never run repository code. Every
+ * other command (tests, lint, agent tools) stays on `--network=none`.
+ */
+const FETCH_ONLY_COMMANDS: readonly (readonly string[])[] = [
+  ["pnpm", "install", "--lockfile-only", "--ignore-scripts"],
+  ["npm", "install", "--package-lock-only", "--ignore-scripts"],
+  ["yarn", "install", "--mode=update-lockfile"],
+  ["go", "mod", "download"],
+];
+
+export function isFetchOnlyCommand(command: readonly string[]): boolean {
+  return FETCH_ONLY_COMMANDS.some(
+    (allowed) =>
+      allowed.length === command.length &&
+      allowed.every((arg, i) => arg === command[i]),
+  );
+}
+
+/** Pin registries via env so repo .npmrc / .yarnrc.yml cannot redirect fetches. */
+const EGRESS_ENV: Record<string, string> = {
+  npm_config_registry: "https://registry.npmjs.org/",
+  YARN_NPM_REGISTRY_SERVER: "https://registry.npmjs.org",
+  GOPROXY: "https://proxy.golang.org",
+};
+
+const CACHE_ENV: Record<string, string> = {
+  GOMODCACHE: "/cache/go/mod",
+  GOCACHE: "/cache/go/build",
+  GOTMPDIR: "/cache/tmp",
+  GOTOOLCHAIN: "local",
+  npm_config_cache: "/cache/npm",
+  npm_config_store_dir: "/cache/pnpm-store",
+  npm_config_manage_package_manager_versions: "false",
+  YARN_CACHE_FOLDER: "/cache/yarn",
+  XDG_CACHE_HOME: "/cache/xdg",
+};
+
+function defaultContainerUser(): string {
+  // Run as the worker's own uid so the 0700 mkdtemp workdir is accessible.
+  if (typeof process.getuid === "function" && typeof process.getgid === "function") {
+    return `${process.getuid()}:${process.getgid()}`;
+  }
+  return "1000:1000";
+}
 
 /**
  * Docker + gVisor (runsc) sandbox manager.
@@ -31,6 +83,7 @@ type ActiveSandbox = SandboxHandle & { destroyed: boolean; image: string };
  */
 export class DockerSandboxManager implements SandboxManager {
   private readonly active = new Map<string, ActiveSandbox>();
+  private runtime: Promise<"runsc" | "runc"> | null = null;
 
   constructor(
     private readonly options?: {
@@ -38,6 +91,10 @@ export class DockerSandboxManager implements SandboxManager {
       image?: string;
       /** Prefer runsc; fall back to runc when runsc unavailable. Default true. */
       preferRunsc?: boolean;
+      /** Fail closed instead of falling back to runc (production). */
+      requireRunsc?: boolean;
+      /** Container uid:gid. Default: the worker's own uid:gid. */
+      user?: string;
       /** Inject for tests. */
       dockerExec?: (
         args: string[],
@@ -55,10 +112,13 @@ export class DockerSandboxManager implements SandboxManager {
     }
 
     await this.assertDockerAvailable();
+    await this.resolveRuntime();
 
     const cloneMode: SandboxCloneMode = input.cloneMode ?? "sim";
     const root = this.options?.rootDir ?? tmpdir();
     const workdir = await mkdtemp(join(root, "cg-sandbox-docker-"));
+    const cacheDir = await mkdtemp(join(root, "cg-sandbox-docker-cache-"));
+    await mkdir(join(cacheDir, "tmp"), { recursive: true });
     const id = `docker_${createHash("sha256")
       .update(`${input.runId}:${Date.now()}`)
       .digest("hex")
@@ -108,6 +168,7 @@ export class DockerSandboxManager implements SandboxManager {
       prodWritesEnabled: input.prodWritesEnabled === true,
       destroyed: false,
       image: spec.image,
+      cacheDir,
     };
     this.active.set(id, handle);
     return { ...handle };
@@ -130,29 +191,34 @@ export class DockerSandboxManager implements SandboxManager {
       image: active.image,
       workdirHostPath: active.workdir,
       baseSha: active.baseSha,
+      user: this.options?.user ?? defaultContainerUser(),
     });
     const runtime = await this.resolveRuntime();
+    const egress = isFetchOnlyCommand(command);
+    const env: Record<string, string> = {
+      COPPERGATE_BASE_SHA: active.baseSha,
+      HOME: "/tmp",
+      GIT_TERMINAL_PROMPT: "0",
+      ...CACHE_ENV,
+      ...(egress ? EGRESS_ENV : { GOPROXY: "off" }),
+    };
     const dockerArgs = [
       "run",
       "--rm",
       `--runtime=${runtime}`,
-      `--network=${spec.networkMode}`,
+      `--network=${egress ? "bridge" : spec.networkMode}`,
       `--user=${spec.user}`,
       "--read-only",
       "--tmpfs",
       "/tmp:rw,noexec,nosuid,size=64m",
       "--workdir=/workspace",
       `-v=${active.workdir}:/workspace:rw`,
+      `-v=${active.cacheDir}:/cache:rw`,
       ...spec.capDrop.flatMap((c) => ["--cap-drop", c]),
       ...spec.securityOpt.flatMap((o) => ["--security-opt", o]),
       `--memory=${spec.limits.memoryMb}m`,
       `--pids-limit=${spec.limits.pidsMax}`,
-      "--env",
-      `COPPERGATE_BASE_SHA=${active.baseSha}`,
-      "--env",
-      "HOME=/tmp",
-      "--env",
-      "GIT_TERMINAL_PROMPT=0",
+      ...Object.entries(env).flatMap(([k, v]) => ["--env", `${k}=${v}`]),
       spec.image,
       ...command,
     ];
@@ -178,6 +244,9 @@ export class DockerSandboxManager implements SandboxManager {
     active.destroyed = true;
     this.active.delete(sandbox.id);
     await rm(active.workdir, { recursive: true, force: true });
+    await rm(active.cacheDir, { recursive: true, force: true }).catch(
+      () => undefined,
+    );
   }
 
   async isDestroyed(sandbox: SandboxHandle): Promise<boolean> {
@@ -210,15 +279,31 @@ export class DockerSandboxManager implements SandboxManager {
     }
   }
 
-  private async resolveRuntime(): Promise<"runsc" | "runc"> {
-    if (this.options?.preferRunsc === false) return "runc";
-    if (this.options?.dockerExec) return "runsc";
-    const probe = await runHostCommand(
-      ["docker", "info", "--format", "{{.Runtimes}}"],
-      8_000,
-    );
-    if (probe.exitCode === 0 && /runsc/i.test(probe.stdout + probe.stderr)) {
+  private resolveRuntime(): Promise<"runsc" | "runc"> {
+    this.runtime ??= this.probeRuntime().catch((err: unknown) => {
+      this.runtime = null;
+      throw err;
+    });
+    return this.runtime;
+  }
+
+  private async probeRuntime(): Promise<"runsc" | "runc"> {
+    const requireRunsc = this.options?.requireRunsc === true;
+    if (this.options?.preferRunsc === false && !requireRunsc) return "runc";
+    const probe = this.options?.dockerExec
+      ? await this.options.dockerExec(["info", "--format", "{{json .Runtimes}}"])
+      : await runHostCommand(
+          ["docker", "info", "--format", "{{json .Runtimes}}"],
+          8_000,
+        );
+    if (probe.exitCode === 0 && /runsc/i.test(probe.stdout)) {
       return "runsc";
+    }
+    if (requireRunsc) {
+      throw new SandboxPolicyError(
+        "invalid",
+        "gVisor runtime (runsc) is required but not registered with the Docker daemon",
+      );
     }
     return "runc";
   }

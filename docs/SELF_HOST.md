@@ -120,10 +120,14 @@ inside a sandbox. With `NODE_ENV=production`:
 - **`SANDBOX_MODE=docker`** runs each command in a container (gVisor `runsc` if the
   daemon has it, else `runc`) with no network. The worker needs a Docker CLI and a
   daemon it can reach, and the sandbox image (`coppergate/sandbox-node22:gvisor`)
-  must be present on that daemon. The Compose stack does **not** wire this up today:
-  the worker container has no Docker CLI, and a bind-mounted host `docker.sock` would
-  resolve sandbox workdirs (`/tmp/cg-sandbox-docker-*`) on the host, not in the worker
-  container. Run the worker directly on a Docker host if you need this mode.
+  must be present on that daemon (`SANDBOX_IMAGE`, built from `Dockerfile.sandbox`).
+  Production refuses the `runc` fallback unless `SANDBOX_ALLOW_RUNC=1`.
+  The worker image can run its own daemon: set `START_DOCKERD=1` and the entrypoint
+  starts `dockerd` + gVisor, builds the sandbox image and installs an egress firewall
+  (this is how the hosted worker runs on Fly). In Compose this needs `privileged: true`
+  on the `worker` service and a volume at `/data` (`DOCKER_DATA_ROOT`). Privileged is
+  root on your Docker host, so only do this on a host dedicated to Coppergate. Do
+  **not** bind-mount the host `docker.sock`: sandbox workdirs would resolve on the host.
 - **`SANDBOX_MODE=off`** executes nothing; validation falls back to the fake gate.
 
 For a single-tenant self-host where you trust the repositories you connect, add to
@@ -139,7 +143,7 @@ ALLOW_LOCAL_SANDBOX=1
 - **No Helm chart yet** — Compose is the supported pack; adapt to Kubernetes yourself or wait for Phase 2.
 - **No SSO / SCIM** — GitHub or GitLab OAuth only.
 - **GitHub.com only for GitHub path** — GitHub Enterprise Server host override not shipped.
-- **Sandbox** — Compose ships local mode only (break-glass ack required in production); Docker/gVisor mode needs a worker on a Docker host. Not a managed VPC fleet.
+- **Sandbox** — Compose defaults to local mode (break-glass ack required in production); Docker/gVisor mode needs a privileged worker container (`START_DOCKERD=1`) or a worker on a Docker host. Not a managed VPC fleet.
 - **Artifacts** — inline in Postgres (no object store).
 - **One primary SCM per workspace** in MVP (GitHub **or** GitLab).
 - Marketing waitlist UI is present; gate with `PILOT_INVITE_REQUIRED=true` if needed.

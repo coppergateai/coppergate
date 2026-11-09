@@ -1,0 +1,23 @@
+# Coppergate sandbox image — runs agent/repo commands for SANDBOX_MODE=docker.
+# Built on the worker's Docker daemon at boot (docker/worker-entrypoint.sh);
+# the worker runs every command with --network=none (fetch-only installs get
+# registry egress), --read-only, --cap-drop ALL, under gVisor runsc.
+FROM node:22-bookworm-slim
+ARG GO_VERSION=1.26.0
+ENV PATH=/usr/local/go/bin:$PATH \
+    GOTOOLCHAIN=local \
+    GOMAXPROCS=1 \
+    COREPACK_HOME=/opt/corepack
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git ca-certificates curl ripgrep \
+  && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-$(dpkg --print-architecture).tar.gz" \
+    | tar -C /usr/local -xz \
+  && npm install -g pnpm@9.15.9 \
+  && corepack enable yarn \
+  && corepack install -g yarn@stable \
+  && chmod -R a+rX /opt/corepack \
+  && apt-get purge -y curl && apt-get autoremove -y \
+  && rm -rf /var/lib/apt/lists/* /root/.npm \
+  && go version && pnpm --version && yarn --version && git --version
+# Container user comes from `docker run --user` (the worker's uid); HOME=/tmp.
+WORKDIR /workspace

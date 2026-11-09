@@ -109,7 +109,15 @@ import { evaluateSandboxModePolicy, type SandboxMode } from "./sandbox-mode.js";
 
 function createSandboxManager(mode: SandboxMode): SandboxManager | null {
   if (mode === "off") return null;
-  if (mode === "docker") return new DockerSandboxManager();
+  if (mode === "docker") {
+    return new DockerSandboxManager({
+      image: process.env.SANDBOX_IMAGE?.trim() || undefined,
+      // SEC-037: production refuses the runc fallback unless explicitly allowed.
+      requireRunsc:
+        process.env.NODE_ENV === "production" &&
+        process.env.SANDBOX_ALLOW_RUNC !== "1",
+    });
+  }
   return new LocalSandboxManager();
 }
 
