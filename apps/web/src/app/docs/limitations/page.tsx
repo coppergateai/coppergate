@@ -29,8 +29,9 @@ export default function LimitationsPage() {
         <p className={styles.pageEyebrow}>Docs</p>
         <h1 className={styles.pageTitle}>Limitations &amp; non-goals</h1>
         <p className={styles.pageLede}>
-          Honest boundaries for the current release — so you can decide whether
-          Coppergate fits before you clone or try hosted.
+          Coppergate is experimental — early, under active dogfood, and still
+          changing. These are the honest boundaries for the current release so
+          you can decide before you clone or try hosted.
         </p>
         <div className={styles.prose}>
           <p>
@@ -38,7 +39,8 @@ export default function LimitationsPage() {
             supervision (efficiency contest, critic, elimination). The current
             release ships GitHub fitness (PR + CI) as the evidence wedge; armed
             arenas run N≤2 efficiency contests today. Live delivery is GitHub
-            and GitLab; Bitbucket / Azure DevOps clients are deferred.
+            and GitLab; Bitbucket / Azure DevOps clients are deferred. Expect
+            rough edges and surface changes while we dogfood the loop ourselves.
           </p>
 
           <section>
