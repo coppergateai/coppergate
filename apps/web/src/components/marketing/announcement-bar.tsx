@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import styles from "./marketing.module.css";
 
-const STORAGE_KEY = "cg-announce-dismissed";
+/** Bump when the announce copy changes so prior dismissals don't hide it. */
+const STORAGE_KEY = "cg-announce-dismissed-experimental-v1";
 
 export function AnnouncementBar() {
   const [hidden, setHidden] = useState(true);
@@ -32,25 +33,29 @@ export function AnnouncementBar() {
   if (hidden) return null;
 
   return (
-    <div className={styles.announce}>
+    <div className={styles.announce} role="status">
       <div className={styles.announceInner}>
         <div className={styles.announceLeft}>
-          <span className={styles.announceDot} aria-hidden="true" />
+          <span
+            className={`${styles.announceDot} ${styles.announceDotExperimental}`}
+            aria-hidden="true"
+          />
           <p className={styles.announceText}>
-            Open Program Runtime · Autonomy under contract · Community $0
+            Experimental — Coppergate is early and still changing. Expect rough
+            edges.
           </p>
         </div>
         <div className={styles.announceRight}>
-          <a className={styles.announceLink} href="/docs/open-program-runtime">
-            Docs
+          <a className={styles.announceLink} href="/docs/limitations">
+            Limitations
           </a>
           <a
             className={styles.announceLink}
-            href="https://github.com/coppergateai/coppergate/blob/main/docs/SELF_HOST.md"
+            href="https://github.com/coppergateai/coppergate"
             target="_blank"
             rel="noreferrer"
           >
-            Self-host
+            GitHub
           </a>
           <button
             type="button"

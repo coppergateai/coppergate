@@ -45,4 +45,8 @@ export const LANDING_FAQS: readonly FaqItem[] = [
     q: "Is Coppergate free / open source?",
     a: "Yes. The full product is MIT-licensed on GitHub. Self-host with Docker Compose and BYOK at $0. You can also try the hosted instance. Paid hosted plan tiers are not offered right now — the community path stays free.",
   },
+  {
+    q: "Is Coppergate production-ready?",
+    a: "Not as a finished product. Coppergate is experimental and under active dogfood — arenas, evidence, and delivery paths still move. Self-host or try hosted knowing the surface can change; Limitations documents the current boundaries.",
+  },
 ] as const;
