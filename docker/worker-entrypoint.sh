@@ -13,6 +13,12 @@ start_dockerd() {
   if ! grep -q " /sys/fs/cgroup cgroup2 " /proc/mounts; then
     mount -t cgroup2 none /sys/fs/cgroup
   fi
+  # cgroup v2 "no internal processes": move everything out of the root cgroup
+  # so controllers can be delegated to containers (same as docker:dind).
+  mkdir -p /sys/fs/cgroup/init
+  xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null || :
+  sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers \
+    > /sys/fs/cgroup/cgroup.subtree_control
   mkdir -p "$DATA_ROOT"
   # --icc=false: sandbox containers cannot reach each other.
   # --dns: fixed public resolvers so the egress firewall below needs no
