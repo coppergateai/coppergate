@@ -1037,3 +1037,20 @@ export {
   listPayingWorkspaceIds,
   type PilotGoNoGoSnapshot,
 } from "./pilots.js";
+export {
+  SAME_HEAD_IDEMPOTENCY_PREFIX,
+  SAME_HEAD_MAX_ATTEMPTS,
+  SAME_HEAD_RUN_EVENT_KIND,
+  SAME_HEAD_SUPERSEDED_ERROR_CODE,
+  armSameHeadHealRun,
+  buildSameHeadHealPrompt,
+  decideSameHeadHeal,
+  getSameHeadHealContext,
+  isSameHeadRun,
+  sameHeadIdempotencyKey,
+  type ArmSameHeadHealResult,
+  type SameHeadFailingCheck,
+  type SameHeadHealContext,
+  type SameHeadHealDecision,
+  type SameHeadHealReason,
+} from "./same-head-heal.js";

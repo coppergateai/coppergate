@@ -314,3 +314,120 @@ describe("HttpGithubDelivery reliability", () => {
     );
   });
 });
+
+describe("same-head push onto an open PR branch", () => {
+  const openPr = (sha: string) => () =>
+    new Response(
+      JSON.stringify([
+        {
+          number: 231,
+          html_url: "https://github.com/acme/app/pull/231",
+          head: { sha, ref: "chore/cg-task-2b21e291" },
+        },
+      ]),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  const input = {
+    repo: { owner: "acme", repo: "app", defaultBranch: "main" },
+    prNumber: 231,
+    branchName: "chore/cg-task-2b21e291",
+    expectedHeadSha: "headheadhead",
+    commitMessage: "Coppergate: same-head heal",
+    files: [{ path: "a.ts", content: "fixed\n" }],
+    idempotencyKey: "k-same",
+  };
+
+  it("commits once on the PR head with the head as parent; no ref/PR create", async () => {
+    const track = { contentsPuts: 0, commits: 0, blobs: 0 };
+    let parents: string[] = [];
+    const { fetchImpl } = mockGitDataDelivery({
+      tipSha: "headheadhead",
+      pulls: openPr("headheadhead"),
+      track,
+      onCommit: (body) => {
+        parents = (body as { parents?: string[] }).parents ?? [];
+      },
+    });
+    const client = new HttpGithubDelivery("tok", fetchImpl);
+    const result = await client.pushToPullRequestBranch(input);
+    assert.equal(result.prNumber, 231);
+    assert.equal(result.created, false);
+    assert.equal(result.headSha, "commit-one");
+    assert.equal(result.branchName, "chore/cg-task-2b21e291");
+    assert.deepEqual(parents, ["headheadhead"]);
+    assert.equal(track.commits, 1);
+  });
+
+  it("refuses when the PR head moved since the heal started (CAS)", async () => {
+    const { fetchImpl, track } = mockGitDataDelivery({
+      tipSha: "someoneelse1",
+      pulls: openPr("someoneelse1"),
+    });
+    const client = new HttpGithubDelivery("tok", fetchImpl);
+    await assert.rejects(
+      () => client.pushToPullRequestBranch(input),
+      (err: unknown) =>
+        err instanceof GithubDeliveryError && err.code === "conflict",
+    );
+    assert.equal(track.commits, 0);
+  });
+
+  it("refuses when the PR is no longer open on that branch", async () => {
+    const { fetchImpl } = mockGitDataDelivery({
+      pulls: () =>
+        new Response("[]", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+    const client = new HttpGithubDelivery("tok", fetchImpl);
+    await assert.rejects(
+      () => client.pushToPullRequestBranch(input),
+      (err: unknown) =>
+        err instanceof GithubDeliveryError && err.code === "not_found",
+    );
+  });
+
+  it("refuses the default branch", async () => {
+    const client = new FakeGithubDelivery();
+    await assert.rejects(
+      () => client.pushToPullRequestBranch({ ...input, branchName: "main" }),
+      (err: unknown) =>
+        err instanceof GithubDeliveryError && err.code === "policy",
+    );
+  });
+
+  it("fake pushes onto the same PR and enforces CAS", async () => {
+    const client = new FakeGithubDelivery();
+    const pr = await client.deliverPullRequest({
+      repo: input.repo,
+      branchName: "chore/cg-task-x",
+      baseSha: "base",
+      commitMessage: "m",
+      prTitle: "t",
+      prBody: "b",
+      files: [{ path: "a.ts", content: "1" }],
+      idempotencyKey: "acme/app:k",
+    });
+    const healed = await client.pushToPullRequestBranch({
+      ...input,
+      prNumber: pr.prNumber,
+      branchName: pr.branchName,
+      expectedHeadSha: pr.headSha,
+    });
+    assert.equal(healed.prNumber, pr.prNumber);
+    assert.notEqual(healed.headSha, pr.headSha);
+    assert.equal(client.pullRequests.size, 1);
+    await assert.rejects(
+      () =>
+        client.pushToPullRequestBranch({
+          ...input,
+          prNumber: pr.prNumber,
+          branchName: pr.branchName,
+          expectedHeadSha: pr.headSha,
+        }),
+      (err: unknown) =>
+        err instanceof GithubDeliveryError && err.code === "conflict",
+    );
+  });
+});
