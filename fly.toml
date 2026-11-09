@@ -10,8 +10,9 @@ primary_region = "iad"
 [env]
   NODE_ENV = "production"
   GITHUB_DELIVERY_MODE = "http"
-  # Fly Machines have no Docker daemon — local sandbox + break-glass ack.
-  # Use SANDBOX_MODE=docker on hosts with Docker + (preferably) gVisor/runsc.
+  # SEC-037: production refuses SANDBOX_MODE=local without ALLOW_LOCAL_SANDBOX=1.
+  # This worker still runs agent commands on the Machine itself (break-glass ack);
+  # moving it to SANDBOX_MODE=docker is pending — see docs/SECURITY_PRODUCTION.md.
   SANDBOX_MODE = "local"
   ALLOW_LOCAL_SANDBOX = "1"
   # Prefer workspace BYOK / OPENAI_API_KEY. OpenHands scaffold stub is disabled.
