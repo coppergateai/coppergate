@@ -120,20 +120,16 @@ export const REPLAN_LEAN_BUDGET_MICROS = 1_000_000;
  */
 export const LEAN_ARENA_PROFILE_KEYS = ["engineer"] as const;
 
-/** Arena spawn keys for vision replan when budget is above the lean replan floor. */
-export const VISION_REPLAN_ARENA_PROFILE_KEYS = ["proposer", "engineer"] as const;
-
 /**
  * Arena seating keys from remaining project micros.
- * Under AG-025 lean floor: engineer peers only; otherwise vision_replan spawn keys.
+ * Always peer-primary engineer (AG-012 peer-only seating) — at any budget, so
+ * the AG-025 under-$1 lean roster holds by construction.
+ * FULL_ARENA_PROFILE_KEYS is spawn catalog only.
  */
 export function rosterKeysForAvailableBudget(
-  availableMicros: number,
+  _availableMicros: number,
 ): string[] {
-  if (availableMicros < REPLAN_LEAN_BUDGET_MICROS) {
-    return [...LEAN_ARENA_PROFILE_KEYS];
-  }
-  return [...VISION_REPLAN_ARENA_PROFILE_KEYS];
+  return [...LEAN_ARENA_PROFILE_KEYS];
 }
 
 /** Effective replan auto-queue cap from residual budget (AG-025). */
@@ -1057,18 +1053,7 @@ export async function startProjectArena(
   // Arm + resume BEFORE vision replan. If backlog boots while PAUSED,
   // min_human is skipped and a zombie Inbox approval is created.
   // Peer seats only — FULL_ARENA_PROFILE_KEYS is catalog, not contender width.
-  let startAvailableMicros = Number.POSITIVE_INFINITY;
-  try {
-    const spend = await getProjectSpendSummary(
-      db,
-      input.workspaceId,
-      input.projectId,
-    );
-    startAvailableMicros = spend.availableMicros;
-  } catch {
-    /* best-effort — lean when unknown */
-  }
-  const rosterKeys = rosterKeysForAvailableBudget(startAvailableMicros);
+  const rosterKeys = rosterKeysForAvailableBudget(Number.POSITIVE_INFINITY);
   const startPolicy = parseMaintainerPolicy(project.maintainerPolicyJson);
   const duelN = maintainerContenderPinN(startPolicy.maxTournamentN);
   let { arena } = await ensureArenaForProject(db, {

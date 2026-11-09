@@ -8,7 +8,6 @@ import {
   LEAN_ROSTER_AVAILABLE_MICROS,
   MIN_REPLAN_AVAILABLE_MICROS,
   REPLAN_LEAN_BUDGET_MICROS,
-  VISION_REPLAN_ARENA_PROFILE_KEYS,
   maxAutoQueueForReplan,
   buildMaintainerReleaseTag,
   computeBudgetBurnRatio,
@@ -100,15 +99,17 @@ describe("maintainer policy", () => {
     assert.equal(p.releaseTagStyle, "daily");
   });
 
-  it("AG-025: lean roster under $1; vision replan keys at or above", () => {
-    assert.deepEqual(
-      rosterKeysForAvailableBudget(REPLAN_LEAN_BUDGET_MICROS - 1),
-      [...LEAN_ARENA_PROFILE_KEYS],
-    );
-    assert.deepEqual(
-      rosterKeysForAvailableBudget(REPLAN_LEAN_BUDGET_MICROS),
-      [...VISION_REPLAN_ARENA_PROFILE_KEYS],
-    );
+  it("uses engineer peer roster for arena seating at any budget (AG-012, AG-025)", () => {
+    for (const micros of [
+      REPLAN_LEAN_BUDGET_MICROS - 1,
+      REPLAN_LEAN_BUDGET_MICROS,
+      LEAN_ROSTER_AVAILABLE_MICROS,
+      Number.POSITIVE_INFINITY,
+    ]) {
+      assert.deepEqual(rosterKeysForAvailableBudget(micros), [
+        ...LEAN_ARENA_PROFILE_KEYS,
+      ]);
+    }
     assert.deepEqual(LEAN_ARENA_PROFILE_KEYS, ["engineer"]);
   });
 

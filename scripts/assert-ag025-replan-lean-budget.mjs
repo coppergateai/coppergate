@@ -17,11 +17,11 @@ const testSrc = fs.readFileSync(testTs, "utf8");
 assert.match(src, /REPLAN_LEAN_BUDGET_MICROS\s*=\s*1_000_000/);
 assert.match(src, /export function maxAutoQueueForReplan/);
 assert.match(src, /maxAutoQueueForReplan\s*\(/);
-assert.match(
+assert.doesNotMatch(
   src,
-  /rosterKeysForAvailableBudget[\s\S]*REPLAN_LEAN_BUDGET_MICROS/,
-  "roster must lean under REPLAN_LEAN_BUDGET_MICROS",
+  /VISION_REPLAN_ARENA_PROFILE_KEYS|"proposer",\s*"engineer"/,
+  "arena seating must stay engineer peer-only (AG-012) — no proposer×engineer duel",
 );
 assert.match(testSrc, /AG-025/);
 
-console.log("AG-025 OK: replan lean budget cap + roster wired");
+console.log("AG-025 OK: replan lean budget cap wired; roster stays peer-only");

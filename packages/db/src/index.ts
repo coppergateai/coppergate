@@ -518,7 +518,6 @@ export {
   LEAN_ARENA_PROFILE_KEYS,
   LEAN_ROSTER_AVAILABLE_MICROS,
   REPLAN_LEAN_BUDGET_MICROS,
-  VISION_REPLAN_ARENA_PROFILE_KEYS,
   maxAutoQueueForReplan,
   MaintainerError,
   buildMaintainerReleaseTag,
