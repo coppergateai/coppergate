@@ -53,8 +53,37 @@ export type DeliverPrResult = {
   idempotencyKey: string;
 };
 
+/** Same-head heal — commit onto an existing open PR's head branch. */
+export type PushToPrBranchInput = {
+  repo: RepoRef;
+  prNumber: number;
+  /** PR head branch (never the default branch). */
+  branchName: string;
+  /** CAS: the head SHA the heal was built on; moved head ⇒ conflict. */
+  expectedHeadSha: string;
+  commitMessage: string;
+  files: FileChange[];
+  idempotencyKey: string;
+};
+
 export interface GithubDeliveryClient {
   deliverPullRequest(input: DeliverPrInput): Promise<DeliverPrResult>;
+  /** Optional: clients without it cannot run same-head heals (fail closed). */
+  pushToPullRequestBranch?(input: PushToPrBranchInput): Promise<DeliverPrResult>;
+}
+
+function assertPushToPrInput(input: PushToPrBranchInput): void {
+  assertSafeBranch(input.branchName, input.repo.defaultBranch);
+  if (!Number.isFinite(input.prNumber) || input.prNumber <= 0) {
+    throw new GithubDeliveryError("invalid", "prNumber is required");
+  }
+  const sha = input.expectedHeadSha.trim();
+  if (!sha || sha === "unknown") {
+    throw new GithubDeliveryError("invalid", "expectedHeadSha is required");
+  }
+  if (!input.files.length) {
+    throw new GithubDeliveryError("invalid", "files required");
+  }
 }
 
 export function assertSafeBranch(
@@ -147,6 +176,36 @@ export class FakeGithubDelivery implements GithubDeliveryClient {
     this.pullRequests.set(input.idempotencyKey, result);
     return result;
   }
+
+  async pushToPullRequestBranch(
+    input: PushToPrBranchInput,
+  ): Promise<DeliverPrResult> {
+    assertPushToPrInput(input);
+    const pr = [...this.pullRequests.values()].find(
+      (p) => p.prNumber === input.prNumber,
+    );
+    if (!pr || pr.branchName !== input.branchName) {
+      throw new GithubDeliveryError(
+        "not_found",
+        `no open PR #${input.prNumber} on ${input.branchName}`,
+      );
+    }
+    if (pr.headSha !== input.expectedHeadSha) {
+      throw new GithubDeliveryError(
+        "conflict",
+        `branch head moved: expected ${input.expectedHeadSha.slice(0, 12)} got ${pr.headSha.slice(0, 12)}`,
+      );
+    }
+    const headSha = `fake${createShortHash(input.idempotencyKey + pr.headSha)}`;
+    this.pushes.push({
+      branch: input.branchName,
+      sha: headSha,
+      files: input.files.map((f) => f.path),
+    });
+    const updated: DeliverPrResult = { ...pr, headSha, created: false };
+    this.pullRequests.set(pr.idempotencyKey, { ...updated, created: true });
+    return { ...updated, idempotencyKey: input.idempotencyKey };
+  }
 }
 
 function createShortHash(input: string): string {
@@ -222,6 +281,48 @@ export class HttpGithubDelivery implements GithubDeliveryClient {
       prNumber: pr.number,
       prUrl: pr.html_url,
       created: true,
+      idempotencyKey: input.idempotencyKey,
+    };
+  }
+
+  /**
+   * Same-head heal: one CAS commit onto the open PR's head branch. Refuses
+   * when the PR is not open on that branch or its head moved since the heal
+   * started; never creates a branch or a PR.
+   */
+  async pushToPullRequestBranch(
+    input: PushToPrBranchInput,
+  ): Promise<DeliverPrResult> {
+    assertPushToPrInput(input);
+    const { owner, repo } = input.repo;
+    const open = await this.findPrByHead(owner, repo, input.branchName);
+    if (!open || open.prNumber !== input.prNumber) {
+      throw new GithubDeliveryError(
+        "not_found",
+        `PR #${input.prNumber} is not open on ${input.branchName}`,
+      );
+    }
+    if (open.headSha !== input.expectedHeadSha) {
+      throw new GithubDeliveryError(
+        "conflict",
+        `branch head moved: expected ${input.expectedHeadSha.slice(0, 12)} got ${open.headSha.slice(0, 12)}`,
+      );
+    }
+    const headSha = await this.commitFilesOnBranch(
+      owner,
+      repo,
+      input.branchName,
+      input.repo.defaultBranch,
+      input.files,
+      input.commitMessage,
+      input.expectedHeadSha,
+    );
+    return {
+      branchName: input.branchName,
+      headSha,
+      prNumber: open.prNumber,
+      prUrl: open.prUrl,
+      created: false,
       idempotencyKey: input.idempotencyKey,
     };
   }

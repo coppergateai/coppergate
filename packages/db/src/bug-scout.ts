@@ -25,6 +25,7 @@ export const BUG_SCOUT_NOISE_ERROR_CODES = new Set([
   "insufficient_quota",
   "pr_closed",
   "validating_lease_expired",
+  "superseded_same_head",
 ]);
 
 const NOISE_TITLE_RE =
