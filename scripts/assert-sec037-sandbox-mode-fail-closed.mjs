@@ -4,6 +4,9 @@
  * - SANDBOX_MODE=local + NODE_ENV=production refused unless ALLOW_LOCAL_SANDBOX=1
  * - executeClaimedRun fails the run with sandbox_local_forbidden before agent work
  * - worker boot surfaces the refusal; no warn-only path remains
+ * - docker mode refuses the runc fallback in production; only exact fetch-only
+ *   argv gets network
+ * - hosted Fly worker runs SANDBOX_MODE=docker without the local break-glass ack
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -50,4 +53,23 @@ assert.match(boot, /evaluateSandboxModePolicy\(\)/);
 const tests = read("apps/worker/src/sandbox-mode.test.ts");
 assert.match(tests, /refuses local in production without ack/);
 
-console.log("SEC-037 OK: production local sandbox fails closed without ALLOW_LOCAL_SANDBOX=1");
+assert.match(execute, /requireRunsc:\s*\n?\s*process\.env\.NODE_ENV === "production"/);
+
+const docker = read("packages/sandbox/src/docker.ts");
+assert.match(docker, /FETCH_ONLY_COMMANDS/);
+assert.match(docker, /egress \? "bridge" : spec\.networkMode/);
+assert.match(docker, /requireRunsc/);
+
+const fly = read("fly.toml");
+assert.match(fly, /SANDBOX_MODE = "docker"/);
+assert.match(fly, /START_DOCKERD = "1"/);
+assert.doesNotMatch(fly, /ALLOW_LOCAL_SANDBOX/);
+assert.doesNotMatch(fly, /SANDBOX_ALLOW_RUNC/);
+
+const entry = read("docker/worker-entrypoint.sh");
+assert.match(entry, /grep -q runsc/);
+assert.match(entry, /DOCKER-USER/);
+assert.match(entry, /setpriv --reuid=coppergate/);
+assert.doesNotMatch(read("Dockerfile.worker"), /docker\.sock/);
+
+console.log("SEC-037 OK: production sandbox fails closed; Fly worker on docker + runsc");

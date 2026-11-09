@@ -13,6 +13,7 @@
 
 ### Features
 
+- SEC-037: **Hosted worker on Docker + gVisor** — Fly worker runs `SANDBOX_MODE=docker` with dockerd + runsc inside the Machine (`START_DOCKERD=1`, `/data` volume, egress firewall); sandbox image from `Dockerfile.sandbox`; containers run as the worker uid with per-sandbox caches; only exact fetch-only installs (`go mod download`, lockfile refresh) get registry egress; production refuses the runc fallback (`SANDBOX_ALLOW_RUNC=1` to override). See `docs/SECURITY_PRODUCTION.md`.
 - AG-024: Dual-workspace spend isolation — Coppergate and kprompt envelopes never share debit; every `estimate_reserve` and usage append asserts `workspaceId` against the project (and task) before ledger write. See `docs/dual-workspace-spend-isolation.md`.
 - AG-023: Regression bisect hard timeout — `planRegressionBisect` budget honored on sandbox exec via `execRegressionBisectPlan` + `hardDeadlineMs`; signal body hints for good/bad/repro. See `docs/regression-bisect-timeout.md`.
 - AG-040: Design scout → Open Program rows — opt-in `designScout` Playwright overflow findings append `| Open | P-N |` under Design scout section (fp dedup); Settings toggle; GH issues remain optional. See `docs/design-scout-open-program.md`.

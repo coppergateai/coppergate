@@ -82,6 +82,19 @@ export async function runStackValidation(
   if (stack === "go" || hasGoMod) {
     // -p 1 keeps peak RAM low on small worker VMs (Go compile OOMs at 512–2GB).
     // kprompt's suite needs ~2–3+ minutes even locally; Fly shared CPUs need more headroom.
+    // Prefetch modules first: the docker sandbox grants registry egress to this
+    // fetch-only step and runs `go test` itself with no network.
+    const goModDownload = await input.exec(["go", "mod", "download"], {
+      timeoutMs: 300_000,
+    });
+    if (goModDownload.exitCode !== 0) {
+      // Informational: vendored modules still let `go test` pass offline.
+      checks.push({
+        name: "go_mod_download",
+        passed: true,
+        detail: `prefetch failed (exit ${goModDownload.exitCode}): ${(goModDownload.stderr || goModDownload.stdout).slice(0, 300)}`,
+      });
+    }
     const goTest = await input.exec(
       ["go", "test", "-p", "1", "-count", "1", "-timeout", "8m", "./..."],
       {

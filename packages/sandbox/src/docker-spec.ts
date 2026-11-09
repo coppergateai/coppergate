@@ -31,6 +31,8 @@ export function buildDockerSandboxSpec(input: {
   workdirHostPath: string;
   baseSha: string;
   limits?: Partial<SandboxLimits>;
+  /** Container uid:gid — match the workdir owner (default 1000:1000). */
+  user?: string;
   /** Extra bind mounts (validated). */
   mounts?: string[];
   egressAllowlist?: readonly string[];
@@ -50,7 +52,7 @@ export function buildDockerSandboxSpec(input: {
   return {
     image: input.image ?? "coppergate/sandbox-node22:gvisor",
     runtime: "runsc",
-    user: "1000:1000",
+    user: input.user ?? "1000:1000",
     networkMode: "none",
     privileged: false,
     readOnlyRootfs: true,
