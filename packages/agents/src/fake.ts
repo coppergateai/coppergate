@@ -206,7 +206,8 @@ export function buildFakeCompletion(
   actualCostMicros: number,
 ): FakeCompletionPayload {
   const slug = shortId(input.taskId);
-  const branchName = `chore/cg-task-${slug}`;
+  // Contenders must not share a branch — honor the run's assigned branch.
+  const branchName = input.branchName?.trim() || `chore/cg-task-${slug}`;
   const headSha = `fake${shortId(input.runId)}${shortId(input.baseSha)}`.slice(
     0,
     40,

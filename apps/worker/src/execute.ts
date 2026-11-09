@@ -819,6 +819,7 @@ export async function executeClaimedRun(
         allowedPaths: parseJsonArray(task.allowedPaths),
         acceptanceCriteria: parseJsonArray(task.acceptanceCriteria),
         baseSha: run.baseSha,
+        branchName: run.branchName ?? undefined,
         toolAllowlist: parseJsonArray(run.toolAllowlist),
         profileTools,
         spendCapMicros: run.spendCapMicros,

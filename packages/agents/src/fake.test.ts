@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   AgentPolicyError,
+  buildFakeCompletion,
   FakeCodingAgent,
   isFakeCompletionPayload,
 } from "./fake.js";
@@ -40,6 +41,20 @@ describe("FakeCodingAgent", () => {
     assert.ok(isFakeCompletionPayload(completion!.payload));
     assert.match(completion!.payload!.branchName, /^chore\/cg-task-/);
     assert.match(completion!.message ?? "", /not DONE/i);
+  });
+
+  it("delivers on the assigned contender branch, not the shared task branch", () => {
+    const a = buildFakeCompletion(
+      baseInput({ branchName: "chore/cg-t-7f3a0000-c-a91c0000" }),
+      0,
+    );
+    const b = buildFakeCompletion(
+      baseInput({ branchName: "chore/cg-t-7f3a0000-c-4be00000" }),
+      0,
+    );
+    assert.equal(a.branchName, "chore/cg-t-7f3a0000-c-a91c0000");
+    assert.notEqual(a.branchName, b.branchName);
+    assert.match(buildFakeCompletion(baseInput(), 0).branchName, /^chore\/cg-task-/);
   });
 
   it("rejects incomplete policy inputs", async () => {

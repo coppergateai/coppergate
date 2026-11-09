@@ -39,6 +39,11 @@ export type AgentRunInput = {
   allowedPaths: string[];
   acceptanceCriteria: string[];
   baseSha: string;
+  /**
+   * Pre-assigned delivery branch (tournament ContenderRuns get
+   * `chore/cg-t-{t}-c-{c}`). Unset → per-task `chore/cg-task-{task}`.
+   */
+  branchName?: string;
   toolAllowlist: string[];
   /**
    * Contender profile toolAllowlist. When non-empty, FILE writes require `edit`
