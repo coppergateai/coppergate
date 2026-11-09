@@ -3,6 +3,8 @@
  */
 import {
   buildMaintainerReleaseTag,
+  closeFailedTasksShippedByMergedPrs,
+  listMergedArchitectureIds,
   ensureMergeConflictSignal,
   ensureShipGateHealTask,
   getInstallationForWorkspace,
@@ -78,10 +80,16 @@ export { shouldRecordShipGateAudit, SHIP_GATE_AUDIT_MIN_MS };
 export const ARCHITECTURE_RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
 const lastArchitectureReconcileAt = new Map<string, number>();
 
-/** Throttled reconcileArchitectureDone — covers human merges + failed writebacks. */
+/**
+ * Throttled reconcile from merged PRs: flips Open rows Done (human merges +
+ * failed writebacks) and closes stale FAILED tasks whose Open ID shipped.
+ */
 async function maybeReconcileArchitectureDone(
+  db: Database,
   log: Logger,
   input: {
+    workspaceId: string;
+    actor: string;
     projectId: string;
     repoFullName: string;
     token: string;
@@ -96,13 +104,31 @@ async function maybeReconcileArchitectureDone(
   const [owner, repo] = input.repoFullName.split("/");
   if (!owner || !repo) return;
   try {
+    const merged = await listMergedArchitectureIds({
+      token: input.token,
+      owner,
+      repo,
+    });
     await reconcileArchitectureDone(log, {
       token: input.token,
       owner,
       repo,
       architectureRepo: input.architectureRepo,
       architecturePaths: input.architecturePaths,
+      listMerged: async () => merged,
     });
+    const closed = await closeFailedTasksShippedByMergedPrs(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      merged,
+      actor: input.actor,
+    });
+    if (closed.length > 0) {
+      log.info("closed stale FAILED tasks for shipped Open IDs", {
+        projectId: input.projectId,
+        taskIds: closed,
+      });
+    }
   } catch (err) {
     log.warn("architecture reconcile failed", {
       projectId: input.projectId,
@@ -240,7 +266,9 @@ export async function runMaintainerSchedulerTick(
       });
     }
 
-    await maybeReconcileArchitectureDone(log, {
+    await maybeReconcileArchitectureDone(db, log, {
+      workspaceId: tick.workspaceId,
+      actor,
       projectId: tick.projectId,
       repoFullName: bound.repository.baseRepoFullName,
       token,
@@ -431,6 +459,51 @@ export async function runMaintainerSchedulerTick(
 
     for (const c of candidates) {
       try {
+        // Preflight: a dirty PR cannot merge — arm/keep the conflict heal and
+        // back off quietly instead of a "Merge not ready" attempt every pass.
+        const pre = await getPullRequestMergeState({
+          token,
+          owner,
+          repo: name,
+          prNumber: c.prNumber,
+        }).catch(() => null);
+        const preOpen = pre != null && pre.state === "open" && !pre.merged;
+        if (
+          pre &&
+          shouldEmitMergeConflictInsteadOfReplan({
+            prOpen: preOpen,
+            merged: pre.merged,
+            mergeable: pre.mergeable,
+            mergeableState: pre.mergeableState,
+          })
+        ) {
+          await ensureMergeConflictSignal(db, {
+            workspaceId: tick.workspaceId,
+            projectId: tick.projectId,
+            actor,
+            owner,
+            repo: name,
+            prNumber: c.prNumber,
+            headRef: pre.headRef,
+            headSha: pre.headSha,
+            baseRef: pre.baseRef,
+            parentTitle: c.task.title,
+          });
+          // Maintainer event only (no audit row) — starts the retry cooldown.
+          await markAutoMerged(db, {
+            workspaceId: tick.workspaceId,
+            projectId: tick.projectId,
+            taskId: c.task.id,
+            prNumber: c.prNumber,
+            merged: false,
+            message: "Pull Request is not mergeable (dirty — merge_conflict heal armed)",
+          });
+          continue;
+        }
+        if (preOpen && pre.mergeableState === "unknown") {
+          // GitHub is still computing mergeability — try next pass.
+          continue;
+        }
         const result = await mergePullRequest({
           token,
           owner,
