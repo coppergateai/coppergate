@@ -29,10 +29,7 @@ import {
   SpendLicenseError,
 } from "./spend-license.js";
 import {
-  computeEfficiencyPayoff,
   CONTENDER_STRATEGIES,
-  DEFAULT_PAYOFF_ALPHA,
-  isContenderStrategy,
   MechanismError,
   PAYOFF_ALPHA_PRESETS,
   payoffAlphaFromPreset,
