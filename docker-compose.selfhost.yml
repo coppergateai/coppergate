@@ -67,6 +67,10 @@ services:
     restart: unless-stopped
 
   worker:
+    # Sandbox: NODE_ENV=production refuses SANDBOX_MODE=local unless
+    # ALLOW_LOCAL_SANDBOX=1 is set in .env.selfhost (docs/SELF_HOST.md#sandbox-mode).
+    # SANDBOX_MODE=docker: set START_DOCKERD=1, add `privileged: true` and a
+    # /data volume here (root on this host — see the doc). Never mount docker.sock.
     build:
       context: .
       dockerfile: Dockerfile.worker

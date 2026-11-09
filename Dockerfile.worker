@@ -23,7 +23,7 @@ ENV GOMAXPROCS=1
 ENV PATH=/usr/local/go/bin:$PATH
 RUN apt-get update \
   && apt-get install -y --no-install-recommends git ca-certificates curl ripgrep \
-  && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+  && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-$(dpkg --print-architecture).tar.gz" \
     | tar -C /usr/local -xz \
   && rm -rf /var/lib/apt/lists/* \
   && corepack enable \
@@ -31,6 +31,22 @@ RUN apt-get update \
   && go version \
   && command -v rg \
   && rg --version
+# SANDBOX_MODE=docker: Docker Engine + gVisor (runsc) inside the worker VM.
+# dockerd only starts when START_DOCKERD=1 (see docker/worker-entrypoint.sh).
+RUN arch="$(dpkg --print-architecture)" \
+  && install -m 0755 -d /etc/apt/keyrings \
+  && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
+  && curl -fsSL https://gvisor.dev/archive.key -o /etc/apt/keyrings/gvisor.asc \
+  && echo "deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" \
+    > /etc/apt/sources.list.d/docker.list \
+  && echo "deb [arch=${arch} signed-by=/etc/apt/keyrings/gvisor.asc] https://storage.googleapis.com/gvisor/releases release main" \
+    > /etc/apt/sources.list.d/gvisor.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends \
+    docker-ce docker-ce-cli containerd.io iptables runsc \
+  && runsc install \
+  && rm -rf /var/lib/apt/lists/* \
+  && runsc --version
 COPY --from=build /app /app
 # Playwright Chromium for design scout (shared path readable by runtime user).
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
@@ -39,9 +55,13 @@ RUN cd /app/apps/worker \
   && pnpm exec playwright install chromium \
   && chmod -R a+rX /ms-playwright
 # Non-root runtime — sandbox workdirs use /tmp (world-writable).
+# The entrypoint starts as root only to launch dockerd, then drops to
+# coppergate (member of `docker`) via setpriv before running CMD.
 RUN groupadd --system --gid 1001 coppergate \
-  && useradd --system --uid 1001 --gid coppergate --home-dir /app --shell /usr/sbin/nologin coppergate \
+  && useradd --system --uid 1001 --gid coppergate --groups docker --home-dir /app --shell /usr/sbin/nologin coppergate \
   && chown -R coppergate:coppergate /app
-USER coppergate
+COPY Dockerfile.sandbox /opt/coppergate/sandbox/Dockerfile
+COPY docker/worker-entrypoint.sh /usr/local/bin/coppergate-worker-entrypoint
 WORKDIR /app/apps/worker
+ENTRYPOINT ["/usr/local/bin/coppergate-worker-entrypoint"]
 CMD ["pnpm", "start"]

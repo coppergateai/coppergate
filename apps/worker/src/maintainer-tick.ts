@@ -38,7 +38,10 @@ import {
 } from "@coppergate/github";
 import { resolveDefaultBranchMergeFlag } from "@coppergate/scm";
 import type { Logger } from "@coppergate/telemetry";
-import { writeArchitectureTaskDone } from "./architecture-writeback.js";
+import {
+  reconcileArchitectureDone,
+  writeArchitectureTaskDone,
+} from "./architecture-writeback.js";
 import { runBugScoutForProject } from "./bug-scout-tick.js";
 import { runCommunityScoutForProject } from "./community-scout-tick.js";
 import { runDesignScoutForProject } from "./design-scout-tick.js";
@@ -69,6 +72,43 @@ function shouldRecordShipGateAudit(
 
 /** Exported for unit tests. */
 export { shouldRecordShipGateAudit, SHIP_GATE_AUDIT_MIN_MS };
+
+/** Reconcile at most this often per project (GitHub API budget). */
+export const ARCHITECTURE_RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
+const lastArchitectureReconcileAt = new Map<string, number>();
+
+/** Throttled reconcileArchitectureDone — covers human merges + failed writebacks. */
+async function maybeReconcileArchitectureDone(
+  log: Logger,
+  input: {
+    projectId: string;
+    repoFullName: string;
+    token: string;
+    architectureRepo: string | null;
+    architecturePaths: string | null;
+  },
+): Promise<void> {
+  const now = Date.now();
+  const last = lastArchitectureReconcileAt.get(input.projectId) ?? 0;
+  if (now - last < ARCHITECTURE_RECONCILE_INTERVAL_MS) return;
+  lastArchitectureReconcileAt.set(input.projectId, now);
+  const [owner, repo] = input.repoFullName.split("/");
+  if (!owner || !repo) return;
+  try {
+    await reconcileArchitectureDone(log, {
+      token: input.token,
+      owner,
+      repo,
+      architectureRepo: input.architectureRepo,
+      architecturePaths: input.architecturePaths,
+    });
+  } catch (err) {
+    log.warn("architecture reconcile failed", {
+      projectId: input.projectId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 export async function runMaintainerSchedulerTick(
   db: Database,
@@ -184,6 +224,14 @@ export async function runMaintainerSchedulerTick(
         error: err instanceof Error ? err.message : String(err),
       });
     }
+
+    await maybeReconcileArchitectureDone(log, {
+      projectId: tick.projectId,
+      repoFullName: bound.repository.baseRepoFullName,
+      token,
+      architectureRepo: policy.architectureRepo,
+      architecturePaths: policy.architecturePaths,
+    });
 
     if (policy.shipRollbackOnCiFail) {
       const [ownerRb, nameRb] = bound.repository.baseRepoFullName.split("/");
@@ -419,6 +467,8 @@ export async function runMaintainerSchedulerTick(
               token,
               taskTitle: c.task.title,
               prNumber: c.prNumber,
+              architectureRepo: policy.architectureRepo,
+              architecturePaths: policy.architecturePaths,
             });
           } catch (err) {
             log.warn("architecture writeback skipped", {
