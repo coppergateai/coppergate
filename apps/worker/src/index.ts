@@ -3,6 +3,7 @@ import { checkDb } from "@coppergate/db";
 import { createLogger, initTelemetry } from "@coppergate/telemetry";
 import { runWorkerLoop } from "./loop.js";
 import { gcOrphanSandboxes } from "./sandbox-gc.js";
+import { evaluateSandboxModePolicy } from "./sandbox-mode.js";
 
 const env = loadEnv();
 
@@ -20,6 +21,17 @@ const ok = await checkDb(env.DATABASE_URL);
 if (!ok) {
   log.error("Database unavailable — worker cannot start");
   process.exit(1);
+}
+
+// SEC-037 — surface a refused sandbox mode at boot. The worker keeps running
+// (maintainer / scout ticks need no sandbox); each agent run fails closed.
+const sandboxPolicy = evaluateSandboxModePolicy();
+if (!sandboxPolicy.allowed) {
+  log.error(sandboxPolicy.message, { errorCode: sandboxPolicy.errorCode });
+} else if (sandboxPolicy.breakGlass) {
+  log.warn("SANDBOX_MODE=local in production via ALLOW_LOCAL_SANDBOX=1 — agent commands run on the worker host", {
+    sandboxMode: sandboxPolicy.mode,
+  });
 }
 
 // Free /tmp before claiming runs (ENOSPC was blocking cursor_local sandboxes).

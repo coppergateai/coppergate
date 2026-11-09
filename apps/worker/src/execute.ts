@@ -105,19 +105,9 @@ import {
   resolveGithubDelivery,
   type ResolvedGithubDelivery,
 } from "./github-delivery.js";
+import { evaluateSandboxModePolicy, type SandboxMode } from "./sandbox-mode.js";
 
-function resolveSandboxMode(): "local" | "docker" | "off" {
-  const raw = (process.env.SANDBOX_MODE ?? "local").trim().toLowerCase();
-  if (raw === "off" || raw === "0" || raw === "false") return "off";
-  if (raw === "docker" || raw === "gvisor" || raw === "docker-gvisor") {
-    return "docker";
-  }
-  return "local";
-}
-
-function createSandboxManager(
-  mode: "local" | "docker" | "off",
-): SandboxManager | null {
+function createSandboxManager(mode: SandboxMode): SandboxManager | null {
   if (mode === "off") return null;
   if (mode === "docker") return new DockerSandboxManager();
   return new LocalSandboxManager();
@@ -232,6 +222,25 @@ export async function executeClaimedRun(
     });
     return "failed";
   }
+
+  // SEC-037 — production refuses host-spawn sandbox without explicit ack.
+  const sandboxPolicy = evaluateSandboxModePolicy();
+  if (!sandboxPolicy.allowed) {
+    log.error("sandbox mode refused; failing run closed", {
+      runId: run.id,
+      errorCode: sandboxPolicy.errorCode,
+    });
+    await markRunFailed(db, {
+      runId: run.id,
+      workerId,
+      errorCode: sandboxPolicy.errorCode,
+      errorMessage: sandboxPolicy.message,
+    });
+    await safeTaskTransition(db, task, "FAILED", workerId, log);
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
+    return "failed";
+  }
+  const sandboxMode = sandboxPolicy.mode;
 
   // Honor paused budgets (TASK027) — fail closed before agent work.
   try {
@@ -439,17 +448,6 @@ export async function executeClaimedRun(
       .join("\n"),
   );
 
-  const sandboxMode = resolveSandboxMode();
-  if (
-    sandboxMode === "local" &&
-    process.env.NODE_ENV === "production" &&
-    process.env.ALLOW_LOCAL_SANDBOX !== "1"
-  ) {
-    log.warn(
-      "SANDBOX_MODE=local in production — host spawn is not strong isolation; set SANDBOX_MODE=docker for gVisor/runc containers (ALLOW_LOCAL_SANDBOX=1 silences)",
-      { runId: run.id },
-    );
-  }
   const sandboxManager = createSandboxManager(sandboxMode);
   let sandbox: SandboxHandle | null = null;
   /** Captured before sandbox destroy so delivery can use real file bodies. */
