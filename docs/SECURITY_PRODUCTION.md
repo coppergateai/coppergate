@@ -40,8 +40,22 @@ Companion to product SECURITY posture. Pen-test sign-off lives in architecture D
 - [x] Container runtime non-root (`USER coppergate` in Dockerfiles)
 - [x] Secret egress in logs — telemetry logger redacts tokens/keys
 - [x] Docker sandbox mode — `SANDBOX_MODE=docker` (gVisor/runc, network none)
+- [x] Local sandbox fails closed in production — `SANDBOX_MODE=local` + `NODE_ENV=production` fails runs with `sandbox_local_forbidden` unless `ALLOW_LOCAL_SANDBOX=1` (SEC-037)
 - [ ] Distributed rate limiting (Redis) for multi-instance
-- [ ] Make `SANDBOX_MODE=docker` the production default once hosts have Docker
+- [ ] Run the hosted (Fly) worker on `SANDBOX_MODE=docker` — today it uses the `ALLOW_LOCAL_SANDBOX=1` break-glass ack
+
+## Sandbox mode
+
+| Mode | Isolation | Production |
+|---|---|---|
+| `docker` | Container per command: gVisor `runsc` (falls back to `runc`), `--network=none`, read-only rootfs, `--cap-drop ALL`, `no-new-privileges`, no `docker.sock` | Recommended |
+| `local` | None. Host child process; command-name denylist only (`node script.js`, `npm run x` still run arbitrary code); host network and host filesystem as the worker user | Refused unless `ALLOW_LOCAL_SANDBOX=1` |
+| `off` | No sandbox; agent output is not executed, validation is fake | Allowed, but no real PR validation |
+
+`ALLOW_LOCAL_SANDBOX=1` is a break-glass ack, not a hardening switch: with it, a
+malicious repository or prompt can run code on the worker with its env and network.
+Only use it on a single-tenant worker whose secrets you are willing to expose to the
+repos it builds. See `docs/sandbox-mode-fail-closed.md`.
 
 ## Sign-off
 

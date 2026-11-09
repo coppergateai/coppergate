@@ -67,6 +67,9 @@ services:
     restart: unless-stopped
 
   worker:
+    # Sandbox: NODE_ENV=production refuses SANDBOX_MODE=local unless
+    # ALLOW_LOCAL_SANDBOX=1 is set in .env.selfhost (docs/SELF_HOST.md#sandbox-mode).
+    # SANDBOX_MODE=docker is not wired in this stack (no Docker CLI / shared workdir).
     build:
       context: .
       dockerfile: Dockerfile.worker
