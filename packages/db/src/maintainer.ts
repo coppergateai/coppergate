@@ -71,12 +71,15 @@ import { getProjectForWorkspace } from "./projects.js";
 import { maintainerContenderPinN } from "./maintainer-contender-pin.js";
 import { openTaskCountsAsBusyForBacklog } from "./ship-gate-heal-policy.js";
 import { fetchArchitectureBacklogMarkdownResult } from "./architecture-program-fetch.js";
+import { listMergedArchitectureIds } from "./architecture-merged.js";
 
 export {
   DEFAULT_ARCHITECTURE_PATHS,
   fetchArchitectureBacklogMarkdown,
   fetchArchitectureBacklogMarkdownResult,
+  resolveArchitectureBinding,
 } from "./architecture-program-fetch.js";
+export { listMergedArchitectureIds } from "./architecture-merged.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
@@ -3184,15 +3187,20 @@ export async function listInFlightArchitectureIds(
 
   const token = input.architectureToken?.trim();
   if (token) {
+    let owner: string | undefined;
+    let name: string | undefined;
     try {
       const bound = await getProjectForWorkspace(
         db,
         input.workspaceId,
         input.projectId,
       );
-      const full = bound?.repository.baseRepoFullName;
-      const [owner, name] = full?.split("/") ?? [];
-      if (owner && name) {
+      [owner, name] = bound?.repository.baseRepoFullName.split("/") ?? [];
+    } catch {
+      /* best-effort — task titles alone still dedupe the board */
+    }
+    if (owner && name) {
+      try {
         const res = await fetch(
           `https://api.github.com/repos/${owner}/${name}/pulls?state=open&per_page=50`,
           {
@@ -3205,28 +3213,29 @@ export async function listInFlightArchitectureIds(
           },
         );
         if (res.ok) {
-          const rows = (await res.json()) as Array<{
-            title?: string;
-            head?: { ref?: string };
-            user?: { login?: string; type?: string };
-          }>;
+          const rows = (await res.json()) as Array<{ title?: string }>;
+          // Any open PR citing an Open ID claims it — bot or human — so the
+          // arena never builds the same ID in parallel with an operator PR.
           for (const pr of rows) {
-            const title = pr.title ?? "";
-            const head = pr.head?.ref ?? "";
-            const login = pr.user?.login ?? "";
-            const coppergateOwned =
-              /^coppergate:/i.test(title) ||
-              head.startsWith("coppergate/") ||
-              head.startsWith("cg/") ||
-              /coppergate/i.test(login);
-            if (!coppergateOwned) continue;
-            const id = extractArchitectureIdFromTitle(title);
+            const id = extractArchitectureIdFromTitle(pr.title);
             if (id) ids.add(id);
           }
         }
+      } catch {
+        /* best-effort — task titles alone still dedupe the board */
       }
-    } catch {
-      /* best-effort — task titles alone still dedupe the board */
+      // Merged PRs ship the ID even when architecture writeback has not
+      // flipped the row yet — never re-invent shipped work.
+      try {
+        const merged = await listMergedArchitectureIds({
+          token,
+          owner,
+          repo: name,
+        });
+        for (const id of merged.keys()) ids.add(id);
+      } catch {
+        /* best-effort — open PRs + cooldown still dedupe */
+      }
     }
   }
 

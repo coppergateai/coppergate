@@ -390,8 +390,16 @@ export function markArchitectureIdDoneInMarkdown(
     if (!new RegExp(`\\b${idEsc}\\b`, "i").test(line)) return line;
     if (/\bDone\b/i.test(line) && !/\bOpen\b/i.test(line)) return line;
     let next = line;
-    if (/\|\s*Open\s*\|/i.test(next)) {
-      next = next.replace(/\|\s*Open\s*\|/i, "| Done |");
+    if (/^\s*\|/.test(next)) {
+      // Table row: only the row whose ID cell is this ID — not rows that
+      // merely cite it in Notes (e.g. "| Open | AG-038 | … (AG-012 Done) |").
+      const cells = next.split("|").map((c) => c.trim());
+      if (!cells.some((c) => c.toUpperCase() === id)) return line;
+      const openIdx = cells.findIndex((c) => /^open$/i.test(c));
+      if (openIdx < 0) return line;
+      const parts = next.split("|");
+      parts[openIdx] = parts[openIdx]!.replace(/open/i, "Done");
+      next = parts.join("|");
       changed = true;
     } else if (/\[ \]/.test(next)) {
       next = next.replace(/\[ \]/, "[x]");
