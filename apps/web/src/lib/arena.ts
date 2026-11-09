@@ -17,6 +17,7 @@ export function mapArenaError(err: unknown): never {
         throw new ApiError("bad_request", e.message);
       case "killed":
       case "eliminated":
+      case "no_qualifying":
       case "conflict":
         throw new ApiError("conflict", e.message);
       default: {

@@ -29,6 +29,17 @@ import {
   SpendLicenseError,
 } from "./spend-license.js";
 import {
+  CONTENDER_STRATEGIES,
+  MechanismError,
+  PAYOFF_ALPHA_PRESETS,
+  payoffAlphaFromPreset,
+  resolvePayoffAlpha,
+  selectWinnerByPayoff as selectWinnerByPayoffMechanism,
+  type ContenderStrategy,
+  type PayoffAlphaPreset,
+  type PayoffCandidate,
+} from "./mechanism.js";
+import {
   agentRuns,
   arenas,
   auditEvents,
@@ -42,6 +53,25 @@ import {
   type Tournament,
 } from "./schema.js";
 
+export {
+  computeEfficiencyPayoff,
+  CONTENDER_STRATEGIES,
+  DEFAULT_PAYOFF_ALPHA,
+  isContenderStrategy,
+  isQualifyingEfficiency,
+  PAYOFF_ALPHA_PRESETS,
+  payoffAlphaFromPreset,
+  resolvePayoffAlpha,
+  SPEND_USD_EPSILON,
+  STRATEGY_ACTION_PROFILES,
+  strategyActionProfile,
+  withStrategyGuidance,
+  type ContenderStrategy,
+  type PayoffAlphaPreset,
+  type PayoffCandidate,
+  type StrategyActionProfile,
+} from "./mechanism.js";
+
 /**
  * Hard-cap until TASK039 relaxes parallel-repo policy.
  * ContenderRuns still isolate via distinct run rows + branch names.
@@ -52,21 +82,8 @@ import {
  */
 export const MAX_TOURNAMENT_FANOUT = 11;
 
-/**
- * Default spend exponent for efficiency payoff (canonical — keep schema/docs aligned).
- * Lower α reduces thrift bias so meaningful fitness can beat tiny cheap diffs.
- */
-export const DEFAULT_PAYOFF_ALPHA = 0.25;
-
 /** Minimum ACTIVE contenders for a cheap Community duel (N=2 Survivor). */
 export const MIN_DUEL_CONTENDERS = 2;
-
-export const CONTENDER_STRATEGIES = ["balanced", "blitz", "fortress"] as const;
-export type ContenderStrategy = (typeof CONTENDER_STRATEGIES)[number];
-
-export function isContenderStrategy(value: string): value is ContenderStrategy {
-  return (CONTENDER_STRATEGIES as readonly string[]).includes(value);
-}
 
 /** Run finished executing (includes WAITING_CI — CI may still be pending). */
 export const TERMINAL_RUN_STATUSES = new Set([
@@ -101,13 +118,21 @@ export class ArenaError extends Error {
     | "killed"
     | "eliminated"
     | "insufficient"
-    | "conflict";
+    | "conflict"
+    | "no_qualifying";
 
   constructor(code: ArenaError["code"], message: string) {
     super(message);
     this.name = "ArenaError";
     this.code = code;
   }
+}
+
+function rethrowMechanism(err: unknown): never {
+  if (err instanceof MechanismError) {
+    throw new ArenaError(err.code, err.message);
+  }
+  throw err;
 }
 
 /** Pure: budgets never go negative. */
@@ -155,65 +180,15 @@ export function selectWinnerByFitness(
   })[0]!;
 }
 
-/** Floor spend (USD) so efficiency stays finite. */
-const SPEND_USD_EPSILON = 1e-6;
-
-/**
- * Mechanism payoff: e = f / spend_usd^α.
- * Hard gate: CI fail ⇒ 0 (token race cannot buy a green check).
- */
-export function computeEfficiencyPayoff(input: {
-  fitness: number;
-  spendMicros: number;
-  alpha?: number;
-  ciPassed?: boolean | null;
-}): number {
-  if (input.ciPassed === false) return 0;
-  const fitness = input.fitness;
-  if (!Number.isFinite(fitness) || fitness < 0) return 0;
-  const alpha =
-    input.alpha != null && Number.isFinite(input.alpha)
-      ? Math.max(0, input.alpha)
-      : DEFAULT_PAYOFF_ALPHA;
-  const spendUsd = Math.max(input.spendMicros / 1_000_000, SPEND_USD_EPSILON);
-  const payoff = fitness / spendUsd ** alpha;
-  return Number.isFinite(payoff) ? payoff : 0;
-}
-
-export type PayoffCandidate = {
-  runId: string;
-  efficiencyScore: number | null;
-  fitnessScore: number | null;
-};
-
-/** Pure: highest efficiency wins; ties → higher fitness → lex runId. */
+/** Pure wrapper: ArenaError codes for mechanism select (incl. no_qualifying). */
 export function selectWinnerByPayoff(
   candidates: PayoffCandidate[],
 ): PayoffCandidate {
-  if (candidates.length === 0) {
-    throw new ArenaError("invalid", "tournament has no candidates");
+  try {
+    return selectWinnerByPayoffMechanism(candidates);
+  } catch (err) {
+    rethrowMechanism(err);
   }
-  const scored = candidates.filter(
-    (c) => c.efficiencyScore != null && Number.isFinite(c.efficiencyScore),
-  );
-  if (scored.length === 0) {
-    throw new ArenaError("invalid", "no scored candidates");
-  }
-  return [...scored].sort((a, b) => {
-    const eDiff =
-      (b.efficiencyScore as number) - (a.efficiencyScore as number);
-    if (eDiff !== 0) return eDiff;
-    const fA =
-      a.fitnessScore != null && Number.isFinite(a.fitnessScore)
-        ? a.fitnessScore
-        : -1;
-    const fB =
-      b.fitnessScore != null && Number.isFinite(b.fitnessScore)
-        ? b.fitnessScore
-        : -1;
-    if (fB !== fA) return fB - fA;
-    return a.runId.localeCompare(b.runId);
-  })[0]!;
 }
 
 /** Pure: at most one WINNER label in a result list. */
@@ -449,6 +424,8 @@ export async function ensureArenaForProject(
     defaultContenderN?: number;
     contenderBudgetMicros?: number;
     contenderCount?: number;
+    /** Mechanism α; defaults to DEFAULT_PAYOFF_ALPHA when omitted. */
+    payoffAlpha?: number;
   },
 ): Promise<{ arena: Arena; contenders: Contender[]; created: boolean }> {
   const existing = await getArenaForProject(db, input);
@@ -475,6 +452,22 @@ export async function ensureArenaForProject(
           updatedAt: new Date(),
         })
         .where(eq(arenas.id, existing.id))
+        .returning();
+      if (updated) arena = updated;
+    }
+    if (
+      input.payoffAlpha != null &&
+      Number.isFinite(input.payoffAlpha) &&
+      input.payoffAlpha >= 0 &&
+      input.payoffAlpha !== arena.payoffAlpha
+    ) {
+      const [updated] = await db
+        .update(arenas)
+        .set({
+          payoffAlpha: input.payoffAlpha,
+          updatedAt: new Date(),
+        })
+        .where(eq(arenas.id, arena.id))
         .returning();
       if (updated) arena = updated;
     }
@@ -516,7 +509,7 @@ export async function ensureArenaForProject(
       minHuman: input.minHuman ?? true,
       prodWritesEnabled: false,
       defaultContenderN: n,
-      payoffAlpha: DEFAULT_PAYOFF_ALPHA,
+      payoffAlpha: resolvePayoffAlpha(input.payoffAlpha),
       status: "ARMED",
       createdAt: now,
       updatedAt: now,
@@ -675,6 +668,77 @@ export async function setArenaMinHuman(
     targetType: "arena",
     targetId: arena.id,
     meta: JSON.stringify({ minHuman: input.minHuman }),
+  });
+
+  return updated!;
+}
+
+/**
+ * Set arena efficiency exponent α (mechanism parameter).
+ * Accepts a numeric α ≥ 0 or a preset key (fitness_first | default | thrift).
+ */
+export async function setArenaPayoffAlpha(
+  db: Database,
+  input: {
+    workspaceId: string;
+    arenaId: string;
+    actor: string;
+    alpha?: number;
+    preset?: PayoffAlphaPreset | string;
+  },
+): Promise<Arena> {
+  const [arena] = await db
+    .select()
+    .from(arenas)
+    .where(
+      and(
+        eq(arenas.id, input.arenaId),
+        eq(arenas.workspaceId, input.workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!arena) throw new ArenaError("not_found", "arena not found");
+
+  let alpha: number;
+  let preset: string | null = null;
+  if (input.preset != null) {
+    try {
+      alpha = payoffAlphaFromPreset(input.preset);
+      preset = String(input.preset);
+    } catch (err) {
+      if (err instanceof MechanismError) {
+        throw new ArenaError("invalid", err.message);
+      }
+      throw err;
+    }
+  } else if (input.alpha != null) {
+    if (!Number.isFinite(input.alpha) || input.alpha < 0) {
+      throw new ArenaError("invalid", "payoffAlpha must be a finite number ≥ 0");
+    }
+    alpha = input.alpha;
+  } else {
+    throw new ArenaError("invalid", "payoffAlpha or preset required");
+  }
+
+  const now = new Date();
+  const [updated] = await db
+    .update(arenas)
+    .set({ payoffAlpha: alpha, updatedAt: now })
+    .where(eq(arenas.id, arena.id))
+    .returning();
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "arena.payoff_alpha",
+    targetType: "arena",
+    targetId: arena.id,
+    meta: JSON.stringify({
+      payoffAlpha: alpha,
+      preset,
+      presets: PAYOFF_ALPHA_PRESETS,
+    }),
   });
 
   return updated!;
@@ -1156,6 +1220,10 @@ export async function startTournamentFanout(
   return { arena, tournament, runs, created: true };
 }
 
+export type TournamentResolveReason =
+  | "efficiency_payoff"
+  | "no_qualifying_contender";
+
 export async function resolveTournamentByFitness(
   db: Database,
   input: {
@@ -1163,7 +1231,11 @@ export async function resolveTournamentByFitness(
     tournamentId: string;
     actor: string;
   },
-): Promise<{ tournament: Tournament; winnerRunId: string }> {
+): Promise<{
+  tournament: Tournament;
+  winnerRunId: string | null;
+  resolveReason: TournamentResolveReason;
+}> {
   const [tournament] = await db
     .select()
     .from(tournaments)
@@ -1179,7 +1251,18 @@ export async function resolveTournamentByFitness(
     if (!tournament.winnerRunId) {
       throw new ArenaError("conflict", "resolved tournament missing winner");
     }
-    return { tournament, winnerRunId: tournament.winnerRunId };
+    return {
+      tournament,
+      winnerRunId: tournament.winnerRunId,
+      resolveReason: "efficiency_payoff",
+    };
+  }
+  if (tournament.status === "NO_QUALIFYING") {
+    return {
+      tournament,
+      winnerRunId: null,
+      resolveReason: "no_qualifying_contender",
+    };
   }
   if (tournament.status === "CANCELLED") {
     throw new ArenaError("killed", "tournament cancelled");
@@ -1190,13 +1273,26 @@ export async function resolveTournamentByFitness(
     .from(agentRuns)
     .where(eq(agentRuns.tournamentId, tournament.id));
 
-  const winner = selectWinnerByPayoff(
-    runs.map((r) => ({
-      runId: r.id,
-      efficiencyScore: r.efficiencyScore,
-      fitnessScore: r.fitnessScore,
-    })),
-  );
+  let winner: PayoffCandidate;
+  try {
+    winner = selectWinnerByPayoff(
+      runs.map((r) => ({
+        runId: r.id,
+        efficiencyScore: r.efficiencyScore,
+        fitnessScore: r.fitnessScore,
+      })),
+    );
+  } catch (err) {
+    if (err instanceof ArenaError && err.code === "no_qualifying") {
+      return markTournamentNoQualifying(db, {
+        workspaceId: input.workspaceId,
+        tournament,
+        runs,
+        actor: input.actor,
+      });
+    }
+    throw err;
+  }
 
   const now = new Date();
   for (const run of runs) {
@@ -1233,7 +1329,18 @@ export async function resolveTournamentByFitness(
       .where(eq(tournaments.id, tournament.id))
       .limit(1);
     if (again?.status === "RESOLVED" && again.winnerRunId) {
-      return { tournament: again, winnerRunId: again.winnerRunId };
+      return {
+        tournament: again,
+        winnerRunId: again.winnerRunId,
+        resolveReason: "efficiency_payoff",
+      };
+    }
+    if (again?.status === "NO_QUALIFYING") {
+      return {
+        tournament: again,
+        winnerRunId: null,
+        resolveReason: "no_qualifying_contender",
+      };
     }
     throw new ArenaError("conflict", "failed to resolve tournament");
   }
@@ -1248,12 +1355,91 @@ export async function resolveTournamentByFitness(
     meta: JSON.stringify({
       winnerRunId: winner.runId,
       mechanism: "efficiency_payoff",
+      resolveReason: "efficiency_payoff",
       winnerEfficiency: winner.efficiencyScore,
       winnerFitness: winner.fitnessScore,
     }),
   });
 
-  return { tournament: updated, winnerRunId: winner.runId };
+  return {
+    tournament: updated,
+    winnerRunId: winner.runId,
+    resolveReason: "efficiency_payoff",
+  };
+}
+
+/** Fail-closed: all e≤0 → terminal NO_QUALIFYING, no promote, all-pay losers. */
+async function markTournamentNoQualifying(
+  db: Database,
+  input: {
+    workspaceId: string;
+    tournament: Tournament;
+    runs: AgentRun[];
+    actor: string;
+  },
+): Promise<{
+  tournament: Tournament;
+  winnerRunId: null;
+  resolveReason: "no_qualifying_contender";
+}> {
+  const now = new Date();
+  for (const run of input.runs) {
+    await db
+      .update(agentRuns)
+      .set({ tournamentResult: "LOSER", updatedAt: now })
+      .where(eq(agentRuns.id, run.id));
+  }
+
+  const [updated] = await db
+    .update(tournaments)
+    .set({
+      status: "NO_QUALIFYING",
+      winnerRunId: null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(tournaments.id, input.tournament.id),
+        inArray(tournaments.status, ["OPEN", "SCORING"]),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    const [again] = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, input.tournament.id))
+      .limit(1);
+    if (again?.status === "NO_QUALIFYING") {
+      return {
+        tournament: again,
+        winnerRunId: null,
+        resolveReason: "no_qualifying_contender",
+      };
+    }
+    throw new ArenaError("conflict", "failed to mark tournament no_qualifying");
+  }
+
+  await db.insert(auditEvents).values({
+    id: crypto.randomUUID(),
+    workspaceId: input.workspaceId,
+    actor: input.actor,
+    action: "tournament.resolve",
+    targetType: "tournament",
+    targetId: input.tournament.id,
+    meta: JSON.stringify({
+      winnerRunId: null,
+      mechanism: "efficiency_payoff",
+      resolveReason: "no_qualifying_contender",
+    }),
+  });
+
+  return {
+    tournament: updated,
+    winnerRunId: null,
+    resolveReason: "no_qualifying_contender",
+  };
 }
 
 /** Claim OPEN → SCORING for idempotent resolve (TASK056). */

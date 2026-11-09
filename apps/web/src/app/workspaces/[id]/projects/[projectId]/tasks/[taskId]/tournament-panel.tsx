@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { formatPromoteReason } from "../../../../arena/payoff-display";
+import {
+  formatNoQualifyingReason,
+  formatPromoteReason,
+} from "../../../../arena/payoff-display";
 import { TournamentFlowGraph } from "../../../../arena/tournament-flow-graph";
 import styles from "./task-detail.module.css";
 
@@ -157,6 +160,9 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
         {!tournament.provisional && tournament.winnerRunId
           ? " · winner selected"
           : null}
+        {!tournament.provisional && tournament.status === "NO_QUALIFYING"
+          ? " · no qualifying contender"
+          : null}
       </p>
 
       {allQuiet ? (
@@ -171,6 +177,10 @@ export function TournamentPanel({ workspaceId, taskId }: Props) {
 
       {winner && tournament.status === "RESOLVED" ? (
         <p className={styles.tournamentWhy}>{formatPromoteReason(winner)}</p>
+      ) : null}
+
+      {tournament.status === "NO_QUALIFYING" ? (
+        <p className={styles.tournamentWhy}>{formatNoQualifyingReason()}</p>
       ) : null}
 
       {!allQuiet ? (

@@ -144,6 +144,10 @@ const ACTION_DEFS: Record<string, ActionDef> = {
     category: "decision",
     outcome: "completed",
     summary: (m) => {
+      const resolveReason = str(m, "resolveReason");
+      if (resolveReason === "no_qualifying_contender") {
+        return "No qualifying contender — max(e)≤0; no promote.";
+      }
       const mechanism = str(m, "mechanism");
       if (mechanism === "efficiency_payoff") {
         return "Winner selected by efficiency payoff.";
@@ -855,16 +859,24 @@ function mergeAttemptOutcome(
 ): ActivityOutcome {
   if (meta?.merged === true) return "completed";
   const message = (str(meta, "message") ?? "").toLowerCase();
-  if (message.includes("not mergeable")) {
+  if (message.includes("not mergeable") || isPendingRequiredCheckMessage(message)) {
     return "review";
   }
   if (meta?.blocked === true || message.includes("fail")) return "failed";
   return "review";
 }
 
+function isPendingRequiredCheckMessage(message: string): boolean {
+  return (
+    message.includes("required status check") &&
+    /is expected|in progress|pending|waiting/.test(message)
+  );
+}
+
 function mergeAttemptTitle(meta: Record<string, unknown> | null): string {
   if (meta?.merged === true) return "PR merged";
   const message = (str(meta, "message") ?? "").toLowerCase();
+  if (isPendingRequiredCheckMessage(message)) return "Waiting on required checks";
   if (message.includes("not mergeable")) return "Merge not ready";
   return "Merge attempted";
 }
@@ -931,15 +943,33 @@ function replanEventOutcome(
   return outcomeFor(action);
 }
 
+/**
+ * `merge.halted_ci_red` is recorded for every ship-gate halt; the copy must
+ * follow meta.reason — a pending tip CI after a push is not "CI red".
+ */
+export function shipGateHaltTitle(meta: Record<string, unknown> | null): string {
+  const reason = str(meta, "reason");
+  if (reason === "default_branch_ci_pending") return "Auto-merge waiting on tip CI";
+  if (reason === "open_ship_rollback") return "Auto-merge halted (ship rollback open)";
+  return "Auto-merge halted (CI red)";
+}
+
+function shipGateHaltOutcome(meta: Record<string, unknown> | null): ActivityOutcome {
+  return str(meta, "reason") === "default_branch_ci_pending" ? "neutral" : "failed";
+}
+
 function annotate(event: ActivityEvent, count = 1): ActivityChildEvent {
   const isMergeAttempt = event.action === "merge.attempt";
+  const isShipGateHalt = event.action === "merge.halted_ci_red";
   const isReplanQueue = event.action === "maintainer.replan_queue_failed";
   const isReplan = event.action === "maintainer.replan";
   return {
     ...event,
     title: isMergeAttempt
       ? mergeAttemptTitle(event.meta)
-      : isReplanQueue
+      : isShipGateHalt
+        ? shipGateHaltTitle(event.meta)
+        : isReplanQueue
         ? replanQueueTitle(event.meta)
         : isReplan
           ? replanEventTitle(event.action, event.meta)
@@ -949,7 +979,9 @@ function annotate(event: ActivityEvent, count = 1): ActivityChildEvent {
     category: categoryFor(event.action),
     outcome: isMergeAttempt
       ? mergeAttemptOutcome(event.meta)
-      : isReplanQueue
+      : isShipGateHalt
+        ? shipGateHaltOutcome(event.meta)
+        : isReplanQueue
         ? replanQueueOutcome(event.meta)
         : isReplan
           ? replanEventOutcome(event.action, event.meta)

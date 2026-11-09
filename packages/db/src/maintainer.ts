@@ -79,7 +79,10 @@ export {
   fetchArchitectureBacklogMarkdownResult,
   resolveArchitectureBinding,
 } from "./architecture-program-fetch.js";
-export { listMergedArchitectureIds } from "./architecture-merged.js";
+export {
+  closeFailedTasksShippedByMergedPrs,
+  listMergedArchitectureIds,
+} from "./architecture-merged.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
@@ -3000,7 +3003,23 @@ export async function getWorkspaceMaintainerRollup(
 }
 
 /** GitHub branch protection / review gate — do not retry merge every tick. */
+/**
+ * Required check not reported (yet) on the current head — e.g. right after
+ * update-branch. Transient: retry after cooldown, never a sticky block.
+ */
+export function isPendingRequiredCheck(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("required status check") &&
+    (m.includes("is expected") ||
+      m.includes("in progress") ||
+      m.includes("pending") ||
+      m.includes("waiting"))
+  );
+}
+
 export function isMergeProtectionBlock(message: string): boolean {
+  if (isPendingRequiredCheck(message)) return false;
   const m = message.toLowerCase();
   return (
     m.includes("approving review") ||
@@ -3031,6 +3050,7 @@ export function isTerminalMergeSkip(message: string): boolean {
 export function isTransientNotMergeable(message: string): boolean {
   const m = message.toLowerCase();
   return (
+    isPendingRequiredCheck(message) ||
     m.includes("not mergeable") ||
     m.includes("is not mergeable") ||
     m.includes("merge conflict") ||

@@ -603,7 +603,8 @@ export async function scoreAndResolveTournament(
   },
 ): Promise<{
   tournament: Tournament;
-  winnerRunId: string;
+  winnerRunId: string | null;
+  resolveReason: "efficiency_payoff" | "no_qualifying_contender";
   scores: Array<{ runId: string; score: number; efficiency: number }>;
 }> {
   const [tournament] = await db
@@ -650,7 +651,7 @@ export async function scoreAndResolveTournament(
     actor: input.actor,
   });
 
-  // TASK051 — natural selection: losers lose contender budget.
+  // TASK051 — natural selection: losers lose contender budget (all-pay).
   await debitTournamentLosers(db, {
     workspaceId: input.workspaceId,
     tournamentId: input.tournamentId,
@@ -660,6 +661,7 @@ export async function scoreAndResolveTournament(
   return {
     tournament: resolved.tournament,
     winnerRunId: resolved.winnerRunId,
+    resolveReason: resolved.resolveReason,
     scores,
   };
 }
@@ -677,7 +679,8 @@ export async function maybeScoreAndResolveTournament(
   },
 ): Promise<{
   tournament: Tournament;
-  winnerRunId: string;
+  winnerRunId: string | null;
+  resolveReason: "efficiency_payoff" | "no_qualifying_contender";
   scores: Array<{ runId: string; score: number; efficiency: number }>;
 } | null> {
   const [tournament] = await db
@@ -691,7 +694,11 @@ export async function maybeScoreAndResolveTournament(
     )
     .limit(1);
   if (!tournament) return null;
-  if (tournament.status === "RESOLVED" || tournament.status === "CANCELLED") {
+  if (
+    tournament.status === "RESOLVED" ||
+    tournament.status === "NO_QUALIFYING" ||
+    tournament.status === "CANCELLED"
+  ) {
     return null;
   }
 

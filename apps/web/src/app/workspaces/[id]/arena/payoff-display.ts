@@ -63,3 +63,11 @@ export function formatPromoteReason(
   }
   return reasons ? `${base} · ${reasons}` : base;
 }
+
+/** Fail-closed narrative when max(e)≤0 — no lex-UUID promote. */
+export function formatNoQualifyingReason(opts?: {
+  alphaLabel?: string;
+}): string {
+  const alpha = opts?.alphaLabel ?? DEFAULT_PAYOFF_ALPHA_LABEL;
+  return `No qualifying contender: max(e)≤0 (α=${alpha}) — selection requires positive efficiency evidence`;
+}

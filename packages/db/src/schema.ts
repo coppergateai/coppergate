@@ -441,7 +441,7 @@ export const tournaments = pgTable(
       .references(() => tasks.id, { onDelete: "cascade" }),
     n: integer("n").notNull().default(2),
     winnerRunId: uuid("winner_run_id"),
-    /** OPEN | SCORING | RESOLVED | CANCELLED */
+    /** OPEN | SCORING | RESOLVED | NO_QUALIFYING | CANCELLED */
     status: text("status").notNull().default("OPEN"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -1298,7 +1298,12 @@ export type MaintainerEventKind =
 
 export type ArenaStatus = "ARMED" | "RUNNING" | "KILLED" | "PAUSED";
 export type ContenderStatus = "ACTIVE" | "ELIMINATED";
-export type TournamentStatus = "OPEN" | "SCORING" | "RESOLVED" | "CANCELLED";
+export type TournamentStatus =
+  | "OPEN"
+  | "SCORING"
+  | "RESOLVED"
+  | "NO_QUALIFYING"
+  | "CANCELLED";
 export type TournamentResult = "WINNER" | "LOSER" | "CANCELLED";
 
 export type AutonomyLevel = "L0" | "L1" | "L2";

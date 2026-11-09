@@ -92,10 +92,13 @@ export {
 } from "./prompt-guard.js";
 export {
   CONTENDER_STRATEGIES,
+  STRATEGY_ACTION_PROFILES,
   isContenderStrategy,
+  strategyActionProfile,
   strategyGuidance,
   strategySpendFraction,
   type ContenderStrategy,
+  type StrategyActionProfile,
 } from "./strategy.js";
 export {
   ClaudeCodeHarness,

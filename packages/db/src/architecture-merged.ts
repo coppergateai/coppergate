@@ -3,7 +3,12 @@
  * Feeds replan dedupe and architecture Done reconcile — independent of whether
  * the merge came from maintainer auto-merge or a human.
  */
+import { and, eq } from "drizzle-orm";
 import { extractArchitectureIdFromTitle } from "./architecture-backlog.js";
+import { recordAuditEvent } from "./briefs.js";
+import type { Database } from "./client.js";
+import { tasks } from "./schema.js";
+import { applyTaskTransition } from "./task-transitions.js";
 
 type MergedPullRow = {
   number?: number;
@@ -50,4 +55,55 @@ export async function listMergedArchitectureIds(input: {
     if (id && !ids.has(id)) ids.set(id, pr.number);
   }
   return ids;
+}
+
+/**
+ * FAILED tasks whose Open ID already shipped via a merged PR are stale board
+ * noise (Evidence "failures" for work that is on main). Close them as
+ * CANCELLED with the shipping PR in the reason. Returns the closed task ids.
+ */
+export async function closeFailedTasksShippedByMergedPrs(
+  db: Database,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    merged: Map<string, number>;
+    actor: string;
+  },
+): Promise<string[]> {
+  if (input.merged.size === 0) return [];
+  const failed = await db
+    .select({ id: tasks.id, title: tasks.title })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.workspaceId, input.workspaceId),
+        eq(tasks.projectId, input.projectId),
+        eq(tasks.status, "FAILED"),
+      ),
+    )
+    .limit(200);
+  const closed: string[] = [];
+  for (const task of failed) {
+    const id = extractArchitectureIdFromTitle(task.title);
+    const prNumber = id ? input.merged.get(id) : undefined;
+    if (!id || prNumber == null) continue;
+    await applyTaskTransition(db, {
+      workspaceId: input.workspaceId,
+      taskId: task.id,
+      toStatus: "CANCELLED",
+      actor: input.actor,
+      reason: `${id} shipped by merged PR #${prNumber} — stale FAILED attempt closed`,
+    });
+    await recordAuditEvent(db, {
+      workspaceId: input.workspaceId,
+      actor: input.actor,
+      action: "task.closed_shipped",
+      targetType: "task",
+      targetId: task.id,
+      meta: { projectId: input.projectId, architectureId: id, prNumber },
+    });
+    closed.push(task.id);
+  }
+  return closed;
 }
