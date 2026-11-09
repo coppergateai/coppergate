@@ -529,6 +529,8 @@ export {
   fetchArchitectureBacklogMarkdown,
   fetchArchitectureBacklogMarkdownResult,
   listInFlightArchitectureIds,
+  listMergedArchitectureIds,
+  resolveArchitectureBinding,
   requeueOrphanQueuedTasks,
   shouldReplanVision,
   MIN_REPLAN_AVAILABLE_MICROS,

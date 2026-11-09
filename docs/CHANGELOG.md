@@ -4,6 +4,7 @@
 
 ### Fixes
 
+- **Open Program Done writeback closes the loop** — writeback now targets the project-bound program (`architectureRepo` / `architecturePaths`) instead of the global `ARCHITECTURE_REPO` env, and a 10-minute reconcile marks Done every Open ID cited by a merged default-branch PR (bot or human). Replan dedupe also excludes IDs from merged PRs and from any open PR citing them, so shipped or operator-claimed IDs are never re-invented. Done marking only flips the row whose ID cell matches (not rows citing the ID in Notes).
 - SEC-037: **Production local sandbox fails closed** — `NODE_ENV=production` + `SANDBOX_MODE=local` now fails runs with `sandbox_local_forbidden` (was a warning) unless `ALLOW_LOCAL_SANDBOX=1`. Self-hosters on the default local mode must set the ack or switch to `SANDBOX_MODE=docker`. See `docs/sandbox-mode-fail-closed.md`.
 - F4: PR-review durable `delivery_checkpoint` immediately after GitHub COMMENT — reclaim recovers to REVIEW_REQUIRED and skips duplicate POST. See `docs/pr-review-checkpoint.md`.
 - F2: `llm_tokens` spend idempotency — `usage_events.llm_provider_role` + unique `(run_id, role)` index so concurrent primary/fallback debits cannot double-count; `appendUsageEvent` recovers on unique races.
