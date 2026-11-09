@@ -4,6 +4,7 @@
 
 ### Fixes
 
+- **Same-head CI heal** — red CI on a bot delivery PR now queues a fixer run on the same task right away (not after the ~6h WAITING_CI timeout) with the failing checks and annotations in its prompt. Heal runs check out the PR head and commit onto the same branch (CAS, non-force) instead of opening a parallel PR from main; stale delivery heals use the same path. Max 2 per PR, then the timeout → replan path. See `docs/same-head-heal.md`.
 - **Open Program Done writeback closes the loop** — writeback now targets the project-bound program (`architectureRepo` / `architecturePaths`) instead of the global `ARCHITECTURE_REPO` env, and a 10-minute reconcile marks Done every Open ID cited by a merged default-branch PR (bot or human). Replan dedupe also excludes IDs from merged PRs and from any open PR citing them, so shipped or operator-claimed IDs are never re-invented. Done marking only flips the row whose ID cell matches (not rows citing the ID in Notes).
 - SEC-037: **Production local sandbox fails closed** — `NODE_ENV=production` + `SANDBOX_MODE=local` now fails runs with `sandbox_local_forbidden` (was a warning) unless `ALLOW_LOCAL_SANDBOX=1`. Self-hosters on the default local mode must set the ack or switch to `SANDBOX_MODE=docker`. See `docs/sandbox-mode-fail-closed.md`.
 - F4: PR-review durable `delivery_checkpoint` immediately after GitHub COMMENT — reclaim recovers to REVIEW_REQUIRED and skips duplicate POST. See `docs/pr-review-checkpoint.md`.

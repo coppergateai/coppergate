@@ -78,6 +78,7 @@ export {
   type DeliverPrResult,
   type FileChange,
   type GithubDeliveryClient,
+  type PushToPrBranchInput,
   type RepoRef,
 } from "./delivery.js";
 export {

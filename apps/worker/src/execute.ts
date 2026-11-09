@@ -66,6 +66,9 @@ import {
   setTaskPrUrl,
   updateRunSkillSnapshot,
   withTemperamentGuidance,
+  buildSameHeadHealPrompt,
+  getSameHeadHealContext,
+  isSameHeadRun,
   type AgentRun,
   type Database,
   type FileWriteCheckpointBody,
@@ -77,6 +80,7 @@ import {
   submitPullRequestReview,
   type GithubDeliveryClient,
 } from "@coppergate/github";
+import { fetchFailingCheckOutput } from "./same-head-heal.js";
 import {
   DockerSandboxManager,
   LocalSandboxManager,
@@ -355,6 +359,14 @@ export async function executeClaimedRun(
     actualCost = totalRunSpendMicros(spendLedger);
   };
 
+  // Same-head heal: fix the delivery PR on its own head (no parallel PR).
+  const sameHead = isSameHeadRun(run)
+    ? await getSameHeadHealContext(db, {
+        workspaceId: run.workspaceId,
+        runId: run.id,
+      })
+    : null;
+
   let strategy = "balanced";
   let strategyContext: string | undefined;
   let promptGuidance: string | undefined;
@@ -584,8 +596,10 @@ export async function executeClaimedRun(
             cloneMode === "git" && deliveryResolved?.cloneUrl
               ? deliveryResolved.cloneUrl
               : `coppergate://project/${run.projectId}`;
-          const baseSha =
-            deliveryResolved?.baseSha || run.baseSha || "unknown";
+          // Same-head heal checks out the PR head, not the default-branch tip.
+          const baseSha = sameHead
+            ? run.baseSha
+            : deliveryResolved?.baseSha || run.baseSha || "unknown";
           const arenaRow = await getArenaForProject(db, {
             workspaceId: run.workspaceId,
             projectId: run.projectId,
@@ -777,6 +791,22 @@ export async function executeClaimedRun(
           runId: run.id,
           error: err instanceof Error ? err.message : String(err),
         });
+      }
+
+      if (sameHead) {
+        const checkOutput =
+          deliveryResolved?.authToken && deliveryResolved.mode === "http"
+            ? await fetchFailingCheckOutput({
+                token: deliveryResolved.authToken,
+                owner: deliveryResolved.repo.owner,
+                repo: deliveryResolved.repo.repo,
+                checks: sameHead.failingChecks,
+              }).catch(() => null)
+            : null;
+        strategyContext = mergeArchitectureContext(
+          strategyContext,
+          buildSameHeadHealPrompt(sameHead, { checkOutput }),
+        );
       }
 
       for await (const event of agent.run({
@@ -1658,7 +1688,17 @@ export async function executeClaimedRun(
         created: false,
         idempotencyKey: `task:${task.id}:run:${run.id}`,
       }
-    : await github.deliverPullRequest({
+    : sameHead
+      ? await pushSameHeadDelivery(github, {
+          repo,
+          prNumber: sameHead.prNumber,
+          branchName: run.branchName ?? sameHead.headRef,
+          expectedHeadSha: run.baseSha,
+          commitMessage: `Coppergate: same-head ${sameHead.reason} heal (${sameHead.attempt}/${sameHead.maxAttempts}) — ${task.title}`,
+          files: prepared.files,
+          idempotencyKey: `task:${task.id}:run:${run.id}`,
+        })
+      : await github.deliverPullRequest({
         repo,
         branchName: completion.branchName,
         baseSha,
@@ -1959,7 +1999,11 @@ export async function executeClaimedRun(
       await markRunFailed(db, {
         runId: run.id,
         workerId,
-        errorCode: closedPr ? "pr_closed" : "delivery_error",
+        errorCode: closedPr
+          ? "pr_closed"
+          : sameHead && /branch head moved|is not open on/i.test(message)
+            ? "same_head_conflict"
+            : "delivery_error",
         errorMessage: message.slice(0, 500),
       });
     } catch (markErr) {
@@ -2142,4 +2186,17 @@ async function safeTaskTransition(
       error: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/** Same-head heal delivery — refuse clients that cannot push onto a PR head. */
+async function pushSameHeadDelivery(
+  github: GithubDeliveryClient,
+  input: Parameters<NonNullable<GithubDeliveryClient["pushToPullRequestBranch"]>>[0],
+) {
+  if (!github.pushToPullRequestBranch) {
+    throw new Error(
+      "same-head heal unsupported by this delivery client — refusing to open a parallel PR",
+    );
+  }
+  return github.pushToPullRequestBranch(input);
 }

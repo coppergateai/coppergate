@@ -520,10 +520,24 @@ export function selectAutoAcceptRun<
     status?: string | null;
     prNumber?: number | null;
     headSha?: string | null;
+    idempotencyKey?: string | null;
   },
 >(runs: T[]): T | null {
   if (runs.length === 0) return null;
-  const winner = runs.find((r) => r.tournamentResult === "WINNER");
+  // Same-head heal supersedes the earlier delivery (incl. a tournament WINNER)
+  // on the same PR — the newest same-head run is the one that ships.
+  const latest = runs[0];
+  if (
+    latest &&
+    (latest.idempotencyKey ?? "").startsWith("same_head:") &&
+    latest.status !== "FAILED" &&
+    latest.status !== "CANCELLED"
+  ) {
+    return latest;
+  }
+  const winner = runs.find(
+    (r) => r.tournamentResult === "WINNER" && r.status !== "FAILED",
+  );
   if (winner) return winner;
   const inTournament = runs.some((r) => r.tournamentId != null);
   if (!inTournament) return runs[0] ?? null;

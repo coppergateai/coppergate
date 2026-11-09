@@ -9,6 +9,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import {
   applyTaskTransition,
+  armSameHeadHealRun,
   decideTaskReview,
   ensureMergeConflictSignal,
   ensureStaleDeliveryHealSignal,
@@ -393,6 +394,19 @@ export async function healStaleReviewsOrEmitConflict(
           continue;
         }
         if (route === "stale_delivery") {
+          const sameHead = await tryArmSameHeadStaleHeal(db, log, {
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            taskId: task.id,
+            actor: input.actor,
+            prNumber,
+          });
+          if (sameHead === "armed") {
+            deliveryHeals += 1;
+            continue;
+          }
+          if (sameHead === "wait") continue;
+          if (sameHead === "exhausted") throw new SameHeadExhausted();
           const signal = await ensureStaleDeliveryHealSignal(db, {
             workspaceId: input.workspaceId,
             projectId: input.projectId,
@@ -435,7 +449,21 @@ export async function healStaleReviewsOrEmitConflict(
           continue;
         }
       } catch (err) {
-        try {
+        // SameHeadExhausted: two same-head heals already failed — free the board.
+        if (!(err instanceof SameHeadExhausted)) try {
+          const sameHead = await tryArmSameHeadStaleHeal(db, log, {
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            taskId: task.id,
+            actor: input.actor,
+            prNumber,
+          });
+          if (sameHead === "armed") {
+            deliveryHeals += 1;
+            continue;
+          }
+          if (sameHead === "wait") continue;
+          if (sameHead === "exhausted") throw new SameHeadExhausted();
           const signal = await ensureStaleDeliveryHealSignal(db, {
             workspaceId: input.workspaceId,
             projectId: input.projectId,
@@ -476,12 +504,19 @@ export async function healStaleReviewsOrEmitConflict(
           );
           continue;
         } catch (healErr) {
-          log.warn("stale delivery heal fallback failed — will replan", {
-            taskId: task.id,
-            prNumber,
-            error:
-              healErr instanceof Error ? healErr.message : String(healErr),
-          });
+          if (healErr instanceof SameHeadExhausted) {
+            log.info("same-head heals exhausted — replan", {
+              taskId: task.id,
+              prNumber,
+            });
+          } else {
+            log.warn("stale delivery heal fallback failed — will replan", {
+              taskId: task.id,
+              prNumber,
+              error:
+                healErr instanceof Error ? healErr.message : String(healErr),
+            });
+          }
         }
       }
     }
@@ -521,4 +556,49 @@ export async function healStaleReviewsOrEmitConflict(
     replanned,
     retiredShipGates,
   };
+}
+
+class SameHeadExhausted extends Error {}
+
+/**
+ * Prefer a same-head fix run on the parent task over a stale_delivery signal
+ * (which opens a parallel PR from main). "unavailable" keeps the legacy signal.
+ */
+async function tryArmSameHeadStaleHeal(
+  db: Database,
+  log: Logger,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    taskId: string;
+    actor: string;
+    prNumber: number;
+  },
+): Promise<"armed" | "wait" | "exhausted" | "unavailable"> {
+  const res = await armSameHeadHealRun(db, {
+    workspaceId: input.workspaceId,
+    projectId: input.projectId,
+    taskId: input.taskId,
+    actor: input.actor,
+    reason: "stale_delivery",
+  });
+  if (res.armed) {
+    log.info("same-head stale delivery heal armed", {
+      projectId: input.projectId,
+      taskId: input.taskId,
+      prNumber: input.prNumber,
+      runId: res.runId,
+      attempt: res.attempt,
+    });
+    return "armed";
+  }
+  if (res.skip === "exhausted") return "exhausted";
+  if (
+    res.skip === "arena_paused" ||
+    res.skip === "active_run" ||
+    res.skip === "flake_cooldown"
+  ) {
+    return "wait";
+  }
+  return "unavailable";
 }

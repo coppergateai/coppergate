@@ -38,6 +38,7 @@ import {
 } from "@coppergate/github";
 import { resolveDefaultBranchMergeFlag } from "@coppergate/scm";
 import type { Logger } from "@coppergate/telemetry";
+import { runSameHeadCiHealForProject } from "./same-head-heal.js";
 import {
   reconcileArchitectureDone,
   writeArchitectureTaskDone,
@@ -182,6 +183,20 @@ export async function runMaintainerSchedulerTick(
 
     const policy = parseMaintainerPolicy(bound.project.maintainerPolicyJson);
     if (bound.project.autonomyLevel !== "L2") continue;
+
+    // Red CI on a delivery PR → same-head fix run now (not after ~6h timeout).
+    try {
+      await runSameHeadCiHealForProject(db, log, {
+        workspaceId: tick.workspaceId,
+        projectId: tick.projectId,
+        actor,
+      });
+    } catch (err) {
+      log.warn("same-head CI heal tick failed", {
+        projectId: tick.projectId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     if (!installation || !opts?.resolveToken || !architectureToken) continue;
 
     const token = architectureToken;

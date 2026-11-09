@@ -34,9 +34,20 @@ export const ALLOWED_TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
     "CANCELLED",
     "BLOCKED",
   ],
-  /** Live CI pending — human Accept only after promotion to REVIEW_REQUIRED. */
-  WAITING_CI: ["REVIEW_REQUIRED", "FAILED", "CANCELLED", "BLOCKED"],
-  REVIEW_REQUIRED: ["ACCEPTED", "NEEDS_REPLAN", "DRAFT", "CANCELLED", "FAILED"],
+  /**
+   * Live CI pending — human Accept only after promotion to REVIEW_REQUIRED.
+   * WAITING_CI → QUEUED: same-head heal run fixes red CI on the same PR.
+   */
+  WAITING_CI: ["REVIEW_REQUIRED", "FAILED", "CANCELLED", "BLOCKED", "QUEUED"],
+  /** REVIEW_REQUIRED → QUEUED: same-head heal after waiting_ci_timeout. */
+  REVIEW_REQUIRED: [
+    "ACCEPTED",
+    "NEEDS_REPLAN",
+    "DRAFT",
+    "CANCELLED",
+    "FAILED",
+    "QUEUED",
+  ],
   ACCEPTED: ["DONE", "CANCELLED"],
   DONE: [],
   BLOCKED: ["READY_FOR_APPROVAL", "QUEUED", "CANCELLED", "NEEDS_REPLAN"],
