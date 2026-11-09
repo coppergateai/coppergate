@@ -24,9 +24,12 @@ The check lives in `apps/worker/src/sandbox-mode.ts`:
 
 ## Recommended production setting
 
-`SANDBOX_MODE=docker` on a host with a Docker daemon (gVisor `runsc` preferred;
-falls back to `runc`). Containers run with `--network=none`, `--read-only`,
-`--cap-drop ALL`, `no-new-privileges`, and never mount `docker.sock`.
+`SANDBOX_MODE=docker` on a host with a Docker daemon and gVisor `runsc`.
+In production the manager refuses to fall back to `runc` (sandbox creation fails,
+and with http delivery the run fails `sandbox_required`) unless `SANDBOX_ALLOW_RUNC=1`.
+Containers run with `--network=none` (fetch-only installs excepted), `--read-only`,
+`--cap-drop ALL`, `no-new-privileges`, and never mount `docker.sock`. The hosted
+worker runs this way on Fly; see `docs/SECURITY_PRODUCTION.md`.
 
 ## Evidence
 

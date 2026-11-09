@@ -10,11 +10,13 @@ primary_region = "iad"
 [env]
   NODE_ENV = "production"
   GITHUB_DELIVERY_MODE = "http"
-  # SEC-037: production refuses SANDBOX_MODE=local without ALLOW_LOCAL_SANDBOX=1.
-  # This worker still runs agent commands on the Machine itself (break-glass ack);
-  # moving it to SANDBOX_MODE=docker is pending — see docs/SECURITY_PRODUCTION.md.
-  SANDBOX_MODE = "local"
-  ALLOW_LOCAL_SANDBOX = "1"
+  # Agent/repo commands run in gVisor containers (network none) on a Docker
+  # daemon inside this Machine. The entrypoint starts dockerd as root, builds the
+  # sandbox image onto the /data volume, then drops to the coppergate user.
+  # SEC-037: production refuses local mode and the runc fallback.
+  SANDBOX_MODE = "docker"
+  START_DOCKERD = "1"
+  DOCKER_DATA_ROOT = "/data/docker"
   # Prefer workspace BYOK / OPENAI_API_KEY. OpenHands scaffold stub is disabled.
   # CONTENDER_HARNESS = "native_openai"
   APP_URL = "https://www.coppergate.ai"
@@ -23,6 +25,12 @@ primary_region = "iad"
   # Design scout: use Playwright-bundled Chromium (see Dockerfile.worker).
   PW_USE_BUNDLED = "1"
   PLAYWRIGHT_BROWSERS_PATH = "/ms-playwright"
+
+# Docker data-root (images + layers). One volume per Machine.
+[mounts]
+  source = "coppergate_worker_docker"
+  destination = "/data"
+  initial_size = "20gb"
 
 [processes]
   worker = "pnpm start"
