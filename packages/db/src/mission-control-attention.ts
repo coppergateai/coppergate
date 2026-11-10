@@ -11,7 +11,9 @@ export type MissionControlAttentionKind =
   | "merge_blocked"
   /** Default-branch CI ship gate — auto-merge halted until tip is green. */
   | "ship_gate_halted"
-  | "concurrency";
+  | "concurrency"
+  /** AG-022 — API changed without docs on a delivery (advisory, normal priority). */
+  | "docs_drift";
 
 export type MissionControlAttentionItem = {
   id: string;

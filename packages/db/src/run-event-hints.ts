@@ -5,6 +5,8 @@ import { agentRunEvents } from "./schema.js";
 export type RunProgressHint = {
   codingPathLine: string | null;
   failoverLine: string | null;
+  /** AG-022 — advisory docs drift (optional Arena attention, not needsAttention). */
+  optionalAttentionLine: string | null;
 };
 
 function parsePayload(raw: string | null): Record<string, unknown> | null {
@@ -25,7 +27,20 @@ export function runProgressHintFromPayload(
   payload: Record<string, unknown> | null,
 ): RunProgressHint {
   if (!payload) {
-    return { codingPathLine: null, failoverLine: null };
+    return {
+      codingPathLine: null,
+      failoverLine: null,
+      optionalAttentionLine: null,
+    };
+  }
+  if (payload.code === "docs_drift") {
+    const message =
+      typeof payload.message === "string" ? payload.message.trim() : "";
+    return {
+      codingPathLine: null,
+      failoverLine: null,
+      optionalAttentionLine: message || "Docs drift · API changed without docs",
+    };
   }
   const code = payload.code;
   if (code === "coding_path_honesty") {
@@ -39,6 +54,7 @@ export function runProgressHintFromPayload(
       return {
         codingPathLine: `Cursor harness · native_openai demoted — ${(demoted as { reason: string }).reason}`,
         failoverLine: null,
+        optionalAttentionLine: null,
       };
     }
     const message =
@@ -46,6 +62,7 @@ export function runProgressHintFromPayload(
     return {
       codingPathLine: message || "Coding path selected",
       failoverLine: null,
+      optionalAttentionLine: null,
     };
   }
   if (code === "provider_failover") {
@@ -59,9 +76,13 @@ export function runProgressHintFromPayload(
     } else if (reason) {
       failoverLine = `Provider failover: ${reason}`;
     }
-    return { codingPathLine: null, failoverLine };
+    return { codingPathLine: null, failoverLine, optionalAttentionLine: null };
   }
-  return { codingPathLine: null, failoverLine: null };
+  return {
+    codingPathLine: null,
+    failoverLine: null,
+    optionalAttentionLine: null,
+  };
 }
 
 /**
@@ -94,7 +115,11 @@ export async function latestRunProgressHints(
     if (map.has(row.runId)) continue;
     const payload = parsePayload(row.payload);
     const hint = runProgressHintFromPayload(payload);
-    if (hint.codingPathLine || hint.failoverLine) {
+    if (
+      hint.codingPathLine ||
+      hint.failoverLine ||
+      hint.optionalAttentionLine
+    ) {
       map.set(row.runId, hint);
     }
   }
@@ -114,5 +139,13 @@ export function mergeRunActivityLine(
       : hint.codingPathLine;
   }
   if (state === "running" && hint.failoverLine) return hint.failoverLine;
+  if (
+    (state === "awaitingCi" || state === "idle") &&
+    hint.optionalAttentionLine
+  ) {
+    return hint.optionalAttentionLine.length > 120
+      ? `${hint.optionalAttentionLine.slice(0, 117)}…`
+      : hint.optionalAttentionLine;
+  }
   return base;
 }
