@@ -62,7 +62,7 @@ export interface SandboxManager {
   exec(
     sandbox: SandboxHandle,
     command: string[],
-    options?: { timeoutMs?: number },
+    options?: { timeoutMs?: number; hardDeadlineMs?: number },
   ): Promise<ExecResult>;
   destroy(sandbox: SandboxHandle): Promise<void>;
 }

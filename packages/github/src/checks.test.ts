@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   commitCheckSuitesFailed,
   countOpenShipRollbackPrs,
+  fetchCheckRunAnnotationSnippet,
   fetchCommitCheckEvidence,
   getRepoDefaultBranchHead,
   mapCheckRunPayload,
@@ -142,6 +143,32 @@ describe("CI check mapping", () => {
     });
     assert.ok(rows.some((r) => r.name === "Vercel Preview Comments" && r.passed));
     assert.ok(rows.some((r) => r.name === "Vercel" && r.passed));
+  });
+
+  it("fetchCheckRunAnnotationSnippet joins annotation messages", async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input);
+      assert.match(url, /\/check-runs\/42\/annotations/);
+      return new Response(
+        JSON.stringify([
+          {
+            path: "src/foo.ts",
+            title: "Type error",
+            message: "Property 'x' does not exist",
+          },
+        ]),
+        { status: 200 },
+      );
+    };
+    const snippet = await fetchCheckRunAnnotationSnippet({
+      token: "t",
+      owner: "acme",
+      repo: "app",
+      checkRunId: 42,
+      fetchImpl,
+    });
+    assert.match(snippet ?? "", /Type error/);
+    assert.match(snippet ?? "", /Property 'x'/);
   });
 
   it("detects failed check suites on a commit", async () => {

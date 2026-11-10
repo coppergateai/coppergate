@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  formatNoQualifyingReason,
   formatPayoffMetrics,
   formatPromoteReason,
 } from "./payoff-display";
@@ -62,6 +63,7 @@ export function TournamentFlowGraph({
   });
 
   const resolved = tournament.status === "RESOLVED";
+  const noQualifying = tournament.status === "NO_QUALIFYING";
   const open =
     tournament.status === "OPEN" || tournament.status === "SCORING";
   const winner =
@@ -74,20 +76,30 @@ export function TournamentFlowGraph({
     ? { className: `${styles.tag} ${styles.tagProvisional}`, label: "Provisional" }
     : resolved
       ? { className: `${styles.tag} ${styles.tagResolved}`, label: "Resolved" }
-      : open
-        ? { className: styles.tag ?? "", label: "Live" }
-        : null;
+      : noQualifying
+        ? {
+            className: `${styles.tag} ${styles.tagResolved}`,
+            label: "No qualifying",
+          }
+        : open
+          ? { className: styles.tag ?? "", label: "Live" }
+          : null;
 
   const title = taskTitle?.trim() || "Active Open ID";
   const outcome = tournament.provisional
     ? "Scoring when CI is ready"
     : winner
       ? `Winner · ${titleCase(winner.agentProfileKey)} · ${formatPayoffMetrics(winner)}`
-      : open
-        ? `${tournament.n} contenders · e = f / spend^α`
-        : tournament.status.replace(/_/g, " ");
-  const promote =
-    resolved && winner ? formatPromoteReason(winner) : null;
+      : noQualifying
+        ? formatNoQualifyingReason()
+        : open
+          ? `${tournament.n} contenders · e = f / spend^α`
+          : tournament.status.replace(/_/g, " ");
+  const promote = resolved && winner
+    ? formatPromoteReason(winner)
+    : noQualifying
+      ? formatNoQualifyingReason()
+      : null;
 
   return (
     <div className={styles.strip} aria-label="Tournament status">

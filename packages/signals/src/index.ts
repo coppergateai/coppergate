@@ -98,7 +98,10 @@ export {
   BISECT_HARD_TIMEOUT_MS,
   BISECT_MAX_STEPS,
   fakeBisectSteps,
+  parseReproCommandArgv,
+  parseRegressionBisectHints,
   planRegressionBisect,
+  planRegressionBisectFromSignal,
   type BisectPlan,
   type BisectStep,
 } from "./bisect.js";

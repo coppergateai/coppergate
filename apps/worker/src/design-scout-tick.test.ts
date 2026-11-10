@@ -28,4 +28,9 @@ describe("design scout policy short-circuit", () => {
     assert.equal(p.designScoutBaseUrl, "https://www.coppergate.ai");
     assert.equal(p.designScoutAutoImportMax, 1);
   });
+
+  it("defaults designScout off for AG-040 Open Program path", () => {
+    const p = parseMaintainerPolicy("{}");
+    assert.equal(p.designScout, false);
+  });
 });

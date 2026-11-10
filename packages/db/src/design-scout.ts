@@ -1,7 +1,15 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "./client.js";
+import {
+  appendOpenProgramRows,
+  nextArchitectureId,
+  parseArchitectureProgramRows,
+  type OpenProgramRowAppend,
+} from "./architecture-backlog.js";
 import { titlesOverlap, type OpenIssueRef } from "./community-scout.js";
 import { maintainerEvents } from "./schema.js";
+
+export const DESIGN_SCOUT_SECTION_HEADING = "## Design scout (continuous)";
 
 export type DesignShotMetrics = {
   client: number;
@@ -137,6 +145,107 @@ export function formatDesignIssueBody(input: {
     `---`,
     `<!-- coppergate-design-scout runId=${input.runId} shot=${input.shot.name} path=${input.shot.path} -->`,
   ].join("\n");
+}
+
+/** Stable fingerprint per route path for Open Program dedup. */
+export function designScoutFingerprint(path: string): string {
+  const p =
+    path
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 48) || "root";
+  return `path_${p}`;
+}
+
+export function extractDesignScoutFingerprints(markdown: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of markdown.matchAll(
+    /<!--\s*design-scout:fp=([a-zA-Z0-9_-]+)\s*-->/g,
+  )) {
+    out.add(m[1]!);
+  }
+  return out;
+}
+
+export type DesignOpenCandidate = OpenProgramRowAppend & {
+  fingerprint: string;
+  path: string;
+};
+
+/**
+ * Propose Open Program rows (P-N) from layout overflow shots; dedup fp + title.
+ */
+export function proposeDesignOpenRows(input: {
+  markdown: string;
+  shots: DesignShot[];
+  max: number;
+  excludeFingerprints?: string[];
+}): DesignOpenCandidate[] {
+  const max = Math.max(0, Math.min(5, Math.floor(input.max)));
+  if (max === 0) return [];
+
+  const existingFp = extractDesignScoutFingerprints(input.markdown);
+  for (const fp of input.excludeFingerprints ?? []) {
+    if (fp) existingFp.add(fp);
+  }
+  const programRows = parseArchitectureProgramRows(input.markdown);
+  const existingTitles = programRows.map((r) => r.title);
+
+  const out: DesignOpenCandidate[] = [];
+  let mdForIds = input.markdown;
+
+  for (const shot of input.shots) {
+    if (out.length >= max) break;
+    if (!shotHasDesignFinding(shot.metrics)) continue;
+
+    const fp = designScoutFingerprint(shot.path);
+    if (existingFp.has(fp)) continue;
+
+    const m = shot.metrics;
+    const findings: string[] = [];
+    if (m.hScroll || m.scrollW > m.client + 1) {
+      findings.push(`hScroll ${m.scrollW}>${m.client}`);
+    }
+    if (m.overflowRight.length > 0) {
+      findings.push(`overflowRight×${m.overflowRight.length}`);
+    }
+    const title = `Fix layout overflow on ${shot.path}`.slice(0, 120);
+    if (existingTitles.some((t) => titlesOverlap(t, title))) continue;
+    if (out.some((c) => titlesOverlap(c.title, title) || c.path === shot.path)) {
+      continue;
+    }
+
+    const id = nextArchitectureId(mdForIds, "P");
+    const notes = [
+      `route=${shot.path}`,
+      findings.join("; ") || "layout anomaly",
+      `url=${shot.url}`.slice(0, 80),
+      `<!-- design-scout:fp=${fp} -->`,
+    ].join(" — ").slice(0, 400);
+
+    const row: DesignOpenCandidate = {
+      id,
+      title,
+      notes,
+      fingerprint: fp,
+      path: shot.path,
+    };
+    out.push(row);
+    existingFp.add(fp);
+    mdForIds = `${mdForIds}\n| Open | ${id} | ${row.title} | ${notes} |\n`;
+  }
+
+  return out;
+}
+
+export function appendDesignScoutOpenRowsToMarkdown(
+  markdown: string,
+  rows: OpenProgramRowAppend[],
+): { content: string; changed: boolean } {
+  return appendOpenProgramRows(markdown, rows, {
+    sectionHeading: DESIGN_SCOUT_SECTION_HEADING,
+  });
 }
 
 export function proposeDesignIssues(input: {

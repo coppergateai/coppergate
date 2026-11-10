@@ -104,6 +104,18 @@ describe("arena invariants (pure)", () => {
     assert.equal(winner.runId, "cheap");
   });
 
+  it("fail-closed: all-zero efficiency does not lex-promote", () => {
+    assert.throws(
+      () =>
+        selectWinnerByPayoff([
+          { runId: "aaa", efficiencyScore: 0, fitnessScore: 0 },
+          { runId: "zzz", efficiencyScore: 0, fitnessScore: 0 },
+        ]),
+      (err: unknown) =>
+        err instanceof ArenaError && err.code === "no_qualifying",
+    );
+  });
+
   it("allows at most one winner", () => {
     assert.throws(
       () => assertAtMostOneWinner(["WINNER", "WINNER", "LOSER"]),
@@ -349,6 +361,57 @@ describe("arena persistence", { skip: !url }, () => {
       .limit(1);
     assert.equal(winnerRow?.tournamentResult, "WINNER");
     assert.equal(loserRow?.tournamentResult, "LOSER");
+
+    const noQualTournament = await createTournament(db, {
+      workspaceId,
+      projectId,
+      arenaId: arena.id,
+      taskId,
+      n: 2,
+      actor,
+    });
+    const zeroA = crypto.randomUUID();
+    const zeroB = crypto.randomUUID();
+    await db.insert(agentRuns).values([
+      {
+        id: zeroA,
+        workspaceId,
+        projectId,
+        taskId,
+        status: "FAILED",
+        idempotencyKey: `t-${noQualTournament.id}-a`,
+        tournamentId: noQualTournament.id,
+        contenderId: contenders[0]!.id,
+        fitnessScore: 0,
+        efficiencyScore: 0,
+        spendCapMicros: 0,
+        estimatedCostMicros: 0,
+        actualCostMicros: 0,
+      },
+      {
+        id: zeroB,
+        workspaceId,
+        projectId,
+        taskId,
+        status: "FAILED",
+        idempotencyKey: `t-${noQualTournament.id}-b`,
+        tournamentId: noQualTournament.id,
+        contenderId: contenders[1]!.id,
+        fitnessScore: 0,
+        efficiencyScore: 0,
+        spendCapMicros: 0,
+        estimatedCostMicros: 0,
+        actualCostMicros: 0,
+      },
+    ]);
+    const noQual = await resolveTournamentByFitness(db, {
+      workspaceId,
+      tournamentId: noQualTournament.id,
+      actor,
+    });
+    assert.equal(noQual.winnerRunId, null);
+    assert.equal(noQual.resolveReason, "no_qualifying_contender");
+    assert.equal(noQual.tournament.status, "NO_QUALIFYING");
 
     const killed = await killArena(db, {
       workspaceId,

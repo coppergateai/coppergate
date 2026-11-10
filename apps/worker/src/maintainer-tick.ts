@@ -3,6 +3,8 @@
  */
 import {
   buildMaintainerReleaseTag,
+  closeFailedTasksShippedByMergedPrs,
+  listMergedArchitectureIds,
   ensureMergeConflictSignal,
   ensureShipGateHealTask,
   getInstallationForWorkspace,
@@ -38,7 +40,12 @@ import {
 } from "@coppergate/github";
 import { resolveDefaultBranchMergeFlag } from "@coppergate/scm";
 import type { Logger } from "@coppergate/telemetry";
-import { writeArchitectureTaskDone } from "./architecture-writeback.js";
+import { runSameHeadCiHealForProject } from "./same-head-heal.js";
+import {
+  reconcileArchitectureDone,
+  writeArchitectureTaskDone,
+} from "./architecture-writeback.js";
+import { runBugScoutForProject } from "./bug-scout-tick.js";
 import { runCommunityScoutForProject } from "./community-scout-tick.js";
 import { runDesignScoutForProject } from "./design-scout-tick.js";
 import { refreshPendingCiEvidence } from "./refresh-ci-evidence.js";
@@ -68,6 +75,67 @@ function shouldRecordShipGateAudit(
 
 /** Exported for unit tests. */
 export { shouldRecordShipGateAudit, SHIP_GATE_AUDIT_MIN_MS };
+
+/** Reconcile at most this often per project (GitHub API budget). */
+export const ARCHITECTURE_RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
+const lastArchitectureReconcileAt = new Map<string, number>();
+
+/**
+ * Throttled reconcile from merged PRs: flips Open rows Done (human merges +
+ * failed writebacks) and closes stale FAILED tasks whose Open ID shipped.
+ */
+async function maybeReconcileArchitectureDone(
+  db: Database,
+  log: Logger,
+  input: {
+    workspaceId: string;
+    actor: string;
+    projectId: string;
+    repoFullName: string;
+    token: string;
+    architectureRepo: string | null;
+    architecturePaths: string | null;
+  },
+): Promise<void> {
+  const now = Date.now();
+  const last = lastArchitectureReconcileAt.get(input.projectId) ?? 0;
+  if (now - last < ARCHITECTURE_RECONCILE_INTERVAL_MS) return;
+  lastArchitectureReconcileAt.set(input.projectId, now);
+  const [owner, repo] = input.repoFullName.split("/");
+  if (!owner || !repo) return;
+  try {
+    const merged = await listMergedArchitectureIds({
+      token: input.token,
+      owner,
+      repo,
+    });
+    await reconcileArchitectureDone(log, {
+      token: input.token,
+      owner,
+      repo,
+      architectureRepo: input.architectureRepo,
+      architecturePaths: input.architecturePaths,
+      listMerged: async () => merged,
+    });
+    const closed = await closeFailedTasksShippedByMergedPrs(db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      merged,
+      actor: input.actor,
+    });
+    if (closed.length > 0) {
+      log.info("closed stale FAILED tasks for shipped Open IDs", {
+        projectId: input.projectId,
+        taskIds: closed,
+      });
+    }
+  } catch (err) {
+    log.warn("architecture reconcile failed", {
+      projectId: input.projectId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 export async function runMaintainerSchedulerTick(
   db: Database,
@@ -141,6 +209,20 @@ export async function runMaintainerSchedulerTick(
 
     const policy = parseMaintainerPolicy(bound.project.maintainerPolicyJson);
     if (bound.project.autonomyLevel !== "L2") continue;
+
+    // Red CI on a delivery PR → same-head fix run now (not after ~6h timeout).
+    try {
+      await runSameHeadCiHealForProject(db, log, {
+        workspaceId: tick.workspaceId,
+        projectId: tick.projectId,
+        actor,
+      });
+    } catch (err) {
+      log.warn("same-head CI heal tick failed", {
+        projectId: tick.projectId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     if (!installation || !opts?.resolveToken || !architectureToken) continue;
 
     const token = architectureToken;
@@ -170,6 +252,29 @@ export async function runMaintainerSchedulerTick(
         error: err instanceof Error ? err.message : String(err),
       });
     }
+
+    try {
+      await runBugScoutForProject(db, log, {
+        workspaceId: tick.workspaceId,
+        project: bound.project,
+        token,
+      });
+    } catch (err) {
+      log.warn("bug scout failed", {
+        projectId: tick.projectId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    await maybeReconcileArchitectureDone(db, log, {
+      workspaceId: tick.workspaceId,
+      actor,
+      projectId: tick.projectId,
+      repoFullName: bound.repository.baseRepoFullName,
+      token,
+      architectureRepo: policy.architectureRepo,
+      architecturePaths: policy.architecturePaths,
+    });
 
     if (policy.shipRollbackOnCiFail) {
       const [ownerRb, nameRb] = bound.repository.baseRepoFullName.split("/");
@@ -354,6 +459,51 @@ export async function runMaintainerSchedulerTick(
 
     for (const c of candidates) {
       try {
+        // Preflight: a dirty PR cannot merge — arm/keep the conflict heal and
+        // back off quietly instead of a "Merge not ready" attempt every pass.
+        const pre = await getPullRequestMergeState({
+          token,
+          owner,
+          repo: name,
+          prNumber: c.prNumber,
+        }).catch(() => null);
+        const preOpen = pre != null && pre.state === "open" && !pre.merged;
+        if (
+          pre &&
+          shouldEmitMergeConflictInsteadOfReplan({
+            prOpen: preOpen,
+            merged: pre.merged,
+            mergeable: pre.mergeable,
+            mergeableState: pre.mergeableState,
+          })
+        ) {
+          await ensureMergeConflictSignal(db, {
+            workspaceId: tick.workspaceId,
+            projectId: tick.projectId,
+            actor,
+            owner,
+            repo: name,
+            prNumber: c.prNumber,
+            headRef: pre.headRef,
+            headSha: pre.headSha,
+            baseRef: pre.baseRef,
+            parentTitle: c.task.title,
+          });
+          // Maintainer event only (no audit row) — starts the retry cooldown.
+          await markAutoMerged(db, {
+            workspaceId: tick.workspaceId,
+            projectId: tick.projectId,
+            taskId: c.task.id,
+            prNumber: c.prNumber,
+            merged: false,
+            message: "Pull Request is not mergeable (dirty — merge_conflict heal armed)",
+          });
+          continue;
+        }
+        if (preOpen && pre.mergeableState === "unknown") {
+          // GitHub is still computing mergeability — try next pass.
+          continue;
+        }
         const result = await mergePullRequest({
           token,
           owner,
@@ -405,6 +555,8 @@ export async function runMaintainerSchedulerTick(
               token,
               taskTitle: c.task.title,
               prNumber: c.prNumber,
+              architectureRepo: policy.architectureRepo,
+              architecturePaths: policy.architecturePaths,
             });
           } catch (err) {
             log.warn("architecture writeback skipped", {

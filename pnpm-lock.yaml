@@ -481,6 +481,9 @@ importers:
       '@coppergate/scm':
         specifier: workspace:*
         version: link:../scm
+      '@coppergate/signals':
+        specifier: workspace:*
+        version: link:../signals
     devDependencies:
       '@coppergate/eslint-config':
         specifier: workspace:*

@@ -68,6 +68,9 @@ import {
   setTaskPrUrl,
   updateRunSkillSnapshot,
   withTemperamentGuidance,
+  buildSameHeadHealPrompt,
+  getSameHeadHealContext,
+  isSameHeadRun,
   type AgentRun,
   type Database,
   type FileWriteCheckpointBody,
@@ -79,6 +82,7 @@ import {
   submitPullRequestReview,
   type GithubDeliveryClient,
 } from "@coppergate/github";
+import { fetchFailingCheckOutput } from "./same-head-heal.js";
 import {
   DockerSandboxManager,
   LocalSandboxManager,
@@ -87,6 +91,7 @@ import {
   type SandboxManager,
 } from "@coppergate/sandbox";
 import { trackFunnelEvent, type Logger } from "@coppergate/telemetry";
+import { shouldSkipPrReviewGithubPost } from "./pr-review-checkpoint.js";
 import {
   assertDeliverySecretsRefused,
   assertLockfileSyncedWithPackageJson,
@@ -106,21 +111,19 @@ import {
   resolveGithubDelivery,
   type ResolvedGithubDelivery,
 } from "./github-delivery.js";
+import { evaluateSandboxModePolicy, type SandboxMode } from "./sandbox-mode.js";
 
-function resolveSandboxMode(): "local" | "docker" | "off" {
-  const raw = (process.env.SANDBOX_MODE ?? "local").trim().toLowerCase();
-  if (raw === "off" || raw === "0" || raw === "false") return "off";
-  if (raw === "docker" || raw === "gvisor" || raw === "docker-gvisor") {
-    return "docker";
-  }
-  return "local";
-}
-
-function createSandboxManager(
-  mode: "local" | "docker" | "off",
-): SandboxManager | null {
+function createSandboxManager(mode: SandboxMode): SandboxManager | null {
   if (mode === "off") return null;
-  if (mode === "docker") return new DockerSandboxManager();
+  if (mode === "docker") {
+    return new DockerSandboxManager({
+      image: process.env.SANDBOX_IMAGE?.trim() || undefined,
+      // SEC-037: production refuses the runc fallback unless explicitly allowed.
+      requireRunsc:
+        process.env.NODE_ENV === "production" &&
+        process.env.SANDBOX_ALLOW_RUNC !== "1",
+    });
+  }
   return new LocalSandboxManager();
 }
 
@@ -234,6 +237,25 @@ export async function executeClaimedRun(
     return "failed";
   }
 
+  // SEC-037 — production refuses host-spawn sandbox without explicit ack.
+  const sandboxPolicy = evaluateSandboxModePolicy();
+  if (!sandboxPolicy.allowed) {
+    log.error("sandbox mode refused; failing run closed", {
+      runId: run.id,
+      errorCode: sandboxPolicy.errorCode,
+    });
+    await markRunFailed(db, {
+      runId: run.id,
+      workerId,
+      errorCode: sandboxPolicy.errorCode,
+      errorMessage: sandboxPolicy.message,
+    });
+    await safeTaskTransition(db, task, "FAILED", workerId, log);
+    await maybeResolveTournamentAfterRun(db, run, workerId, log);
+    return "failed";
+  }
+  const sandboxMode = sandboxPolicy.mode;
+
   // Honor paused budgets (TASK027) — fail closed before agent work.
   try {
     await assertSufficientBudget(
@@ -339,6 +361,14 @@ export async function executeClaimedRun(
     actualCost = totalRunSpendMicros(spendLedger);
   };
 
+  // Same-head heal: fix the delivery PR on its own head (no parallel PR).
+  const sameHead = isSameHeadRun(run)
+    ? await getSameHeadHealContext(db, {
+        workspaceId: run.workspaceId,
+        runId: run.id,
+      })
+    : null;
+
   let strategy = "balanced";
   let strategyContext: string | undefined;
   let promptGuidance: string | undefined;
@@ -440,17 +470,6 @@ export async function executeClaimedRun(
       .join("\n"),
   );
 
-  const sandboxMode = resolveSandboxMode();
-  if (
-    sandboxMode === "local" &&
-    process.env.NODE_ENV === "production" &&
-    process.env.ALLOW_LOCAL_SANDBOX !== "1"
-  ) {
-    log.warn(
-      "SANDBOX_MODE=local in production — host spawn is not strong isolation; set SANDBOX_MODE=docker for gVisor/runc containers (ALLOW_LOCAL_SANDBOX=1 silences)",
-      { runId: run.id },
-    );
-  }
   const sandboxManager = createSandboxManager(sandboxMode);
   let sandbox: SandboxHandle | null = null;
   /** Captured before sandbox destroy so delivery can use real file bodies. */
@@ -579,8 +598,10 @@ export async function executeClaimedRun(
             cloneMode === "git" && deliveryResolved?.cloneUrl
               ? deliveryResolved.cloneUrl
               : `coppergate://project/${run.projectId}`;
-          const baseSha =
-            deliveryResolved?.baseSha || run.baseSha || "unknown";
+          // Same-head heal checks out the PR head, not the default-branch tip.
+          const baseSha = sameHead
+            ? run.baseSha
+            : deliveryResolved?.baseSha || run.baseSha || "unknown";
           const arenaRow = await getArenaForProject(db, {
             workspaceId: run.workspaceId,
             projectId: run.projectId,
@@ -774,6 +795,22 @@ export async function executeClaimedRun(
         });
       }
 
+      if (sameHead) {
+        const checkOutput =
+          deliveryResolved?.authToken && deliveryResolved.mode === "http"
+            ? await fetchFailingCheckOutput({
+                token: deliveryResolved.authToken,
+                owner: deliveryResolved.repo.owner,
+                repo: deliveryResolved.repo.repo,
+                checks: sameHead.failingChecks,
+              }).catch(() => null)
+            : null;
+        strategyContext = mergeArchitectureContext(
+          strategyContext,
+          buildSameHeadHealPrompt(sameHead, { checkOutput }),
+        );
+      }
+
       for await (const event of agent.run({
         runId: run.id,
         taskId: task.id,
@@ -784,6 +821,7 @@ export async function executeClaimedRun(
         allowedPaths: parseJsonArray(task.allowedPaths),
         acceptanceCriteria: parseJsonArray(task.acceptanceCriteria),
         baseSha: run.baseSha,
+        branchName: run.branchName ?? undefined,
         toolAllowlist: parseJsonArray(run.toolAllowlist),
         profileTools,
         spendCapMicros: run.spendCapMicros,
@@ -1453,26 +1491,65 @@ export async function executeClaimedRun(
       deliveryMode === "http"
         ? `https://github.com/${repo.owner}/${repo.repo}/pull/${prNumber}`
         : `https://github.com/${repo.owner}/${repo.repo}/pull/${prNumber}`;
+    const reviewBranch = `review/pr-${prNumber}`;
+    const reviewHeadSha = run.baseSha;
     const reviewBody =
       (typeof completion.reviewBody === "string" &&
         completion.reviewBody.trim()) ||
       `## Coppergate review\n\nAutomated review for task \`${task.id}\` / run \`${run.id}\`.\n`;
 
-    {
-      const cancelled = await honorCancelIfRequested(
-        "Run cancelled before PR review post",
-      );
-      if (cancelled) return cancelled;
-    }
+    // F4: resume skips GitHub COMMENT when delivery_checkpoint already exists.
+    const existingReviewCheckpoint = await getDeliveryCheckpoint(
+      db,
+      run.workspaceId,
+      run.id,
+    );
+    const skipReviewPost = shouldSkipPrReviewGithubPost(
+      existingReviewCheckpoint,
+      prNumber,
+    );
 
-    if (deliveryMode === "http" && authToken) {
-      await submitPullRequestReview({
-        token: authToken,
-        owner: repo.owner,
-        repo: repo.repo,
+    if (!skipReviewPost) {
+      {
+        const cancelled = await honorCancelIfRequested(
+          "Run cancelled before PR review post",
+        );
+        if (cancelled) return cancelled;
+      }
+
+      if (deliveryMode === "http" && authToken) {
+        await submitPullRequestReview({
+          token: authToken,
+          owner: repo.owner,
+          repo: repo.repo,
+          prNumber,
+          body: reviewBody,
+          event: "COMMENT",
+        });
+      }
+
+      // Checkpoint immediately after side effect — reaper recovers VALIDATING.
+      await persistDeliveryCheckpoint(db, {
+        workspaceId: run.workspaceId,
+        projectId: run.projectId,
+        taskId: task.id,
+        runId: run.id,
+        checkpoint: buildDeliveryCheckpoint({
+          taskId: task.id,
+          runId: run.id,
+          prUrl,
+          prNumber,
+          branchName: reviewBranch,
+          headSha: reviewHeadSha,
+          actualCostMicros: actualCost,
+          awaitLiveCi: false,
+          previewUrl: null,
+        }),
+      });
+    } else {
+      log.info("pr review checkpoint resume — skipping GitHub COMMENT", {
+        runId: run.id,
         prNumber,
-        body: reviewBody,
-        event: "COMMENT",
       });
     }
 
@@ -1481,13 +1558,15 @@ export async function executeClaimedRun(
       workspaceId: run.workspaceId,
       kind: "evidence",
       payload: {
-        message:
-          deliveryMode === "http" && authToken
+        message: skipReviewPost
+          ? "PR review resumed from delivery_checkpoint"
+          : deliveryMode === "http" && authToken
             ? "PR review comment posted"
             : "PR review prepared (fake delivery — no GitHub POST)",
         prUrl,
         prNumber,
         reviewMode: true,
+        resumedFromCheckpoint: skipReviewPost,
         repo: `${repo.owner}/${repo.repo}`,
       },
     });
@@ -1498,8 +1577,8 @@ export async function executeClaimedRun(
       taskId: task.id,
       runId: run.id,
       diff: buildDiffSummary({
-        branchName: `review/pr-${prNumber}`,
-        headSha: run.baseSha,
+        branchName: reviewBranch,
+        headSha: reviewHeadSha,
         baseSha: run.baseSha,
         filesChanged: [],
         notes: ["PR review — no code delivery"],
@@ -1509,8 +1588,8 @@ export async function executeClaimedRun(
         runId: run.id,
         prUrl,
         prNumber,
-        branchName: `review/pr-${prNumber}`,
-        headSha: run.baseSha,
+        branchName: reviewBranch,
+        headSha: reviewHeadSha,
         actualCostMicros: actualCost,
         validationPassed: true,
         filesChanged: [],
@@ -1534,8 +1613,8 @@ export async function executeClaimedRun(
     const awaiting = await markRunAwaitingReview(db, {
       runId: run.id,
       workerId,
-      branchName: `review/pr-${prNumber}`,
-      headSha: run.baseSha,
+      branchName: reviewBranch,
+      headSha: reviewHeadSha,
       prNumber,
       prUrl,
       actualCostMicros: actualCost,
@@ -1611,7 +1690,17 @@ export async function executeClaimedRun(
         created: false,
         idempotencyKey: `task:${task.id}:run:${run.id}`,
       }
-    : await github.deliverPullRequest({
+    : sameHead
+      ? await pushSameHeadDelivery(github, {
+          repo,
+          prNumber: sameHead.prNumber,
+          branchName: run.branchName ?? sameHead.headRef,
+          expectedHeadSha: run.baseSha,
+          commitMessage: `Coppergate: same-head ${sameHead.reason} heal (${sameHead.attempt}/${sameHead.maxAttempts}) — ${task.title}`,
+          files: prepared.files,
+          idempotencyKey: `task:${task.id}:run:${run.id}`,
+        })
+      : await github.deliverPullRequest({
         repo,
         branchName: completion.branchName,
         baseSha,
@@ -1922,7 +2011,11 @@ export async function executeClaimedRun(
       await markRunFailed(db, {
         runId: run.id,
         workerId,
-        errorCode: closedPr ? "pr_closed" : "delivery_error",
+        errorCode: closedPr
+          ? "pr_closed"
+          : sameHead && /branch head moved|is not open on/i.test(message)
+            ? "same_head_conflict"
+            : "delivery_error",
         errorMessage: message.slice(0, 500),
       });
     } catch (markErr) {
@@ -2105,4 +2198,17 @@ async function safeTaskTransition(
       error: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/** Same-head heal delivery — refuse clients that cannot push onto a PR head. */
+async function pushSameHeadDelivery(
+  github: GithubDeliveryClient,
+  input: Parameters<NonNullable<GithubDeliveryClient["pushToPullRequestBranch"]>>[0],
+) {
+  if (!github.pushToPullRequestBranch) {
+    throw new Error(
+      "same-head heal unsupported by this delivery client — refusing to open a parallel PR",
+    );
+  }
+  return github.pushToPullRequestBranch(input);
 }

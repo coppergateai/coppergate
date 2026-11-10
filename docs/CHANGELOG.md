@@ -4,12 +4,23 @@
 
 ### Fixes
 
+- **Same-head CI heal** — red CI on a bot delivery PR now queues a fixer run on the same task right away (not after the ~6h WAITING_CI timeout) with the failing checks and annotations in its prompt. Heal runs check out the PR head and commit onto the same branch (CAS, non-force) instead of opening a parallel PR from main; stale delivery heals use the same path. Max 2 per PR, then the timeout → replan path. See `docs/same-head-heal.md`.
+- **Open Program Done writeback closes the loop** — writeback now targets the project-bound program (`architectureRepo` / `architecturePaths`) instead of the global `ARCHITECTURE_REPO` env, and a 10-minute reconcile marks Done every Open ID cited by a merged default-branch PR (bot or human). Replan dedupe also excludes IDs from merged PRs and from any open PR citing them, so shipped or operator-claimed IDs are never re-invented. Done marking only flips the row whose ID cell matches (not rows citing the ID in Notes).
+- SEC-037: **Production local sandbox fails closed** — `NODE_ENV=production` + `SANDBOX_MODE=local` now fails runs with `sandbox_local_forbidden` (was a warning) unless `ALLOW_LOCAL_SANDBOX=1`. Self-hosters on the default local mode must set the ack or switch to `SANDBOX_MODE=docker`. See `docs/sandbox-mode-fail-closed.md`.
+- F4: PR-review durable `delivery_checkpoint` immediately after GitHub COMMENT — reclaim recovers to REVIEW_REQUIRED and skips duplicate POST. See `docs/pr-review-checkpoint.md`.
+- F2: `llm_tokens` spend idempotency — `usage_events.llm_provider_role` + unique `(run_id, role)` index so concurrent primary/fallback debits cannot double-count; `appendUsageEvent` recovers on unique races.
 - AG-018: Maintainer vision replan re-pins `defaultContenderN` to `maxTournamentN` so spawn/invent cannot drift duel width above policy (N=1 dogfood respected). See `docs/maintainer-contender-pin.md`.
 - GitHub PR delivery batches all files into a single Git Data API commit (no more N Contents-API commits with the same message).
 - Peer-only arena contenders: tournaments are same-role strategy peers (no Fixer×QA / Engineer×Reviewer duels). Spawn matrix picks primary role; meta-tournament flips strategy on the champion key; sticky cross-role pools cleared on spawn/fan-out.
 
 ### Features
 
+- SEC-037: **Hosted worker on Docker + gVisor** — Fly worker runs `SANDBOX_MODE=docker` with dockerd + runsc inside the Machine (`START_DOCKERD=1`, `/data` volume, egress firewall); sandbox image from `Dockerfile.sandbox`; containers run as the worker uid with per-sandbox caches; only exact fetch-only installs (`go mod download`, lockfile refresh) get registry egress; production refuses the runc fallback (`SANDBOX_ALLOW_RUNC=1` to override). See `docs/SECURITY_PRODUCTION.md`.
+- AG-025: Replan lean budget under $1 — when available micros fall below $1, vision replan forces `maxAutoQueue=1`; at or above $1, the policy auto-queue cap applies. Arena seating stays engineer peer-only (AG-012) at every budget. See `docs/replan-lean-budget.md`.
+- AG-024: Dual-workspace spend isolation — Coppergate and kprompt envelopes never share debit; every `estimate_reserve` and usage append asserts `workspaceId` against the project (and task) before ledger write. See `docs/dual-workspace-spend-isolation.md`.
+- AG-023: Regression bisect hard timeout — `planRegressionBisect` budget honored on sandbox exec via `execRegressionBisectPlan` + `hardDeadlineMs`; signal body hints for good/bad/repro. See `docs/regression-bisect-timeout.md`.
+- AG-040: Design scout → Open Program rows — opt-in `designScout` Playwright overflow findings append `| Open | P-N |` under Design scout section (fp dedup); Settings toggle; GH issues remain optional. See `docs/design-scout-open-program.md`.
+- AG-037: Continuous bug scout → Open Program rows — opt-in `bugScout` maintainer policy scans FAILED runs + tip CI evidence (check-run annotations when present), appends `| Open | AG-N |` under Bug scout section (fingerprint dedup; skips ship-gate/merge_conflict/stale_delivery). See `docs/bug-scout-open-program.md`.
 - AG-036: Behind delivery auto-update — accept-ready + strict-behind PRs get GitHub `update-branch` (board drain + auto-merge path); update conflict arms `merge_conflict`; Arena labels REVIEW as Awaiting merge. See `docs/behind-delivery-update.md`.
 - AG-022: Docs-drift heuristic (`detectDocsDrift`) → optional Arena attention and calm Mission Control rows — not Spend License bypass. See `docs/docs-drift-attention.md`.
 - AG-021: Flake cooldown wire — `detectFlakePattern` gates `ci_failure` auto-arm, Evidence Retry, and worker execute so oscillating checks do not thrash spend. See `docs/flake-cooldown.md`.

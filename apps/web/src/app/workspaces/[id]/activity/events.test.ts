@@ -48,6 +48,21 @@ describe("activity events", () => {
     );
   });
 
+  it("summarizes fail-closed no_qualifying resolve", () => {
+    assert.match(
+      summaryFor(
+        "tournament.resolve",
+        {
+          winnerRunId: null,
+          mechanism: "efficiency_payoff",
+          resolveReason: "no_qualifying_contender",
+        },
+        1,
+      ) ?? "",
+      /No qualifying contender/,
+    );
+  });
+
   it("groups tournament create/fanout/resolve under one execution", () => {
     const tid = "tourn-1";
     const groups = groupActivityEvents([
@@ -160,7 +175,7 @@ describe("activity events", () => {
     assert.equal(groups.length, 1);
     assert.equal(groups[0]!.count, 2);
     assert.match(groups[0]!.technicalLabel, /×2/);
-    assert.match(groups[0]!.summary ?? "", /2 candidates/);
+    assert.match(groups[0]!.summary ?? "", /2 contenders/);
   });
 
   it("collapses consecutive fitness.score storms", () => {

@@ -32,8 +32,9 @@ export function MarketingFooter() {
               Autonomy under contract. Only what&apos;s on the program ships.
             </p>
             <p className={styles.footerNote}>
-              Coppergate is built by Coppergate — and ships adjacent open-source
-              pilots like ACPP and kprompt.
+              Experimental and under active dogfood — not a finished product yet.
+              Built by Coppergate; adjacent open-source pilots include ACPP and
+              kprompt.
             </p>
             <a className={styles.footerEmail} href="mailto:hello@coppergate.ai">
               hello@coppergate.ai

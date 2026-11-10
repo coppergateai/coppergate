@@ -71,12 +71,18 @@ import { getProjectForWorkspace } from "./projects.js";
 import { maintainerContenderPinN } from "./maintainer-contender-pin.js";
 import { openTaskCountsAsBusyForBacklog } from "./ship-gate-heal-policy.js";
 import { fetchArchitectureBacklogMarkdownResult } from "./architecture-program-fetch.js";
+import { listMergedArchitectureIds } from "./architecture-merged.js";
 
 export {
   DEFAULT_ARCHITECTURE_PATHS,
   fetchArchitectureBacklogMarkdown,
   fetchArchitectureBacklogMarkdownResult,
+  resolveArchitectureBinding,
 } from "./architecture-program-fetch.js";
+export {
+  closeFailedTasksShippedByMergedPrs,
+  listMergedArchitectureIds,
+} from "./architecture-merged.js";
 
 /** Soft buffer under a typical OpenAI org $10/mo hard cap (BYOK dogfood). */
 export const DEFAULT_MONTHLY_BUDGET_MICROS = 8_000_000;
@@ -111,6 +117,9 @@ export const ARCHITECTURE_ID_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 /** Below this available project budget, skip meta-tournament arming (spend guard). */
 export const LEAN_ROSTER_AVAILABLE_MICROS = 2_000_000;
 
+/** Below $1 available, vision replan caps auto-queue to 1 and uses lean roster (AG-025). */
+export const REPLAN_LEAN_BUDGET_MICROS = 1_000_000;
+
 /**
  * Minimal spend-safe arena roster — peer seats of engineer only.
  * Reviewer remains a catalog profile (critic/review path), not a duel seat.
@@ -119,12 +128,28 @@ export const LEAN_ARENA_PROFILE_KEYS = ["engineer"] as const;
 
 /**
  * Arena seating keys from remaining project micros.
- * Always peer-primary engineer — FULL_ARENA_PROFILE_KEYS is spawn catalog only.
+ * Always peer-primary engineer (AG-012 peer-only seating) — at any budget, so
+ * the AG-025 under-$1 lean roster holds by construction.
+ * FULL_ARENA_PROFILE_KEYS is spawn catalog only.
  */
 export function rosterKeysForAvailableBudget(
   _availableMicros: number,
 ): string[] {
   return [...LEAN_ARENA_PROFILE_KEYS];
+}
+
+/** Effective replan auto-queue cap from residual budget (AG-025). */
+export function maxAutoQueueForReplan(input: {
+  availableMicros: number;
+  policyMaxAutoQueuePerReplan: number;
+  override?: number;
+}): number {
+  const raw = input.override ?? input.policyMaxAutoQueuePerReplan;
+  const capped = Math.max(1, Math.min(5, Math.floor(raw)));
+  if (input.availableMicros < REPLAN_LEAN_BUDGET_MICROS) {
+    return 1;
+  }
+  return capped;
 }
 
 /**
@@ -208,6 +233,15 @@ export type MaintainerPolicy = {
    * After design scout creates issues, auto-import up to N (0 = create-only).
    */
   designScoutAutoImportMax: number;
+  /**
+   * Periodically scan FAILED runs + CI log evidence and append Open rows
+   * to the bound Open Program markdown (AG-037).
+   */
+  bugScout: boolean;
+  bugScoutIntervalHours: number;
+  bugScoutMaxPerRun: number;
+  /** How far back to scan FAILED runs for bug evidence. */
+  bugScoutLookbackHours: number;
   /** When true, open a revert PR if a recent auto-merge's checks go red. */
   shipRollbackOnCiFail: boolean;
   /** When true, enable multi-repo + coordinated PRs for product stacks. */
@@ -253,6 +287,10 @@ export const DEFAULT_MAINTAINER_POLICY: MaintainerPolicy = {
   designScoutMaxPerRun: 2,
   designScoutBaseUrl: null,
   designScoutAutoImportMax: 0,
+  bugScout: false,
+  bugScoutIntervalHours: 12,
+  bugScoutMaxPerRun: 2,
+  bugScoutLookbackHours: 48,
   shipRollbackOnCiFail: true,
   coordinatedMultiRepo: false,
   allowedSignalProviders: [
@@ -432,6 +470,24 @@ export function parseMaintainerPolicy(
         v.designScoutAutoImportMax >= 0
           ? Math.min(5, Math.floor(v.designScoutAutoImportMax))
           : DEFAULT_MAINTAINER_POLICY.designScoutAutoImportMax,
+      bugScout:
+        typeof v.bugScout === "boolean"
+          ? v.bugScout
+          : DEFAULT_MAINTAINER_POLICY.bugScout,
+      bugScoutIntervalHours:
+        typeof v.bugScoutIntervalHours === "number" &&
+        v.bugScoutIntervalHours >= 1
+          ? Math.min(168, Math.floor(v.bugScoutIntervalHours))
+          : DEFAULT_MAINTAINER_POLICY.bugScoutIntervalHours,
+      bugScoutMaxPerRun:
+        typeof v.bugScoutMaxPerRun === "number" && v.bugScoutMaxPerRun >= 0
+          ? Math.min(5, Math.floor(v.bugScoutMaxPerRun))
+          : DEFAULT_MAINTAINER_POLICY.bugScoutMaxPerRun,
+      bugScoutLookbackHours:
+        typeof v.bugScoutLookbackHours === "number" &&
+        v.bugScoutLookbackHours >= 1
+          ? Math.min(168, Math.floor(v.bugScoutLookbackHours))
+          : DEFAULT_MAINTAINER_POLICY.bugScoutLookbackHours,
       shipRollbackOnCiFail:
         typeof v.shipRollbackOnCiFail === "boolean"
           ? v.shipRollbackOnCiFail
@@ -467,10 +523,24 @@ export function selectAutoAcceptRun<
     status?: string | null;
     prNumber?: number | null;
     headSha?: string | null;
+    idempotencyKey?: string | null;
   },
 >(runs: T[]): T | null {
   if (runs.length === 0) return null;
-  const winner = runs.find((r) => r.tournamentResult === "WINNER");
+  // Same-head heal supersedes the earlier delivery (incl. a tournament WINNER)
+  // on the same PR — the newest same-head run is the one that ships.
+  const latest = runs[0];
+  if (
+    latest &&
+    (latest.idempotencyKey ?? "").startsWith("same_head:") &&
+    latest.status !== "FAILED" &&
+    latest.status !== "CANCELLED"
+  ) {
+    return latest;
+  }
+  const winner = runs.find(
+    (r) => r.tournamentResult === "WINNER" && r.status !== "FAILED",
+  );
   if (winner) return winner;
   const inTournament = runs.some((r) => r.tournamentId != null);
   if (!inTournament) return runs[0] ?? null;
@@ -2335,8 +2405,26 @@ export async function runVisionReplan(
   const policy = parseMaintainerPolicy(project?.maintainerPolicyJson);
   const autoQueue =
     input.autoQueue ?? policy.autoQueueReplanTasks;
-  const maxAutoQueue =
-    input.maxAutoQueue ?? policy.maxAutoQueuePerReplan;
+
+  let replanAvailableMicros = Number.POSITIVE_INFINITY;
+  try {
+    const spend = await getProjectSpendSummary(
+      db,
+      input.workspaceId,
+      input.projectId,
+    );
+    replanAvailableMicros = spend.availableMicros;
+  } catch {
+    /* lean replan when spend unknown */
+    replanAvailableMicros = 0;
+  }
+  const maxAutoQueue = maxAutoQueueForReplan({
+    availableMicros: replanAvailableMicros,
+    policyMaxAutoQueuePerReplan: policy.maxAutoQueuePerReplan,
+    override: input.maxAutoQueue,
+  });
+  const leanReplan =
+    replanAvailableMicros < REPLAN_LEAN_BUDGET_MICROS;
 
   // Primary-only invent: archive / secondary product shells stay quiet.
   if (
@@ -2522,7 +2610,7 @@ export async function runVisionReplan(
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       actor: input.actor,
-      profileKeys: rosterKeysForAvailableBudget(Number.POSITIVE_INFINITY),
+      profileKeys: rosterKeysForAvailableBudget(replanAvailableMicros),
       seatCount: pinN,
       policyMaxContenderN: pinN,
     });
@@ -2597,6 +2685,11 @@ export async function runVisionReplan(
       taskCount,
       queued,
       autoQueue,
+      maxAutoQueue,
+      leanReplan,
+      availableMicros: Number.isFinite(replanAvailableMicros)
+        ? replanAvailableMicros
+        : null,
       architectureId: archTask.id,
       architectureTitle: archTask.title.slice(0, 160),
     },
@@ -2613,6 +2706,11 @@ export async function runVisionReplan(
       briefId: brief.id,
       taskCount,
       queued,
+      maxAutoQueue,
+      leanReplan,
+      availableMicros: Number.isFinite(replanAvailableMicros)
+        ? replanAvailableMicros
+        : null,
       architectureId: archTask.id,
       architectureTitle: archTask.title.slice(0, 160),
     },
@@ -2905,7 +3003,23 @@ export async function getWorkspaceMaintainerRollup(
 }
 
 /** GitHub branch protection / review gate — do not retry merge every tick. */
+/**
+ * Required check not reported (yet) on the current head — e.g. right after
+ * update-branch. Transient: retry after cooldown, never a sticky block.
+ */
+export function isPendingRequiredCheck(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("required status check") &&
+    (m.includes("is expected") ||
+      m.includes("in progress") ||
+      m.includes("pending") ||
+      m.includes("waiting"))
+  );
+}
+
 export function isMergeProtectionBlock(message: string): boolean {
+  if (isPendingRequiredCheck(message)) return false;
   const m = message.toLowerCase();
   return (
     m.includes("approving review") ||
@@ -2936,6 +3050,7 @@ export function isTerminalMergeSkip(message: string): boolean {
 export function isTransientNotMergeable(message: string): boolean {
   const m = message.toLowerCase();
   return (
+    isPendingRequiredCheck(message) ||
     m.includes("not mergeable") ||
     m.includes("is not mergeable") ||
     m.includes("merge conflict") ||
@@ -3153,15 +3268,20 @@ export async function listInFlightArchitectureIds(
 
   const token = input.architectureToken?.trim();
   if (token) {
+    let owner: string | undefined;
+    let name: string | undefined;
     try {
       const bound = await getProjectForWorkspace(
         db,
         input.workspaceId,
         input.projectId,
       );
-      const full = bound?.repository.baseRepoFullName;
-      const [owner, name] = full?.split("/") ?? [];
-      if (owner && name) {
+      [owner, name] = bound?.repository.baseRepoFullName.split("/") ?? [];
+    } catch {
+      /* best-effort — task titles alone still dedupe the board */
+    }
+    if (owner && name) {
+      try {
         const res = await fetch(
           `https://api.github.com/repos/${owner}/${name}/pulls?state=open&per_page=50`,
           {
@@ -3174,28 +3294,29 @@ export async function listInFlightArchitectureIds(
           },
         );
         if (res.ok) {
-          const rows = (await res.json()) as Array<{
-            title?: string;
-            head?: { ref?: string };
-            user?: { login?: string; type?: string };
-          }>;
+          const rows = (await res.json()) as Array<{ title?: string }>;
+          // Any open PR citing an Open ID claims it — bot or human — so the
+          // arena never builds the same ID in parallel with an operator PR.
           for (const pr of rows) {
-            const title = pr.title ?? "";
-            const head = pr.head?.ref ?? "";
-            const login = pr.user?.login ?? "";
-            const coppergateOwned =
-              /^coppergate:/i.test(title) ||
-              head.startsWith("coppergate/") ||
-              head.startsWith("cg/") ||
-              /coppergate/i.test(login);
-            if (!coppergateOwned) continue;
-            const id = extractArchitectureIdFromTitle(title);
+            const id = extractArchitectureIdFromTitle(pr.title);
             if (id) ids.add(id);
           }
         }
+      } catch {
+        /* best-effort — task titles alone still dedupe the board */
       }
-    } catch {
-      /* best-effort — task titles alone still dedupe the board */
+      // Merged PRs ship the ID even when architecture writeback has not
+      // flipped the row yet — never re-invent shipped work.
+      try {
+        const merged = await listMergedArchitectureIds({
+          token,
+          owner,
+          repo: name,
+        });
+        for (const id of merged.keys()) ids.add(id);
+      } catch {
+        /* best-effort — open PRs + cooldown still dedupe */
+      }
     }
   }
 

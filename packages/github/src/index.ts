@@ -78,6 +78,7 @@ export {
   type DeliverPrResult,
   type FileChange,
   type GithubDeliveryClient,
+  type PushToPrBranchInput,
   type RepoRef,
 } from "./delivery.js";
 export {
@@ -85,6 +86,7 @@ export {
   commitCheckSuitesShipGate,
   countOpenShipRollbackPrs,
   fetchCommitCheckEvidence,
+  fetchCheckRunAnnotationSnippet,
   getRepoDefaultBranchHead,
   mapCheckRunPayload,
   mapCheckSuitePayload,

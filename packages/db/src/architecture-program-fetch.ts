@@ -83,6 +83,19 @@ function resolveRepoAndPaths(opts: FetchOpts): {
 }
 
 /**
+ * Resolve the Open Program binding the same way fetch does: per-project
+ * repo/paths first, then ARCHITECTURE_REPO / ARCHITECTURE_PATHS env.
+ * Writers (writeback, reconcile) must use this so they touch the file replan reads.
+ */
+export function resolveArchitectureBinding(opts: {
+  repo?: string | null;
+  paths?: string | null;
+}): { repo: string; owner: string; name: string; paths: string[] } | null {
+  const resolved = resolveRepoAndPaths(opts);
+  return "error" in resolved ? null : resolved;
+}
+
+/**
  * Classify fetch outcomes when no markdown body was collected (AG-020).
  * Prefer auth failures over 404 over network over empty.
  */

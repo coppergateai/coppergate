@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  formatNoQualifyingReason,
   formatPayoffMetrics,
   formatPromoteReason,
   formatUsdMicros,
@@ -72,5 +73,13 @@ describe("payoff-display", () => {
   it("formats tiny USD micros", () => {
     assert.equal(formatUsdMicros(1_000), "$0.0010");
     assert.equal(formatUsdMicros(0), "$0");
+  });
+
+  it("formats no-qualifying fail-closed narrative", () => {
+    assert.match(
+      formatNoQualifyingReason(),
+      /No qualifying contender: max\(e\)≤0/,
+    );
+    assert.match(formatNoQualifyingReason(), /α=0\.25/);
   });
 });

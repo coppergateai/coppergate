@@ -441,7 +441,7 @@ export const tournaments = pgTable(
       .references(() => tasks.id, { onDelete: "cascade" }),
     n: integer("n").notNull().default(2),
     winnerRunId: uuid("winner_run_id"),
-    /** OPEN | SCORING | RESOLVED | CANCELLED */
+    /** OPEN | SCORING | RESOLVED | NO_QUALIFYING | CANCELLED */
     status: text("status").notNull().default("OPEN"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -648,12 +648,22 @@ export const usageEvents = pgTable(
     provider: text("provider"),
     model: text("model"),
     meta: text("meta"),
+    /**
+     * Denormalized AG-016 role for llm_tokens idempotency:
+     * primary | fallback | legacy. Null for non-llm kinds.
+     */
+    llmProviderRole: text("llm_provider_role"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
     index("usage_events_project_created_idx").on(t.projectId, t.createdAt),
+    uniqueIndex("usage_events_llm_tokens_run_role_uidx")
+      .on(t.runId, t.llmProviderRole)
+      .where(
+        sql`${t.kind} = 'llm_tokens' AND ${t.runId} IS NOT NULL AND ${t.llmProviderRole} IS NOT NULL`,
+      ),
   ],
 );
 
@@ -1049,7 +1059,7 @@ export const maintainerEvents = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    /** tick | auto_accept | auto_merge | release | self_improve | meta_tournament | replan | triage | community | design_scout */
+    /** tick | auto_accept | auto_merge | release | self_improve | meta_tournament | replan | triage | community | design_scout | bug_scout */
     kind: text("kind").notNull(),
     payload: text("payload").notNull().default("{}"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -1282,11 +1292,18 @@ export type MaintainerEventKind =
   | "replan"
   | "triage"
   | "community"
+  | "design_scout"
+  | "bug_scout"
   | "period_roll";
 
 export type ArenaStatus = "ARMED" | "RUNNING" | "KILLED" | "PAUSED";
 export type ContenderStatus = "ACTIVE" | "ELIMINATED";
-export type TournamentStatus = "OPEN" | "SCORING" | "RESOLVED" | "CANCELLED";
+export type TournamentStatus =
+  | "OPEN"
+  | "SCORING"
+  | "RESOLVED"
+  | "NO_QUALIFYING"
+  | "CANCELLED";
 export type TournamentResult = "WINNER" | "LOSER" | "CANCELLED";
 
 export type AutonomyLevel = "L0" | "L1" | "L2";

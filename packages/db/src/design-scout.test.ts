@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  DESIGN_SCOUT_SECTION_HEADING,
+  appendDesignScoutOpenRowsToMarkdown,
+  designScoutFingerprint,
   formatDesignIssueBody,
   proposeDesignIssues,
+  proposeDesignOpenRows,
   resolveDesignScoutRoutes,
   shotHasDesignFinding,
   type DesignShot,
@@ -177,5 +181,43 @@ describe("design scout propose", () => {
     });
     assert.ok(withAuth.some((r) => r.name === "agents"));
     assert.ok(withAuth.some((r) => r.path === "/workspaces/ws-1/agents"));
+  });
+
+  it("proposeDesignOpenRows allocates P-N with fingerprint dedup", () => {
+    const md = `
+## Product
+
+| Status | ID | Title | Notes |
+| --- | --- | --- | --- |
+| Done | P-154 | Catalog SoT | ok |
+`;
+    const shots = [
+      shot({
+        name: "landing",
+        url: "https://www.coppergate.ai/",
+        path: "/",
+        metrics: {
+          client: 1440,
+          scrollW: 1600,
+          hScroll: true,
+          mainW: 1200,
+          overflowRight: [],
+          title: "Coppergate",
+        },
+      }),
+    ];
+    const rows = proposeDesignOpenRows({ markdown: md, shots, max: 2 });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.id, "P-155");
+    assert.equal(rows[0]!.fingerprint, designScoutFingerprint("/"));
+    assert.match(rows[0]!.notes, /design-scout:fp=/);
+
+    const { content, changed } = appendDesignScoutOpenRowsToMarkdown(md, rows);
+    assert.equal(changed, true);
+    assert.ok(content.includes(DESIGN_SCOUT_SECTION_HEADING));
+    assert.match(content, /\| Open \| P-155 \|/);
+
+    const again = proposeDesignOpenRows({ markdown: content, shots, max: 2 });
+    assert.equal(again.length, 0);
   });
 });

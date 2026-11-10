@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  appendOpenProgramRows,
   architectureIdsFromTitles,
   extractArchitectureIdFromTitle,
   markArchitectureIdDoneInMarkdown,
+  nextArchitectureId,
   parseArchitectureOpenTasks,
   parseArchitectureProgramRows,
   pickNextArchitectureTask,
@@ -86,5 +88,33 @@ describe("architecture-backlog", () => {
     assert.equal(changed, true);
     assert.match(content, /\|\s*Done\s*\|/);
     assert.equal(extractArchitectureIdFromTitle("P-007: Refresh models"), "P-007");
+  });
+
+  it("writeback flips only the row whose ID cell matches", () => {
+    const md = [
+      "| Status | ID | Title | Notes |",
+      "| Open | AG-012 | Lean roster | gate |",
+      "| Open | AG-038 | Fix ops_kick | Force-fail zombie (AG-012 Done) |",
+    ].join("\n");
+    const { content, changed } = markArchitectureIdDoneInMarkdown(md, "AG-012");
+    assert.equal(changed, true);
+    assert.match(content, /\| Done \| AG-012 \|/);
+    assert.match(content, /\| Open \| AG-038 \|/);
+
+    const none = markArchitectureIdDoneInMarkdown(
+      "| Open | AG-038 | x | cites AG-012 |",
+      "AG-012",
+    );
+    assert.equal(none.changed, false);
+  });
+
+  it("nextArchitectureId and appendOpenProgramRows", () => {
+    assert.equal(nextArchitectureId("| Open | AG-009 | x | y |", "AG"), "AG-010");
+    const { content, changed } = appendOpenProgramRows("# Doc\n", [
+      { id: "AG-010", title: "Bug fix", notes: "evidence" },
+    ]);
+    assert.equal(changed, true);
+    assert.match(content, /## Bug scout \(continuous\)/);
+    assert.match(content, /\| Open \| AG-010 \| Bug fix \| evidence \|/);
   });
 });

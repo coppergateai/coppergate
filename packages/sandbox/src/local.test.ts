@@ -45,4 +45,24 @@ describe("LocalSandboxManager", () => {
         err instanceof SandboxPolicyError && err.code === "destroyed",
     );
   });
+
+  it("AG-023 rejects exec when hardDeadlineMs elapsed", async () => {
+    const mgr = new LocalSandboxManager();
+    const sandbox = await mgr.create({
+      runId: "run-deadline",
+      workspaceId: "ws-1",
+      repoUrl: "https://github.com/example/app.git",
+      baseSha: "deadbeefcafebabe",
+    });
+    await assert.rejects(
+      () =>
+        mgr.exec(sandbox, ["echo", "late"], {
+          timeoutMs: 60_000,
+          hardDeadlineMs: Date.now() - 1,
+        }),
+      (err: unknown) =>
+        err instanceof SandboxPolicyError && err.code === "timeout",
+    );
+    await mgr.destroy(sandbox);
+  });
 });

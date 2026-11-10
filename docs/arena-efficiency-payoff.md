@@ -1,6 +1,6 @@
 # Arena efficiency payoff (P-140)
 
-Tournament resolve already ranks by efficiency `e = f / spend^α` (default `α=0.25`) with CI fail forcing `e=0`. P-140 surfaces that math on the Arena board so selection is readable without opening the task tournament panel.
+Tournament resolve ranks by efficiency `e = f / spend^α` (default `α=0.25`) with CI fail forcing `e=0`. Promote is **fail-closed**: when `max(e) ≤ 0` the tournament ends `NO_QUALIFYING` (no lex-UUID winner) — see [`mechanism-fail-closed.md`](./mechanism-fail-closed.md). P-140 surfaces that math on the Arena board so selection is readable without opening the task tournament panel.
 
 ## Surfaces
 

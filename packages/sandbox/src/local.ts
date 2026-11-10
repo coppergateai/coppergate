@@ -4,6 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { assertSandboxCommandArgs } from "./command-policy.js";
+import {
+  authenticatedCloneUrl,
+  scrubOriginCredentials,
+} from "./clone-credentials.js";
+import { resolveSandboxExecTimeoutMs } from "./exec-timeout.js";
 import { DEFAULT_LIMITS, SandboxPolicyError } from "./policy.js";
 import type {
   CreateSandboxInput,
@@ -127,11 +132,14 @@ export class LocalSandboxManager implements SandboxManager {
         `git clone failed: ${clone.stderr.slice(0, 400)}`,
       );
     }
+    await scrubOriginCredentials(input.repoUrl, (cmd) =>
+      runCommand(cmd, workdir, 30_000),
+    );
 
     const sha = input.baseSha.trim();
     if (sha && sha !== "unknown" && !/^0+$/.test(sha)) {
       const fetch = await runCommand(
-        ["git", "fetch", "--depth", "1", "origin", sha],
+        ["git", "fetch", "--depth", "1", url, sha],
         workdir,
         60_000,
       );
@@ -167,7 +175,7 @@ export class LocalSandboxManager implements SandboxManager {
   async exec(
     sandbox: SandboxHandle,
     command: string[],
-    options?: { timeoutMs?: number },
+    options?: { timeoutMs?: number; hardDeadlineMs?: number },
   ): Promise<ExecResult> {
     const active = this.requireActive(sandbox.id);
     if (!command.length) {
@@ -178,7 +186,7 @@ export class LocalSandboxManager implements SandboxManager {
       prodWritesEnabled: active.prodWritesEnabled,
     });
 
-    const timeoutMs = options?.timeoutMs ?? DEFAULT_LIMITS.wallClockMs;
+    const timeoutMs = resolveSandboxExecTimeoutMs(options);
     return runCommand(command, active.workdir, timeoutMs);
   }
 
@@ -217,27 +225,6 @@ export class LocalSandboxManager implements SandboxManager {
 
 function redactRepoUrl(url: string): string {
   return url.replace(/https:\/\/[^@]+@/i, "https://***@");
-}
-
-function authenticatedCloneUrl(
-  repoUrl: string,
-  token: string | null | undefined,
-): string {
-  const trimmed = repoUrl.trim();
-  if (!token?.trim()) return trimmed;
-  if (trimmed.startsWith("https://github.com/")) {
-    return trimmed.replace(
-      "https://github.com/",
-      `https://x-access-token:${encodeURIComponent(token)}@github.com/`,
-    );
-  }
-  if (trimmed.startsWith("https://")) {
-    return trimmed.replace(
-      "https://",
-      `https://oauth2:${encodeURIComponent(token)}@`,
-    );
-  }
-  return trimmed;
 }
 
 function killProcessTree(child: { pid?: number; kill: (sig?: NodeJS.Signals) => boolean }): void {

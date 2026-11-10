@@ -544,12 +544,15 @@ export async function getWorkspaceMissionControl(
       if (seenShipGate.has(dedupeKey)) continue;
       seenShipGate.add(dedupeKey);
       const pending = reason === "default_branch_ci_pending";
+      const rollback = reason === "open_ship_rollback";
       attention.push({
         id: `ship-gate-${dedupeKey}`,
         kind: "ship_gate_halted",
         title: pending
           ? "Auto-merge waiting on tip CI"
-          : "Auto-merge halted — tip CI red",
+          : rollback
+            ? "Auto-merge halted — ship rollback open"
+            : "Auto-merge halted — tip CI red",
         detail: (cta ?? "Fix default-branch CI before auto-merge resumes").slice(
           0,
           140,
@@ -558,7 +561,7 @@ export async function getWorkspaceMissionControl(
           ? `/workspaces/${workspaceId}/projects/${projectId}`
           : `/workspaces/${workspaceId}/activity`,
         priority: "high",
-        ctaLabel: "Fix main CI",
+        ctaLabel: pending ? "View project" : rollback ? "Review rollback" : "Fix main CI",
       });
     }
   }
