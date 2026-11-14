@@ -8,6 +8,8 @@ Mission Control (`/workspaces/[id]`) surfaces what needs human intervention now.
 
 ### Lead attention
 
+**Docs drift (AG-022):** normal-priority `docs_drift` rows are advisory (API changed without docs) — they do not inflate Arena **needs attention** or bypass Spend License. See `docs/docs-drift-attention.md`.
+
 Attention rows sort with this crisis order:
 
 1. **Concurrency** — more in-flight runs than the plan allows; primary CTA is Pause Arena.

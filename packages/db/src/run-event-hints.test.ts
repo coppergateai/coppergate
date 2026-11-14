@@ -33,9 +33,21 @@ describe("run progress hints (AG-013)", () => {
       {
         codingPathLine: "Coding path: cursor_local",
         failoverLine: "Failover (provider quota): exhausted",
+        optionalAttentionLine: null,
       },
       "running",
     );
     assert.equal(merged, "Failover (provider quota): exhausted");
+  });
+
+  it("AG-022 surfaces docs_drift on awaitingCi rows", () => {
+    const hint = runProgressHintFromPayload({
+      code: "docs_drift",
+      message: "Docs drift · API paths changed without docs (src/api/x.ts)",
+      optional: true,
+    });
+    assert.ok(hint.optionalAttentionLine?.includes("Docs drift"));
+    const merged = mergeRunActivityLine("", hint, "awaitingCi");
+    assert.match(merged, /Docs drift/);
   });
 });
