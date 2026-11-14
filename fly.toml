@@ -27,15 +27,18 @@ primary_region = "iad"
   PLAYWRIGHT_BROWSERS_PATH = "/ms-playwright"
 
 # Docker data-root (images + layers). One volume per Machine.
+# Keep a single Machine (no standby) so we only pay for one volume.
+# 10GB is enough for dockerd + one sandbox image cache; volumes only grow, never shrink.
 [mounts]
   source = "coppergate_worker_docker"
   destination = "/data"
-  initial_size = "20gb"
+  initial_size = "10gb"
 
 [processes]
   worker = "pnpm start"
 
+# Cost: shared-cpu-2x @ 2GB ≈ $13.39/mo always-on (iad). Extra RAM was the bill spike.
 [[vm]]
   size = "shared-cpu-2x"
-  memory = "4096mb"
+  memory = "2048mb"
   processes = ["worker"]
